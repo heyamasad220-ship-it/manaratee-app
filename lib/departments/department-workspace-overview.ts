@@ -7,9 +7,6 @@ import {
   loadDepartmentOpenPrograms,
 } from "@/lib/departments/department-active-programs"
 import { summarizeDepartmentStaff } from "@/lib/departments/department-list-summary"
-import { roundMoney } from "@/lib/departments/department-period-helpers"
-import { fetchDepartmentPayrollList } from "@/lib/departments/department-payroll"
-import { fetchDepartmentStudentPaymentsMatrix } from "@/lib/departments/department-student-payments"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { createClient } from "@/lib/supabase/server"
 
@@ -17,9 +14,6 @@ export type DepartmentWorkspaceOverview = {
   studentsCount: number
   staffCount: number
   directorName: string | null
-  revenue: number
-  expenses: number
-  net: number
   upcomingEventsCount: number
   /** True when at least one draft/active/paused year exists. */
   hasOpenYears: boolean
@@ -39,7 +33,7 @@ const ACTIVE_ENROLLMENT_STATUSES = [
 
 /**
  * KPI strip for the department Overview tab.
- * Participants / revenue use **open** years only (draft / active / paused).
+ * Participants use **open** years only (draft / active / paused).
  * Closed years stay on cards and operating tabs for reports, but do not inflate
  * the live Overview KPIs.
  */
@@ -56,9 +50,6 @@ export async function fetchDepartmentWorkspaceOverview(
     studentsCount: 0,
     staffCount: 0,
     directorName: null,
-    revenue: 0,
-    expenses: 0,
-    net: 0,
     upcomingEventsCount: 0,
     hasOpenYears: false,
   }
@@ -66,15 +57,13 @@ export async function fetchDepartmentWorkspaceOverview(
 
   const supabase = await createClient()
 
-  const [detail, openPrograms, tuition, payroll] = await Promise.all([
+  const [detail, openPrograms] = await Promise.all([
     fetchDepartmentDetail(departmentId),
     loadDepartmentOpenPrograms(organizationId, departmentId).then((rows) =>
       rows.filter((row) =>
         (DEPARTMENT_OPEN_PROGRAM_STATUSES as readonly string[]).includes(row.status)
       )
     ),
-    fetchDepartmentStudentPaymentsMatrix(departmentId, { openYearsOnly: true }),
-    fetchDepartmentPayrollList(departmentId, { scope: "all-approved-for-budget" }),
   ])
 
   // Prefer counting enrollments on open years only (not closed).
@@ -107,22 +96,12 @@ export async function fetchDepartmentWorkspaceOverview(
     studentsCount = keys.size
   }
 
-  // Fallback if payments matrix is needed for revenue only
   const staffCount = detail?.staff.length ?? 0
   const directorName = await loadDepartmentDirectorName(
     supabase,
     organizationId,
     departmentId
   )
-  const revenue = roundMoney(
-    tuition.rows.reduce((sum, row) => sum + Number(row.received || 0), 0)
-  )
-  const expenses = roundMoney(
-    payroll.rows
-      .filter((row) => row.status === "approved")
-      .reduce((sum, row) => sum + Number(row.amount || 0), 0)
-  )
-  const net = roundMoney(revenue - expenses)
 
   let upcomingEventsCount = 0
   const { data: events, error } = await supabase
@@ -140,9 +119,6 @@ export async function fetchDepartmentWorkspaceOverview(
     studentsCount,
     staffCount,
     directorName,
-    revenue,
-    expenses,
-    net,
     upcomingEventsCount,
     hasOpenYears: openProgramIds.length > 0,
   }

@@ -8,12 +8,14 @@ import {
 } from "@/components/programs/programs-attendance-waitlist-report-panels"
 import { ProgramsStaffSubnav } from "@/components/programs/programs-staff-subnav"
 import { EVENT_MANAGEMENT_CHILDCARE_REPORTS_PATH } from "@/lib/events/event-management-reports-path"
+import { redirectOrgWideProgramPagesForDepartmentHead } from "@/lib/programs/program-access"
 
 export default async function ProgramsReportsPage({
   searchParams,
 }: {
   searchParams: Promise<{ tab?: string | string[] }>
 }) {
+  await redirectOrgWideProgramPagesForDepartmentHead()
   const resolved = await searchParams
   const tabRaw = Array.isArray(resolved.tab) ? resolved.tab[0] : resolved.tab
   const tab = (tabRaw || "").trim().toLowerCase()
@@ -35,6 +37,13 @@ export default async function ProgramsReportsPage({
   }
   if (tab === "year-comparison" || tab === "growth" || tab === "year-over-year") {
     redirect("/programs/reports/year-comparison")
+  }
+  if (
+    tab === "camp-enrollment" ||
+    tab === "camp-families" ||
+    tab === "camps"
+  ) {
+    redirect("/programs/reports/camp-enrollment")
   }
   if (tab === "tuition-plans" || tab === "payment-summary") {
     redirect("/programs/reports/tuition-plans")

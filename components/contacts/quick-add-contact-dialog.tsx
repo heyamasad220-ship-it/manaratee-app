@@ -35,6 +35,8 @@ export type QuickAddContactDialogProps = {
   onOpenChange: (open: boolean) => void
   searchHint?: string
   onCreated: (contact: QuickAddContactResult) => void
+  description?: string
+  individualOnly?: boolean
 }
 
 export function parseContactSearchDefaults(search: string) {
@@ -76,6 +78,8 @@ export function QuickAddContactDialog({
   onOpenChange,
   searchHint = "",
   onCreated,
+  description = "Create a person or organization for this pledge. The Donor role is added after the first payment, not when the pledge is saved.",
+  individualOnly = false,
 }: QuickAddContactDialogProps) {
   const [contactName, setContactName] = useState("")
   const [contactEmail, setContactEmail] = useState("")
@@ -91,9 +95,9 @@ export function QuickAddContactDialog({
     setContactName(defaults.name)
     setContactEmail(defaults.email)
     setContactPhone(defaults.phone)
-    setContactType(guessContactTypeFromName(defaults.name))
+    setContactType(individualOnly ? "individual" : guessContactTypeFromName(defaults.name))
     setPrimaryContactName("")
-  }, [open, searchHint])
+  }, [open, searchHint, individualOnly])
 
   async function handleSave() {
     const cleanName = contactName.trim()
@@ -110,7 +114,7 @@ export function QuickAddContactDialog({
         fullName: cleanName,
         email: contactEmail.trim() || undefined,
         phone: contactPhone.trim() || undefined,
-        contactType,
+        contactType: individualOnly ? "individual" : contactType,
         primaryContactName:
           contactType === "organization" ? primaryContactName.trim() || undefined : undefined,
         roles: [],
@@ -139,13 +143,11 @@ export function QuickAddContactDialog({
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Add Contact</DialogTitle>
-          <DialogDescription>
-            Create a person or organization for this pledge. The Donor role is added after
-            the first payment, not when the pledge is saved.
-          </DialogDescription>
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col gap-4 py-4">
+          {individualOnly ? null : (
           <div className="flex flex-col gap-2">
             <Label htmlFor="quick-add-type">Record type</Label>
             <Select
@@ -161,6 +163,7 @@ export function QuickAddContactDialog({
               </SelectContent>
             </Select>
           </div>
+          )}
 
           <div className="flex flex-col gap-2">
             <Label htmlFor="quick-add-name">

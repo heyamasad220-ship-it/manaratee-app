@@ -553,15 +553,8 @@ export function CampaignProspectsTab({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-base font-semibold text-foreground">Prospects</h2>
-          <p className="text-sm text-muted-foreground">
-            People and organizations you plan to approach for donations or sponsorships. Track
-            outreach, follow-ups, and outcomes in one place.
-          </p>
-        </div>
-        {canManage ? (
+      {canManage ? (
+        <div className="flex justify-end">
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={() => setShowQuickAdd(true)}>
               New Contact
@@ -571,8 +564,8 @@ export function CampaignProspectsTab({
               Add Prospect
             </Button>
           </div>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
 
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">

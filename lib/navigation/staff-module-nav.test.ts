@@ -60,10 +60,13 @@ describe("staff module nav", () => {
       "Overview",
       "Events",
       "Master Calendar",
-      "Ticketing",
+      "Check-in",
       "Reports",
       "Settings",
     ])
+    const checkIn = children.find((item) => item.label === "Check-in")
+    assert.equal(checkIn?.href, "/event-management/check-in")
+    assert.equal(checkIn?.matchPrefix, "/event-management/check-in")
     const reports = children.find((item) => item.label === "Reports")
     assert.equal(reports?.href, "/event-management/reports")
     assert.equal(reports?.matchPrefix, "/event-management/reports")

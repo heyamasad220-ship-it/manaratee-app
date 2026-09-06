@@ -112,7 +112,8 @@ export function TicketingEventsClient({
           <FolderOpen className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
           <h3 className="text-lg font-semibold">No ticketed events</h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            Enable ticketing on an event, then assign it to a category here.
+            Enable ticketing on an event (Event Management, a campaign, or a
+            department), then assign it to a category here.
           </p>
           <Button className="mt-4" asChild>
             <Link href="/event-management/events">Go to Events</Link>

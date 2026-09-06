@@ -26,7 +26,7 @@ Every organization-specific table should either include `organization_id` direct
 ## Core Platform Tables
 
 * organizations
-* organization_members — `role` is the platform access tier (`super_admin`, `admin`, `viewer`, …). `platform_support_access` (SQL **`086`**, **`272`**) marks platform-admin support rows so they are not treated as org Super Admins. `organization_users` is a convenience view over members (excludes support rows after **`272`**).
+* organization_members — `role` is the platform access tier (`super_admin`, `admin`, `viewer`, …). `platform_support_access` (SQL **`086`**, **`272`**) marks platform-admin support rows so they are not treated as org Super Admins. `assigned_contact_id` (SQL **`288`**) is the Directory person currently holding this staff login / work email (transferable; one person per org excluding support rows). `organization_users` is a convenience view over members (excludes support rows after **`272`**).
 * organization_roles — every org gets **Super Admin** and **Admin** system roles (`is_system_role`); SQL **`271`** backfills existing orgs and lets Super Admin / Admin / platform admins insert roles (fixes RLS on Add Role).
 * role_permissions — keys include `events.view`, `events.checkin` (SQL **`257`**, door staff scan/check-in), `events.manage`, plus ticketing/program counterparts. `events.manage` still implies check-in in the app.
 * organization_audit_logs (migration `142` — append-only financial + permission audit trail)
@@ -42,6 +42,7 @@ Key relationships:
 ```text
 organization_members.organization_id → organizations.id
 organization_members.role_id → organization_roles.id
+organization_members.assigned_contact_id → contacts.id
 organization_roles.organization_id → organizations.id
 role_permissions.organization_id → organizations.id
 role_permissions.role_id → organization_roles.id
@@ -209,19 +210,20 @@ npm run validate:contacts-security -- --post-m4   # after 111
 
 ## Programs Module
 
-* programs — optional defaults; `capacity` temporarily = sum of limited offerings (S2 sync; catalog may also read offerings live in S6). S4: staff saves no longer write operational eligibility/capacity/`billing_*` as SSOT. **S5:** `program_type` CHECK adult|youth only (`179_drop_program_type_family.sql`; family backfilled to youth). Obsolete eligibility/capacity columns retained pending RPC cutover. **Status (`199`):** `draft` | `active` | `paused` | `closed` | `archived` — prefer **closed** (stays in department workspace) over **archived**.
+* programs — optional defaults; `capacity` temporarily = sum of limited offerings (S2 sync; catalog may also read offerings live in S6). S4: staff saves no longer write operational eligibility/capacity/`billing_*` as SSOT. **S5:** `program_type` CHECK adult|youth only (`179_drop_program_type_family.sql`; family backfilled to youth). Obsolete eligibility/capacity columns retained pending RPC cutover. **Status (`199`):** `draft` | `active` | `paused` | `closed` | `archived` — prefer **closed** (stays in department workspace) over **archived**. **Program Lead (`290`):** nullable `lead_contact_id` → `contacts.id`. One Directory person per year/season who can open that program workspace and see all offerings without org-wide `programs.view`. Not Department Head (whole department) and not offering Coordinator (one or more classes). Run **`scripts/290_program_lead_contact.sql`**.
 * program_offerings — S1 attribute columns; S4 registration panel writes here only. **F1 (`180`):** `inherit_dates`, `inherit_eligibility`, `inherit_enrollment` (existing rows overridden/`false`; new offerings default `true`). **F4 (`181`):** `care_enabled`. **Catalog branding (`191`):** `flyer_url`, `background_color` (placeholder when no flyer). **Sort (`243`):** `sort_order` for staff Offerings list drag-and-drop (lower first). Programs may have **zero** offerings; first created offering is `is_default`. Audience adult|youth. Catalog enrollment display uses offering `capacity_mode` / `capacity` (S6). **Session capacity (`244`):** when the offering has weeks/sessions, limited `capacity` is the **per-session** seat limit (not unique offering headcount); `grant_enrollment_session_access` blocks adding to a full week. **Selected-weeks priority (`245`):** `selected_sessions_open` (default true). When false, only full Camp 1 / Camp 2 packages (all weeks in a camp) enroll immediately; partial selected weeks go to waitlist. Staff toggle opens selected weeks and FIFO-promotes waitlist rows that fit. **`245` also patches `promote_waitlist`:** drops early program-level capacity raise (seats checked in `grant_enrollment_session_access`); prefers `program_waitlist.offering_id` when set, else default offering. App should set waitlist `offering_id` on insert when possible. **Status (`283`):** `draft` | `active` | `closed` | `archived` | `cancelled`. **cancelled** = class called off (not enough registrations); hidden from families; staff Cancel offering is blocked while students are enrolled.
 * program_staff_assignments — **`278`:** at most one active offering-level `primary_instructor` per offering (`program_staff_assignments_one_offering_primary`; extras deactivated keeping the newest). Unique active row per contact+offering+role remains from **`031`**.
 * program_offering_fee_plan_components — **`200`:** `billing_scope` (`individual` \| `family` flat household). Discount rules: `full_payment` rule type added (`200`); early bird / member-staff tag conditions stored in `conditions` JSONB.
 * program_offering_registration_questions — **`201`:** custom registration prompts per offering (`yes_no` \| `text` \| `textarea`, required flag, sort order). **`239`:** adds `select` type + `options` jsonb (drop-down choices).
 * program_attendance — **F5 (`181`):** per enrollment/day status (`present`/`absent`/`late`/`excused`); teachers mark from `/my-classes/[offeringId]`.
-* program_enrollments — **`183`:** assigned offering staff (via `program_staff_assignments` + `contacts.auth_user_id`) may SELECT enrollments for their offerings so personal-portal teachers can load `/my-classes/[offeringId]` roster (org-member and “own enrollment” policies remain).
+* program_enrollments — **`183`:** assigned offering staff (via `program_staff_assignments` + `contacts.auth_user_id`) may SELECT enrollments for their offerings so personal-portal teachers can load `/my-classes/[offeringId]` roster (org-member and “own enrollment” policies remain). Historical Recreational Camps 2022–2026 rows (tag `CAMP_HISTORICAL_V1`) are people + enrollments only; 2026 Camp One/Two stay on operational Summer Camp 2026.
 * program_capacity_groups — S2 `offering_id` required (`177`); `program_id` retained for queries
 * program_schedule_items — S3 `offering_id` required (`178`); weekly class times edited on offering Schedule tab; optional `venue_id` for shared facility calendar/conflicts (`209`)
 * departments — RLS repair: `scripts/164_departments_rls_policies.sql` (org members can manage). App writes also authorize then use service role when needed. **`flyer_url` (migration `203`):** optional department flyer column (not shown on department Overview). **`terms_html` + `terms_pdf_url` (migration `241`):** Terms and Conditions on department Settings (rich text + optional PDF in `program-flyers` storage).
 * venues — Spaces catalog under Facilities → Settings. **`color` + `flyer_url` (migration `204`):** card branding on Spaces settings (3-column grid like Departments). **Required:** run `scripts/204_venue_color_flyer.sql` in Supabase SQL Editor (includes `NOTIFY pgrst, 'reload schema'`) or color/flyer will not persist. **Per-day hours/rates:** `rental_space_pricing` (from `046`; seed `205`) — Sunday–Saturday open hours + flat/hourly; Spaces edit form replaces peak/non-peak buckets. **Setup/cleanup overrides (`222`):** nullable `venues.setup_minutes` / `cleanup_minutes` (NULL inherits org defaults on `venue_rental_settings`). **Calendar:** Facilities sidebar **Calendar** is `/facilities/calendar` (merged former Space Availability + Schedule); `/facilities/availability` redirects there. Module filtered views use `?sources=` against the same `resource_reservations` (+ program expand). **Overview:** `/facilities/overview` is the Facilities landing (read-only schedule metrics). **Inventory:** `facility_inventory_items` (migrations `207` + `208`) — Facilities → Inventory catalog with category, size/style/color, quantity, location, purchased_at, unit_cost, notes, active, sort_order. **Shared scheduling (migration `209`):** `program_schedule_items.venue_id`; `setup_minutes` / `cleanup_minutes` on `rental_reservations` and `internal_events` expand occupied windows in sync triggers to `resource_reservations`. Run **`scripts/209_shared_scheduling_foundation.sql`** after `208`. **Event location types (`210`):** `internal_events.location_type`, `location_address`. **Multi-venue events (`211`):** `internal_event_venues` junction; sync creates one `resource_reservations` row per venue; `internal_events.venue_id` remains primary. Run **`210`** then **`211`**. If submit fails with ON CONFLICT on resource_reservations, run **`212_fix_internal_event_sync_on_conflict.sql`**.
-* internal_event_venues — Facility spaces for an internal event (`211`). Unique `(internal_event_id, venue_id)`. Backfilled from `internal_events.venue_id`.
-* internal_events — **`flyer_url` (migration `214`):** optional event flyer on workspace Overview; uploads reuse `program-flyers` storage. Run `scripts/214_internal_event_flyer_url.sql` in Supabase SQL Editor (`NOTIFY pgrst, 'reload schema'`). **`flyer_focal_x` / `flyer_focal_y` (migration `249`):** Community Calendar featured banner crop (object-position %). **`community_calendar_status` (migration `247`):** Community Calendar visibility — UI is **Private** / **Public** (`not_published` | `published`; legacy `community_visible` still accepted). Set on event Overview. Shared Community Calendar at `/community-calendar` also lists Vendor Hub bazaars via `vendor_hub_events.calendar_status`. **Event Workspace redesign (`252`):** `workspace_features` (JSONB toggles), `audience` / `event_tags` (text[]), `coordinator_contact_id`, `estimated_attendance`, `internal_notes`; attendance mode lives in `ticketing_config.attendanceMode`; optional **`ticketing_config.linkedCampaignId`** for Finance tab campaign rollup; optional **`ticketing_config.communications`** for confirmation/reservation email subject + message overrides. **`ticketing_category_id` (`287`):** optional Ticketing Events category (`ticketing_event_categories`); ON DELETE SET NULL.
+* event_management_settings — **`291`:** one row per org. `approval_required` (default false) — when true, on-site Center events submit as `awaiting_approval`. Online and External Venue never use this flag. Run `scripts/291_event_management_settings.sql` in Supabase SQL Editor (`NOTIFY pgrst, 'reload schema'`).
+* internal_event_venues — Facility spaces for an internal event (`211`). Unique `(internal_event_id, venue_id)`. Backfilled from `internal_events.venue_id`. On-site create may have no venues yet (staff check the facility calendar, then finish the form).
+* internal_events — **`flyer_url` (migration `214`):** optional event flyer on workspace Overview; uploads reuse `program-flyers` storage. Run `scripts/214_internal_event_flyer_url.sql` in Supabase SQL Editor (`NOTIFY pgrst, 'reload schema'`). **`flyer_focal_x` / `flyer_focal_y` (migration `249`):** Community Calendar featured banner crop (object-position %). **`community_calendar_status` (migration `247`):** Community Calendar visibility — UI is **Private** / **Public** (`not_published` | `published`; legacy `community_visible` still accepted). Set on event Overview. Shared Community Calendar at `/community-calendar` also lists Vendor Hub bazaars via `vendor_hub_events.calendar_status`. **Event Workspace redesign (`252`):** `workspace_features` (JSONB toggles), `audience` / `event_tags` (text[]), `coordinator_contact_id`, `estimated_attendance`, `internal_notes`; attendance mode lives in `ticketing_config.attendanceMode`; optional **`ticketing_config.linkedCampaignId`** is the campaign↔event link (campaign workspace Events tab, event Finance rollup); optional **`ticketing_config.communications`** for confirmation/reservation email subject + message overrides. **`ticketing_category_id` (`287`):** optional Ticketing Events category (`ticketing_event_categories`); ON DELETE SET NULL.
 * ticketing_event_categories — **`287`:** org-managed labels for grouping ticketed events (Kids Workshop, I Pray Party, Bazaar, …). Unique `(organization_id, slug)`. Staff add/rename/hide/delete on Ticketing → Events. Separate from `event_types`.
 * event_ticket_types — **`252`:** per-offering `visibility`, `min_per_order`, `max_per_order`, `offering_kind`, optional `sales_start_at` / `sales_end_at` (inherit event `ticketing_config.salesOpenAt` / `salesCloseAt` when null).
 * event_documents — **`254`:** files attached to an internal event (`title`, `file_url`, `visibility` staff|public). Uploads reuse `program-flyers` storage under `event-docs/{org}/{event}/`. Public rows listed on `/o/[orgSlug]/events/[eventId]`.
@@ -246,6 +248,7 @@ program_sessions.program_id → programs.id
 program_sessions.organization_id → organizations.id
 program_schedule_items.program_id → programs.id
 program_schedule_items.offering_id → program_offerings.id
+programs.lead_contact_id → contacts.id (`290_program_lead_contact.sql`)
 program_lunch_options.organization_id → organizations.id
 program_fee_options.program_id → programs.id
 program_fee_options.organization_id → organizations.id
@@ -406,6 +409,8 @@ Import CSV flow writes directly to `payments` + `payment_import_batches` (no row
 
 **Campaign wishlist (migration `267_campaign_wishlist.sql`):** `campaign_wishlist_items` (org + campaign scoped). Optional `fund_id` (donation_subcategories), `department_id`, `campaign_phase_id`. Carry-forward via `carried_from_item_id` / `carried_to_item_id` + `previous_funding_amount` (historical snapshot — not current-campaign collected). Nullable `wishlist_item_id` on `pledges`, `payments`, `recurring_donation_plans`, `donation_checkout_sessions`. Staff RLS via donations view/manage helpers. Public donate `/donate/w/{token}` uses service role. Wishlist targets do not increase `campaigns.goal_amount`.
 
+**Campaign same-organization FKs (migration `292_campaign_same_organization_fks.sql`):** Unique `(id, organization_id)` on `campaigns`. Composite FK `(campaign_id, organization_id)` on campaign children (wishlist, groups, phases, ask levels, prospects, prospect activities, sponsorships, packages) so a child cannot point at another tenant’s campaign. Ledger tables keep SET NULL on `campaign_id` / `wishlist_item_id`; triggers reject cross-org links. Wishlist RLS also requires `campaign_belongs_to_org`. Service-role writes still bypass RLS — the FKs/triggers are the DB guarantee. Run `scripts/292_campaign_same_organization_fks.sql`.
+
 **Campaign group checkout (migration `264_campaign_group_checkout.sql`):** `donation_checkout_sessions.campaign_group_id` + `attributed_group_contact_id`. Stripe metadata + webhook payment insert carry the same fields.
 
 **Group recurring + FD emails (migration `266_group_recurring_and_fd_emails.sql`):** `recurring_donation_plans.campaign_group_id` + `attributed_group_contact_id`; invoice payments copy group attribution from the plan. `prospect_follow_up_reminder_log` dedupes daily assignee digests. Transactional email template CHECK expanded.
@@ -425,6 +430,7 @@ npx supabase db query --linked -f scripts/266_group_recurring_and_fd_emails.sql
 npx supabase db query --linked -f scripts/267_campaign_wishlist.sql
 npx supabase db query --linked -f scripts/284_campaign_sponsorship_prospects.sql
 npx supabase db query --linked -f scripts/285_campaign_sponsorship_packages.sql
+npx supabase db query --linked -f scripts/292_campaign_same_organization_fks.sql
 npm run validate:donations-security
 ```
 
@@ -458,12 +464,12 @@ Key relationships:
 ```text
 campaigns.organization_id → organizations.id
 campaign_phases.organization_id → organizations.id
-campaign_phases.campaign_id → campaigns.id
+campaign_phases.campaign_id + organization_id → campaigns (id, organization_id)
 campaign_ask_levels.organization_id → organizations.id
-campaign_ask_levels.campaign_id → campaigns.id
+campaign_ask_levels.campaign_id + organization_id → campaigns (id, organization_id)
 campaign_ask_levels.campaign_phase_id → campaign_phases.id
 campaign_prospects.organization_id → organizations.id
-campaign_prospects.campaign_id → campaigns.id
+campaign_prospects.campaign_id + organization_id → campaigns (id, organization_id)
 campaign_prospects.contact_id → contacts.id
 campaign_prospects.ask_level_id → campaign_ask_levels.id
 campaign_prospects.assigned_to_contact_id → contacts.id
@@ -472,14 +478,14 @@ campaign_prospects.event_id → internal_events.id
 campaign_prospects.sponsorship_package_id → sponsorship_packages.id
 campaign_prospects.converted_sponsorship_id → campaign_sponsorships.id
 campaign_prospect_activities.organization_id → organizations.id
-campaign_prospect_activities.campaign_id → campaigns.id
+campaign_prospect_activities.campaign_id + organization_id → campaigns (id, organization_id)
 campaign_prospect_activities.prospect_id → campaign_prospects.id
 sponsorship_packages.organization_id → organizations.id
-sponsorship_packages.campaign_id → campaigns.id
+sponsorship_packages.campaign_id + organization_id → campaigns (id, organization_id)
 sponsorship_packages.event_id → internal_events.id
 sponsorship_package_benefits.package_id → sponsorship_packages.id
 campaign_sponsorships.organization_id → organizations.id
-campaign_sponsorships.campaign_id → campaigns.id
+campaign_sponsorships.campaign_id + organization_id → campaigns (id, organization_id)
 campaign_sponsorships.event_id → internal_events.id
 campaign_sponsorships.contact_id → contacts.id
 campaign_sponsorships.prospect_id → campaign_prospects.id
@@ -488,11 +494,11 @@ campaign_sponsorship_benefits.organization_id → organizations.id
 campaign_sponsorship_benefits.sponsorship_id → campaign_sponsorships.id
 campaign_sponsorship_benefits.package_benefit_id → sponsorship_package_benefits.id
 campaign_groups.organization_id → organizations.id
-campaign_groups.campaign_id → campaigns.id
+campaign_groups.campaign_id + organization_id → campaigns (id, organization_id)
 campaign_groups.organizational_group_id → contacts.id
 campaign_groups.lead_contact_id → contacts.id
 campaign_wishlist_items.organization_id → organizations.id
-campaign_wishlist_items.campaign_id → campaigns.id
+campaign_wishlist_items.campaign_id + organization_id → campaigns (id, organization_id)
 campaign_wishlist_items.fund_id → donation_subcategories.id
 campaign_wishlist_items.department_id → departments.id
 campaign_wishlist_items.campaign_phase_id → campaign_phases.id

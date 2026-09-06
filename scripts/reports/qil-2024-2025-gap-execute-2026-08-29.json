@@ -1,0 +1,539 @@
+{
+  "importTag": "QIL_2024_25_GAP_V1",
+  "mode": "execute",
+  "generatedAt": "2026-08-29T21:14:08.744Z",
+  "csvRows": 212,
+  "skipped": {
+    "already_stripe": 105,
+    "zero_or_other": 1,
+    "already_enrolled": 28,
+    "no_money": 0
+  },
+  "missingCount": 29,
+  "missing": [
+    {
+      "student": "Lamyaa Moustafa",
+      "payer": "Lamyaa Moustafa",
+      "offering": "QIL Registration",
+      "email": "lamiaa15@yahoo.com",
+      "phone": "19143914870",
+      "net": 120,
+      "gross": 120,
+      "refunded": 0,
+      "remarks": null
+    },
+    {
+      "student": "Heba El Manawy",
+      "payer": "Heba El Manawy",
+      "offering": "QIL Registration",
+      "email": "elmanawyheba78@gmail.com",
+      "phone": "13196218955",
+      "net": 200,
+      "gross": 200,
+      "refunded": 0,
+      "remarks": null
+    },
+    {
+      "student": "Aziza Owda",
+      "payer": "Aziza Owda",
+      "offering": "QIL Registration",
+      "email": "azizasalim@ymail.com",
+      "phone": "18175247982",
+      "net": 120,
+      "gross": 120,
+      "refunded": 0,
+      "remarks": null
+    },
+    {
+      "student": "Buthaynah Daglas",
+      "payer": "Buthaynah Daglas",
+      "offering": "QIL Registration",
+      "email": "buthainadaglas@yahoo.com",
+      "phone": "17142777770",
+      "net": 120,
+      "gross": 120,
+      "refunded": 0,
+      "remarks": null
+    },
+    {
+      "student": "Amany Elsharkawi",
+      "payer": "Amany Elsharkawi",
+      "offering": "Recitation & Arabic Grammar",
+      "email": "ummadam56@gmail.com",
+      "phone": "15743231293",
+      "net": 120,
+      "gross": 120,
+      "refunded": 0,
+      "remarks": "For June recitation class with Sr Fadia Salamah"
+    },
+    {
+      "student": "Letifa Tahir",
+      "payer": "Letifa Tahir",
+      "offering": "QIL Registration",
+      "email": "letifa.m.tahir@gamil.com",
+      "phone": "14696826522",
+      "net": 250,
+      "gross": 250,
+      "refunded": 0,
+      "remarks": "50% Staff discount"
+    },
+    {
+      "student": "ESSA DEENA Z",
+      "payer": "ESSA DEENA Z",
+      "offering": "QIL Registration",
+      "email": "alaghao@gmail.com",
+      "phone": "",
+      "net": 25,
+      "gross": 25,
+      "refunded": 0,
+      "remarks": "none"
+    },
+    {
+      "student": "Mohamad Al Shaikh",
+      "payer": "Mohamad Al Shaikh",
+      "offering": "QIL Registration",
+      "email": "moh.sheikh@gmail.com",
+      "phone": "14694685202",
+      "net": 250,
+      "gross": 250,
+      "refunded": 0,
+      "remarks": null
+    },
+    {
+      "student": "EDHAIR SEREYA",
+      "payer": "EDHAIR SEREYA",
+      "offering": "QIL Registration",
+      "email": "",
+      "phone": "",
+      "net": 300,
+      "gross": 300,
+      "refunded": 0,
+      "remarks": "$100 for 24-25\nOutstanding balance from last year as donation: $200"
+    },
+    {
+      "student": "Ahmed Walid Hussein",
+      "payer": "Ahmed Walid Hussein",
+      "offering": "QIL Registration",
+      "email": "elabady1974@gmail.com",
+      "phone": "17033896223",
+      "net": 250,
+      "gross": 250,
+      "refunded": 0,
+      "remarks": null
+    },
+    {
+      "student": "Walaa Alazzam",
+      "payer": "Walaa Alazzam",
+      "offering": "QIL Registration",
+      "email": "walaaalazzam@icloud.com",
+      "phone": "14696186677",
+      "net": 450,
+      "gross": 450,
+      "refunded": 0,
+      "remarks": null
+    },
+    {
+      "student": "Yasmeen Maligeli",
+      "payer": "Yasmeen Maligeli",
+      "offering": "QIL Registration",
+      "email": "ymaligeli@gmail.com",
+      "phone": "19034583119",
+      "net": 450,
+      "gross": 450,
+      "refunded": 0,
+      "remarks": null
+    },
+    {
+      "student": "Aimmin Chouaibi",
+      "payer": "Aimmin Chouaibi",
+      "offering": "QIL Registration",
+      "email": "aimmin35@gmail.com",
+      "phone": "14694072240",
+      "net": 50,
+      "gross": 50,
+      "refunded": 0,
+      "remarks": null
+    },
+    {
+      "student": "Gulnoza Tukhtasinova",
+      "payer": "Gulnoza Tukhtasinova",
+      "offering": "QIL Registration",
+      "email": "tukhtasinova1797@gmail.com",
+      "phone": "12705597116",
+      "net": 300,
+      "gross": 300,
+      "refunded": 0,
+      "remarks": null
+    },
+    {
+      "student": "Nuha Aldaqqa",
+      "payer": "Nuha Aldaqqa",
+      "offering": "QIL Registration",
+      "email": "aldaqqanoha@gmail.com",
+      "phone": "19186440781",
+      "net": 350,
+      "gross": 350,
+      "refunded": 0,
+      "remarks": null
+    },
+    {
+      "student": "Maram Alahlas",
+      "payer": "Maram Alahlas",
+      "offering": "QIL Registration",
+      "email": "maramahlas604@gmail.com",
+      "phone": "14794613975",
+      "net": 150,
+      "gross": 150,
+      "refunded": 0,
+      "remarks": null
+    },
+    {
+      "student": "Suhair Younes",
+      "payer": "Suhair Younes",
+      "offering": "QIL Registration",
+      "email": "suhair.younes1970@gmail.com",
+      "phone": "12142266018",
+      "net": 400,
+      "gross": 400,
+      "refunded": 0,
+      "remarks": null
+    },
+    {
+      "student": "Asmaa Hamadmad",
+      "payer": "Asmaa Hamadmad",
+      "offering": "QIL Registration",
+      "email": "hillrose4@hotmail.com",
+      "phone": "19712809090",
+      "net": 200,
+      "gross": 200,
+      "refunded": 0,
+      "remarks": null
+    },
+    {
+      "student": "Shaza Alsharaa",
+      "payer": "Shaza Alsharaa",
+      "offering": "QIL Registration",
+      "email": "shaza.alsharaa1234@gmail.com",
+      "phone": "12147635086",
+      "net": 150,
+      "gross": 150,
+      "refunded": 0,
+      "remarks": null
+    },
+    {
+      "student": "Danna Albataineh",
+      "payer": "Danna Albataineh",
+      "offering": "QIL Registration",
+      "email": "dannatb89@gmail.com",
+      "phone": "18178075869",
+      "net": 1150,
+      "gross": 1150,
+      "refunded": 0,
+      "remarks": null
+    },
+    {
+      "student": "Fathieh Alaeddin",
+      "payer": "Fathieh Alaeddin",
+      "offering": "QIL Registration",
+      "email": "um_mahdii@yahoo.com",
+      "phone": "12144630557",
+      "net": 200,
+      "gross": 200,
+      "refunded": 0,
+      "remarks": null
+    },
+    {
+      "student": "Zohour Hawa",
+      "payer": "Zohour Hawa",
+      "offering": "QIL Registration",
+      "email": "zohourhawa83@gmail.com",
+      "phone": "15057289917",
+      "net": 250,
+      "gross": 250,
+      "refunded": 0,
+      "remarks": null
+    },
+    {
+      "student": "Rihab Ramoun",
+      "payer": "Rihab Ramoun",
+      "offering": "QIL Registration",
+      "email": "rihab.ramoun@radiantstem.com",
+      "phone": "",
+      "net": 200,
+      "gross": 200,
+      "refunded": 0,
+      "remarks": null
+    },
+    {
+      "student": "Zilal Khalbous",
+      "payer": "Zilal Khalbous",
+      "offering": "QIL Registration",
+      "email": "zelalkhalel@gmail.com",
+      "phone": "14694685203",
+      "net": 250,
+      "gross": 250,
+      "refunded": 0,
+      "remarks": "Zilal Khalbous"
+    },
+    {
+      "student": "Nagham Issa",
+      "payer": "Nagham Issa",
+      "offering": "QIL Registration",
+      "email": "nagham.t.issa@gmail.com",
+      "phone": "18327402520",
+      "net": 500,
+      "gross": 500,
+      "refunded": 0,
+      "remarks": null
+    },
+    {
+      "student": "Lamya Saleh",
+      "payer": "Lamya Saleh",
+      "offering": "QIL Registration",
+      "email": "lamya.saleh18@gmail.com",
+      "phone": "",
+      "net": 450,
+      "gross": 450,
+      "refunded": 0,
+      "remarks": null
+    },
+    {
+      "student": "H S",
+      "payer": "H S",
+      "offering": "QIL Registration",
+      "email": "utd.hana.saleh@gmail.com",
+      "phone": "14697344333",
+      "net": 100,
+      "gross": 100,
+      "refunded": 0,
+      "remarks": null
+    },
+    {
+      "student": "Aziza Owda",
+      "payer": "Aziza Owda",
+      "offering": "Recitation & Arabic Grammar",
+      "email": "azizasalim@ymail.com",
+      "phone": "18175247982",
+      "net": 300,
+      "gross": 300,
+      "refunded": 0,
+      "remarks": "Tilawah class with Sr.Huda"
+    },
+    {
+      "student": "Afrah Alakhali",
+      "payer": "Afrah Alakhali",
+      "offering": "QIL Registration",
+      "email": "afrah0375@gmail.com",
+      "phone": "12143995882",
+      "net": 102.5,
+      "gross": 102.5,
+      "refunded": 0,
+      "remarks": null
+    }
+  ],
+  "created": [
+    {
+      "student": "Lamyaa Moustafa",
+      "offering": "QIL Registration",
+      "email": "lamiaa15@yahoo.com",
+      "net": 120,
+      "enrollmentId": "72ba096a-c6fa-47ac-b78f-c893513f4a12"
+    },
+    {
+      "student": "Heba El Manawy",
+      "offering": "QIL Registration",
+      "email": "elmanawyheba78@gmail.com",
+      "net": 200,
+      "enrollmentId": "d8bacf7d-1131-49af-850a-b3cf51cc291b"
+    },
+    {
+      "student": "AZIZA OWDA",
+      "offering": "QIL Registration",
+      "email": "azizasalim@ymail.com",
+      "net": 120,
+      "enrollmentId": "64bf63a7-86a6-4fe6-9978-84078814df82"
+    },
+    {
+      "student": "Buthaynah Alian (Daglas)",
+      "offering": "QIL Registration",
+      "email": "buthainadaglas@yahoo.com",
+      "net": 120,
+      "enrollmentId": "d7e32fdc-1370-4bcb-bca8-406bce0423f8"
+    },
+    {
+      "student": "Amany Elsharkawi",
+      "offering": "Recitation & Arabic Grammar",
+      "email": "ummadam56@gmail.com",
+      "net": 120,
+      "enrollmentId": "687b841c-9e2a-43b4-8364-6b1cd6b1e398"
+    },
+    {
+      "student": "Letifa Tahir",
+      "offering": "QIL Registration",
+      "email": "letifa.m.tahir@gamil.com",
+      "net": 250,
+      "enrollmentId": "1dd565e5-d069-4aa5-8941-36b3c78d1f9e"
+    },
+    {
+      "student": "ESSA DEENA Z",
+      "offering": "QIL Registration",
+      "email": "alaghao@gmail.com",
+      "net": 25,
+      "enrollmentId": "5e9bcf0a-5233-4be7-ada2-fd9373a3b2db"
+    },
+    {
+      "student": "Mohamad Al Shaikh",
+      "offering": "QIL Registration",
+      "email": "moh.sheikh@gmail.com",
+      "net": 250,
+      "enrollmentId": "fbc0f8ec-7e38-4370-9ef7-217e3fc7231e"
+    },
+    {
+      "student": "EDHAIR SEREYA",
+      "offering": "QIL Registration",
+      "email": "",
+      "net": 300,
+      "enrollmentId": "a4d45a63-8be7-4e9f-ad50-8e61b2c4ed84"
+    },
+    {
+      "student": "Ahmed Walid Hussein",
+      "offering": "QIL Registration",
+      "email": "elabady1974@gmail.com",
+      "net": 250,
+      "enrollmentId": "7c39115a-a28c-4414-a40d-f5e551c2ef73"
+    },
+    {
+      "student": "Walaa Alazzam",
+      "offering": "QIL Registration",
+      "email": "walaaalazzam@icloud.com",
+      "net": 450,
+      "enrollmentId": "1d5769c2-51fe-40e6-a023-3139cffdad2f"
+    },
+    {
+      "student": "Yasmeen Maligeli",
+      "offering": "QIL Registration",
+      "email": "ymaligeli@gmail.com",
+      "net": 450,
+      "enrollmentId": "6d043aee-8426-4db0-9a66-f8ea03462223"
+    },
+    {
+      "student": "Aimmin Chouaibi",
+      "offering": "QIL Registration",
+      "email": "aimmin35@gmail.com",
+      "net": 50,
+      "enrollmentId": "c43a47e9-c253-45fb-9914-621a4fa966cf"
+    },
+    {
+      "student": "Gulnoza Tukhtasinova",
+      "offering": "QIL Registration",
+      "email": "tukhtasinova1797@gmail.com",
+      "net": 300,
+      "enrollmentId": "d9a26125-2ade-46d0-a636-692938767c7c"
+    },
+    {
+      "student": "Nuha Aldaqqa",
+      "offering": "QIL Registration",
+      "email": "aldaqqanoha@gmail.com",
+      "net": 350,
+      "enrollmentId": "e7d1cd09-808b-4b4b-9122-a80baebda09e"
+    },
+    {
+      "student": "Maram Alahlas",
+      "offering": "QIL Registration",
+      "email": "maramahlas604@gmail.com",
+      "net": 150,
+      "enrollmentId": "98a1e003-8710-43a8-bd7b-c404f2fdf320"
+    },
+    {
+      "student": "SUHAIR YOUNES",
+      "offering": "QIL Registration",
+      "email": "suhair.younes1970@gmail.com",
+      "net": 400,
+      "enrollmentId": "5a596f0d-d44e-40dd-84bc-c3fb4c6a8b7c"
+    },
+    {
+      "student": "Asmaa Hamadmad",
+      "offering": "QIL Registration",
+      "email": "hillrose4@hotmail.com",
+      "net": 200,
+      "enrollmentId": "2eae0e63-19a2-4d6a-a691-56c43699940c"
+    },
+    {
+      "student": "shaza alsharaa",
+      "offering": "QIL Registration",
+      "email": "shaza.alsharaa1234@gmail.com",
+      "net": 150,
+      "enrollmentId": "1e316f91-8f6f-4927-8ba9-8e7549a7e61d"
+    },
+    {
+      "student": "Danna tahseen Albataineh",
+      "offering": "QIL Registration",
+      "email": "dannatb89@gmail.com",
+      "net": 1150,
+      "enrollmentId": "bf7c80ee-3d97-4bf0-9fb7-0134d567ae52"
+    },
+    {
+      "student": "Fathieh Alaeddin",
+      "offering": "QIL Registration",
+      "email": "um_mahdii@yahoo.com",
+      "net": 200,
+      "enrollmentId": "ec763c43-169d-40d2-a030-0fc378d0b11e"
+    },
+    {
+      "student": "Zuhoor Hawwa",
+      "offering": "QIL Registration",
+      "email": "zohourhawa83@gmail.com",
+      "net": 250,
+      "enrollmentId": "3171f6da-74d4-433f-ab18-308546ba910c"
+    },
+    {
+      "student": "Rihab Ramoun",
+      "offering": "QIL Registration",
+      "email": "rihab.ramoun@radiantstem.com",
+      "net": 200,
+      "enrollmentId": "fcbe5953-3ecb-41ee-af91-a51fa72bec17"
+    },
+    {
+      "student": "Zilal Khalbous",
+      "offering": "QIL Registration",
+      "email": "zelalkhalel@gmail.com",
+      "net": 250,
+      "enrollmentId": "9ca8cfd5-f872-4d6b-b591-2595440f6fcc"
+    },
+    {
+      "student": "Nagham Issa",
+      "offering": "QIL Registration",
+      "email": "nagham.t.issa@gmail.com",
+      "net": 500,
+      "enrollmentId": "1a972073-23d2-4e72-85a9-9752c9c5d040"
+    },
+    {
+      "student": "Lamya saleh",
+      "offering": "QIL Registration",
+      "email": "lamya.saleh18@gmail.com",
+      "net": 450,
+      "enrollmentId": "1bdacb1e-bc27-41c8-8a88-b25e10113601"
+    },
+    {
+      "student": "Hana S",
+      "offering": "QIL Registration",
+      "email": "utd.hana.saleh@gmail.com",
+      "net": 100,
+      "enrollmentId": "aa5c4ea8-e879-4367-861f-99d7aab5f8d0"
+    },
+    {
+      "student": "AZIZA OWDA",
+      "offering": "Recitation & Arabic Grammar",
+      "email": "azizasalim@ymail.com",
+      "net": 300,
+      "enrollmentId": "ecd48b6b-cc4b-4d3f-af35-25a49f0e0a17"
+    },
+    {
+      "student": "Afrah Ahmed",
+      "offering": "QIL Registration",
+      "email": "afrah0375@gmail.com",
+      "net": 102.5,
+      "enrollmentId": "b5f5b67e-53a7-4c82-b10d-397455ec8bda"
+    }
+  ]
+}

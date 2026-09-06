@@ -20,7 +20,9 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { StatCard, StatCardsRow, type StatCardTone } from "@/components/ui/stat-card"
+import { VendorHubReportsOverviewPanels } from "@/components/vendor-hub/vendor-hub-reports-overview-panels"
 import { VENDOR_HUB_ROUTES } from "@/lib/vendor-hub/vendor-hub-routes"
+import type { VendorHubReportOverview } from "@/lib/vendor-hub/vendor-hub-reports-queries"
 import type {
   VendorHubEventWithInternal,
   VendorHubOrgDashboardMetrics,
@@ -41,9 +43,11 @@ function formatEventDate(value?: string | null) {
 export function VendorHubDashboardClient({
   metrics,
   upcomingEvents,
+  reportsOverview,
 }: {
   metrics: VendorHubOrgDashboardMetrics
   upcomingEvents: VendorHubEventWithInternal[]
+  reportsOverview: VendorHubReportOverview
 }) {
   const [createDrawerOpen, setCreateDrawerOpen] = useState(false)
 
@@ -107,7 +111,7 @@ export function VendorHubDashboardClient({
       id: "history",
       label: "Participation History",
       icon: Store,
-      href: VENDOR_HUB_ROUTES.network.history,
+      href: VENDOR_HUB_ROUTES.reportsHistory(),
     },
     {
       id: "calendar",
@@ -126,9 +130,9 @@ export function VendorHubDashboardClient({
   return (
     <div className="p-6">
       <div className="mb-6 border-b border-border pb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Overview</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Organization-wide vendor network health and upcoming bazaars.
+          Organization-wide vendor health, sales snapshot, and upcoming bazaars.
         </p>
       </div>
 
@@ -148,6 +152,8 @@ export function VendorHubDashboardClient({
             </Link>
           ))}
         </StatCardsRow>
+
+        <VendorHubReportsOverviewPanels overview={reportsOverview} scopeLabel="All events" />
 
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
           <Card>

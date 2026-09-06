@@ -857,8 +857,8 @@ export function StaffRecordsClient({
           <DialogHeader>
             <DialogTitle>Add Employee</DialogTitle>
             <DialogDescription>
-              Search for an existing contact, then set their employment details. If they are not
-              in Contacts yet, create them there first.
+              Search Directory for an existing person, or create a contact if they are not
+              listed, then set their employment details.
             </DialogDescription>
           </DialogHeader>
 
@@ -866,6 +866,9 @@ export function StaffRecordsClient({
             <HrContactPicker
               selectedContactId={selectedContactId}
               selectedLabel={selectedContactLabel}
+              allowCreate
+              individualOnly
+              createDescription="Create a Directory person, then add them as an employee."
               onChange={(contact) => {
                 setSelectedContactId(contact.contactId)
                 const name = contact.full_name?.trim() || "Unnamed"

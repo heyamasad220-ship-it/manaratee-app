@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/card"
 import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
+import { requireWaitlistAccess } from "@/lib/programs/program-access"
 import {
   promoteWaitlistAction,
   removeWaitlistEntryAction,
@@ -64,6 +65,7 @@ export default async function WaitlistRegistrationDetailPage({
   params: Promise<PageParams>
 }) {
   const { waitlistId } = await params
+  await requireWaitlistAccess(waitlistId)
   const organizationId = await getSelectedOrganizationId()
 
   if (!organizationId) {

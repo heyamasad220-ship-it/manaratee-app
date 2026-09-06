@@ -1,5 +1,7 @@
-import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
+
+import { getTicketedEventsOverview } from "@/lib/tickets/ticketing-overview-queries"
+import { summarizeTicketedEventsOverview } from "@/lib/tickets/ticketing-overview-types"
 
 import {
   daysUntil,
@@ -286,6 +288,13 @@ function buildDashboardFromEvents(
 
   return {
     kpis,
+    ticketSales: {
+      totalTicketedEvents: 0,
+      activeTicketedEvents: 0,
+      ticketsIssued: 0,
+      revenueCents: 0,
+      currency: "USD",
+    },
     attentionItems: buildAttentionItems(events, pendingRequests, period),
   }
 }
@@ -300,14 +309,27 @@ export async function getEventManagementDashboard(
     return buildDashboardFromEvents([], [], period)
   }
 
-  const [events, pendingRequests] = await Promise.all([
+  const [events, pendingRequests, ticketedEvents] = await Promise.all([
     preloadedEvents
       ? Promise.resolve(preloadedEvents)
       : getInternalEvents(),
     getPendingInternalEventRequests(),
+    getTicketedEventsOverview(),
   ])
 
-  return buildDashboardFromEvents(events, pendingRequests, period)
+  const dashboard = buildDashboardFromEvents(events, pendingRequests, period)
+  const ticketSales = summarizeTicketedEventsOverview(ticketedEvents)
+
+  return {
+    ...dashboard,
+    ticketSales: {
+      totalTicketedEvents: ticketSales.totalEvents,
+      activeTicketedEvents: ticketSales.activeEvents,
+      ticketsIssued: ticketSales.ticketsIssued,
+      revenueCents: ticketSales.revenueCents,
+      currency: ticketSales.currency,
+    },
+  }
 }
 
 export function parseDashboardTimePeriod(

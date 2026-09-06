@@ -7,7 +7,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { getDepartments } from "@/lib/departments/department-queries"
 import { summarizeDepartmentStaff } from "@/lib/departments/department-list-summary"
-import { canViewDepartment } from "@/lib/departments/department-access"
+import { canManageDepartment, canViewDepartment } from "@/lib/departments/department-access"
 import {
   departmentDeleteBlockedReason,
   type DepartmentDeleteUsage,
@@ -76,12 +76,15 @@ function formatDepartmentError(error: { code?: string; message?: string }, actio
   return error.message || `Failed to ${action} department`
 }
 
-async function requireDepartmentWriteAccess() {
-  const canWrite =
+async function requireDepartmentWriteAccess(departmentId?: string) {
+  const canWriteOrgWide =
     (await hasPermission(PERMISSIONS.STAFF_MANAGE)) ||
     (await hasPermission(PERMISSIONS.STAFF_VIEW))
+  const canWriteThisDepartment = departmentId
+    ? await canManageDepartment(departmentId)
+    : false
 
-  if (!canWrite) {
+  if (!canWriteOrgWide && !canWriteThisDepartment) {
     throw new Error("You do not have permission to manage departments.")
   }
 
@@ -213,7 +216,7 @@ export async function updateDepartment(input: UpdateDepartmentInput) {
     throw new Error("Department name is required")
   }
 
-  const { organizationId, supabase } = await requireDepartmentWriteAccess()
+  const { organizationId, supabase } = await requireDepartmentWriteAccess(input.id)
 
   const updatePayload: Record<string, unknown> = {
     name,
@@ -244,7 +247,7 @@ export async function updateDepartmentFlyer(input: {
   id: string
   flyerUrl: string | null
 }) {
-  const { organizationId, supabase } = await requireDepartmentWriteAccess()
+  const { organizationId, supabase } = await requireDepartmentWriteAccess(input.id)
 
   const { error } = await supabase
     .from("departments")
@@ -572,7 +575,7 @@ export async function updateDepartmentTerms(input: {
   termsHtml?: string | null
   termsPdfUrl?: string | null
 }) {
-  const { organizationId, supabase } = await requireDepartmentWriteAccess()
+  const { organizationId, supabase } = await requireDepartmentWriteAccess(input.id)
 
   const patch: Record<string, string | null> = {}
   if (input.termsHtml !== undefined) {

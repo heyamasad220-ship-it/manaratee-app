@@ -1,18 +1,18 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import {
   BookOpen,
   CalendarDays,
-  CircleDollarSign,
   Layers,
   Loader2,
   UserCheck,
   Users,
-  Wallet,
+  UsersRound,
 } from "lucide-react"
 
+import { DepartmentEnrollmentTrendChart } from "@/components/departments/department-enrollment-trend-chart"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -36,17 +36,12 @@ import {
   type ProgramStatus,
 } from "@/lib/programs/program-status"
 import { programWorkspaceHref } from "@/lib/programs/program-workspace-path"
-
-function formatUsd(value: number) {
-  const rounded = Math.round(value * 100) / 100
-  const whole = Math.abs(rounded - Math.round(rounded)) < 0.009
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: whole ? 0 : 2,
-    maximumFractionDigits: 2,
-  }).format(rounded)
-}
+import {
+  buildYearRows,
+  filterYearComparisonFacts,
+  type YearComparisonFact,
+} from "@/lib/programs/year-comparison"
+import { getYearComparisonFacts } from "@/lib/programs/year-comparison-queries"
 
 function formatCount(value: number) {
   return new Intl.NumberFormat("en-US").format(value)
@@ -67,19 +62,22 @@ export function DepartmentOverviewPanel({
     null
   )
   const [programs, setPrograms] = useState<DepartmentYearProgramRow[]>([])
+  const [facts, setFacts] = useState<YearComparisonFact[]>([])
 
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
-    const [overviewResult, programsResult] = await Promise.all([
+    const [overviewResult, programsResult, factsResult] = await Promise.all([
       fetchDepartmentWorkspaceOverviewAction(departmentId),
       fetchDepartmentYearProgramsAction(departmentId),
+      getYearComparisonFacts({ departmentId }),
     ])
 
     if (!overviewResult.success) {
       setError(overviewResult.error)
       setOverview(null)
       setPrograms([])
+      setFacts([])
       setLoading(false)
       return
     }
@@ -90,12 +88,26 @@ export function DepartmentOverviewPanel({
     } else {
       setPrograms([])
     }
+    if (factsResult.success) {
+      setFacts(factsResult.facts)
+    } else {
+      setFacts([])
+    }
     setLoading(false)
   }, [departmentId])
 
   useEffect(() => {
     void load()
   }, [load])
+
+  const yearRows = useMemo(
+    () =>
+      buildYearRows(
+        filterYearComparisonFacts(facts, { departmentId, programKind: "all" })
+      ),
+    [facts, departmentId]
+  )
+  const latestYear = yearRows[yearRows.length - 1] ?? null
 
   if (loading) {
     return (
@@ -122,7 +134,8 @@ export function DepartmentOverviewPanel({
     )
   }
 
-  const offeringsCount = programs.reduce(
+  const activePrograms = programs.filter((program) => program.status === "active")
+  const activeOfferingsCount = activePrograms.reduce(
     (sum, program) => sum + Number(program.offeringCount || 0),
     0
   )
@@ -130,14 +143,11 @@ export function DepartmentOverviewPanel({
     tab: "programs",
   })
   const employeesHref = departmentGroupWorkspaceHref(departmentId, {
-    tab: "employees",
+    tab: "financial",
+    finance: "employees",
   })
   const eventsHref = departmentGroupWorkspaceHref(departmentId, {
     tab: "activity",
-  })
-  const financialHref = departmentGroupWorkspaceHref(departmentId, {
-    tab: "financial",
-    finance: "budget",
   })
 
   return (
@@ -153,15 +163,14 @@ export function DepartmentOverviewPanel({
         </p>
       </div>
 
-      <StatCardsRow equal columns={5}>
+      <StatCardsRow equal columns={6}>
         <Link href={programsHref} className="min-w-0">
           <StatCard
             fill
             tone="sky"
             icon={BookOpen}
             label="Programs"
-            value={formatCount(programs.length)}
-            hint="Years and seasons"
+            value={`${formatCount(activePrograms.length)} Active`}
           />
         </Link>
         <Link href={programsHref} className="min-w-0">
@@ -170,8 +179,7 @@ export function DepartmentOverviewPanel({
             tone="violet"
             icon={Layers}
             label="Offerings"
-            value={formatCount(offeringsCount)}
-            hint="Courses and classes"
+            value={`${formatCount(activeOfferingsCount)} Active`}
           />
         </Link>
         <Link href={employeesHref} className="min-w-0">
@@ -181,7 +189,6 @@ export function DepartmentOverviewPanel({
             icon={Users}
             label="Employees"
             value={formatCount(overview.staffCount)}
-            hint="Assigned to this department"
           />
         </Link>
         <Link href={programsHref} className="min-w-0">
@@ -191,7 +198,6 @@ export function DepartmentOverviewPanel({
             icon={UserCheck}
             label="Students"
             value={formatCount(overview.studentsCount)}
-            hint="On open programs"
           />
         </Link>
         <Link href={eventsHref} className="min-w-0">
@@ -201,92 +207,98 @@ export function DepartmentOverviewPanel({
             icon={CalendarDays}
             label="Upcoming events"
             value={formatCount(overview.upcomingEventsCount)}
-            hint="From today forward"
+          />
+        </Link>
+        <Link href={programsHref} className="min-w-0">
+          <StatCard
+            fill
+            tone="indigo"
+            icon={UsersRound}
+            label="Families"
+            value={formatCount(latestYear?.families ?? 0)}
+            hint={
+              latestYear
+                ? `${formatCount(latestYear.returningFamilies)} returning, ${formatCount(latestYear.newFamilies)} new`
+                : undefined
+            }
           />
         </Link>
       </StatCardsRow>
 
-      <StatCardsRow equal columns={3}>
-        <Link href={financialHref} className="min-w-0">
-          <StatCard
-            fill
-            tone="blue"
-            icon={CircleDollarSign}
-            label="Collected"
-            value={formatUsd(overview.revenue)}
-            hint="Open programs"
-          />
-        </Link>
-        <Link href={financialHref} className="min-w-0">
-          <StatCard
-            fill
-            tone="orange"
-            icon={Wallet}
-            label="Payroll"
-            value={formatUsd(overview.expenses)}
-            hint="Approved payroll"
-          />
-        </Link>
-        <Link href={financialHref} className="min-w-0">
-          <StatCard
-            fill
-            tone={overview.net >= 0 ? "emerald" : "rose"}
-            icon={CircleDollarSign}
-            label="Net"
-            value={formatUsd(overview.net)}
-            hint="Collected minus payroll"
-          />
-        </Link>
-      </StatCardsRow>
-
-      <section className="space-y-3">
-        <div className="flex flex-wrap items-end justify-between gap-2">
-          <div>
-            <h3 className="text-base font-semibold tracking-tight">Programs</h3>
-            <p className="text-sm text-muted-foreground">
-              Open a program to manage offerings, registrations, and schedule.
-            </p>
+      <div className="grid items-start gap-4 lg:grid-cols-2">
+        <section className="min-w-0 space-y-3">
+          <div className="flex flex-wrap items-end justify-between gap-2">
+            <div>
+              <h3 className="text-base font-semibold tracking-tight">Programs</h3>
+              <p className="text-sm text-muted-foreground">
+                Active programs only. Open one to manage offerings, registrations,
+                and schedule.
+              </p>
+            </div>
+            <Link
+              href={programsHref}
+              className="text-sm font-medium text-sky-800 underline-offset-4 hover:underline"
+            >
+              View all programs
+            </Link>
           </div>
-          <Link
-            href={programsHref}
-            className="text-sm font-medium text-sky-800 underline-offset-4 hover:underline"
-          >
-            View all programs
-          </Link>
-        </div>
 
-        {programs.length === 0 ? (
-          <Card>
-            <CardHeader>
-              <CardTitle>No programs</CardTitle>
-              <CardDescription>
-                Add a year or season in the Programs module.
-              </CardDescription>
-            </CardHeader>
-          </Card>
-        ) : (
-          <div className="divide-y rounded-lg border">
-            {programs.map((program) => (
-              <Link
-                key={program.id}
-                href={programWorkspaceHref(program.id)}
-                className="block px-4 py-3 text-sm transition-colors hover:bg-muted/40"
-              >
-                <span className="font-medium text-sky-800">{program.name}</span>
-                <span className="text-muted-foreground">
-                  {" "}
-                  —{" "}
-                  {getProgramStatusLabel(
-                    (program.status as ProgramStatus) || "active"
-                  )}{" "}
-                  — {programCountPhrase(program.offeringCount)} —{" "}
-                  {enrollmentPhrase(program.enrolled)}
-                </span>
-              </Link>
-            ))}
-          </div>
-        )}
-      </section>
+          {activePrograms.length === 0 ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>No active programs</CardTitle>
+                <CardDescription>
+                  Closed and paused years stay on{" "}
+                  <Link
+                    href={programsHref}
+                    className="font-medium text-sky-800 underline-offset-4 hover:underline"
+                  >
+                    View all programs
+                  </Link>
+                  .
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          ) : (
+            <div className="max-h-[28rem] divide-y overflow-y-auto rounded-lg border">
+              {activePrograms.map((program) => (
+                <Link
+                  key={program.id}
+                  href={programWorkspaceHref(program.id)}
+                  className="block px-4 py-3 text-sm transition-colors hover:bg-muted/40"
+                >
+                  <span className="font-medium text-sky-800">{program.name}</span>
+                  <span className="text-muted-foreground">
+                    {" "}
+                    —{" "}
+                    {getProgramStatusLabel(
+                      (program.status as ProgramStatus) || "active"
+                    )}{" "}
+                    — {programCountPhrase(program.offeringCount)} —{" "}
+                    {enrollmentPhrase(program.enrolled)}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="min-w-0">
+          {yearRows.length > 0 ? (
+            <DepartmentEnrollmentTrendChart className="h-full" yearRows={yearRows} />
+          ) : (
+            <Card className="h-full min-h-[280px]">
+              <CardHeader>
+                <CardTitle className="text-base">Enrollment over time</CardTitle>
+                <CardDescription>
+                  Enrolled participants will appear here once this department has
+                  registrations.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          )}
+        </section>
+      </div>
     </div>
   )
 }

@@ -187,7 +187,7 @@ export function TicketingReportsClient({
 
   function onRangeChange(next: string) {
     startTransition(() => {
-      router.push(`/event-management/ticketing/reports?range=${next}`)
+      router.push(`/event-management/reports/tickets?range=${next}`)
     })
   }
 

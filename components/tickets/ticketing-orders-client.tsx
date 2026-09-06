@@ -1,8 +1,8 @@
 "use client"
 
-import { useMemo, useState, useTransition } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { ChevronDown, MoreHorizontal, Plus, Search } from "lucide-react"
+import { ChevronDown, Plus, Search } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -13,8 +13,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
@@ -37,10 +35,6 @@ import {
 } from "@/components/ui/table"
 import { CreateTicketOrderDialog } from "@/components/tickets/create-ticket-order-dialog"
 import { TicketOrderDetailPanel } from "@/components/tickets/ticket-order-detail-panel"
-import {
-  bulkCancelRefundOrders,
-  bulkDeleteOrderPersonalData,
-} from "@/lib/tickets/ticket-order-actions"
 import {
   isTicketedEventPast,
   formatEventSchedule,
@@ -155,8 +149,12 @@ export function TicketingOrdersClient({
   const [selectedOrder, setSelectedOrder] = useState<TicketOrderListItem | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
-  const [actionError, setActionError] = useState<string | null>(null)
-  const [isPending, startTransition] = useTransition()
+
+  useEffect(() => {
+    if (!selectedOrder) return
+    const next = orders.find((order) => order.id === selectedOrder.id)
+    if (next && next !== selectedOrder) setSelectedOrder(next)
+  }, [orders, selectedOrder])
 
   const selectedOrders = useMemo(
     () => orders.filter((order) => selectedIds.includes(order.id)),
@@ -228,50 +226,7 @@ export function TicketingOrdersClient({
   }
 
   function handleExport() {
-    if (!hasSelection) return
-    exportOrdersCsv(selectedOrders)
-  }
-
-  function handleCancelRefund() {
-    if (!hasSelection) return
-    if (
-      !window.confirm(
-        `Cancel or refund ${selectedIds.length} order${selectedIds.length === 1 ? "" : "s"}? Paid Stripe orders are refunded on the organization’s Stripe account. Pay-at-event orders are marked refunded locally.`
-      )
-    ) {
-      return
-    }
-
-    setActionError(null)
-    startTransition(async () => {
-      try {
-        await bulkCancelRefundOrders(selectedIds)
-        setSelectedIds([])
-        router.refresh()
-      } catch (error) {
-        setActionError(
-          error instanceof Error ? error.message : "Could not cancel or refund the selected orders."
-        )
-      }
-    })
-  }
-
-  function handleDeletePersonalData() {
-    if (!hasSelection) return
-
-    if (
-      !window.confirm(
-        `Delete personal data for ${selectedIds.length} order${selectedIds.length === 1 ? "" : "s"}? Purchaser and attendee names and emails will be redacted.`
-      )
-    ) {
-      return
-    }
-
-    startTransition(async () => {
-      await bulkDeleteOrderPersonalData(selectedIds)
-      setSelectedIds([])
-      router.refresh()
-    })
+    exportOrdersCsv(hasSelection ? selectedOrders : filtered)
   }
 
   return (
@@ -291,8 +246,6 @@ export function TicketingOrdersClient({
         ) : null}
       </div>
 
-      {actionError ? <p className="text-sm text-destructive">{actionError}</p> : null}
-
       <div className="rounded-lg border bg-card p-4">
         <div className="grid gap-4">
           <div className="relative">
@@ -305,7 +258,7 @@ export function TicketingOrdersClient({
             />
           </div>
 
-          <div className="grid gap-4 md:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             <div className="space-y-2">
               <Label>Events</Label>
               <Select value={eventFilter} onValueChange={setEventFilter}>
@@ -384,49 +337,37 @@ export function TicketingOrdersClient({
                 </SelectContent>
               </Select>
             </div>
+            {canManage ? (
+              <div className="space-y-2">
+                <Label>Actions</Label>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="w-full justify-between">
+                      Actions
+                      <ChevronDown className="ml-2 h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-52">
+                    <DropdownMenuItem
+                      disabled={filtered.length === 0}
+                      onClick={handleExport}
+                    >
+                      Export
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-muted-foreground">
-          {filtered.length.toLocaleString()} order{filtered.length === 1 ? "" : "s"}
-        </p>
-        {canManage ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" disabled={isPending}>
-                Actions
-                <ChevronDown className="ml-2 h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52">
-              <DropdownMenuLabel className="font-normal text-muted-foreground">
-                {hasSelection
-                  ? `${selectedIds.length} order${selectedIds.length === 1 ? "" : "s"} selected`
-                  : "No orders selected"}
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem disabled={!hasSelection || isPending} onClick={handleExport}>
-                Export
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={!hasSelection || isPending}
-                onClick={handleCancelRefund}
-              >
-                Cancel/refund
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={!hasSelection || isPending}
-                onClick={handleDeletePersonalData}
-                className="text-destructive focus:text-destructive"
-              >
-                Delete personal data
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ) : null}
-      </div>
+      <p className="text-sm text-muted-foreground">
+        {filtered.length.toLocaleString()} order{filtered.length === 1 ? "" : "s"}
+        {hasSelection
+          ? ` · ${selectedIds.length} selected`
+          : ""}
+      </p>
 
       <div className="overflow-hidden rounded-lg border bg-card">
         <Table>
@@ -446,14 +387,13 @@ export function TicketingOrdersClient({
               <TableHead>Date/Time</TableHead>
               <TableHead className="min-w-[240px]">Event</TableHead>
               <TableHead className="text-right">Value</TableHead>
-              <TableHead className="w-10" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={canManage ? 8 : 7}
+                  colSpan={canManage ? 7 : 6}
                   className="py-12 text-center text-muted-foreground"
                 >
                   {orders.length === 0
@@ -483,8 +423,18 @@ export function TicketingOrdersClient({
                         />
                       </TableCell>
                     ) : null}
-                    <TableCell className="font-medium text-primary">
-                      {order.orderNumber}
+                    <TableCell>
+                      <button
+                        type="button"
+                        className="font-medium text-primary hover:underline"
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          setSelectedOrder(order)
+                          setDetailOpen(true)
+                        }}
+                      >
+                        {order.orderNumber}
+                      </button>
                     </TableCell>
                     <TableCell>
                       <Badge
@@ -509,25 +459,6 @@ export function TicketingOrdersClient({
                     </TableCell>
                     <TableCell className="text-right font-medium">
                       {formatTicketPrice(order.totalCents, order.currency)}
-                    </TableCell>
-                    <TableCell onClick={(event) => event.stopPropagation()}>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => {
-                              setSelectedOrder(order)
-                              setDetailOpen(true)
-                            }}
-                          >
-                            View details
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 )

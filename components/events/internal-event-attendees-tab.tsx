@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Users, ScanLine } from "lucide-react"
+import { Users } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -25,7 +25,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
-import { setEventTicketCheckIn, promoteWaitlistedTicket, checkInEventTicketByCode, resendEventTicketConfirmation, completePendingEventTicketOrder, refundEventTicketOrder } from "@/lib/tickets/ticket-order-actions"
+import { setEventTicketCheckIn, promoteWaitlistedTicket, resendEventTicketConfirmation, completePendingEventTicketOrder, refundEventTicketOrder } from "@/lib/tickets/ticket-order-actions"
 import type { EventAttendeeListItem } from "@/lib/tickets/ticket-order-queries"
 import type { EventTicketType } from "@/lib/tickets/ticket-types"
 import { formatTicketPrice } from "@/lib/tickets/ticket-types"
@@ -33,6 +33,7 @@ import { InternalEventAttendeeOrderSheet } from "@/components/events/internal-ev
 import { InternalEventAddAttendeeDialog } from "@/components/events/internal-event-add-attendee-dialog"
 import { InternalEventTransferAttendeeDialog } from "@/components/events/internal-event-transfer-attendee-dialog"
 import { InternalEventRefundDialog } from "@/components/events/internal-event-refund-dialog"
+import { TicketCheckInScanner } from "@/components/tickets/ticket-check-in-scanner"
 import { ticketOrderRemainingCents } from "@/lib/tickets/ticket-refund-math"
 import { formatPhoneDisplay } from "@/lib/ui/format-phone"
 
@@ -98,7 +99,6 @@ export function InternalEventAttendeesTab({
   const router = useRouter()
   const [addOpen, setAddOpen] = useState(false)
   const [transferTarget, setTransferTarget] = useState<EventAttendeeListItem | null>(null)
-  const [scanCode, setScanCode] = useState("")
   const [scanMessage, setScanMessage] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -184,29 +184,6 @@ export function InternalEventAttendeesTab({
   const orderActions = orderTarget
     ? attendeeOrderActions(orderTarget, canManage)
     : null
-
-  function handleScanCheckIn() {
-    setError(null)
-    setScanMessage(null)
-    startTransition(async () => {
-      const result = await checkInEventTicketByCode({
-        eventId,
-        ticketCode: scanCode,
-        checkedIn: true,
-      })
-      if (!result.success) {
-        setError(result.error)
-        return
-      }
-      setScanMessage(
-        result.alreadyCheckedIn
-          ? `${result.attendeeName} was already checked in.`
-          : `Checked in ${result.attendeeName}.`
-      )
-      setScanCode("")
-      router.refresh()
-    })
-  }
 
   function handleResend(ticketId: string) {
     setError(null)
@@ -305,8 +282,8 @@ export function InternalEventAttendeesTab({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
+      <div className="grid shrink-0 gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -360,58 +337,29 @@ export function InternalEventAttendeesTab({
       </div>
 
       {canCheckIn ? (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <ScanLine className="h-4 w-4" />
-              Check-in scanner
-            </CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Scan or type a ticket code (QR codes encode this code) and press Enter.
-            </p>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-end">
-            <div className="flex-1 space-y-2">
-              <Input
-                value={scanCode}
-                onChange={(event) => setScanCode(event.target.value.toUpperCase())}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault()
-                    handleScanCheckIn()
-                  }
-                }}
-                placeholder="Ticket code"
-                autoComplete="off"
-                className="font-mono uppercase tracking-wider"
-              />
-            </div>
-            <Button
-              type="button"
-              disabled={isPending || !scanCode.trim()}
-              onClick={handleScanCheckIn}
-            >
-              Check in
-            </Button>
-          </CardContent>
-        </Card>
+        <div className="shrink-0">
+          <TicketCheckInScanner
+            eventId={eventId}
+            onCheckedIn={() => router.refresh()}
+          />
+        </div>
       ) : null}
 
       {scanMessage ? (
-        <p className="text-sm text-emerald-700">{scanMessage}</p>
+        <p className="shrink-0 text-sm text-emerald-700">{scanMessage}</p>
       ) : null}
 
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+      <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <CardHeader className="shrink-0 flex flex-row items-start justify-between gap-4 space-y-0">
           <div>
             <CardTitle className="flex items-center gap-2 text-base">
               <Users className="h-4 w-4" />
-              Attendees
+              Orders
             </CardTitle>
             <p className="mt-1 text-sm text-muted-foreground">
-              People attending from paid, free, or complimentary registration.
+              People attending from paid or free tickets.
               {waitlistEnabled
-                ? " Waitlist is enabled — promote people manually from waitlisted registrations when capacity opens."
+                ? " Waitlist is enabled — promote people manually from waitlisted orders when capacity opens."
                 : ""}
             </p>
           </div>
@@ -427,15 +375,15 @@ export function InternalEventAttendeesTab({
             ) : null}
             {canManage ? (
               <Button variant="outline" size="sm" asChild>
-                <Link href={`/event-management/ticketing/orders?event=${eventId}`}>
+                <Link href={`/event-management/reports/orders?event=${eventId}`}>
                   View orders
                 </Link>
               </Button>
             ) : null}
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+        <CardContent className="flex min-h-0 flex-1 flex-col space-y-4 overflow-hidden">
+          <div className="flex shrink-0 flex-col gap-3 lg:flex-row lg:items-center">
             <Input
               placeholder="Search name, email, ticket, order…"
               value={search}
@@ -472,7 +420,7 @@ export function InternalEventAttendeesTab({
             </Select>
             <Select value={typeFilter} onValueChange={setTypeFilter}>
               <SelectTrigger className="lg:w-[200px]">
-                <SelectValue placeholder="Registration type" />
+                <SelectValue placeholder="Ticket type" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All types</SelectItem>
@@ -490,13 +438,13 @@ export function InternalEventAttendeesTab({
           {filtered.length === 0 ? (
             <p className="rounded-md border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
               {attendees.length === 0
-                ? "No attendees yet. Orders and free registrations will appear here."
-                : "No attendees match your filters."}
+                ? "No orders yet. Orders and free tickets will appear here."
+                : "No orders match your filters."}
             </p>
           ) : (
-            <div className="overflow-x-auto rounded-md border">
-              <Table>
-                <TableHeader>
+            <div className="min-h-0 flex-1 overflow-auto rounded-md border">
+              <Table containerClassName="overflow-visible">
+                <TableHeader className="sticky top-0 z-10 bg-background [&_th]:bg-background">
                   <TableRow>
                     <TableHead>Attendee</TableHead>
                     <TableHead>Type</TableHead>

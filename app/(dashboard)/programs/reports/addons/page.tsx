@@ -6,8 +6,10 @@ import { AddonsReportTable } from "@/components/programs/addons-report-table"
 import { ProgramsStaffSubnav } from "@/components/programs/programs-staff-subnav"
 import { getAddonReportRows } from "@/lib/programs/addons-report"
 import { hasPermission, PERMISSIONS } from "@/lib/permissions/permissions"
+import { redirectOrgWideProgramPagesForDepartmentHead } from "@/lib/programs/program-access"
 
 export default async function ProgramsAddonsReportPage() {
+  await redirectOrgWideProgramPagesForDepartmentHead()
   const canView =
     (await hasPermission(PERMISSIONS.PROGRAMS_VIEW)) ||
     (await hasPermission(PERMISSIONS.REPORTS_VIEW))

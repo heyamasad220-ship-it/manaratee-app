@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import type { UserPortalCapabilities } from "@/lib/auth/portal-capabilities-types"
 import { resolvePortalPermissions } from "@/lib/auth/resolve-portal-permissions"
 import { resolveStaffToolsPortalAccess } from "@/lib/auth/staff-tools-eligibility"
+import { resolveStaffIdentityForUser } from "@/lib/organizations/work-email-lookups"
 
 export async function fetchUserPortalCapabilities(
   supabase: SupabaseClient,
@@ -21,33 +22,35 @@ export async function fetchUserPortalCapabilities(
 
   const { data: membership } = await supabase
     .from("organization_members")
-    .select("role, role_id")
+    .select("role, role_id, assigned_contact_id")
     .eq("organization_id", organizationId)
     .eq("user_id", userId)
     .eq("status", "active")
     .maybeSingle()
 
-  const { data: contact } = await supabase
-    .from("contacts")
-    .select("id")
-    .eq("organization_id", organizationId)
-    .eq("auth_user_id", userId)
-    .maybeSingle()
+  const identity = await resolveStaffIdentityForUser(
+    supabase,
+    organizationId,
+    userId
+  )
 
+  const teachingContactId = identity.staffContactId || identity.personalContactId
   let hasTeachingPortal = false
 
-  if (contact?.id) {
+  if (teachingContactId) {
     const { count } = await supabase
       .from("program_staff_assignments")
       .select("id", { count: "exact", head: true })
       .eq("organization_id", organizationId)
-      .eq("contact_id", contact.id)
+      .eq("contact_id", teachingContactId)
       .eq("is_active", true)
 
     hasTeachingPortal = (count ?? 0) > 0
   }
 
-  const hasPersonalPortal = Boolean(contact?.id) || membership?.role === "viewer"
+  const hasPersonalPortal = identity.isWorkLogin
+    ? false
+    : Boolean(identity.personalContactId) || membership?.role === "viewer"
 
   const portalPermissions = await resolvePortalPermissions(
     supabase,
@@ -60,7 +63,7 @@ export async function fetchUserPortalCapabilities(
     organizationId,
     userId,
     membership,
-    contact?.id
+    identity.staffContactId
   )
 
   return {

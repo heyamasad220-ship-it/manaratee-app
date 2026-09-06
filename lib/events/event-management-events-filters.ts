@@ -4,11 +4,14 @@ import { toWorkspaceEventStatus } from "@/lib/events/internal-event-status"
 import type { InternalEventWithRelations } from "@/lib/events/internal-event-types"
 
 export type EventManagementEventsStatusFilter = "active" | "draft" | "past" | "all"
+export type EventManagementEventsTicketedFilter = "all" | "ticketed"
 
 export type EventManagementEventsFilters = {
   q: string
   department: string
   status: EventManagementEventsStatusFilter
+  ticketed: EventManagementEventsTicketedFilter
+  category: string
 }
 
 export const DEFAULT_EVENT_MANAGEMENT_EVENTS_FILTERS: EventManagementEventsFilters =
@@ -16,6 +19,8 @@ export const DEFAULT_EVENT_MANAGEMENT_EVENTS_FILTERS: EventManagementEventsFilte
     q: "",
     department: "all",
     status: "active",
+    ticketed: "all",
+    category: "all",
   }
 
 export const EVENT_MANAGEMENT_EVENTS_STATUS_FILTER_ITEMS: Array<{
@@ -28,8 +33,19 @@ export const EVENT_MANAGEMENT_EVENTS_STATUS_FILTER_ITEMS: Array<{
   { value: "all", label: "All" },
 ]
 
+export const EVENT_MANAGEMENT_EVENTS_TICKETED_FILTER_ITEMS: Array<{
+  value: EventManagementEventsTicketedFilter
+  label: string
+}> = [
+  { value: "all", label: "All events" },
+  { value: "ticketed", label: "Ticketed" },
+]
+
 const STATUS_FILTER_VALUES = new Set(
   EVENT_MANAGEMENT_EVENTS_STATUS_FILTER_ITEMS.map((item) => item.value)
+)
+const TICKETED_FILTER_VALUES = new Set(
+  EVENT_MANAGEMENT_EVENTS_TICKETED_FILTER_ITEMS.map((item) => item.value)
 )
 
 function getParam(
@@ -47,12 +63,19 @@ export function parseEventManagementEventsFilters(
   params: URLSearchParams | Record<string, string | string[] | undefined>
 ): EventManagementEventsFilters {
   const status = getParam(params, "status")
+  const ticketed = getParam(params, "ticketed")
   return {
     q: getParam(params, "q"),
     department: getParam(params, "department") || "all",
     status: STATUS_FILTER_VALUES.has(status as EventManagementEventsStatusFilter)
       ? (status as EventManagementEventsStatusFilter)
       : DEFAULT_EVENT_MANAGEMENT_EVENTS_FILTERS.status,
+    ticketed: TICKETED_FILTER_VALUES.has(
+      ticketed as EventManagementEventsTicketedFilter
+    )
+      ? (ticketed as EventManagementEventsTicketedFilter)
+      : DEFAULT_EVENT_MANAGEMENT_EVENTS_FILTERS.ticketed,
+    category: getParam(params, "category") || "all",
   }
 }
 
@@ -66,6 +89,12 @@ export function buildEventManagementEventsHref(
   }
   if (filters.status && filters.status !== DEFAULT_EVENT_MANAGEMENT_EVENTS_FILTERS.status) {
     params.set("status", filters.status)
+  }
+  if (filters.ticketed && filters.ticketed !== DEFAULT_EVENT_MANAGEMENT_EVENTS_FILTERS.ticketed) {
+    params.set("ticketed", filters.ticketed)
+  }
+  if (filters.category && filters.category !== "all") {
+    params.set("category", filters.category)
   }
   const query = params.toString()
   return query
@@ -133,6 +162,28 @@ function sortEventsForStatus(
   })
 }
 
+function eventIsTicketed(event: InternalEventWithRelations) {
+  return event.requires_ticketing === true
+}
+
+function matchesTicketedFilter(
+  event: InternalEventWithRelations,
+  ticketed: EventManagementEventsTicketedFilter | undefined
+) {
+  if (!ticketed || ticketed === "all") return true
+  return eventIsTicketed(event)
+}
+
+function matchesCategoryFilter(
+  event: InternalEventWithRelations,
+  category: string | undefined
+) {
+  if (!category || category === "all") return true
+  if (!eventIsTicketed(event)) return false
+  if (category === "none") return !event.ticketing_category_id
+  return event.ticketing_category_id === category
+}
+
 export function filterEventManagementEvents(
   events: InternalEventWithRelations[],
   filters: EventManagementEventsFilters,
@@ -146,6 +197,8 @@ export function filterEventManagementEvents(
     ) {
       return false
     }
+    if (!matchesTicketedFilter(event, filters.ticketed)) return false
+    if (!matchesCategoryFilter(event, filters.category)) return false
     return matchesEventStatus(event, filters.status, now)
   })
   return sortEventsForStatus(filtered, filters.status)

@@ -166,7 +166,7 @@ export function InternalEventReportsTab({
             customers.
           </p>
           <Button type="button" size="sm" variant="outline" asChild>
-            <Link href="/event-management/ticketing/reports">Open reports</Link>
+            <Link href="/event-management/reports/tickets">Open reports</Link>
           </Button>
         </CardContent>
       </Card>

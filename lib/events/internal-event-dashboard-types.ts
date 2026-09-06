@@ -15,6 +15,14 @@ export interface EventManagementDashboardKpis {
   ticketedEvents: number
 }
 
+export interface EventManagementDashboardTicketSales {
+  totalTicketedEvents: number
+  activeTicketedEvents: number
+  ticketsIssued: number
+  revenueCents: number
+  currency: string
+}
+
 export interface DashboardEventRow {
   id: string
   name: string
@@ -37,5 +45,6 @@ export interface DashboardAttentionItem {
 
 export interface EventManagementDashboardData {
   kpis: EventManagementDashboardKpis
+  ticketSales: EventManagementDashboardTicketSales
   attentionItems: DashboardAttentionItem[]
 }

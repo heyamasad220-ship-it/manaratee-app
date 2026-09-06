@@ -17,7 +17,7 @@ export type HierarchyLabels = {
   /** Year / Season */
   containerSingular: string
   containerPlural: string
-  /** Offering / Program (sellable unit) */
+  /** Offering (sellable unit) */
   offeringSingular: string
   offeringPlural: string
   /** Term / Session */

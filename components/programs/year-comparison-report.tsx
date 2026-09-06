@@ -149,19 +149,47 @@ function WorkspaceNameLink({
   )
 }
 
-export function YearComparisonReport({
-  facts,
-  lockedSeriesKey = null,
-  lockedDepartmentId = null,
-  initialYearKey = null,
-}: {
+type YearComparisonReportProps = {
   facts: YearComparisonFact[]
   lockedSeriesKey?: string | null
   lockedDepartmentId?: string | null
   initialYearKey?: string | null
+  hideToolbar?: boolean
+  showTables?: boolean
+}
+
+export function YearComparisonReport(props: YearComparisonReportProps) {
+  if (props.hideToolbar) {
+    return <YearComparisonReportView {...props} kindFilter="all" />
+  }
+  return <YearComparisonReportWithKindPreset {...props} />
+}
+
+function YearComparisonReportWithKindPreset(props: YearComparisonReportProps) {
+  const { kindFilter, setKindFilter } = useProgramKindReportPreset()
+  return (
+    <YearComparisonReportView
+      {...props}
+      kindFilter={kindFilter}
+      onKindFilterChange={setKindFilter}
+    />
+  )
+}
+
+function YearComparisonReportView({
+  facts,
+  lockedSeriesKey = null,
+  lockedDepartmentId = null,
+  initialYearKey = null,
+  hideToolbar = false,
+  showTables = true,
+  kindFilter,
+  onKindFilterChange,
+}: YearComparisonReportProps & {
+  kindFilter: ProgramKind | "all"
+  onKindFilterChange?: (value: ProgramKind | "all") => void
 }) {
   const locked = Boolean(lockedSeriesKey)
-  const { kindFilter, setKindFilter } = useProgramKindReportPreset()
   const [departmentFilter, setDepartmentFilter] = useState(
     lockedDepartmentId || ALL
   )
@@ -199,17 +227,21 @@ export function YearComparisonReport({
   const filteredFacts = useMemo(
     () =>
       filterYearComparisonFacts(facts, {
-        departmentId: locked
-          ? lockedDepartmentId || null
-          : departmentFilter === ALL
-            ? null
-            : departmentFilter,
-        seriesKey: safeSeriesFilter === ALL ? null : safeSeriesFilter,
-        programKind: locked ? "all" : kindFilter,
+        departmentId:
+          locked || hideToolbar
+            ? lockedDepartmentId ||
+              (departmentFilter === ALL ? null : departmentFilter)
+            : departmentFilter === ALL
+              ? null
+              : departmentFilter,
+        seriesKey:
+          hideToolbar || safeSeriesFilter === ALL ? null : safeSeriesFilter,
+        programKind: locked || hideToolbar ? "all" : kindFilter,
       }),
     [
       facts,
       locked,
+      hideToolbar,
       lockedDepartmentId,
       departmentFilter,
       safeSeriesFilter,
@@ -283,6 +315,7 @@ export function YearComparisonReport({
 
   return (
     <div className="space-y-6">
+      {hideToolbar ? null : (
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
         {locked ? null : (
           <>
@@ -313,7 +346,7 @@ export function YearComparisonReport({
           <Select
             value={kindFilter}
             onValueChange={(value) => {
-              setKindFilter(value as ProgramKind | "all")
+              onKindFilterChange?.(value as ProgramKind | "all")
               setSeriesFilter(ALL)
             }}
           >
@@ -371,6 +404,7 @@ export function YearComparisonReport({
           Export CSV
         </Button>
       </div>
+      )}
 
       {selectedYear ? (
         <div className="space-y-2">
@@ -507,6 +541,8 @@ export function YearComparisonReport({
             </Card>
           </div>
 
+          {showTables ? (
+            <>
           <div className="overflow-x-auto rounded-md border">
             <Table>
               <TableHeader>
@@ -603,6 +639,8 @@ export function YearComparisonReport({
                 </Table>
               </div>
             </div>
+          ) : null}
+            </>
           ) : null}
         </>
       )}

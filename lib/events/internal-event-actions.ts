@@ -21,7 +21,13 @@ import { createClient } from "@/lib/supabase/server"
 import { resolveOrganizationId } from "@/lib/organizations/resolve-organization-id"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { userCanSubmitInternalEventRequest } from "@/lib/auth/staff-tools-eligibility"
-import { hasAnyPermission, PERMISSIONS } from "@/lib/permissions/permissions"
+import {
+  canLinkEventToCampaign,
+  canManageDepartmentEvents,
+  canManageInternalEvent,
+} from "@/lib/events/event-access"
+import { linkedCampaignIdFromConfig } from "@/lib/events/event-finance-types"
+import { getEventManagementSettings } from "@/lib/events/event-management-settings"
 import { getConflictingReservations } from "@/lib/reservations/reservation-queries"
 import { fireModuleNotifications } from "@/lib/notifications/dispatch-module-notification"
 
@@ -90,6 +96,8 @@ type CreateInternalEventInput = {
   operationalSetup?: OperationalSetupInput
   /** Recurring series (materialized as one event row per occurrence). */
   recurrence_config?: EventRecurrenceConfig | Record<string, unknown> | null
+  /** When creating from a campaign Event tab, link this campaign. */
+  linkedCampaignId?: string | null
 }
 
 type UpdateInternalEventInput = CreateInternalEventInput & {
@@ -170,10 +178,7 @@ function validateEventInput(input: CreateInternalEventInput) {
   let locationAddress = input.location_address?.trim() || null
 
   if (locationType === INTERNAL_EVENT_LOCATION_TYPES.facility) {
-    if (venueIds.length === 0) {
-      throw new Error("Select at least one facility venue.")
-    }
-    venueId = venueIds[0]
+    venueId = venueIds[0] || null
     locationAddress = null
   } else if (locationType === INTERNAL_EVENT_LOCATION_TYPES.online) {
     venueId = null
@@ -468,10 +473,7 @@ function revalidateInternalEventPaths(eventId?: string) {
 }
 
 export async function createInternalEvent(input: CreateInternalEventInput) {
-  const canManage = await hasAnyPermission(
-    PERMISSIONS.EVENTS_MANAGE,
-    PERMISSIONS.PROGRAMS_MANAGE
-  )
+  const canManage = await canManageDepartmentEvents(input.department_id)
   if (!canManage) {
     throw new Error("You do not have permission to create events.")
   }
@@ -571,11 +573,13 @@ export async function submitInternalEventRequest(input: CreateInternalEventInput
     throw new Error("Select Center, Online, or External Venue.")
   }
 
-  // Center (facility) needs approval to coordinate spaces. Online / External Venue
-  // do not use the building, so they confirm on submit.
+  // On-site waits for approval only when the org setting is on.
+  // Online / External Venue never use Facilities and never wait.
   const isFacility =
     input.location_type === INTERNAL_EVENT_LOCATION_TYPES.facility
-  const submitStatus = isFacility
+  const settings = await getEventManagementSettings(organizationId)
+  const needsApproval = isFacility && settings.approvalRequired
+  const submitStatus = needsApproval
     ? INTERNAL_EVENT_STATUSES.awaitingApproval
     : INTERNAL_EVENT_STATUSES.confirmed
 
@@ -595,13 +599,9 @@ export async function submitInternalEventRequest(input: CreateInternalEventInput
     throw new Error("Start and end times are required to submit an event request.")
   }
 
-  if (isFacility && venueIds.length === 0) {
-    throw new Error("Select at least one venue to submit an event request.")
-  }
-
   await assertDepartmentInOrg(supabase, organizationId, eventPayload.department_id)
   await assertEventTypeInOrg(supabase, organizationId, eventPayload.event_type_id)
-  if (isFacility) {
+  if (isFacility && venueIds.length > 0) {
     await assertVenuesInOrg(supabase, organizationId, venueIds)
   }
 
@@ -613,7 +613,7 @@ export async function submitInternalEventRequest(input: CreateInternalEventInput
     throw new Error("No occurrences to schedule. Check recurrence rules and exceptions.")
   }
 
-  if (isFacility) {
+  if (isFacility && venueIds.length > 0) {
     for (const occurrence of occurrences) {
       await assertInternalEventSpacesAvailable({
         organizationId,
@@ -651,7 +651,7 @@ export async function submitInternalEventRequest(input: CreateInternalEventInput
         end_at: occurrence.endAt.toISOString(),
         status: submitStatus,
         submitted_at: nowIso,
-        approved_at: isFacility ? null : nowIso,
+        approved_at: needsApproval ? null : nowIso,
         created_by: user.id,
         recurrence_config: storedRecurrence,
       })
@@ -687,7 +687,7 @@ export async function submitInternalEventRequest(input: CreateInternalEventInput
     const eventId = data.id as string
     createdIds.push(eventId)
 
-    if (isFacility) {
+    if (isFacility && venueIds.length > 0) {
       await replaceInternalEventVenues({
         supabase,
         organizationId,
@@ -705,7 +705,17 @@ export async function submitInternalEventRequest(input: CreateInternalEventInput
 
   const primaryId = createdIds[0]
 
-  if (isFacility) {
+  const linkedCampaignId = input.linkedCampaignId?.trim() || null
+  if (linkedCampaignId) {
+    for (const eventId of createdIds) {
+      await updateEventLinkedCampaign({
+        eventId,
+        linkedCampaignId,
+      })
+    }
+  }
+
+  if (needsApproval) {
     fireModuleNotifications([
       {
         organizationId,
@@ -731,7 +741,7 @@ export async function submitInternalEventRequest(input: CreateInternalEventInput
         eventKey: "request_received",
         subject: "Event request received",
         summary:
-          "Your Center event request was received and is awaiting facility review.",
+          "Your Center event request was received and is awaiting review.",
         metadata: {
           eventId: primaryId,
           eventIds: createdIds,
@@ -750,8 +760,10 @@ export async function submitInternalEventRequest(input: CreateInternalEventInput
         subject: "New event created",
         summary:
           createdIds.length > 1
-            ? `A staff member created a recurring Online/External event (${createdIds.length} occurrences).`
-            : "A staff member created an Online or External Venue event (no facility approval required).",
+            ? `A staff member created a recurring event (${createdIds.length} occurrences).`
+            : isFacility
+              ? "A staff member created a Center event (approval is not required)."
+              : "A staff member created an Online or External Venue event (no facility approval required).",
         metadata: {
           eventId: primaryId,
           eventIds: createdIds,
@@ -766,7 +778,9 @@ export async function submitInternalEventRequest(input: CreateInternalEventInput
         audience: "customer",
         eventKey: "request_approved",
         subject: "Event confirmed",
-        summary: "Your Online or External Venue event is confirmed.",
+        summary: isFacility
+          ? "Your Center event is live."
+          : "Your Online or External Venue event is live.",
         metadata: {
           eventId: primaryId,
           eventIds: createdIds,
@@ -786,10 +800,7 @@ export async function submitInternalEventRequest(input: CreateInternalEventInput
 }
 
 export async function approveInternalEventRequest(eventId: string) {
-  const canManage = await hasAnyPermission(
-    PERMISSIONS.EVENTS_MANAGE,
-    PERMISSIONS.PROGRAMS_MANAGE
-  )
+  const canManage = await canManageInternalEvent(eventId)
   if (!canManage) {
     throw new Error("You do not have permission to approve event requests.")
   }
@@ -885,10 +896,7 @@ export async function declineInternalEventRequest(input: {
   eventId: string
   declineReason?: string | null
 }) {
-  const canManage = await hasAnyPermission(
-    PERMISSIONS.EVENTS_MANAGE,
-    PERMISSIONS.PROGRAMS_MANAGE
-  )
+  const canManage = await canManageInternalEvent(input.eventId)
   if (!canManage) {
     throw new Error("You do not have permission to decline event requests.")
   }
@@ -968,15 +976,12 @@ export async function updateInternalEvent(input: UpdateInternalEventInput) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  const canManage = await hasAnyPermission(
-    PERMISSIONS.EVENTS_MANAGE,
-    PERMISSIONS.PROGRAMS_MANAGE
-  )
-
   const existingEvent = await getInternalEventRecordById(input.id)
   if (!existingEvent) {
     throw new Error("Event not found.")
   }
+
+  const canManage = await canManageDepartmentEvents(existingEvent.department_id)
 
   const isPendingOwner =
     Boolean(user?.id) &&
@@ -1100,10 +1105,7 @@ export async function updateInternalEventStatus(
   id: string,
   status: InternalEventStatus
 ) {
-  const canManage = await hasAnyPermission(
-    PERMISSIONS.EVENTS_MANAGE,
-    PERMISSIONS.PROGRAMS_MANAGE
-  )
+  const canManage = await canManageInternalEvent(id)
   if (!canManage) {
     throw new Error("You do not have permission to update events.")
   }
@@ -1169,7 +1171,7 @@ export async function setInternalEventStatusFromMenu(
   }
 
   if (
-    menuValue === "approved" &&
+    menuValue === "live" &&
     isInternalEventPendingApproval(event.status)
   ) {
     await approveInternalEventRequest(eventId)
@@ -1185,10 +1187,7 @@ export async function setInternalEventStatusFromMenu(
 export async function deleteInternalEvent(
   id: string
 ): Promise<InternalEventCatalogActionResult> {
-  const canManage = await hasAnyPermission(
-    PERMISSIONS.EVENTS_MANAGE,
-    PERMISSIONS.PROGRAMS_MANAGE
-  )
+  const canManage = await canManageInternalEvent(id)
   if (!canManage) {
     return { success: false, error: "You do not have permission to delete events." }
   }
@@ -1323,10 +1322,7 @@ export async function getInternalEventDeleteBlockersMap(
 export async function duplicateInternalEvent(
   sourceEventId: string
 ): Promise<InternalEventCatalogActionResult> {
-  const canManage = await hasAnyPermission(
-    PERMISSIONS.EVENTS_MANAGE,
-    PERMISSIONS.PROGRAMS_MANAGE
-  )
+  const canManage = await canManageInternalEvent(sourceEventId)
   if (!canManage) {
     return { success: false, error: "You do not have permission to copy events." }
   }
@@ -1409,10 +1405,7 @@ export async function updateInternalEventModules(input: {
   attendanceMode?: EventAttendanceMode
 }): Promise<InternalEventCatalogActionResult> {
   try {
-    const canManage = await hasAnyPermission(
-      PERMISSIONS.EVENTS_MANAGE,
-      PERMISSIONS.PROGRAMS_MANAGE
-    )
+    const canManage = await canManageInternalEvent(input.eventId)
     if (!canManage) {
       return { success: false, error: "You do not have permission to update events." }
     }
@@ -1559,10 +1552,7 @@ export async function updateEventWorkspaceFeatures(input: {
   features: EventWorkspaceFeatures
 }): Promise<InternalEventCatalogActionResult> {
   try {
-    const canManage = await hasAnyPermission(
-      PERMISSIONS.EVENTS_MANAGE,
-      PERMISSIONS.PROGRAMS_MANAGE
-    )
+    const canManage = await canManageInternalEvent(input.eventId)
     if (!canManage) {
       return { success: false, error: "You do not have permission to update events." }
     }
@@ -1656,10 +1646,7 @@ export async function updateEventWorkspaceMeta(input: {
   internalNotes?: string | null
 }): Promise<InternalEventCatalogActionResult> {
   try {
-    const canManage = await hasAnyPermission(
-      PERMISSIONS.EVENTS_MANAGE,
-      PERMISSIONS.PROGRAMS_MANAGE
-    )
+    const canManage = await canManageInternalEvent(input.eventId)
     if (!canManage) {
       return { success: false, error: "You do not have permission to update events." }
     }
@@ -1754,12 +1741,12 @@ export async function updateEventLinkedCampaign(input: {
   linkedCampaignId: string | null
 }): Promise<InternalEventCatalogActionResult> {
   try {
-    const canManage = await hasAnyPermission(
-      PERMISSIONS.EVENTS_MANAGE,
-      PERMISSIONS.PROGRAMS_MANAGE
-    )
-    if (!canManage) {
-      return { success: false, error: "You do not have permission to update events." }
+    const canLink = await canLinkEventToCampaign(input.eventId)
+    if (!canLink) {
+      return {
+        success: false,
+        error: "You do not have permission to link this event to a campaign.",
+      }
     }
 
     const supabase = await createClient()
@@ -1772,6 +1759,10 @@ export async function updateEventLinkedCampaign(input: {
     if (!existingEvent) {
       return { success: false, error: "Event not found." }
     }
+
+    const previousCampaignId = linkedCampaignIdFromConfig(
+      existingEvent.ticketing_config as EventTicketingConfig | null
+    )
 
     const linkedCampaignId =
       typeof input.linkedCampaignId === "string" && input.linkedCampaignId.trim()
@@ -1811,6 +1802,12 @@ export async function updateEventLinkedCampaign(input: {
 
     revalidateInternalEventPaths(input.eventId)
     revalidatePath(`/event-management/${input.eventId}`)
+    if (previousCampaignId) {
+      revalidatePath(`/donations/campaigns/${previousCampaignId}`)
+    }
+    if (linkedCampaignId) {
+      revalidatePath(`/donations/campaigns/${linkedCampaignId}`)
+    }
     return { success: true, eventId: input.eventId }
   } catch (error) {
     return {
@@ -1825,10 +1822,7 @@ export async function updateInternalEventFlyer(input: {
   flyerUrl: string | null
 }): Promise<InternalEventCatalogActionResult> {
   try {
-    const canManage = await hasAnyPermission(
-      PERMISSIONS.EVENTS_MANAGE,
-      PERMISSIONS.PROGRAMS_MANAGE
-    )
+    const canManage = await canManageInternalEvent(input.eventId)
     if (!canManage) {
       return { success: false, error: "You do not have permission to update events." }
     }
@@ -1877,10 +1871,7 @@ export async function updateInternalEventCommunityCalendar(input: {
   visibility: CommunityCalendarVisibility
 }): Promise<InternalEventCatalogActionResult> {
   try {
-    const canManage = await hasAnyPermission(
-      PERMISSIONS.EVENTS_MANAGE,
-      PERMISSIONS.PROGRAMS_MANAGE
-    )
+    const canManage = await canManageInternalEvent(input.eventId)
     if (!canManage) {
       return { success: false, error: "You do not have permission to update events." }
     }
@@ -1937,10 +1928,7 @@ export async function updateInternalEventDescription(input: {
   description: string | null
 }): Promise<InternalEventCatalogActionResult> {
   try {
-    const canManage = await hasAnyPermission(
-      PERMISSIONS.EVENTS_MANAGE,
-      PERMISSIONS.PROGRAMS_MANAGE
-    )
+    const canManage = await canManageInternalEvent(input.eventId)
     if (!canManage) {
       return { success: false, error: "You do not have permission to update events." }
     }
@@ -1990,10 +1978,7 @@ export async function updateInternalEventFlyerFocal(input: {
   focalY: number
 }): Promise<InternalEventCatalogActionResult> {
   try {
-    const canManage = await hasAnyPermission(
-      PERMISSIONS.EVENTS_MANAGE,
-      PERMISSIONS.PROGRAMS_MANAGE
-    )
+    const canManage = await canManageInternalEvent(input.eventId)
     if (!canManage) {
       return { success: false, error: "You do not have permission to update events." }
     }

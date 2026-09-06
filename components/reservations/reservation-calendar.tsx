@@ -36,6 +36,8 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { TimeInput } from "@/components/ui/time-input"
 import { CREATE_EVENT_CTA_LABEL } from "@/lib/events/facility-event-request-href"
+import { updateEventLinkedCampaign } from "@/lib/events/internal-event-actions"
+import { isSafeReturnToPath } from "@/lib/navigation/return-to"
 import type { CalendarAudience } from "@/lib/reservations/calendar-audience"
 
 import { createReservationBlock } from "@/lib/reservations/reservation-actions"
@@ -91,6 +93,7 @@ export type FacilityEventFormOptions = {
     departmentId: string | null
     user: { id: string; name: string } | null
   }
+  approvalRequired?: boolean
 }
 
 type CalendarColumn = {
@@ -617,6 +620,7 @@ export function ReservationCalendar({
   const columns = useMemo(() => buildColumns(data), [data])
   const eventRequestDepartmentId = searchParams.get("department")?.trim() || null
   const eventRequestReturnTo = searchParams.get("returnTo")?.trim() || null
+  const eventRequestCampaignId = searchParams.get("campaign")?.trim() || null
   const queryVenueId = searchParams.get("venueId")?.trim() || ""
   const queryStart = searchParams.get("start")?.trim() || ""
   const queryEnd = searchParams.get("end")?.trim() || ""
@@ -713,7 +717,7 @@ export function ReservationCalendar({
   function clearEventCreateQueryParams() {
     const params = new URLSearchParams(searchParams.toString())
     let changed = false
-    for (const key of ["openNew", "venueId", "start", "end"]) {
+    for (const key of ["openNew", "venueId", "start", "end", "campaign"]) {
       if (params.has(key)) {
         params.delete(key)
         changed = true
@@ -1133,17 +1137,33 @@ export function ReservationCalendar({
           lockDepartment={Boolean(eventRequestDepartmentId)}
           initialSlot={eventSlot}
           editEventId={editEventId}
-          onSubmitted={() => {
+          linkedCampaignId={eventRequestCampaignId}
+          approvalRequired={eventFormOptions.approvalRequired === true}
+          spaceMode="select"
+          onSubmitted={(createdEventId) => {
+            const shouldLinkCampaign = Boolean(eventRequestCampaignId) && !editEventId
+            const campaignIdToLink = eventRequestCampaignId
+            const returnTo = isSafeReturnToPath(eventRequestReturnTo)
+              ? eventRequestReturnTo
+              : null
+
             setEventDrawerOpen(false)
             setEditEventId(null)
             setEventSlot(null)
             clearEventCreateQueryParams()
-            if (eventRequestReturnTo) {
-              router.push(eventRequestReturnTo)
+
+            void (async () => {
+              if (shouldLinkCampaign && campaignIdToLink) {
+                await updateEventLinkedCampaign({
+                  eventId: createdEventId,
+                  linkedCampaignId: campaignIdToLink,
+                })
+              }
+              if (returnTo) {
+                router.push(returnTo)
+              }
               router.refresh()
-              return
-            }
-            router.refresh()
+            })()
           }}
         />
       ) : null}

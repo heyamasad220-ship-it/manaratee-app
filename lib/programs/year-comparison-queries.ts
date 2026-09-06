@@ -1,6 +1,7 @@
 "use server"
 
 import { getDepartments } from "@/lib/departments/department-queries"
+import { canViewDepartment } from "@/lib/departments/department-access"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { ROSTER_ENROLLMENT_STATUSES } from "@/lib/programs/enrollment-status-helpers"
 import { getOpenPrograms } from "@/lib/programs/program-queries"
@@ -28,14 +29,17 @@ function normalizeName(value: string | null | undefined) {
 }
 
 async function fetchRosterEnrollments(
-  organizationId: string
+  organizationId: string,
+  programIds?: string[]
 ): Promise<EnrollmentRow[]> {
+  if (programIds && programIds.length === 0) return []
+
   const supabase = await createClient()
   const pageSize = 1000
   const rows: EnrollmentRow[] = []
   let from = 0
   for (;;) {
-    const { data, error } = await supabase
+    let query = supabase
       .from("program_enrollments")
       .select(
         `
@@ -49,7 +53,12 @@ async function fetchRosterEnrollments(
       )
       .eq("organization_id", organizationId)
       .in("status", [...ROSTER_ENROLLMENT_STATUSES])
-      .range(from, from + pageSize - 1)
+
+    if (programIds) {
+      query = query.in("program_id", programIds)
+    }
+
+    const { data, error } = await query.range(from, from + pageSize - 1)
 
     if (error) throw new Error(error.message)
     const page = (data || []) as EnrollmentRow[]
@@ -60,7 +69,9 @@ async function fetchRosterEnrollments(
   return rows
 }
 
-export async function getYearComparisonFacts(): Promise<
+export async function getYearComparisonFacts(options?: {
+  departmentId?: string
+}): Promise<
   | { success: true; facts: YearComparisonFact[] }
   | { success: false; error: string }
 > {
@@ -69,12 +80,29 @@ export async function getYearComparisonFacts(): Promise<
     return { success: false, error: "No organization selected." }
   }
 
+  const departmentId = options?.departmentId
+  if (departmentId) {
+    const canView = await canViewDepartment(departmentId)
+    if (!canView) {
+      return {
+        success: false,
+        error: "You do not have permission to view this department.",
+      }
+    }
+  }
+
   try {
-    const [programs, departments, enrollments] = await Promise.all([
+    const [allPrograms, departments] = await Promise.all([
       getOpenPrograms(),
       getDepartments(),
-      fetchRosterEnrollments(organizationId),
     ])
+    const programs = departmentId
+      ? allPrograms.filter((program) => program.department_id === departmentId)
+      : allPrograms
+    const enrollments = await fetchRosterEnrollments(
+      organizationId,
+      departmentId ? programs.map((program) => program.id) : undefined
+    )
 
     const departmentNameById = new Map(
       departments.map((department) => [department.id, department.name])

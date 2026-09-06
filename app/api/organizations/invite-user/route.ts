@@ -8,6 +8,7 @@ import {
   invitedMemberSystemRoleCandidates,
   type OrganizationMemberSystemRole,
 } from "@/lib/organizations/organization-member-constants"
+import { assignWorkLoginToContactAction } from "@/lib/organizations/work-email-assignment"
 import { syncProfileForOrganizationMember } from "@/lib/organizations/sync-profile-organization"
 
 export const dynamic = "force-dynamic"
@@ -121,6 +122,7 @@ export async function POST(req: NextRequest) {
     const roleName = String(body.roleName || "").trim()
     const firstName = String(body.firstName || "").trim()
     const lastName = String(body.lastName || "").trim()
+    const assignedContactId = String(body.assignedContactId || "").trim() || null
 
     if (!email || !organizationId || !roleId) {
       return json(400, {
@@ -343,6 +345,18 @@ export async function POST(req: NextRequest) {
       systemRole: roleUsed ?? DEFAULT_INVITED_MEMBER_SYSTEM_ROLE,
     })
 
+    let assignmentWarning: string | null = null
+    const membershipId = (membership as { id?: string } | null)?.id
+    if (assignedContactId && membershipId) {
+      const assigned = await assignWorkLoginToContactAction({
+        membershipId,
+        contactId: assignedContactId,
+      })
+      if (!assigned.success) {
+        assignmentWarning = assigned.error
+      }
+    }
+
     return json(200, {
       success: true,
       message: existingUser
@@ -355,6 +369,7 @@ export async function POST(req: NextRequest) {
       existingUser,
       emailSent,
       memberSystemRole: roleUsed,
+      assignmentWarning,
     })
   } catch (error: unknown) {
     console.error("Unhandled invite-user error", error)

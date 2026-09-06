@@ -1,8 +1,27 @@
 import type { ProgramKind } from "@/lib/programs/program-kind"
 
 const SERIES_ALIASES: Record<string, string> = {
-  qlh: "Quran 4 Little Hearts",
+  qlh: "Quran for Little Hearts",
   qil: "Quran Institute for Ladies",
+  "summer camp 1": "Summer Camp",
+  "summer camp 2": "Summer Camp",
+  "fall camp october": "Fall Camp",
+  "fall camp november": "Fall Camp",
+  "spring camp week 1": "Spring Camp",
+  "spring camp week 2": "Spring Camp",
+  "winter break camp": "Winter Camp",
+  "winter camp ready set pray": "Winter Camp",
+}
+
+/** Compact labels for department Programs KPI cards. Unlisted series keep their parsed name. */
+const SERIES_SHORT_ALIASES: Record<string, string> = {
+  "kids saturday quranic arabic": "Kids SQA",
+  "saturday quranic arabic": "SQA",
+  "quran institute junior": "QIJ",
+  qlh: "QLH",
+  "quran 4 little hearts": "QLH",
+  "quran for little hearts": "QLH",
+  qil: "QIL",
 }
 
 const ACADEMIC_YEAR_IN_NAME =
@@ -84,6 +103,68 @@ export function seriesLabelFromRaw(raw: string) {
   return alias || trimmed
 }
 
+export function seriesShortLabelFromRaw(raw: string) {
+  const canonical = seriesLabelFromRaw(raw)
+  const alias =
+    SERIES_SHORT_ALIASES[canonical.toLowerCase()] ||
+    SERIES_SHORT_ALIASES[raw.trim().toLowerCase()]
+  return alias || canonical
+}
+
+export type ProgramSeriesSummary = {
+  seriesKey: string
+  seriesRaw: string
+  shortLabel: string
+  activeCount: number
+  closedCount: number
+}
+
+export function programSeriesKey(
+  departmentId: string,
+  name: string,
+  startDate?: string | null
+) {
+  const parsed = parseProgramSeriesAndYear(name, startDate)
+  return makeSeriesKey(departmentId, parsed.seriesRaw)
+}
+
+/** Active and closed year counts per series. Draft, paused, and archived years are omitted. */
+export function buildProgramSeriesSummaries(
+  programs: Array<{
+    name: string
+    status: string
+    startDate?: string | null
+  }>,
+  departmentId: string,
+  options?: { minPrograms?: number }
+): ProgramSeriesSummary[] {
+  const minPrograms = options?.minPrograms ?? 1
+  const byKey = new Map<string, ProgramSeriesSummary>()
+  for (const program of programs) {
+    if (program.status !== "active" && program.status !== "closed") continue
+    const parsed = parseProgramSeriesAndYear(program.name, program.startDate)
+    const seriesKey = makeSeriesKey(departmentId, parsed.seriesRaw)
+    let row = byKey.get(seriesKey)
+    if (!row) {
+      row = {
+        seriesKey,
+        seriesRaw: parsed.seriesLabel,
+        shortLabel: seriesShortLabelFromRaw(parsed.seriesLabel),
+        activeCount: 0,
+        closedCount: 0,
+      }
+      byKey.set(seriesKey, row)
+    }
+    if (program.status === "active") row.activeCount += 1
+    else row.closedCount += 1
+  }
+  return [...byKey.values()]
+    .filter((row) => row.activeCount + row.closedCount >= minPrograms)
+    .sort((a, b) =>
+      a.shortLabel.localeCompare(b.shortLabel, undefined, { sensitivity: "base" })
+    )
+}
+
 export function parseProgramSeriesAndYear(
   name: string,
   startDate?: string | null
@@ -150,7 +231,7 @@ function inferYearFromStartDate(startDate?: string | null): {
 }
 
 export function makeSeriesKey(departmentId: string, seriesRaw: string) {
-  return `${departmentId}::${seriesRaw.trim().toLowerCase()}`
+  return `${departmentId}::${seriesLabelFromRaw(seriesRaw).trim().toLowerCase()}`
 }
 
 export function percentChange(current: number, previous: number | null): number | null {

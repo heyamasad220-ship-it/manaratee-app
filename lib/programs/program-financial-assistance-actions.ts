@@ -4,10 +4,7 @@ import { revalidatePath } from "next/cache"
 
 import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
-import {
-  hasPermission,
-  PERMISSIONS,
-} from "@/lib/permissions/permissions"
+import { assertCanManageProgram } from "@/lib/programs/program-access"
 import type { ProgramStatus } from "@/lib/programs/program-status"
 import { PROGRAMS_FINANCIAL_ASSISTANCE_PATH } from "@/lib/applications/application-routes"
 import { FINANCE_FINANCIAL_ASSISTANCE_PATH } from "@/lib/finance/finance-paths"
@@ -25,14 +22,6 @@ export type ProgramFinancialAssistanceSettings = {
 export type ProgramFinancialAssistanceActionResult =
   | { success: true }
   | { success: false; error: string }
-
-async function requireProgramsManagePermission() {
-  const canManage = await hasPermission(PERMISSIONS.PROGRAMS_MANAGE)
-
-  if (!canManage) {
-    throw new Error("You do not have permission to manage program settings.")
-  }
-}
 
 function revalidateFinancialAssistancePaths(programId: string) {
   revalidatePath(FINANCE_FINANCIAL_ASSISTANCE_PATH)
@@ -73,7 +62,7 @@ export async function setProgramFinancialAssistanceEnabled(
   enabled: boolean
 ): Promise<ProgramFinancialAssistanceActionResult> {
   try {
-    await requireProgramsManagePermission()
+    await assertCanManageProgram(programId)
 
     const supabase = await createClient()
     const organizationId = await getSelectedOrganizationId()
@@ -126,7 +115,7 @@ export async function updateProgramFinancialAssistanceSettings(input: {
   financial_assistance_instructions: string | null
 }): Promise<ProgramFinancialAssistanceActionResult> {
   try {
-    await requireProgramsManagePermission()
+    await assertCanManageProgram(input.programId)
 
     const supabase = await createClient()
     const organizationId = await getSelectedOrganizationId()

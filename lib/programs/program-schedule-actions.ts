@@ -7,6 +7,7 @@ import { getBlockingReservationsForVenue } from "@/lib/bookings/venue-rental-que
 import { syncOperationalBriefForProgram } from "@/lib/operational-briefs/operational-brief-queries"
 import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
+import { assertCanManageProgram } from "@/lib/programs/program-access"
 import { programOfferingManageHref } from "@/lib/programs/program-offering-paths"
 import { getInstructorScheduleConflicts } from "@/lib/programs/program-schedule-queries"
 import {
@@ -214,6 +215,8 @@ export async function createScheduleItem(input: ScheduleItemInput) {
     throw new Error("No organization selected")
   }
 
+  await assertCanManageProgram(input.program_id)
+
   if (!input.offering_id) {
     throw new Error("Offering is required for schedule items")
   }
@@ -285,6 +288,8 @@ export async function createRecurringScheduleItems(
   if (!organizationId) {
     throw new Error("No organization selected")
   }
+
+  await assertCanManageProgram(input.program_id)
 
   if (!input.offering_id) {
     throw new Error("Offering is required for schedule items")
@@ -380,6 +385,8 @@ export async function replaceOfferingWeeklySchedule(input: {
     throw new Error("No organization selected")
   }
 
+  await assertCanManageProgram(input.program_id)
+
   if (!input.offering_id) {
     throw new Error("Offering is required for schedule items")
   }
@@ -429,6 +436,8 @@ export async function clearOfferingWeeklySchedule(input: {
     throw new Error("No organization selected")
   }
 
+  await assertCanManageProgram(input.program_id)
+
   const { error } = await supabase
     .from("program_schedule_items")
     .delete()
@@ -455,6 +464,8 @@ export async function updateScheduleItem(
   if (!organizationId) {
     throw new Error("No organization selected")
   }
+
+  await assertCanManageProgram(input.program_id)
 
   if (!input.offering_id) {
     throw new Error("Offering is required for schedule items")
@@ -557,6 +568,8 @@ export async function deleteScheduleItem(
     throw new Error("No organization selected")
   }
 
+  await assertCanManageProgram(programId)
+
   const { error } = await supabase
     .from("program_schedule_items")
     .delete()
@@ -581,6 +594,7 @@ export async function copyOfferingScheduleItems(input: {
   sourceOfferingId: string
   targetOfferingId: string
 }) {
+  await assertCanManageProgram(input.programId)
   const supabase = await createClient()
 
   const { data: sourceItems, error } = await supabase

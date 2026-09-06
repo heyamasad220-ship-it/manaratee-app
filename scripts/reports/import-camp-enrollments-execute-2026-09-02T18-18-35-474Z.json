@@ -1,0 +1,253 @@
+{
+  "mode": "execute",
+  "xlsxPath": "C:/Users/danan/Downloads/Camp_Enrollment_Growth.xlsx",
+  "generatedAt": "2026-09-02T17:14:19.570Z",
+  "excelRows": 3524,
+  "createdPrograms": 15,
+  "createdOfferings": 15,
+  "createdContacts": 260,
+  "reusedContacts": 2295,
+  "createdPeople": 550,
+  "reusedPeople": 2003,
+  "createdEnrollments": 1965,
+  "skippedExisting": 683,
+  "skippedDuplicate": 201,
+  "skippedExistingYear": 667,
+  "skippedUnmapped": 0,
+  "skippedNoMember": 0,
+  "skippedNoParent": 0,
+  "uniqueParents": 805,
+  "byProgram": {
+    "Summer Camp 1 2024": {
+      "rows": 323,
+      "enrolled": 76,
+      "skipped": 247
+    },
+    "Summer Camp 2 2024": {
+      "rows": 324,
+      "enrolled": 296,
+      "skipped": 28
+    },
+    "Spring Camp 2024": {
+      "rows": 38,
+      "enrolled": 38,
+      "skipped": 0
+    },
+    "Summer Camp 1 2025": {
+      "rows": 323,
+      "enrolled": 297,
+      "skipped": 26
+    },
+    "Summer Camp 2 2025": {
+      "rows": 308,
+      "enrolled": 289,
+      "skipped": 19
+    },
+    "Youth Intensive 2025": {
+      "rows": 47,
+      "enrolled": 36,
+      "skipped": 11
+    },
+    "Youth Intensive 2026": {
+      "rows": 35,
+      "enrolled": 35,
+      "skipped": 0
+    },
+    "Fall Camp 2023": {
+      "rows": 49,
+      "enrolled": 49,
+      "skipped": 0
+    },
+    "Fall Camp 2022": {
+      "rows": 69,
+      "enrolled": 63,
+      "skipped": 6
+    },
+    "Fall Camp 2025": {
+      "rows": 39,
+      "enrolled": 37,
+      "skipped": 2
+    },
+    "Fall Camp October 2024": {
+      "rows": 17,
+      "enrolled": 5,
+      "skipped": 12
+    },
+    "Fall Camp November 2024": {
+      "rows": 63,
+      "enrolled": 63,
+      "skipped": 0
+    },
+    "Summer Camp 1 2023": {
+      "rows": 230,
+      "enrolled": 211,
+      "skipped": 19
+    },
+    "Summer Camp 2 2023": {
+      "rows": 213,
+      "enrolled": 195,
+      "skipped": 18
+    },
+    "RIJAAL Overnight Camp 2024": {
+      "rows": 5,
+      "enrolled": 5,
+      "skipped": 0
+    },
+    "Special Needs Summer Camp 2026": {
+      "rows": 3,
+      "enrolled": 3,
+      "skipped": 0
+    },
+    "Spring Camp 2025": {
+      "rows": 16,
+      "enrolled": 16,
+      "skipped": 0
+    },
+    "Spring Camp Week 2 2023": {
+      "rows": 50,
+      "enrolled": 22,
+      "skipped": 28
+    },
+    "Spring Camp Week 1 2023": {
+      "rows": 30,
+      "enrolled": 12,
+      "skipped": 18
+    },
+    "Summer Camp 1 2022": {
+      "rows": 167,
+      "enrolled": 69,
+      "skipped": 98
+    },
+    "Summer Camp 2 2022": {
+      "rows": 133,
+      "enrolled": 44,
+      "skipped": 89
+    },
+    "Winter Break Camp 2024": {
+      "rows": 92,
+      "enrolled": 18,
+      "skipped": 74
+    },
+    "Winter Camp Ready Set Pray 2024": {
+      "rows": 98,
+      "enrolled": 19,
+      "skipped": 79
+    },
+    "Winter Camp 2022": {
+      "rows": 68,
+      "enrolled": 27,
+      "skipped": 41
+    },
+    "Winter Camp 2025": {
+      "rows": 117,
+      "enrolled": 40,
+      "skipped": 77
+    }
+  },
+  "unmapped": [],
+  "errors": [
+    {
+      "member": "Baheej Hamdi",
+      "program": "Summer Camp 1 2024",
+      "error": "parent person: upstream request timeout"
+    },
+    {
+      "member": "Zain Balbaki",
+      "program": "Summer Camp 1 2024",
+      "error": "link parent person: upstream request timeout"
+    },
+    {
+      "member": "Yasmin Elashi",
+      "program": "Summer Camp 1 2024",
+      "error": "enrollment retry: canceling statement due to statement timeout"
+    },
+    {
+      "member": "Yusuf Elahi",
+      "program": "Summer Camp 1 2024",
+      "error": "enrollment retry: canceling statement due to statement timeout"
+    },
+    {
+      "member": "Marya Elashi",
+      "program": "Summer Camp 1 2024",
+      "error": "enrollment retry: canceling statement due to statement timeout"
+    },
+    {
+      "member": "Sulayman Syed",
+      "program": "Summer Camp 2 2023",
+      "error": "enrollment retry: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Umar Syed",
+      "program": "Summer Camp 2 2023",
+      "error": "enrollment retry: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Abdullah Syed",
+      "program": "Summer Camp 2 2023",
+      "error": "enrollment retry: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    }
+  ],
+  "samples": [
+    {
+      "program": "Summer Camp 1 2024",
+      "member": "Usman Khawaja",
+      "parent": "Tazeen Khawaja"
+    },
+    {
+      "program": "Summer Camp 1 2024",
+      "member": "Jibreal Ismail",
+      "parent": "Alaa Ammuss"
+    },
+    {
+      "program": "Summer Camp 1 2024",
+      "member": "Noor Zafar",
+      "parent": "Salma Hussain"
+    },
+    {
+      "program": "Summer Camp 1 2024",
+      "member": "Hamza Zafar",
+      "parent": "Salma Hussain"
+    },
+    {
+      "program": "Summer Camp 1 2024",
+      "member": "Ayan Haque",
+      "parent": "Kawtar Eljaouhari"
+    },
+    {
+      "program": "Summer Camp 1 2024",
+      "member": "Nouredeen Alzuraqi",
+      "parent": "Nisreen Hajaj"
+    },
+    {
+      "program": "Summer Camp 1 2024",
+      "member": "Jawad Alzuraqi",
+      "parent": "Nisreen Hajaj"
+    },
+    {
+      "program": "Summer Camp 1 2024",
+      "member": "Ali Dia",
+      "parent": "Ali Dia"
+    },
+    {
+      "program": "Summer Camp 1 2024",
+      "member": "Nassim Boudjenah",
+      "parent": "Meriem Douma"
+    },
+    {
+      "program": "Summer Camp 1 2024",
+      "member": "Maria Ahmad",
+      "parent": "Rukaya Ali"
+    },
+    {
+      "program": "Summer Camp 1 2024",
+      "member": "Jad Alrayes",
+      "parent": "Hashem Almously"
+    },
+    {
+      "program": "Summer Camp 1 2024",
+      "member": "Lana Owidat",
+      "parent": "Jessica Owidat"
+    }
+  ],
+  "programCount": 25
+}

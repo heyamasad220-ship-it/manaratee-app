@@ -27,6 +27,7 @@ import {
 } from "@/lib/permissions/permissions"
 import { countEnrollmentsByProgramIds } from "@/lib/programs/program-offering-queries"
 import { createProgram } from "@/lib/programs/program-actions"
+import { canAccessProgram } from "@/lib/programs/program-access"
 import { copyOfferingCapacityGroups } from "@/lib/programs/program-capacity-group-actions"
 import { createProgramOffering } from "@/lib/programs/program-offering-actions"
 import { normalizeProgramAudienceType } from "@/lib/programs/program-offering-attributes"
@@ -260,9 +261,10 @@ export async function fetchDepartmentYearBasicsAction(
   | { success: false; error: string }
 > {
   try {
-    const canView = await canViewDepartment(departmentId)
+    const canView =
+      (await canViewDepartment(departmentId)) || (await canAccessProgram(programId))
     if (!canView) {
-      return { success: false, error: "You do not have permission to view this department." }
+      return { success: false, error: "You do not have permission to view this program." }
     }
 
     const organizationId = await getSelectedOrganizationId()

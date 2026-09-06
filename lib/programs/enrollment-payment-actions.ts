@@ -5,6 +5,10 @@ import { revalidatePath } from "next/cache"
 import { recordEnrollmentFaAward } from "@/lib/programs/fa-awards"
 import { clampDateToProgramYear } from "@/lib/programs/program-year-attribution"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
+import {
+  canAccessEnrollment,
+  canManageEnrollment,
+} from "@/lib/programs/program-access"
 import { createClient } from "@/lib/supabase/server"
 
 function resolvePaymentStatus(total: number, paid: number) {
@@ -39,6 +43,14 @@ async function requireOrgId() {
   return organizationId
 }
 
+async function denyUnlessCanManageEnrollment(enrollmentId: string) {
+  if (await canManageEnrollment(enrollmentId)) return null
+  return {
+    success: false as const,
+    error: "You do not have permission to manage this registration.",
+  }
+}
+
 function appendNote(existing: string | null | undefined, addition: string) {
   const next = addition.trim()
   if (!next) return existing?.trim() || null
@@ -60,6 +72,8 @@ export async function receiveEnrollmentPaymentAction(input: {
     if (!enrollmentId) {
       return { success: false, error: "Missing enrollment." }
     }
+    const denied = await denyUnlessCanManageEnrollment(enrollmentId)
+    if (denied) return denied
     if (!Number.isFinite(amount) || amount <= 0) {
       return { success: false, error: "Enter a payment amount greater than zero." }
     }
@@ -219,6 +233,9 @@ export async function getEnrollmentEditContextAction(
     const organizationId = await requireOrgId()
     const id = String(enrollmentId || "").trim()
     if (!id) return { success: false, error: "Missing enrollment." }
+    if (!(await canAccessEnrollment(id))) {
+      return { success: false, error: "You do not have permission to view this registration." }
+    }
 
     const supabase = await createClient()
     const { data: enrollment, error } = await supabase
@@ -312,6 +329,8 @@ export async function updateEnrollmentRegistrationAction(input: {
     if (!enrollmentId) {
       return { success: false, error: "Missing enrollment." }
     }
+    const denied = await denyUnlessCanManageEnrollment(enrollmentId)
+    if (denied) return denied
     if (hasFeeInput && (feeAmount == null || !Number.isFinite(feeAmount) || feeAmount < 0)) {
       return { success: false, error: "Enter a valid fee (0 or more)." }
     }
@@ -601,6 +620,9 @@ export async function getEnrollmentAssistanceContextAction(
     const organizationId = await requireOrgId()
     const id = String(enrollmentId || "").trim()
     if (!id) return { success: false, error: "Missing enrollment." }
+    if (!(await canAccessEnrollment(id))) {
+      return { success: false, error: "You do not have permission to view this registration." }
+    }
 
     const supabase = await createClient()
     const { data: enrollment, error } = await supabase
@@ -700,6 +722,8 @@ export async function applyEnrollmentFinancialAssistanceAction(input: {
     if (!enrollmentId) {
       return { success: false, error: "Missing enrollment." }
     }
+    const denied = await denyUnlessCanManageEnrollment(enrollmentId)
+    if (denied) return denied
 
     const supabase = await createClient()
     const { data: enrollment, error } = await supabase
@@ -1065,6 +1089,8 @@ export async function createEnrollmentCustomPaymentPlanAction(input: {
     if (!enrollmentId) {
       return { success: false, error: "Missing enrollment." }
     }
+    const denied = await denyUnlessCanManageEnrollment(enrollmentId)
+    if (denied) return denied
     if (!Number.isFinite(installmentCount) || installmentCount < 2 || installmentCount > 24) {
       return {
         success: false,
@@ -1183,6 +1209,8 @@ export async function updateEnrollmentNotesAction(input: {
     if (!enrollmentId) {
       return { success: false, error: "Missing enrollment." }
     }
+    const denied = await denyUnlessCanManageEnrollment(enrollmentId)
+    if (denied) return denied
 
     const supabase = await createClient()
     const { data: enrollment, error } = await supabase
@@ -1251,6 +1279,8 @@ export async function withdrawAndSettleEnrollmentAction(input: {
     if (!enrollmentId) {
       return { success: false, error: "Missing enrollment." }
     }
+    const denied = await denyUnlessCanManageEnrollment(enrollmentId)
+    if (denied) return denied
     if (!reason) {
       return { success: false, error: "Enter a withdrawal reason." }
     }
@@ -1498,6 +1528,9 @@ export async function getEnrollmentPaymentActivityAction(
     if (!id) {
       return { success: false, error: "Missing enrollment." }
     }
+    if (!(await canAccessEnrollment(id))) {
+      return { success: false, error: "You do not have permission to view this registration." }
+    }
 
     const supabase = await createClient()
     const { data: enrollment, error } = await supabase
@@ -1666,6 +1699,8 @@ export async function voidEnrollmentPaymentAction(input: {
     if (!enrollmentId) {
       return { success: false, error: "Missing enrollment." }
     }
+    const denied = await denyUnlessCanManageEnrollment(enrollmentId)
+    if (denied) return denied
     if (!Number.isFinite(amount) || amount <= 0) {
       return { success: false, error: "Enter an amount greater than zero." }
     }

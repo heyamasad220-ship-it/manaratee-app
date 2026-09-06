@@ -148,6 +148,7 @@ export function DepartmentPayrollPanel({
   programId = null,
   readOnly = false,
   stickyStatsTop,
+  hideStats = false,
   variant = "combined",
 }: {
   departmentId: string
@@ -159,8 +160,10 @@ export function DepartmentPayrollPanel({
   readOnly?: boolean
   /** CSS `top` so KPI cards stick below department workspace tab chrome. */
   stickyStatsTop?: string
+  /** Hide local KPIs when the parent Financial tab shows the combined row. */
+  hideStats?: boolean
   /**
-   * `roster` — Employees tab (staff only).
+   * `roster` — Financial → Employees (staff only).
    * `periods` — Payroll tab (pay periods, log hours, create periods).
    * `combined` — legacy / reports mixed view.
    */
@@ -375,7 +378,7 @@ export function DepartmentPayrollPanel({
 
   return (
     <div className="space-y-6">
-      {!loading && !error && !isPeriodsOnly ? (
+      {!hideStats && !loading && !error && !isPeriodsOnly ? (
         <div
           className={
             stickyStatsTop
@@ -789,9 +792,9 @@ export function DepartmentPayrollPanel({
             <DialogHeader>
               <DialogTitle>Add employee</DialogTitle>
               <DialogDescription>
-                Choose an existing contact. If they are already an employee, they are assigned to{" "}
-                {departmentName}. Otherwise a new employee record is created for this department.
-                Create the person in Directory first if they are missing.
+                Search Directory for an existing person, or create a contact if they are not
+                listed. If they are already an employee, they are assigned to {departmentName}.
+                Otherwise a new employee record is created for this department.
               </DialogDescription>
             </DialogHeader>
 
@@ -805,6 +808,9 @@ export function DepartmentPayrollPanel({
               <HrContactPicker
                 selectedContactId={selectedContactId}
                 selectedLabel={selectedContactLabel}
+                allowCreate
+                individualOnly
+                createDescription="Create a Directory person, then add them to this department as an employee."
                 onChange={(contact) => {
                   setSelectedContactId(contact.contactId)
                   const name = contact.full_name?.trim() || "Unnamed"

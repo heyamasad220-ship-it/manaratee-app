@@ -640,6 +640,7 @@ export async function updateApplicationStatus(input: UpdateApplicationStatusInpu
     supabase,
   })
 
+  revalidatePath(VENDOR_HUB_ROUTES.reports)
   revalidatePath(VENDOR_HUB_ROUTES.network.history)
   revalidatePath(VENDOR_HUB_ROUTES.network.onboarding)
   revalidatePath(VENDOR_HUB_ROUTES.events.list)

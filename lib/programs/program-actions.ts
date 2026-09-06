@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 
 import { workforceDepartmentDetailPath } from "@/lib/departments/department-paths"
+import { assertCanManageProgram, canManageProgramDepartment } from "@/lib/programs/program-access"
 import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { syncRegistrationOptionsFromProgramFlags } from "@/lib/programs/program-registration-option-actions"
@@ -108,6 +109,11 @@ export async function createProgram(input: CreateProgramInput) {
 
   if (!organizationId) {
     throw new Error("No organization selected")
+  }
+
+  const allowed = await canManageProgramDepartment(input.department_id)
+  if (!allowed) {
+    throw new Error("You do not have permission to create a program for this department.")
   }
 
   if (
@@ -349,6 +355,8 @@ export async function updateProgram(input: UpdateProgramInput) {
     throw new Error("No organization selected")
   }
 
+  await assertCanManageProgram(input.id)
+
   const minAge = input.min_age ?? null
   const maxAge = input.max_age ?? null
 
@@ -550,6 +558,8 @@ export async function updateProgramKind(input: {
   if (!organizationId) {
     throw new Error("No organization selected")
   }
+
+  await assertCanManageProgram(input.id)
 
   const nextKind = normalizeProgramKind(input.program_kind)
   const { getOrganizationProgramKindsEntitlement } = await import(

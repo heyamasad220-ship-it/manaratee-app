@@ -29,6 +29,7 @@ import {
   type RegistrationFeeLineInput,
 } from "@/lib/programs/registration-report-helpers"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
+import { redirectOrgWideProgramPagesForDepartmentHead } from "@/lib/programs/program-access"
 import {
   contactLabel,
   isTerminalEnrollmentStatus,
@@ -372,6 +373,7 @@ export default async function ProgramsRegistrationsPage({
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>
 }) {
+  await redirectOrgWideProgramPagesForDepartmentHead()
   const resolvedSearchParams = await searchParams
 
   const filters: PageSearchParams = {

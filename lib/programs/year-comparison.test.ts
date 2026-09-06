@@ -2,11 +2,14 @@ import assert from "node:assert/strict"
 import { describe, it } from "node:test"
 
 import {
+  buildProgramSeriesSummaries,
   buildSeriesBreakdown,
   buildYearRows,
   filterYearComparisonFacts,
   parseProgramSeriesAndYear,
   previousYearKey,
+  programSeriesKey,
+  seriesShortLabelFromRaw,
   type YearComparisonFact,
 } from "./year-comparison"
 
@@ -21,7 +24,7 @@ function fact(
     departmentId: "edu",
     departmentName: "Education",
     seriesKey,
-    seriesLabel: "Quran 4 Little Hearts",
+    seriesLabel: "Quran for Little Hearts",
     yearLabel: yearKey.replace("-", "–"),
     sortYear: start,
     programKind: "academic",
@@ -33,7 +36,7 @@ function fact(
 describe("parseProgramSeriesAndYear", () => {
   it("parses academic year programs including QLH", () => {
     const qlh = parseProgramSeriesAndYear("QLH 2022-2023")
-    assert.equal(qlh.seriesLabel, "Quran 4 Little Hearts")
+    assert.equal(qlh.seriesLabel, "Quran for Little Hearts")
     assert.equal(qlh.yearKey, "2022-2023")
     assert.equal(qlh.sortYear, 2022)
 
@@ -50,6 +53,14 @@ describe("parseProgramSeriesAndYear", () => {
     assert.equal(camp.seriesLabel, "Summer Camp")
     assert.equal(camp.yearKey, "2026")
     assert.equal(camp.sortYear, 2026)
+
+    const campOne = parseProgramSeriesAndYear("Summer Camp 1 2024")
+    assert.equal(campOne.seriesLabel, "Summer Camp")
+    assert.equal(campOne.yearKey, "2024")
+
+    const winterBreak = parseProgramSeriesAndYear("Winter Break Camp 2024")
+    assert.equal(winterBreak.seriesLabel, "Winter Camp")
+    assert.equal(winterBreak.yearKey, "2024")
   })
 
   it("falls back to start date when the name has no year", () => {
@@ -152,7 +163,7 @@ describe("department vs series returning", () => {
       fact({
         yearKey: "2026-2027",
         seriesKey: "edu::qlh",
-        seriesLabel: "Quran 4 Little Hearts",
+        seriesLabel: "Quran for Little Hearts",
         familyId: "parent-a",
         kidId: "kid-1",
       }),
@@ -229,6 +240,116 @@ describe("filterYearComparisonFacts", () => {
     assert.equal(
       filterYearComparisonFacts(facts, { seriesKey: "edu::qlh" }).length,
       1
+    )
+  })
+})
+
+describe("seriesShortLabelFromRaw", () => {
+  it("uses compact aliases and keeps already-short names", () => {
+    assert.equal(seriesShortLabelFromRaw("Kids Saturday Quranic Arabic"), "Kids SQA")
+    assert.equal(seriesShortLabelFromRaw("Saturday Quranic Arabic"), "SQA")
+    assert.equal(seriesShortLabelFromRaw("Quran Institute Junior"), "QIJ")
+    assert.equal(seriesShortLabelFromRaw("QLH"), "QLH")
+    assert.equal(seriesShortLabelFromRaw("Sunday School"), "Sunday School")
+    assert.equal(seriesShortLabelFromRaw("Summer Camp 1"), "Summer Camp")
+    assert.equal(
+      seriesShortLabelFromRaw("The Companion of the Quran"),
+      "The Companion of the Quran"
+    )
+  })
+})
+
+describe("buildProgramSeriesSummaries", () => {
+  it("counts only active and closed years and groups by series", () => {
+    const rows = buildProgramSeriesSummaries(
+      [
+        { name: "Kids Saturday Quranic Arabic 2026-2027", status: "active" },
+        { name: "Kids Saturday Quranic Arabic 2025-2026", status: "closed" },
+        { name: "Kids Saturday Quranic Arabic 2024-2025", status: "draft" },
+        { name: "QLH 2026-2027", status: "active" },
+        { name: "QLH 2025-2026", status: "paused" },
+        { name: "Sunday School 2026-2027", status: "archived" },
+      ],
+      "edu"
+    )
+    assert.equal(rows.length, 2)
+    const kids = rows.find((row) => row.shortLabel === "Kids SQA")
+    const qlh = rows.find((row) => row.shortLabel === "QLH")
+    assert.equal(kids?.activeCount, 1)
+    assert.equal(kids?.closedCount, 1)
+    assert.equal(qlh?.activeCount, 1)
+    assert.equal(qlh?.closedCount, 0)
+  })
+
+  it("merges camp name variants into one season card without collapsing Education series", () => {
+    const rows = buildProgramSeriesSummaries(
+      [
+        { name: "Fall Camp 2022", status: "closed" },
+        { name: "Fall Camp October 2024", status: "closed" },
+        { name: "Fall Camp November 2024", status: "closed" },
+        { name: "Summer Camp 1 2024", status: "closed" },
+        { name: "Summer Camp 2 2024", status: "closed" },
+        { name: "Summer Camp 2026", status: "closed" },
+        { name: "Winter Break Camp 2024", status: "closed" },
+        { name: "Winter Camp Ready Set Pray 2024", status: "closed" },
+        { name: "Winter Camp 2025", status: "closed" },
+        { name: "Youth Intensive 2025", status: "closed" },
+        { name: "Special Needs Summer Camp 2026", status: "closed" },
+        { name: "Sunday School 2025-2026", status: "closed" },
+        { name: "Sunday School 2026-2027", status: "active" },
+        { name: "QLH 2022-2023", status: "closed" },
+        { name: "Quran for Little Hearts 2024-2025", status: "active" },
+      ],
+      "dept"
+    )
+
+    const fall = rows.find((row) => row.shortLabel === "Fall Camp")
+    const summer = rows.find((row) => row.shortLabel === "Summer Camp")
+    const winter = rows.find((row) => row.shortLabel === "Winter Camp")
+    const youth = rows.find((row) => row.shortLabel === "Youth Intensive")
+    const special = rows.find((row) => row.shortLabel === "Special Needs Summer Camp")
+    const sunday = rows.find((row) => row.shortLabel === "Sunday School")
+    const qlh = rows.find((row) => row.shortLabel === "QLH")
+
+    assert.equal(fall?.closedCount, 3)
+    assert.equal(summer?.closedCount, 3)
+    assert.equal(winter?.closedCount, 3)
+    assert.equal(youth?.closedCount, 1)
+    assert.equal(special?.closedCount, 1)
+    assert.equal(sunday?.activeCount, 1)
+    assert.equal(sunday?.closedCount, 1)
+    assert.equal(qlh?.activeCount, 1)
+    assert.equal(qlh?.closedCount, 1)
+    assert.equal(
+      rows.some((row) => row.shortLabel === "Summer Camp 1"),
+      false
+    )
+    assert.equal(
+      programSeriesKey("dept", "Summer Camp 1 2024"),
+      programSeriesKey("dept", "Summer Camp 2026")
+    )
+    assert.equal(
+      programSeriesKey("dept", "QLH 2022-2023"),
+      programSeriesKey("dept", "Quran for Little Hearts 2024-2025")
+    )
+  })
+
+  it("hides series that only have one program when minPrograms is 2", () => {
+    const rows = buildProgramSeriesSummaries(
+      [
+        { name: "Fall Camp 2022", status: "closed" },
+        { name: "Fall Camp 2023", status: "closed" },
+        { name: "RIJAAL Overnight Camp 2024", status: "closed" },
+        { name: "Special Needs Summer Camp 2026", status: "closed" },
+        { name: "Youth Intensive 2025", status: "closed" },
+        { name: "Youth Intensive 2026", status: "closed" },
+      ],
+      "camps",
+      { minPrograms: 2 }
+    )
+    assert.deepEqual(
+      rows.map((row) => row.shortLabel).sort(),
+      ["Fall Camp", "Youth Intensive"]
     )
   })
 })

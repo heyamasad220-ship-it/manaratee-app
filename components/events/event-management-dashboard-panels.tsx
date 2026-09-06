@@ -9,8 +9,8 @@ import {
   Users,
   Truck,
   Ticket,
+  DollarSign,
   ChevronRight,
-  Plus,
   ClipboardCheck,
   MapPin,
   AlertTriangle,
@@ -19,6 +19,7 @@ import type { LucideIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { CreateInternalEventButton } from "@/components/events/create-internal-event-button"
 import {
   Select,
   SelectContent,
@@ -27,12 +28,13 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { EVENT_MANAGEMENT_EVENTS_PATH } from "@/lib/events/event-management-section-path"
-import { CREATE_EVENT_CTA_LABEL } from "@/lib/events/facility-event-request-href"
 import type {
   DashboardAttentionItem,
   DashboardTimePeriod,
   EventManagementDashboardData,
 } from "@/lib/events/internal-event-dashboard-types"
+import { formatTicketPrice } from "@/lib/tickets/ticket-types"
+import { StatCard, StatCardsRow } from "@/components/ui/stat-card"
 import { cn } from "@/lib/utils"
 
 const ATTENTION_ICONS: Record<DashboardAttentionItem["kind"], LucideIcon> = {
@@ -154,7 +156,7 @@ export function EventManagementDashboardPanels({
     })
   }
 
-  const { kpis, attentionItems } = data
+  const { kpis, ticketSales, attentionItems } = data
 
   return (
     <div className="flex flex-col gap-4 sm:gap-6">
@@ -162,7 +164,8 @@ export function EventManagementDashboardPanels({
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Overview</h1>
           <p className="text-muted-foreground">
-            Monitor operations for internal department-owned events.
+            Operations for every event, plus ticket sales across ticketed
+            events.
           </p>
         </div>
 
@@ -170,14 +173,7 @@ export function EventManagementDashboardPanels({
           <Button asChild size="sm" variant="outline">
             <Link href={EVENT_MANAGEMENT_EVENTS_PATH}>View all events</Link>
           </Button>
-          {canManage ? (
-            <Button asChild size="sm">
-              <Link href="/facilities/calendar?openNew=1">
-                <Plus className="mr-2 h-4 w-4" />
-                {CREATE_EVENT_CTA_LABEL}
-              </Link>
-            </Button>
-          ) : null}
+          {canManage ? <CreateInternalEventButton /> : null}
           <Select
             value={period}
             onValueChange={(value) => setPeriod(value as DashboardTimePeriod)}
@@ -230,11 +226,41 @@ export function EventManagementDashboardPanels({
         />
       </div>
 
+      <StatCardsRow equal columns={3}>
+        <StatCard
+          label="Active ticketed"
+          value={ticketSales.activeTicketedEvents.toLocaleString("en-US")}
+          icon={CalendarCheck}
+          hint={`${ticketSales.totalTicketedEvents.toLocaleString("en-US")} ticketed total`}
+          layout="compact"
+          fill
+          tone="emerald"
+        />
+        <StatCard
+          label="Tickets issued"
+          value={ticketSales.ticketsIssued.toLocaleString("en-US")}
+          icon={Ticket}
+          hint="All ticketed events"
+          layout="compact"
+          fill
+          tone="violet"
+        />
+        <StatCard
+          label="Revenue"
+          value={formatTicketPrice(ticketSales.revenueCents, ticketSales.currency)}
+          icon={DollarSign}
+          hint="Completed ticket sales"
+          layout="compact"
+          fill
+          tone="blue"
+        />
+      </StatCardsRow>
+
       <section id="attention-required" className="space-y-3">
         <div>
           <h2 className="text-base font-semibold">Attention required</h2>
           <p className="text-sm text-muted-foreground">
-            Open an event to approve requests, assign childcare, volunteers, and
+            Open an event to complete pending work, assign childcare, volunteers, and
             more.
           </p>
         </div>

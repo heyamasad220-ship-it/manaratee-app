@@ -60,6 +60,9 @@ export async function getMoveOfferingTargetsAction(programId: string): Promise<
     if (!program) {
       return { success: false, error: "Program not found." }
     }
+    if (!(await canMoveProgramEnrollments(program.department_id))) {
+      return { success: false, error: "You do not have permission to manage this program." }
+    }
     const targets = await listMoveOfferingTargets(programId, organizationId)
     return { success: true, programName: program.name, targets }
   } catch (error) {

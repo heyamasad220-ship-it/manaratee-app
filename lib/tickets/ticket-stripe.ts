@@ -511,9 +511,11 @@ async function sendTicketOrderRefundEmail(
   supabase: SupabaseClient,
   input: {
     organizationId: string
-    kind: "refunded" | "partial_refund"
+    kind: "refunded" | "partial_refund" | "canceled"
     refundAmountCents?: number
     currency?: string | null
+    staffNote?: string | null
+    ticketIds?: string[]
     order: {
       id: string
       order_number?: unknown
@@ -526,11 +528,17 @@ async function sendTicketOrderRefundEmail(
   const purchaserEmail = stringField(input.order.purchaser_email)
   if (!purchaserEmail) return { sent: false }
 
-  const { data: tickets } = await supabase
+  let ticketsQuery = supabase
     .from("tickets")
-    .select("ticket_code, attendee_name, event_ticket_types:ticket_type_id ( name )")
+    .select("id, ticket_code, attendee_name, event_ticket_types:ticket_type_id ( name )")
     .eq("ticket_order_id", input.order.id)
     .eq("organization_id", input.organizationId)
+
+  if (input.ticketIds && input.ticketIds.length > 0) {
+    ticketsQuery = ticketsQuery.in("id", input.ticketIds)
+  }
+
+  const { data: tickets } = await ticketsQuery
 
   const eventEmbed = Array.isArray(input.order.internal_events)
     ? input.order.internal_events[0]
@@ -551,6 +559,7 @@ async function sendTicketOrderRefundEmail(
       input.refundAmountCents && input.refundAmountCents > 0
         ? formatTicketPrice(input.refundAmountCents, input.currency || "USD")
         : null,
+    staffNote: input.staffNote,
     lines: (tickets || []).map((row) => {
       const typeEmbed = Array.isArray(row.event_ticket_types)
         ? row.event_ticket_types[0]
@@ -685,6 +694,73 @@ export async function createStripeTicketRefund(
   }
 }
 
+const ACTIVE_TICKET_STATUSES = ["valid", "checked_in", "waitlisted"] as const
+
+async function voidTicketOrderSeats(
+  supabase: SupabaseClient,
+  input: {
+    organizationId: string
+    orderId: string
+    ticketStatus: "refunded" | "canceled"
+    ticketIds?: string[]
+  }
+) {
+  let query = supabase
+    .from("tickets")
+    .select("id, ticket_type_id, status")
+    .eq("organization_id", input.organizationId)
+    .eq("ticket_order_id", input.orderId)
+    .in("status", [...ACTIVE_TICKET_STATUSES])
+
+  if (input.ticketIds && input.ticketIds.length > 0) {
+    query = query.in("id", input.ticketIds)
+  }
+
+  const { data: tickets, error: ticketsError } = await query
+  if (ticketsError) {
+    throw new Error(ticketsError.message || "Could not load tickets.")
+  }
+  if (!tickets?.length) return
+
+  const ticketIds = tickets.map((ticket) => ticket.id as string)
+  const { error: ticketUpdateError } = await supabase
+    .from("tickets")
+    .update({ status: input.ticketStatus })
+    .eq("organization_id", input.organizationId)
+    .eq("ticket_order_id", input.orderId)
+    .in("id", ticketIds)
+    .in("status", [...ACTIVE_TICKET_STATUSES])
+
+  if (ticketUpdateError) {
+    throw new Error(ticketUpdateError.message || "Could not update tickets.")
+  }
+
+  const countsByType = new Map<string, number>()
+  for (const ticket of tickets) {
+    if (ticket.status === "waitlisted") continue
+    const typeId = ticket.ticket_type_id as string
+    countsByType.set(typeId, (countsByType.get(typeId) || 0) + 1)
+  }
+
+  for (const [typeId, count] of countsByType) {
+    const { data: ticketType, error: typeError } = await supabase
+      .from("event_ticket_types")
+      .select("quantity_sold")
+      .eq("id", typeId)
+      .eq("organization_id", input.organizationId)
+      .maybeSingle()
+
+    if (typeError || !ticketType) continue
+
+    const nextSold = Math.max(Number(ticketType.quantity_sold || 0) - count, 0)
+    await supabase
+      .from("event_ticket_types")
+      .update({ quantity_sold: nextSold })
+      .eq("id", typeId)
+      .eq("organization_id", input.organizationId)
+  }
+}
+
 export async function applyTicketOrderRefundInDatabase(
   supabase: SupabaseClient,
   input: {
@@ -694,6 +770,9 @@ export async function applyTicketOrderRefundInDatabase(
     refundedAmountCents?: number
     thisRefundCents?: number
     stripeRefundId?: string | null
+    ticketIdsToVoid?: string[]
+    notifyCustomer?: boolean
+    staffNote?: string | null
   }
 ): Promise<{ applied: boolean; alreadyFinal: boolean; eventId?: string | null }> {
   const { data: order, error } = await loadTicketOrderRefundRow(supabase, {
@@ -725,15 +804,18 @@ export async function applyTicketOrderRefundInDatabase(
 
   if (
     input.nextOrderStatus === "partially_refunded" &&
-    nextRefunded <= alreadyRefunded
+    nextRefunded <= alreadyRefunded &&
+    !(input.ticketIdsToVoid && input.ticketIdsToVoid.length > 0)
   ) {
     return { applied: false, alreadyFinal: true, eventId: order.internal_event_id as string }
   }
 
+  const staffNote = input.staffNote?.trim() || null
   const metadata = {
     ...asRecord(order.metadata),
     refunded_at: new Date().toISOString(),
     ...(input.stripeRefundId ? { stripeRefundId: input.stripeRefundId } : {}),
+    ...(staffNote ? { staff_refund_note: staffNote } : {}),
   }
 
   const updatePayload: Record<string, unknown> = {
@@ -764,84 +846,50 @@ export async function applyTicketOrderRefundInDatabase(
     throw new Error(orderError.message || "Could not update order.")
   }
 
-  const cancelTickets =
+  const cancelAllRemaining =
     input.nextOrderStatus === "refunded" || input.nextOrderStatus === "canceled"
-
-  if (cancelTickets) {
-    const ticketStatus = input.nextOrderStatus === "refunded" ? "refunded" : "canceled"
-    const { data: tickets, error: ticketsError } = await supabase
-      .from("tickets")
-      .select("id, ticket_type_id, status")
-      .eq("organization_id", input.organizationId)
-      .eq("ticket_order_id", input.orderId)
-      .in("status", ["valid", "checked_in", "waitlisted"])
-
-    if (ticketsError) {
-      throw new Error(ticketsError.message || "Could not load tickets.")
-    }
-
-    if (tickets?.length) {
-      const { error: ticketUpdateError } = await supabase
-        .from("tickets")
-        .update({ status: ticketStatus })
-        .eq("organization_id", input.organizationId)
-        .eq("ticket_order_id", input.orderId)
-        .in("status", ["valid", "checked_in", "waitlisted"])
-
-      if (ticketUpdateError) {
-        throw new Error(ticketUpdateError.message || "Could not update tickets.")
-      }
-
-      const countsByType = new Map<string, number>()
-      for (const ticket of tickets) {
-        if (ticket.status === "waitlisted") continue
-        const typeId = ticket.ticket_type_id as string
-        countsByType.set(typeId, (countsByType.get(typeId) || 0) + 1)
-      }
-
-      for (const [typeId, count] of countsByType) {
-        const { data: ticketType, error: typeError } = await supabase
-          .from("event_ticket_types")
-          .select("quantity_sold")
-          .eq("id", typeId)
-          .eq("organization_id", input.organizationId)
-          .maybeSingle()
-
-        if (typeError || !ticketType) continue
-
-        const nextSold = Math.max(Number(ticketType.quantity_sold || 0) - count, 0)
-        await supabase
-          .from("event_ticket_types")
-          .update({ quantity_sold: nextSold })
-          .eq("id", typeId)
-          .eq("organization_id", input.organizationId)
-      }
-    }
+  const ticketStatus =
+    input.nextOrderStatus === "canceled" ? "canceled" : "refunded"
+  if (cancelAllRemaining || (input.ticketIdsToVoid && input.ticketIdsToVoid.length > 0)) {
+    await voidTicketOrderSeats(supabase, {
+      organizationId: input.organizationId,
+      orderId: input.orderId,
+      ticketStatus,
+      ticketIds: cancelAllRemaining ? undefined : input.ticketIdsToVoid,
+    })
   }
 
-  const emailKind =
-    input.nextOrderStatus === "partially_refunded" ? "partial_refund" : "refunded"
   const thisRefundCents =
     input.thisRefundCents ?? Math.max(nextRefunded - alreadyRefunded, 0)
-  if (
-    (input.nextOrderStatus === "refunded" ||
-      input.nextOrderStatus === "partially_refunded") &&
-    totalCents > 0 &&
-    thisRefundCents > 0
-  ) {
-    await sendTicketOrderRefundEmail(supabase, {
-      organizationId: input.organizationId,
-      kind: emailKind,
-      refundAmountCents: thisRefundCents,
-      currency: stringField(order.currency) || "USD",
-      order: {
-        id: order.id as string,
-        order_number: order.order_number,
-        purchaser_name: order.purchaser_name,
-        purchaser_email: order.purchaser_email,
-        internal_events: order.internal_events,
-      },
-    })
+  const shouldEmail = input.notifyCustomer !== false
+  if (shouldEmail) {
+    const emailKind =
+      input.nextOrderStatus === "canceled"
+        ? "canceled"
+        : input.nextOrderStatus === "partially_refunded"
+          ? "partial_refund"
+          : "refunded"
+    if (
+      emailKind === "canceled" ||
+      thisRefundCents > 0 ||
+      (input.ticketIdsToVoid && input.ticketIdsToVoid.length > 0)
+    ) {
+      await sendTicketOrderRefundEmail(supabase, {
+        organizationId: input.organizationId,
+        kind: emailKind,
+        refundAmountCents: thisRefundCents,
+        currency: stringField(order.currency) || "USD",
+        staffNote,
+        ticketIds: input.ticketIdsToVoid,
+        order: {
+          id: order.id as string,
+          order_number: order.order_number,
+          purchaser_name: order.purchaser_name,
+          purchaser_email: order.purchaser_email,
+          internal_events: order.internal_events,
+        },
+      })
+    }
   }
 
   return {

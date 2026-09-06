@@ -5,8 +5,10 @@ import { Header } from "@/components/layout/header"
 import { PaymentSummaryReportPanel } from "@/components/programs/payment-summary-report-panel"
 import { ProgramsStaffSubnav } from "@/components/programs/programs-staff-subnav"
 import { hasPermission, PERMISSIONS } from "@/lib/permissions/permissions"
+import { redirectOrgWideProgramPagesForDepartmentHead } from "@/lib/programs/program-access"
 
 export default async function ProgramsPaymentSummaryReportPage() {
+  await redirectOrgWideProgramPagesForDepartmentHead()
   const canView =
     (await hasPermission(PERMISSIONS.PROGRAMS_VIEW)) ||
     (await hasPermission(PERMISSIONS.REPORTS_VIEW)) ||

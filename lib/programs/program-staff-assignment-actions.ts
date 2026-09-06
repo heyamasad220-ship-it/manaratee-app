@@ -4,6 +4,9 @@ import { revalidatePath } from "next/cache"
 
 import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
+import { getDepartmentHeadshipForCurrentUser } from "@/lib/departments/department-access"
+import { hasPermission, PERMISSIONS } from "@/lib/permissions/permissions"
+import { assertCanManageProgram } from "@/lib/programs/program-access"
 import {
   getStaffAssignmentsForContact,
   getStaffAssignmentsForOffering,
@@ -156,6 +159,8 @@ export async function createProgramStaffAssignment(input: {
     throw new Error("No organization selected")
   }
 
+  await assertCanManageProgram(input.programId)
+
   await assertStaffEligibleContact(organizationId, input.contactId)
   await assertOfferingBelongsToProgram({
     organizationId,
@@ -269,6 +274,8 @@ export async function setOfferingPrimaryInstructor(input: {
     throw new Error("No organization selected")
   }
 
+  await assertCanManageProgram(input.programId)
+
   await assertOfferingBelongsToProgram({
     organizationId,
     programId: input.programId,
@@ -379,6 +386,8 @@ export async function removeProgramStaffAssignment(input: {
     throw new Error("No organization selected")
   }
 
+  await assertCanManageProgram(input.programId)
+
   const supabase = await createClient()
 
   const { data: existing, error: loadError } = await supabase
@@ -432,7 +441,24 @@ export async function searchProgramStaffContactsAction(
     )
   }
 
-  return searchStaffEligibleContacts(organizationId, search)
+  if (
+    (await hasPermission(PERMISSIONS.PROGRAMS_MANAGE)) ||
+    (await hasPermission(PERMISSIONS.PROGRAMS_VIEW)) ||
+    (await hasPermission(PERMISSIONS.STAFF_VIEW))
+  ) {
+    return searchStaffEligibleContacts(organizationId, search)
+  }
+
+  const headship = await getDepartmentHeadshipForCurrentUser()
+  if (headship) {
+    return searchDepartmentEmployeeContacts(
+      organizationId,
+      headship.departmentId,
+      search
+    )
+  }
+
+  throw new Error("You do not have permission to search staff.")
 }
 
 export async function loadContactProgramAssignments(contactId: string) {

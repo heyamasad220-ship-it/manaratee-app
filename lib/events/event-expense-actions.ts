@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache"
 
 import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
-import { hasAnyPermission, PERMISSIONS } from "@/lib/permissions/permissions"
+import { canManageInternalEvent } from "@/lib/events/event-access"
 import {
   isExpenseCategory,
   type EventExpense,
@@ -53,10 +53,7 @@ export async function createEventExpense(input: {
   currency?: string
 }): Promise<EventExpenseActionResult> {
   try {
-    const canManage = await hasAnyPermission(
-      PERMISSIONS.EVENTS_MANAGE,
-      PERMISSIONS.PROGRAMS_MANAGE
-    )
+    const canManage = await canManageInternalEvent(input.eventId)
     if (!canManage) {
       return { success: false, error: "You do not have permission to manage expenses." }
     }
@@ -135,10 +132,7 @@ export async function deleteEventExpense(input: {
   eventId: string
 }): Promise<EventExpenseActionResult> {
   try {
-    const canManage = await hasAnyPermission(
-      PERMISSIONS.EVENTS_MANAGE,
-      PERMISSIONS.PROGRAMS_MANAGE
-    )
+    const canManage = await canManageInternalEvent(input.eventId)
     if (!canManage) {
       return { success: false, error: "You do not have permission to manage expenses." }
     }

@@ -101,6 +101,7 @@ export function buildEventManagementChildren(): SubItem[] {
       matchPrefix: "/event-management",
       excludeMatchPrefixes: [
         "/event-management/calendar",
+        "/event-management/check-in",
         "/event-management/ticketing",
         "/event-management/settings",
         "/event-management/reports",
@@ -114,10 +115,11 @@ export function buildEventManagementChildren(): SubItem[] {
       permissionKey: "events.view",
     },
     {
-      label: "Ticketing",
-      href: "/event-management/ticketing",
-      matchPrefix: "/event-management/ticketing",
-      permissionKey: "ticketing.view",
+      label: "Check-in",
+      href: "/event-management/check-in",
+      matchPrefix: "/event-management/check-in",
+      permissionKey: "events.view",
+      permissionKeys: ["events.view", "events.checkin", "ticketing.view"],
     },
     {
       label: "Reports",

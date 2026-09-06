@@ -1,0 +1,218 @@
+{
+  "mode": "execute",
+  "xlsxPath": "C:/Users/danan/Downloads/Camp_Enrollment_Growth.xlsx",
+  "generatedAt": "2026-09-02T17:08:00.975Z",
+  "excelRows": 3524,
+  "createdPrograms": 15,
+  "createdOfferings": 15,
+  "createdContacts": 262,
+  "reusedContacts": 2394,
+  "createdPeople": 488,
+  "reusedPeople": 2167,
+  "createdEnrollments": 1968,
+  "skippedExisting": 687,
+  "skippedDuplicate": 201,
+  "skippedExistingYear": 667,
+  "skippedUnmapped": 0,
+  "skippedNoMember": 0,
+  "skippedNoParent": 0,
+  "uniqueParents": 827,
+  "byProgram": {
+    "Summer Camp 1 2024": {
+      "rows": 323,
+      "enrolled": 53,
+      "skipped": 270
+    },
+    "Summer Camp 2 2024": {
+      "rows": 324,
+      "enrolled": 296,
+      "skipped": 28
+    },
+    "Spring Camp 2024": {
+      "rows": 38,
+      "enrolled": 38,
+      "skipped": 0
+    },
+    "Summer Camp 1 2025": {
+      "rows": 323,
+      "enrolled": 297,
+      "skipped": 26
+    },
+    "Summer Camp 2 2025": {
+      "rows": 308,
+      "enrolled": 289,
+      "skipped": 19
+    },
+    "Youth Intensive 2025": {
+      "rows": 47,
+      "enrolled": 36,
+      "skipped": 11
+    },
+    "Youth Intensive 2026": {
+      "rows": 35,
+      "enrolled": 35,
+      "skipped": 0
+    },
+    "Fall Camp 2023": {
+      "rows": 49,
+      "enrolled": 49,
+      "skipped": 0
+    },
+    "Fall Camp 2022": {
+      "rows": 69,
+      "enrolled": 63,
+      "skipped": 6
+    },
+    "Fall Camp 2025": {
+      "rows": 39,
+      "enrolled": 37,
+      "skipped": 2
+    },
+    "Fall Camp October 2024": {
+      "rows": 17,
+      "enrolled": 4,
+      "skipped": 13
+    },
+    "Fall Camp November 2024": {
+      "rows": 63,
+      "enrolled": 63,
+      "skipped": 0
+    },
+    "Summer Camp 1 2023": {
+      "rows": 230,
+      "enrolled": 211,
+      "skipped": 19
+    },
+    "Summer Camp 2 2023": {
+      "rows": 213,
+      "enrolled": 198,
+      "skipped": 15
+    },
+    "RIJAAL Overnight Camp 2024": {
+      "rows": 5,
+      "enrolled": 5,
+      "skipped": 0
+    },
+    "Special Needs Summer Camp 2026": {
+      "rows": 3,
+      "enrolled": 3,
+      "skipped": 0
+    },
+    "Spring Camp 2025": {
+      "rows": 16,
+      "enrolled": 16,
+      "skipped": 0
+    },
+    "Spring Camp Week 2 2023": {
+      "rows": 50,
+      "enrolled": 23,
+      "skipped": 27
+    },
+    "Spring Camp Week 1 2023": {
+      "rows": 30,
+      "enrolled": 14,
+      "skipped": 16
+    },
+    "Summer Camp 1 2022": {
+      "rows": 167,
+      "enrolled": 81,
+      "skipped": 86
+    },
+    "Summer Camp 2 2022": {
+      "rows": 133,
+      "enrolled": 49,
+      "skipped": 84
+    },
+    "Winter Break Camp 2024": {
+      "rows": 92,
+      "enrolled": 13,
+      "skipped": 79
+    },
+    "Winter Camp Ready Set Pray 2024": {
+      "rows": 98,
+      "enrolled": 23,
+      "skipped": 75
+    },
+    "Winter Camp 2022": {
+      "rows": 68,
+      "enrolled": 27,
+      "skipped": 41
+    },
+    "Winter Camp 2025": {
+      "rows": 117,
+      "enrolled": 45,
+      "skipped": 72
+    }
+  },
+  "unmapped": [],
+  "errors": [
+    {
+      "member": "Jood Chweki",
+      "program": "Summer Camp 1 2024",
+      "error": "parent person: canceling statement due to statement timeout"
+    }
+  ],
+  "samples": [
+    {
+      "program": "Summer Camp 1 2024",
+      "member": "Ibraheem Abdalla",
+      "parent": "Omar Syed Abdulla"
+    },
+    {
+      "program": "Summer Camp 1 2024",
+      "member": "Harris Ali",
+      "parent": "Faiza Ali"
+    },
+    {
+      "program": "Summer Camp 1 2024",
+      "member": "Usman Khawaja",
+      "parent": "Tazeen Khawaja"
+    },
+    {
+      "program": "Summer Camp 1 2024",
+      "member": "Jibreal Ismail",
+      "parent": "Alaa Ammuss"
+    },
+    {
+      "program": "Summer Camp 1 2024",
+      "member": "Emir Elbasi",
+      "parent": "Tarik ELBASI"
+    },
+    {
+      "program": "Summer Camp 1 2024",
+      "member": "Zayn Alhajaji",
+      "parent": "Mohamed Alhajaji"
+    },
+    {
+      "program": "Summer Camp 1 2024",
+      "member": "Fatima Hosain",
+      "parent": "Saima Malik"
+    },
+    {
+      "program": "Summer Camp 1 2024",
+      "member": "Maryam Hosain",
+      "parent": "Saima Malik"
+    },
+    {
+      "program": "Summer Camp 1 2024",
+      "member": "Faissal A Rashed",
+      "parent": "Faissal A Rashed"
+    },
+    {
+      "program": "Summer Camp 1 2024",
+      "member": "Baheej Hamdi",
+      "parent": "Baheej Hamdi"
+    },
+    {
+      "program": "Summer Camp 1 2024",
+      "member": "Noor Zafar",
+      "parent": "Salma Hussain"
+    },
+    {
+      "program": "Summer Camp 1 2024",
+      "member": "Hamza Zafar",
+      "parent": "Salma Hussain"
+    }
+  ],
+  "programCount": 25
+}

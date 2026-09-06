@@ -409,7 +409,7 @@ export async function listOrganizationMembers(
   const { data: members, error: membersError } = await admin
     .from("organization_members")
     .select(
-      "id, user_id, organization_id, role, role_id, status, created_at, platform_support_access"
+      "id, user_id, organization_id, role, role_id, status, created_at, platform_support_access, assigned_contact_id"
     )
     .eq("organization_id", organizationId)
     .order("created_at", { ascending: false })
@@ -419,6 +419,13 @@ export async function listOrganizationMembers(
   }
 
   const userIds = (members || []).map((member) => member.user_id as string)
+  const assignedContactIds = [
+    ...new Set(
+      (members || [])
+        .map((member) => member.assigned_contact_id as string | null)
+        .filter((id): id is string => Boolean(id))
+    ),
+  ]
   let profiles: Array<{
     id: string
     first_name: string | null
@@ -426,6 +433,11 @@ export async function listOrganizationMembers(
     email: string | null
     updated_at: string | null
     created_at: string | null
+  }> = []
+  let assignedContacts: Array<{
+    id: string
+    full_name: string | null
+    email: string | null
   }> = []
 
   if (userIds.length > 0) {
@@ -441,8 +453,25 @@ export async function listOrganizationMembers(
     profiles = profileRows || []
   }
 
+  if (assignedContactIds.length > 0) {
+    const { data: contactRows, error: contactsError } = await admin
+      .from("contacts")
+      .select("id, full_name, email")
+      .eq("organization_id", organizationId)
+      .in("id", assignedContactIds)
+
+    if (contactsError) {
+      throw new Error(contactsError.message)
+    }
+
+    assignedContacts = contactRows || []
+  }
+
   const roleById = new Map((roles || []).map((role) => [role.id as string, role]))
   const profileById = new Map(profiles.map((profile) => [profile.id, profile]))
+  const assignedById = new Map(
+    assignedContacts.map((contact) => [contact.id, contact])
+  )
 
   const visibleRoles = staffOnly
     ? (roles || []).filter(
@@ -457,6 +486,9 @@ export async function listOrganizationMembers(
     const customRole = member.role_id
       ? roleById.get(member.role_id as string)
       : null
+    const assigned = member.assigned_contact_id
+      ? assignedById.get(member.assigned_contact_id as string)
+      : null
     const email = profile?.email ?? "No email found"
     const firstName = profile?.first_name?.trim() || ""
     const lastName = profile?.last_name?.trim() || ""
@@ -469,6 +501,9 @@ export async function listOrganizationMembers(
       firstName,
       lastName,
       email,
+      assignedContactId: (member.assigned_contact_id as string | null) ?? null,
+      assignedContactName: assigned?.full_name ?? null,
+      assignedContactEmail: assigned?.email ?? null,
       systemRole: member.role as string,
       roleId: (member.role_id as string | null) ?? null,
       roleName:

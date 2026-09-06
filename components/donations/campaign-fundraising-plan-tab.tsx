@@ -1,10 +1,13 @@
 "use client"
 
-import { useRouter, useSearchParams } from "next/navigation"
+import { useMemo } from "react"
+import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 
 import { CampaignProspectsTab } from "@/components/donations/campaign-prospects-tab"
 import { CampaignStrategyTab } from "@/components/donations/campaign-strategy-tab"
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import { StatCard, StatCardsRow } from "@/components/ui/stat-card"
+import { formatDonationCurrency } from "@/lib/donations/campaign-analytics"
 import type {
   CampaignAskLevelMetrics,
   CampaignAskLevelRow,
@@ -14,8 +17,113 @@ import {
   donationCampaignWorkspaceHref,
   parseCampaignWorkspaceTab,
   parseFundraisingPlanSection,
-  type FundraisingPlanSection,
 } from "@/lib/donations/campaign-workspace-paths"
+import { cn } from "@/lib/utils"
+
+type CampaignFundraisingPlanHeaderProps = {
+  campaignId: string
+  askLevelMetrics: CampaignAskLevelMetrics[]
+}
+
+export function CampaignFundraisingPlanHeader({
+  campaignId,
+  askLevelMetrics,
+}: CampaignFundraisingPlanHeaderProps) {
+  const searchParams = useSearchParams()
+  const tab = parseCampaignWorkspaceTab(searchParams.get("tab"))
+  const section = parseFundraisingPlanSection(tab, searchParams.get("section"))
+
+  const totals = useMemo(() => {
+    return askLevelMetrics.reduce(
+      (acc, row) => {
+        acc.targetGifts += row.targetCount
+        acc.targetValue += row.targetValue
+        acc.amountSecured += row.amountSecured
+        acc.gap += row.gap
+        return acc
+      },
+      { targetGifts: 0, targetValue: 0, amountSecured: 0, gap: 0 }
+    )
+  }, [askLevelMetrics])
+
+  const planSections = [
+    {
+      id: "strategy" as const,
+      label: "Strategy",
+      href: donationCampaignWorkspaceHref(campaignId, { tab: "plan" }),
+    },
+    {
+      id: "prospects" as const,
+      label: "Prospects",
+      href: donationCampaignWorkspaceHref(campaignId, {
+        tab: "plan",
+        section: "prospects",
+      }),
+    },
+  ]
+
+  return (
+    <div className="space-y-3">
+      <StatCardsRow equal columns={4} className="gap-3">
+        <StatCard
+          layout="compact"
+          fill
+          tone="violet"
+          label="Targeted gifts"
+          value={totals.targetGifts}
+          valueClassName="text-xl"
+        />
+        <StatCard
+          layout="compact"
+          fill
+          tone="sky"
+          label="Target value"
+          value={formatDonationCurrency(totals.targetValue)}
+          valueClassName="text-xl"
+        />
+        <StatCard
+          layout="compact"
+          fill
+          tone="emerald"
+          label="Amount secured"
+          value={formatDonationCurrency(totals.amountSecured)}
+          valueClassName="text-xl"
+        />
+        <StatCard
+          layout="compact"
+          fill
+          tone="amber"
+          label="Gap"
+          value={formatDonationCurrency(totals.gap)}
+          valueClassName="text-xl"
+        />
+      </StatCardsRow>
+
+      <nav
+        aria-label="Fundraising Plan views"
+        className="flex flex-wrap gap-1 border-b border-border pb-px"
+      >
+        {planSections.map((item) => {
+          const isActive = item.id === section
+          return (
+            <Link
+              key={item.id}
+              href={item.href}
+              className={cn(
+                "-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors",
+                isActive
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
+              )}
+            >
+              {item.label}
+            </Link>
+          )
+        })}
+      </nav>
+    </div>
+  )
+}
 
 type CampaignFundraisingPlanTabProps = {
   campaignId: string
@@ -33,6 +141,7 @@ type CampaignFundraisingPlanTabProps = {
   initialAskType?: CampaignProspectAskType | null
   initialAskLevelId?: string | null
   initialAsked?: boolean
+  showHeader?: boolean
 }
 
 export function CampaignFundraisingPlanTab({
@@ -51,55 +160,20 @@ export function CampaignFundraisingPlanTab({
   initialAskType = null,
   initialAskLevelId = null,
   initialAsked = false,
+  showHeader = true,
 }: CampaignFundraisingPlanTabProps) {
-  const router = useRouter()
   const searchParams = useSearchParams()
   const tab = parseCampaignWorkspaceTab(searchParams.get("tab"))
   const section = parseFundraisingPlanSection(tab, searchParams.get("section"))
 
-  function setSection(next: FundraisingPlanSection) {
-    router.replace(
-      donationCampaignWorkspaceHref(campaignId, {
-        tab: "plan",
-        section: next === "prospects" ? "prospects" : undefined,
-      })
-    )
-  }
-
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h2 className="text-base font-semibold text-foreground">Fundraising Plan</h2>
-        <p className="text-sm text-muted-foreground">
-          Plan your campaign ask levels, assign prospects, and track progress toward your
-          fundraising targets.
-        </p>
-      </div>
-
-      <ToggleGroup
-        type="single"
-        value={section}
-        onValueChange={(value) => {
-          if (value === "strategy" || value === "prospects") setSection(value)
-        }}
-        variant="outline"
-        size="sm"
-        aria-label="Fundraising Plan views"
-        className="w-fit bg-muted/40"
-      >
-        <ToggleGroupItem
-          value="strategy"
-          className="px-3 data-[state=on]:bg-background data-[state=on]:shadow-sm"
-        >
-          Ask Strategy
-        </ToggleGroupItem>
-        <ToggleGroupItem
-          value="prospects"
-          className="px-3 data-[state=on]:bg-background data-[state=on]:shadow-sm"
-        >
-          Prospects
-        </ToggleGroupItem>
-      </ToggleGroup>
+      {showHeader ? (
+        <CampaignFundraisingPlanHeader
+          campaignId={campaignId}
+          askLevelMetrics={askLevelMetrics}
+        />
+      ) : null}
 
       {section === "strategy" ? (
         <CampaignStrategyTab

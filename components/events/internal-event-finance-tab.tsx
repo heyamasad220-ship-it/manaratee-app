@@ -27,9 +27,11 @@ import {
   createEventExpense,
   deleteEventExpense,
   listEventExpenses,
-  type EventExpense,
 } from "@/lib/events/event-expense-actions"
-import { EVENT_EXPENSE_CATEGORIES } from "@/lib/events/event-expense-types"
+import {
+  EVENT_EXPENSE_CATEGORIES,
+  type EventExpense,
+} from "@/lib/events/event-expense-types"
 import { updateEventLinkedCampaign } from "@/lib/events/internal-event-actions"
 import type {
   EventCampaignOption,

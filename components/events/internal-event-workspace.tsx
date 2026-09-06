@@ -1,22 +1,22 @@
 "use client"
 
 import { useRouter, useSearchParams } from "next/navigation"
-import { Building2, Calendar, MapPin, Tag } from "lucide-react"
 
 import { Header } from "@/components/layout/header"
 import { InternalEventCardActions } from "@/components/events/internal-event-card-actions"
 import { InternalEventChildcareTab } from "@/components/events/internal-event-childcare-tab"
-import { InternalEventCommunityCalendarCard } from "@/components/events/internal-event-community-calendar-card"
-import { InternalEventDescriptionCard } from "@/components/events/internal-event-description-card"
 import { InternalEventFeaturesSettings } from "@/components/events/internal-event-features-settings"
+import { InternalEventGeneralSettings } from "@/components/events/internal-event-general-settings"
 import { InternalEventMetaSettings } from "@/components/events/internal-event-meta-settings"
 import { InternalEventServiceNeedsSettings } from "@/components/events/internal-event-service-needs-settings"
 import { InternalEventFinanceTab } from "@/components/events/internal-event-finance-tab"
-import { InternalEventFlyerCard } from "@/components/events/internal-event-flyer-card"
 import { InternalEventModuleSetupPanel } from "@/components/events/internal-event-module-setup-panel"
 import { InternalEventModuleDisabledState } from "@/components/events/internal-event-participations-panel"
 import { InternalEventAttendeesTab } from "@/components/events/internal-event-attendees-tab"
-import { InternalEventOverviewDashboard } from "@/components/events/internal-event-overview-dashboard"
+import {
+  InternalEventOverviewDashboard,
+  InternalEventOverviewKpis,
+} from "@/components/events/internal-event-overview-dashboard"
 import { InternalEventRegistrationWorkspace } from "@/components/events/internal-event-registration-workspace"
 import { InternalEventReportsTab } from "@/components/events/internal-event-reports-tab"
 import {
@@ -28,9 +28,7 @@ import { InternalEventSettingsWorkspace } from "@/components/events/internal-eve
 import { InternalEventVendorsTab } from "@/components/events/internal-event-vendors-tab"
 import { InternalEventStatusSelect } from "@/components/events/internal-event-status-select"
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { formatInternalEventLocation } from "@/lib/events/internal-event-location"
 import { buildEventRecentOrders } from "@/lib/events/event-recent-activity"
 import type { EventOverviewSummary } from "@/lib/events/event-overview-metrics"
 import type { EventExpense } from "@/lib/events/event-expense-types"
@@ -40,9 +38,12 @@ import type {
 } from "@/lib/events/event-finance-types"
 import {
   getVisibleWorkspaceTabs,
+  isLegacyTicketsTab,
+  parseEventSettingsSection,
   resolveAttendanceMode,
   resolveEventWorkspaceFeatures,
   resolveWorkspaceTabId,
+  type EventSettingsSection,
   type EventWorkspaceTabId,
 } from "@/lib/events/event-workspace-features"
 import type { InternalEventWithRelations } from "@/lib/events/internal-event-types"
@@ -58,20 +59,8 @@ import type { VendorHubVendorType } from "@/lib/vendor-hub/vendor-type-types"
 import type { VendorHubLinkForInternalEvent } from "@/lib/vendor-hub/vendor-hub-internal-event-queries"
 import type { EventDocument } from "@/lib/events/event-document-types"
 import { InternalEventDocumentsCard } from "@/components/events/internal-event-documents-card"
-
-function formatDateTime(value: string | null) {
-  if (!value) {
-    return "TBD"
-  }
-
-  return new Date(value).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  })
-}
+import { STAFF_MAIN_CONTENT_STICKY_TOP_CLASS } from "@/lib/layout/staff-dashboard-chrome"
+import { cn } from "@/lib/utils"
 
 export function InternalEventWorkspace({
   event,
@@ -166,133 +155,73 @@ export function InternalEventWorkspace({
     event.service_requirements
   )
   const recentActivity = buildEventRecentOrders(attendees, 4)
+  const showCheckoutSettings =
+    features.registration && attendanceMode !== "open_public"
+  const requestedSettingsSection = isLegacyTicketsTab(tabParam)
+    ? "tickets"
+    : parseEventSettingsSection(searchParams.get("section"))
+  const settingsSection: EventSettingsSection =
+    requestedSettingsSection === "checkout" && !showCheckoutSettings
+      ? "tickets"
+      : requestedSettingsSection
+
+  const settingsSections: Array<{ id: EventSettingsSection; label: string }> = [
+    { id: "general", label: "General" },
+    { id: "tickets", label: "Tickets" },
+    { id: "features", label: "Features" },
+    ...(showCheckoutSettings
+      ? [{ id: "checkout" as const, label: "Checkout" }]
+      : []),
+  ]
+
+  function replaceWorkspaceQuery(next: { tab: EventWorkspaceTabId; section?: EventSettingsSection }) {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set("tab", next.tab)
+    if (next.tab === "settings" && next.section && next.section !== "general") {
+      params.set("section", next.section)
+    } else {
+      params.delete("section")
+    }
+    const nextHref = `/event-management/${event.id}?${params.toString()}`
+    const currentHref = `/event-management/${event.id}?${searchParams.toString()}`
+    if (nextHref === currentHref) return
+    router.replace(nextHref, { scroll: false })
+  }
 
   function handleTabChange(value: string) {
+    if (isLegacyTicketsTab(value)) {
+      replaceWorkspaceQuery({ tab: "settings", section: "tickets" })
+      return
+    }
     const nextTab = resolveWorkspaceTabId(value)
     if (!nextTab) return
     if (!visibleTabs.some((tab) => tab.value === nextTab)) return
     // Radix can emit onValueChange for the already-selected tab after RSC
     // refresh. Replacing the same URL retriggers the refresh and loops.
-    if (tabParam === nextTab || (!tabParam && nextTab === activeTab)) return
-    const params = new URLSearchParams(searchParams.toString())
-    params.set("tab", nextTab)
-    const nextHref = `/event-management/${event.id}?${params.toString()}`
-    const currentHref = `/event-management/${event.id}?${searchParams.toString()}`
-    if (nextHref === currentHref) return
-    router.replace(nextHref, {
-      scroll: false,
+    if (nextTab === activeTab) return
+    replaceWorkspaceQuery({
+      tab: nextTab,
+      section: nextTab === "settings" ? "general" : undefined,
     })
   }
 
-  const overviewDetails = (
-    <div className="grid gap-6 lg:grid-cols-2">
-      <div className="space-y-6">
-        <InternalEventFlyerCard
-          eventId={event.id}
-          flyerUrl={event.flyer_url ?? null}
-          canManage={canManage}
-        />
-
-        <InternalEventDescriptionCard
-          eventId={event.id}
-          description={event.description}
-          canManage={canManage}
-        />
-      </div>
-
-      <div className="space-y-6">
-        <Card
-          className={
-            canManage
-              ? "cursor-pointer transition-colors hover:bg-muted/30"
-              : undefined
-          }
-          onClick={
-            canManage
-              ? () => router.push(`/event-management/${event.id}/edit`)
-              : undefined
-          }
-          role={canManage ? "link" : undefined}
-          tabIndex={canManage ? 0 : undefined}
-          onKeyDown={
-            canManage
-              ? (keyboardEvent) => {
-                  if (
-                    keyboardEvent.key === "Enter" ||
-                    keyboardEvent.key === " "
-                  ) {
-                    keyboardEvent.preventDefault()
-                    router.push(`/event-management/${event.id}/edit`)
-                  }
-                }
-              : undefined
-          }
-        >
-          <CardHeader>
-            <CardTitle className="text-base">Event details</CardTitle>
-            {canManage ? (
-              <p className="text-xs font-normal text-muted-foreground">
-                Click to edit schedule and location
-              </p>
-            ) : null}
-          </CardHeader>
-          <CardContent className="space-y-4 text-sm">
-            <div className="flex items-start gap-3">
-              <Building2 className="mt-0.5 h-4 w-4 text-muted-foreground" />
-              <div>
-                <p className="font-medium">Department</p>
-                <p className="text-muted-foreground">{departmentName}</p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3">
-              <Tag className="mt-0.5 h-4 w-4 text-muted-foreground" />
-              <div>
-                <p className="font-medium">Event type</p>
-                <p className="text-muted-foreground">{eventTypeName}</p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3">
-              <Calendar className="mt-0.5 h-4 w-4 text-muted-foreground" />
-              <div>
-                <p className="font-medium">Schedule</p>
-                <p className="text-muted-foreground">
-                  {formatDateTime(event.start_at)} –{" "}
-                  {formatDateTime(event.end_at)}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3">
-              <MapPin className="mt-0.5 h-4 w-4 text-muted-foreground" />
-              <div>
-                <p className="font-medium">Location</p>
-                <p className="text-muted-foreground">
-                  {formatInternalEventLocation(event)}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <InternalEventCommunityCalendarCard
-          eventId={event.id}
-          eventName={event.name}
-          communityCalendarStatus={event.community_calendar_status}
-          organizationSlug={organizationSlug}
-          canManage={canManage}
-        />
-      </div>
-    </div>
-  )
+  function handleSettingsSectionChange(section: EventSettingsSection) {
+    if (activeTab === "settings" && section === settingsSection) return
+    replaceWorkspaceQuery({ tab: "settings", section })
+  }
 
   return (
     <>
       <Header title="Event Management" />
 
-      <div className="flex flex-col gap-6 p-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div
+        className={cn(
+          "flex flex-col gap-6 p-6",
+          activeTab === "attendees" &&
+            "h-[calc(100vh-11.75rem)] min-h-0 overflow-hidden"
+        )}
+      >
+        <div className="flex shrink-0 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className="text-sm text-muted-foreground">Event workspace</p>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight">
@@ -323,14 +252,56 @@ export function InternalEventWorkspace({
           </div>
         </div>
 
-        <Tabs value={activeTab} onValueChange={handleTabChange} className="gap-4">
-          <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
-            {visibleTabs.map((tab) => (
-              <TabsTrigger key={tab.value} value={tab.value}>
-                {tab.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
+        <Tabs
+          value={activeTab}
+          onValueChange={handleTabChange}
+          className={cn(
+            "gap-4",
+            activeTab === "attendees" && "flex min-h-0 flex-1 flex-col"
+          )}
+        >
+          <div
+            className={cn(
+              "sticky z-40 -mx-6 min-w-0 shrink-0 space-y-4 border-b border-border bg-background px-6 pb-4 pt-1",
+              STAFF_MAIN_CONTENT_STICKY_TOP_CLASS
+            )}
+          >
+            <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
+              {visibleTabs.map((tab) => (
+                <TabsTrigger key={tab.value} value={tab.value}>
+                  {tab.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+            {activeTab === "overview" ? (
+              <InternalEventOverviewKpis overview={overview} />
+            ) : null}
+            {activeTab === "settings" ? (
+              <nav
+                aria-label="Event settings"
+                className="flex flex-wrap gap-1 border-b border-border pb-px"
+              >
+                {settingsSections.map((section) => {
+                  const isActive = section.id === settingsSection
+                  return (
+                    <button
+                      key={section.id}
+                      type="button"
+                      onClick={() => handleSettingsSectionChange(section.id)}
+                      className={cn(
+                        "-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors",
+                        isActive
+                          ? "border-primary text-primary"
+                          : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
+                      )}
+                    >
+                      {section.label}
+                    </button>
+                  )
+                })}
+              </nav>
+            ) : null}
+          </div>
 
           <TabsContent value="overview" className="mt-0">
             <InternalEventOverviewDashboard
@@ -338,24 +309,15 @@ export function InternalEventWorkspace({
               canManage={canManage}
               eventId={event.id}
               coordinatorName={coordinatorName}
-              details={overviewDetails}
               recentActivity={recentActivity}
               onNavigateTab={handleTabChange}
             />
           </TabsContent>
 
-          <TabsContent value="registration" className="mt-0">
-            <InternalEventRegistrationWorkspace
-              eventId={event.id}
-              ticketTypes={ticketTypes}
-              ticketingConfig={event.ticketing_config}
-              requiresTicketing={event.requires_ticketing}
-              canManage={canManage}
-            />
-          </TabsContent>
-
-          <TabsContent value="attendees" className="mt-0">
-            {attendanceMode !== "open_public" || attendees.length > 0 ? (
+          <TabsContent
+            value="attendees"
+            className="mt-0 flex min-h-0 flex-1 flex-col overflow-hidden"
+          >
               <InternalEventAttendeesTab
                 eventId={event.id}
                 attendees={attendees}
@@ -364,12 +326,6 @@ export function InternalEventWorkspace({
                 canCheckIn={canCheckIn || canManage}
                 waitlistEnabled={features.waitlist}
               />
-            ) : (
-              <InternalEventModuleDisabledState
-                title="Attendees"
-                description="This event is open to the public without registration. Change the attendance method under Registration to collect attendee records."
-              />
-            )}
           </TabsContent>
 
           <TabsContent value="staff" className="mt-0">
@@ -488,37 +444,60 @@ export function InternalEventWorkspace({
           </TabsContent>
 
           <TabsContent value="settings" className="mt-0">
-            <div className="space-y-6">
-              <InternalEventServiceNeedsSettings
-                key={event.id}
+            {settingsSection === "general" ? (
+              <InternalEventGeneralSettings
                 event={event}
-                vendorTypes={vendorTypes}
                 canManage={canManage}
-                canManageVendorTypes={canManage}
+                organizationSlug={organizationSlug}
               />
-              <InternalEventFeaturesSettings
+            ) : null}
+
+            {settingsSection === "tickets" ? (
+              <InternalEventRegistrationWorkspace
                 eventId={event.id}
-                initialFeatures={features}
+                ticketTypes={ticketTypes}
+                ticketingConfig={event.ticketing_config}
+                requiresTicketing={event.requires_ticketing}
                 canManage={canManage}
               />
-              <InternalEventMetaSettings
-                eventId={event.id}
-                coordinatorCandidates={coordinatorCandidates}
-                initialCoordinatorContactId={
-                  event.coordinator_contact_id ?? null
-                }
-                initialAudience={event.audience}
-                initialEventTags={event.event_tags}
-                initialEstimatedAttendance={event.estimated_attendance ?? null}
-                initialInternalNotes={event.internal_notes ?? null}
-                canManage={canManage}
-              />
-              <InternalEventDocumentsCard
-                eventId={event.id}
-                documents={eventDocuments}
-                canManage={canManage}
-              />
-              {features.registration && attendanceMode !== "open_public" ? (
+            ) : null}
+
+            {settingsSection === "features" ? (
+              <div className="space-y-6">
+                <InternalEventServiceNeedsSettings
+                  key={event.id}
+                  event={event}
+                  vendorTypes={vendorTypes}
+                  canManage={canManage}
+                  canManageVendorTypes={canManage}
+                />
+                <InternalEventFeaturesSettings
+                  eventId={event.id}
+                  initialFeatures={features}
+                  canManage={canManage}
+                />
+                <InternalEventMetaSettings
+                  eventId={event.id}
+                  coordinatorCandidates={coordinatorCandidates}
+                  initialCoordinatorContactId={
+                    event.coordinator_contact_id ?? null
+                  }
+                  initialAudience={event.audience}
+                  initialEventTags={event.event_tags}
+                  initialEstimatedAttendance={event.estimated_attendance ?? null}
+                  initialInternalNotes={event.internal_notes ?? null}
+                  canManage={canManage}
+                />
+                <InternalEventDocumentsCard
+                  eventId={event.id}
+                  documents={eventDocuments}
+                  canManage={canManage}
+                />
+              </div>
+            ) : null}
+
+            {settingsSection === "checkout" ? (
+              showCheckoutSettings ? (
                 <InternalEventSettingsWorkspace
                   eventId={event.id}
                   eventName={event.name}
@@ -529,15 +508,15 @@ export function InternalEventWorkspace({
               ) : canManage ? (
                 <p className="text-sm text-muted-foreground">
                   Checkout fields, attendee questions, and promo codes appear
-                  when registration requires tickets or free sign-up.
+                  when this event has paid or free tickets.
                 </p>
               ) : (
                 <InternalEventModuleDisabledState
                   title="Checkout settings"
                   description="Registration checkout is not configured for this event."
                 />
-              )}
-            </div>
+              )
+            ) : null}
           </TabsContent>
         </Tabs>
       </div>

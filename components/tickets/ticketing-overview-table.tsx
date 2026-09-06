@@ -33,8 +33,8 @@ export function TicketingOverviewTable({
         <Ticket className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
         <h3 className="text-lg font-semibold">No ticketed events yet</h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          Enable ticketing on an event in Event Management to start selling
-          tickets.
+          Enable ticketing on an event in Event Management, a campaign, or a
+          department. Ticketed events appear here.
         </p>
         <Button className="mt-4" asChild>
           <Link href="/event-management/events">Go to Events</Link>
@@ -88,14 +88,14 @@ export function TicketingOverviewTable({
         <div className="flex items-center justify-between gap-3">
           <p className="text-sm font-medium">Active events</p>
           <Button asChild size="sm" variant="outline">
-            <Link href="/event-management/ticketing/events">View all events</Link>
+            <Link href="/event-management/events">View all events</Link>
           </Button>
         </div>
         {activeEvents.length === 0 ? (
           <div className="rounded-lg border bg-card p-10 text-center text-sm text-muted-foreground">
             No active ticketed events.{" "}
             <Link
-              href="/event-management/ticketing/events"
+              href="/event-management/events"
               className="font-medium text-primary hover:underline"
             >
               View all events

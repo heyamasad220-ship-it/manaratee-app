@@ -10,6 +10,7 @@ import {
 } from "lucide-react"
 
 import { Header } from "@/components/layout/header"
+import { redirectOrgWideProgramPagesForDepartmentHead } from "@/lib/programs/program-access"
 import {
   Card,
   CardDescription,
@@ -137,6 +138,7 @@ const quickLinks: Array<{
 ]
 
 export default async function ProgramsHomePage() {
+  await redirectOrgWideProgramPagesForDepartmentHead()
   const [programs, offeringCount] = await Promise.all([
     getOpenPrograms(),
     countActiveOfferings(),

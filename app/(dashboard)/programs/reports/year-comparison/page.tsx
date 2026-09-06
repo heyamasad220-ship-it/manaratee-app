@@ -6,8 +6,10 @@ import { ProgramsStaffSubnav } from "@/components/programs/programs-staff-subnav
 import { YearComparisonReport } from "@/components/programs/year-comparison-report"
 import { getYearComparisonFacts } from "@/lib/programs/year-comparison-queries"
 import { hasPermission, PERMISSIONS } from "@/lib/permissions/permissions"
+import { redirectOrgWideProgramPagesForDepartmentHead } from "@/lib/programs/program-access"
 
 export default async function ProgramsYearComparisonReportPage() {
+  await redirectOrgWideProgramPagesForDepartmentHead()
   const canView =
     (await hasPermission(PERMISSIONS.PROGRAMS_VIEW)) ||
     (await hasPermission(PERMISSIONS.REPORTS_VIEW))

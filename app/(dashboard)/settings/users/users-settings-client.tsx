@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import Link from "next/link"
 import { Header } from "@/components/layout/header"
 import {
   fetchOrganizationUsersForSettings,
@@ -58,10 +59,14 @@ import {
   UserX,
   Loader2,
   ExternalLink,
+  UserRound,
 } from "lucide-react"
 import { enterCustomerPortalAsUser } from "@/lib/organizations/org-user-access-actions"
 import { isOrganizationSystemAdmin } from "@/lib/organizations/organization-system-admin"
+import { assignWorkLoginToContactAction } from "@/lib/organizations/work-email-assignment"
 import { createClient } from "@/lib/supabase/client"
+import { HrContactPicker } from "@/components/hr/hr-contact-picker"
+import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
 
 function defaultInviteRoleId(roles: OrganizationSettingsRole[]) {
   const adminRole = roles.find((role) => role.name.toLowerCase() === "admin")
@@ -97,11 +102,19 @@ export function UsersSettingsClient({
   const [inviteRoleId, setInviteRoleId] = useState(() =>
     defaultInviteRoleId(initialRoles)
   )
+  const [inviteAssignedContactId, setInviteAssignedContactId] = useState<string | null>(
+    null
+  )
+  const [inviteAssignedLabel, setInviteAssignedLabel] = useState("")
   const [sendingInvite, setSendingInvite] = useState(false)
 
   const [showRoleDialog, setShowRoleDialog] = useState(false)
   const [showEditDialog, setShowEditDialog] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [showAssignDialog, setShowAssignDialog] = useState(false)
+  const [assignContactId, setAssignContactId] = useState<string | null>(null)
+  const [assignContactLabel, setAssignContactLabel] = useState("")
+  const [savingAssignment, setSavingAssignment] = useState(false)
   const [selectedUser, setSelectedUser] = useState<OrganizationSettingsUser | null>(null)
   const [selectedRoleId, setSelectedRoleId] = useState("")
   const [savingRole, setSavingRole] = useState(false)
@@ -167,6 +180,8 @@ export function UsersSettingsClient({
     setInviteFirstName("")
     setInviteLastName("")
     setInviteEmail("")
+    setInviteAssignedContactId(null)
+    setInviteAssignedLabel("")
 
     const adminRole = roles.find((role) => role.name.toLowerCase() === "admin")
     setInviteRoleId(adminRole?.id ?? roles[0]?.id ?? "")
@@ -207,6 +222,7 @@ export function UsersSettingsClient({
           roleName: selectedRole.name,
           firstName: inviteFirstName.trim() || null,
           lastName: inviteLastName.trim() || null,
+          assignedContactId: inviteAssignedContactId,
         }),
       })
 
@@ -224,7 +240,13 @@ export function UsersSettingsClient({
         return
       }
 
-      alert(result.message || "Invitation email sent successfully.")
+      if (result.assignmentWarning) {
+        alert(
+          `${result.message || "Invitation email sent successfully."}\n\nThe login was created, but assigning it to a Directory person failed: ${result.assignmentWarning}`
+        )
+      } else {
+        alert(result.message || "Invitation email sent successfully.")
+      }
 
       resetInviteForm()
       setShowAddDialog(false)
@@ -301,6 +323,65 @@ export function UsersSettingsClient({
     }
   }
 
+  function openAssignDialog(user: OrganizationSettingsUser) {
+    setSelectedUser(user)
+    setAssignContactId(user.assignedContactId)
+    setAssignContactLabel(
+      user.assignedContactName
+        ? user.assignedContactEmail
+          ? `${user.assignedContactName} (${user.assignedContactEmail})`
+          : user.assignedContactName
+        : ""
+    )
+    setShowAssignDialog(true)
+  }
+
+  async function saveWorkEmailAssignment() {
+    if (!selectedUser) return
+
+    setSavingAssignment(true)
+    setError(null)
+
+    const result = await assignWorkLoginToContactAction({
+      membershipId: selectedUser.membershipId,
+      contactId: assignContactId,
+    })
+
+    if (!result.success) {
+      setError(result.error)
+      setSavingAssignment(false)
+      return
+    }
+
+    setShowAssignDialog(false)
+    setSelectedUser(null)
+    await loadUsers()
+    setSavingAssignment(false)
+  }
+
+  async function unassignWorkEmail() {
+    if (!selectedUser) return
+
+    setSavingAssignment(true)
+    setError(null)
+
+    const result = await assignWorkLoginToContactAction({
+      membershipId: selectedUser.membershipId,
+      contactId: null,
+    })
+
+    if (!result.success) {
+      setError(result.error)
+      setSavingAssignment(false)
+      return
+    }
+
+    setShowAssignDialog(false)
+    setSelectedUser(null)
+    await loadUsers()
+    setSavingAssignment(false)
+  }
+
   function openDeleteDialog(user: OrganizationSettingsUser) {
     setSelectedUser(user)
     setShowDeleteDialog(true)
@@ -365,7 +446,9 @@ export function UsersSettingsClient({
     return users.filter((user) => {
       const matchesSearch =
         user.name.toLowerCase().includes(search.toLowerCase()) ||
-        user.email.toLowerCase().includes(search.toLowerCase())
+        user.email.toLowerCase().includes(search.toLowerCase()) ||
+        (user.assignedContactName || "").toLowerCase().includes(search.toLowerCase()) ||
+        (user.assignedContactEmail || "").toLowerCase().includes(search.toLowerCase())
 
       const matchesRole = roleFilter === "All" || user.roleName === roleFilter
       const matchesStatus = statusFilter === "All" || user.status === statusFilter
@@ -389,7 +472,8 @@ export function UsersSettingsClient({
           <div>
             <h2 className="text-xl font-semibold text-foreground">Users</h2>
             <p className="text-sm text-muted-foreground">
-              Manage user accounts and organization roles.
+              Staff logins and organization-owned work emails. Assign a login to a
+              Directory person to transfer the mailbox without creating a second account.
             </p>
           </div>
 
@@ -521,6 +605,7 @@ export function UsersSettingsClient({
                   <TableHeader>
                     <TableRow>
                       <TableHead>User</TableHead>
+                      <TableHead>Assigned to</TableHead>
                       <TableHead>Role</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Last Login</TableHead>
@@ -532,7 +617,7 @@ export function UsersSettingsClient({
                   <TableBody>
                     {loading ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="py-6 text-center text-muted-foreground">
+                        <TableCell colSpan={7} className="py-6 text-center text-muted-foreground">
                           <div className="flex items-center justify-center gap-2">
                             <Loader2 className="h-4 w-4 animate-spin" />
                             Loading users...
@@ -541,7 +626,7 @@ export function UsersSettingsClient({
                       </TableRow>
                     ) : filteredUsers.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="py-6 text-center text-muted-foreground">
+                        <TableCell colSpan={7} className="py-6 text-center text-muted-foreground">
                           No users found.
                         </TableCell>
                       </TableRow>
@@ -565,6 +650,26 @@ export function UsersSettingsClient({
                                 <p className="text-sm text-muted-foreground">{user.email}</p>
                               </div>
                             </div>
+                          </TableCell>
+
+                          <TableCell>
+                            {user.assignedContactId ? (
+                              <div>
+                                <Link
+                                  href={contactProfileHref(user.assignedContactId)}
+                                  className="font-medium text-primary underline-offset-4 hover:underline"
+                                >
+                                  {user.assignedContactName || "Directory person"}
+                                </Link>
+                                {user.assignedContactEmail ? (
+                                  <p className="text-sm text-muted-foreground">
+                                    {user.assignedContactEmail}
+                                  </p>
+                                ) : null}
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground">Unassigned</span>
+                            )}
                           </TableCell>
 
                           <TableCell>
@@ -609,6 +714,11 @@ export function UsersSettingsClient({
                               </DropdownMenuTrigger>
 
                               <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => openAssignDialog(user)}>
+                                  <UserRound className="mr-2 h-4 w-4" />
+                                  {user.assignedContactId ? "Change assigned person" : "Assign person"}
+                                </DropdownMenuItem>
+
                                 <DropdownMenuItem onClick={() => openChangeRoleDialog(user)}>
                                   <Shield className="mr-2 h-4 w-4" />
                                   Change Role
@@ -675,7 +785,9 @@ export function UsersSettingsClient({
           <DialogHeader>
             <DialogTitle>Add User</DialogTitle>
             <DialogDescription>
-              Send an invitation email to add a user to this organization.
+              Invite a staff login or organization work email (for example finance@masdfw.org).
+              Optionally assign it to a Directory person. Do not create a Directory record for the
+              mailbox itself.
             </DialogDescription>
           </DialogHeader>
 
@@ -703,15 +815,34 @@ export function UsersSettingsClient({
             </div>
 
             <div className="flex flex-col gap-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">Work email</Label>
               <Input
                 id="email"
                 type="email"
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
-                placeholder="Enter email address"
+                placeholder="finance@masdfw.org"
               />
             </div>
+
+            <HrContactPicker
+              label="Assigned to (optional)"
+              selectedContactId={inviteAssignedContactId}
+              selectedLabel={inviteAssignedLabel}
+              allowCreate={false}
+              individualOnly
+              onChange={(contact) => {
+                setInviteAssignedContactId(contact.contactId)
+                const name = contact.full_name?.trim() || "Unnamed"
+                setInviteAssignedLabel(
+                  contact.email ? `${name} (${contact.email})` : name
+                )
+              }}
+              onClear={() => {
+                setInviteAssignedContactId(null)
+                setInviteAssignedLabel("")
+              }}
+            />
 
             <div className="flex flex-col gap-2">
               <Label htmlFor="role">Role</Label>
@@ -732,7 +863,8 @@ export function UsersSettingsClient({
             <div className="flex items-center gap-2 rounded-md bg-muted/50 p-3">
               <Mail className="h-4 w-4 text-muted-foreground" />
               <p className="text-sm text-muted-foreground">
-                An invitation email will be sent to the user with login instructions.
+                An invitation email will be sent with login instructions. Reassign later from this
+                list if the mailbox moves to another person.
               </p>
             </div>
           </div>
@@ -870,6 +1002,72 @@ export function UsersSettingsClient({
               {deletingUser && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Remove User
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {selectedUser?.assignedContactId ? "Change assigned person" : "Assign person"}
+            </DialogTitle>
+            <DialogDescription>
+              {selectedUser
+                ? `Assign ${selectedUser.email} to a Directory person. Reassigning moves this work email; do not create a second user for the same address.`
+                : "Assign this work email to a Directory person."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4">
+            <HrContactPicker
+              label="Directory person"
+              selectedContactId={assignContactId}
+              selectedLabel={assignContactLabel}
+              allowCreate={false}
+              individualOnly
+              onChange={(contact) => {
+                setAssignContactId(contact.contactId)
+                const name = contact.full_name?.trim() || "Unnamed"
+                setAssignContactLabel(
+                  contact.email ? `${name} (${contact.email})` : name
+                )
+              }}
+              onClear={() => {
+                setAssignContactId(null)
+                setAssignContactLabel("")
+              }}
+            />
+          </div>
+
+          <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-between">
+            {selectedUser?.assignedContactId ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void unassignWorkEmail()}
+                disabled={savingAssignment}
+              >
+                Unassign
+              </Button>
+            ) : (
+              <span />
+            )}
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowAssignDialog(false)}
+                disabled={savingAssignment}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => void saveWorkEmailAssignment()}
+                disabled={savingAssignment || !assignContactId}
+              >
+                {savingAssignment && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Save
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

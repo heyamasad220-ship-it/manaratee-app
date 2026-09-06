@@ -32,7 +32,6 @@ export const DEFAULT_WORKSPACE_FEATURES: EventWorkspaceFeatures = {
 
 export type EventWorkspaceTabId =
   | "overview"
-  | "registration"
   | "attendees"
   | "staff"
   | "youth"
@@ -41,6 +40,8 @@ export type EventWorkspaceTabId =
   | "reports"
   | "settings"
 
+export type EventSettingsSection = "general" | "tickets" | "features" | "checkout"
+
 export type EventWorkspaceTabDef = {
   value: EventWorkspaceTabId
   label: string
@@ -48,8 +49,7 @@ export type EventWorkspaceTabDef = {
 
 const ALL_TABS: EventWorkspaceTabDef[] = [
   { value: "overview", label: "Overview" },
-  { value: "registration", label: "Registration" },
-  { value: "attendees", label: "Attendees" },
+  { value: "attendees", label: "Orders" },
   { value: "staff", label: "Staff & Volunteers" },
   { value: "youth", label: "Youth" },
   { value: "vendors", label: "Vendors" },
@@ -138,7 +138,6 @@ export function getVisibleWorkspaceTabs(
   ctx: WorkspaceVisibilityContext
 ): EventWorkspaceTabDef[] {
   const { features, attendanceMode } = ctx
-  const showRegistration = true
   const showAttendees =
     attendanceMode !== "open_public" ||
     Boolean(ctx.hasAttendees) ||
@@ -154,8 +153,6 @@ export function getVisibleWorkspaceTabs(
       case "overview":
       case "settings":
         return true
-      case "registration":
-        return showRegistration
       case "attendees":
         return showAttendees
       case "staff":
@@ -174,12 +171,34 @@ export function getVisibleWorkspaceTabs(
   })
 }
 
+/** True when an old Tickets workspace URL should open Settings → Tickets. */
+export function isLegacyTicketsTab(value: string | null | undefined): boolean {
+  return value === "tickets" || value === "ticketing" || value === "registration"
+}
+
+/** Map URL ?section= values on the event Settings tab. */
+export function parseEventSettingsSection(
+  value: string | null | undefined
+): EventSettingsSection {
+  if (value === "features" || value === "modules" || value === "service-needs") {
+    return "features"
+  }
+  if (isLegacyTicketsTab(value)) {
+    return "tickets"
+  }
+  if (value === "checkout") {
+    return "checkout"
+  }
+  return "general"
+}
+
 /** Map URL ?tab= values including legacy aliases. */
 export function resolveWorkspaceTabId(
   value: string | null | undefined
 ): EventWorkspaceTabId | null {
   if (!value) return null
-  if (value === "ticketing") return "registration"
+  if (isLegacyTicketsTab(value)) return "settings"
+  if (value === "orders") return "attendees"
   if (value === "childcare") return "youth"
   if (value === "volunteers") return "staff"
   if (ALL_TABS.some((tab) => tab.value === value)) {
@@ -188,32 +207,21 @@ export function resolveWorkspaceTabId(
   return null
 }
 
+export type EventAttendancePickerMode = "paid" | "free"
+
+/** Map stored/legacy modes onto the Paid / Free picker. */
+export function toAttendancePickerMode(
+  mode: EventAttendanceMode
+): EventAttendancePickerMode {
+  return mode === "free" || mode === "open_public" ? "free" : "paid"
+}
+
 export const ATTENDANCE_MODE_OPTIONS: Array<{
-  value: EventAttendanceMode
+  value: EventAttendancePickerMode
   label: string
-  description: string
 }> = [
-  {
-    value: "paid",
-    label: "Paid tickets",
-    description: "Attendees purchase tickets to attend.",
-  },
-  {
-    value: "free",
-    label: "Free registration",
-    description: "People register at no charge (optionally multiple types).",
-  },
-  {
-    value: "paid_and_free",
-    label: "Paid tickets + free registrations",
-    description:
-      "Mix paid tickets with complimentary types (VIP, speakers, sponsors).",
-  },
-  {
-    value: "open_public",
-    label: "Open to public — no registration required",
-    description: "No checkout. Optionally track estimated attendance later.",
-  },
+  { value: "paid", label: "Paid" },
+  { value: "free", label: "Free" },
 ]
 
 export function attendanceModeRequiresOfferings(mode: EventAttendanceMode) {

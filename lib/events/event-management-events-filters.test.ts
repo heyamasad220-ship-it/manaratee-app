@@ -70,7 +70,7 @@ describe("event management events filters", () => {
 
     const active = filterEventManagementEvents(
       events,
-      { q: "", department: "all", status: "active" },
+      { q: "", department: "all", status: "active", ticketed: "all", category: "all" },
       now
     )
     assert.deepEqual(
@@ -80,7 +80,7 @@ describe("event management events filters", () => {
 
     const drafts = filterEventManagementEvents(
       events,
-      { q: "", department: "all", status: "draft" },
+      { q: "", department: "all", status: "draft", ticketed: "all", category: "all" },
       now
     )
     assert.deepEqual(
@@ -111,7 +111,7 @@ describe("event management events filters", () => {
 
     const byName = filterEventManagementEvents(
       events,
-      { q: "iftar", department: "all", status: "active" },
+      { q: "iftar", department: "all", status: "active", ticketed: "all", category: "all" },
       now
     )
     assert.deepEqual(
@@ -121,12 +121,64 @@ describe("event management events filters", () => {
 
     const byDept = filterEventManagementEvents(
       events,
-      { q: "", department: "dept-2", status: "active" },
+      { q: "", department: "dept-2", status: "active", ticketed: "all", category: "all" },
       now
     )
     assert.deepEqual(
       byDept.map((item) => item.id),
       ["b"]
+    )
+  })
+
+  it("filters ticketed events and category", () => {
+    const now = new Date("2026-08-27T12:00:00.000Z")
+    const events = [
+      event({
+        id: "ticketed",
+        name: "Dinner",
+        requires_ticketing: true,
+        ticketing_category_id: "cat-1",
+        start_at: "2026-08-29T18:00:00.000Z",
+        end_at: "2026-08-29T20:00:00.000Z",
+      }),
+      event({
+        id: "plain",
+        name: "Staff Meeting",
+        start_at: "2026-08-29T18:00:00.000Z",
+        end_at: "2026-08-29T20:00:00.000Z",
+      }),
+    ]
+
+    const ticketedOnly = filterEventManagementEvents(
+      events,
+      {
+        q: "",
+        department: "all",
+        status: "active",
+        ticketed: "ticketed",
+        category: "all",
+      },
+      now
+    )
+    assert.deepEqual(
+      ticketedOnly.map((item) => item.id),
+      ["ticketed"]
+    )
+
+    const byCategory = filterEventManagementEvents(
+      events,
+      {
+        q: "",
+        department: "all",
+        status: "active",
+        ticketed: "all",
+        category: "cat-1",
+      },
+      now
+    )
+    assert.deepEqual(
+      byCategory.map((item) => item.id),
+      ["ticketed"]
     )
   })
 })

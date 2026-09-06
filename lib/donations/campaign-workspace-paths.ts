@@ -1,5 +1,6 @@
 export type CampaignWorkspaceTab =
   | "overview"
+  | "events"
   | "plan"
   | "strategy"
   | "prospects"
@@ -13,6 +14,7 @@ export type FundraisingPlanSection = "strategy" | "prospects"
 
 export const CAMPAIGN_WORKSPACE_TABS = [
   { id: "overview", label: "Overview" },
+  { id: "events", label: "Event" },
   { id: "plan", label: "Fundraising Plan" },
   { id: "pledges", label: "Pledges" },
   { id: "donations", label: "Donations" },
@@ -26,6 +28,7 @@ export function parseCampaignWorkspaceTab(
 ): CampaignWorkspaceTab {
   if (
     tab === "overview" ||
+    tab === "events" ||
     tab === "plan" ||
     tab === "strategy" ||
     tab === "prospects" ||

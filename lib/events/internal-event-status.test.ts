@@ -41,14 +41,14 @@ describe("internal event approval status", () => {
     )
     assert.equal(
       toInternalEventStatusMenuValue(INTERNAL_EVENT_STATUSES.confirmed),
-      "approved"
+      "live"
     )
     assert.equal(
       fromInternalEventStatusMenuValue("pending"),
       INTERNAL_EVENT_STATUSES.awaitingApproval
     )
     assert.equal(
-      fromInternalEventStatusMenuValue("approved"),
+      fromInternalEventStatusMenuValue("live"),
       INTERNAL_EVENT_STATUSES.confirmed
     )
   })

@@ -19,7 +19,7 @@ export function CampaignWorkspaceNav({ campaignId, activeTab }: CampaignWorkspac
   return (
     <nav
       aria-label="Campaign workspace"
-      className="flex flex-wrap gap-1 border-b border-border pb-px"
+      className="flex min-w-0 flex-wrap gap-1 border-b border-border pb-px"
     >
       {CAMPAIGN_WORKSPACE_TABS.map((tab) => {
         const isActive =

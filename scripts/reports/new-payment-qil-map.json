@@ -1,0 +1,698 @@
+{
+  "reasonCount": 39,
+  "reasons": [
+    {
+      "reason": "Quran Institute for Ladies 2025-2026",
+      "count": 336,
+      "amount": 31650,
+      "succeeded": 325,
+      "refunded": 11,
+      "processing": 0,
+      "minDate": "2025-08-25",
+      "maxDate": "2026-05-11",
+      "uniqueEmails": 97,
+      "uniqueTxnIds": 322,
+      "secondaries": {
+        "(none)": 336
+      }
+    },
+    {
+      "reason": "MAS Quran Institute",
+      "count": 266,
+      "amount": 34911.8,
+      "succeeded": 250,
+      "refunded": 16,
+      "processing": 0,
+      "minDate": "2023-08-31",
+      "maxDate": "2024-06-14",
+      "uniqueEmails": 69,
+      "uniqueTxnIds": 250,
+      "secondaries": {
+        "/Qaeda Nouranea/Beginner/Advance/ Ousol": 88,
+        "/Improvement Recitation/ Itqan/ Pre- Ijaza": 86,
+        "/Hifz Classes": 44,
+        "/Hifz Review & Arabic Grammer": 38,
+        "Recitation  / Qaeda Noranea": 10
+      }
+    },
+    {
+      "reason": "MAS Quran Institute/ سورة النّساء",
+      "count": 160,
+      "amount": 10385,
+      "succeeded": 141,
+      "refunded": 19,
+      "processing": 0,
+      "minDate": "2022-08-09",
+      "maxDate": "2023-05-17",
+      "uniqueEmails": 29,
+      "uniqueTxnIds": 141,
+      "secondaries": {
+        "(none)": 160
+      }
+    },
+    {
+      "reason": "Quran Institute For Ladies",
+      "count": 157,
+      "amount": 25280.74,
+      "succeeded": 137,
+      "refunded": 20,
+      "processing": 0,
+      "minDate": "2024-08-06",
+      "maxDate": "2025-06-30",
+      "uniqueEmails": 74,
+      "uniqueTxnIds": 137,
+      "secondaries": {
+        "(none)": 128,
+        "All Programs / Full Payment / $500": 29
+      }
+    },
+    {
+      "reason": "MAS Quran Institute/ Beginner/ مبتدئة",
+      "count": 128,
+      "amount": 7738.24,
+      "succeeded": 124,
+      "refunded": 4,
+      "processing": 0,
+      "minDate": "2022-08-21",
+      "maxDate": "2023-05-06",
+      "uniqueEmails": 21,
+      "uniqueTxnIds": 123,
+      "secondaries": {
+        "(none)": 128
+      }
+    },
+    {
+      "reason": "MAS Quran Institute/ Osool/ الأصول",
+      "count": 103,
+      "amount": 7085,
+      "succeeded": 102,
+      "refunded": 1,
+      "processing": 0,
+      "minDate": "2022-08-20",
+      "maxDate": "2023-05-06",
+      "uniqueEmails": 14,
+      "uniqueTxnIds": 102,
+      "secondaries": {
+        "(none)": 103
+      }
+    },
+    {
+      "reason": "MAS Quran Institute/ سورة البقرة",
+      "count": 86,
+      "amount": 4480,
+      "succeeded": 81,
+      "refunded": 5,
+      "processing": 0,
+      "minDate": "2022-08-09",
+      "maxDate": "2023-05-22",
+      "uniqueEmails": 20,
+      "uniqueTxnIds": 81,
+      "secondaries": {
+        "(none)": 86
+      }
+    },
+    {
+      "reason": "Quran Institute Junior (Part Time Hifth)",
+      "count": 61,
+      "amount": 6220,
+      "succeeded": 54,
+      "refunded": 7,
+      "processing": 0,
+      "minDate": "2025-08-11",
+      "maxDate": "2026-05-01",
+      "uniqueEmails": 5,
+      "uniqueTxnIds": 54,
+      "secondaries": {
+        "(none)": 61
+      }
+    },
+    {
+      "reason": "Quran Institute for Ladies",
+      "count": 55,
+      "amount": 11150,
+      "succeeded": 51,
+      "refunded": 4,
+      "processing": 0,
+      "minDate": "2024-07-29",
+      "maxDate": "2025-02-05",
+      "uniqueEmails": 34,
+      "uniqueTxnIds": 50,
+      "secondaries": {
+        "All Programs / Half Payment / $250": 19,
+        "All Programs / Monthly Payment / $100": 15,
+        "Memorization / Half Payment / 250$": 12,
+        "Memorization / Full Payment/500$": 5,
+        "Recitation & Arabic Grammar / Full Payment/500$": 4
+      }
+    },
+    {
+      "reason": "MAS Quran Institute/ Qaeda Nouranea / قاعدة نورانيّة",
+      "count": 55,
+      "amount": 3705,
+      "succeeded": 55,
+      "refunded": 0,
+      "processing": 0,
+      "minDate": "2022-08-24",
+      "maxDate": "2023-04-05",
+      "uniqueEmails": 9,
+      "uniqueTxnIds": 55,
+      "secondaries": {
+        "(none)": 55
+      }
+    },
+    {
+      "reason": "MAS  Quran Institute/ Advance - متقدّمة",
+      "count": 47,
+      "amount": 3056.62,
+      "succeeded": 43,
+      "refunded": 4,
+      "processing": 0,
+      "minDate": "2022-09-12",
+      "maxDate": "2023-05-12",
+      "uniqueEmails": 8,
+      "uniqueTxnIds": 43,
+      "secondaries": {
+        "(none)": 47
+      }
+    },
+    {
+      "reason": "Quran Institute For Ladies 2026-2027",
+      "count": 46,
+      "amount": 5675,
+      "succeeded": 41,
+      "refunded": 5,
+      "processing": 0,
+      "minDate": "2026-06-11",
+      "maxDate": "2026-08-28",
+      "uniqueEmails": 40,
+      "uniqueTxnIds": 39,
+      "secondaries": {
+        "Tajweed & Recitation": 46
+      }
+    },
+    {
+      "reason": "MAS Quran Institute/ Recitation Improvement / level 1/ تحسين تلاوة",
+      "count": 39,
+      "amount": 2600,
+      "succeeded": 36,
+      "refunded": 3,
+      "processing": 0,
+      "minDate": "2022-09-10",
+      "maxDate": "2023-04-06",
+      "uniqueEmails": 11,
+      "uniqueTxnIds": 36,
+      "secondaries": {
+        "(none)": 39
+      }
+    },
+    {
+      "reason": "MAS Quran Institute/ Quran & Arabic Language Arts (Girls14+)",
+      "count": 30,
+      "amount": 745,
+      "succeeded": 25,
+      "refunded": 5,
+      "processing": 0,
+      "minDate": "2022-09-05",
+      "maxDate": "2022-12-06",
+      "uniqueEmails": 7,
+      "uniqueTxnIds": 25,
+      "secondaries": {
+        "(none)": 30
+      }
+    },
+    {
+      "reason": "MAS Quran Institute**",
+      "count": 27,
+      "amount": 7300,
+      "succeeded": 27,
+      "refunded": 0,
+      "processing": 0,
+      "minDate": "2023-08-31",
+      "maxDate": "2024-05-01",
+      "uniqueEmails": 25,
+      "uniqueTxnIds": 27,
+      "secondaries": {
+        "/Qaeda Nouranea/Beginner/Advance/ Ousol": 12,
+        "/Improvement Recitation/ Itqan/ Pre- Ijaza": 7,
+        "/Hifz Classes": 5,
+        "/Hifz Review & Arabic Grammer": 3
+      }
+    },
+    {
+      "reason": "MAS Quran Institute/ النّحو والإعراب",
+      "count": 16,
+      "amount": 738.5,
+      "succeeded": 15,
+      "refunded": 1,
+      "processing": 0,
+      "minDate": "2022-08-09",
+      "maxDate": "2023-04-08",
+      "uniqueEmails": 5,
+      "uniqueTxnIds": 15,
+      "secondaries": {
+        "(none)": 16
+      }
+    },
+    {
+      "reason": "MAS Quran Institute/ Recitation Improvement / level 2/ تحسين الأداء",
+      "count": 16,
+      "amount": 1040,
+      "succeeded": 16,
+      "refunded": 0,
+      "processing": 0,
+      "minDate": "2022-09-07",
+      "maxDate": "2023-04-05",
+      "uniqueEmails": 2,
+      "uniqueTxnIds": 16,
+      "secondaries": {
+        "(none)": 16
+      }
+    },
+    {
+      "reason": "Quran Institute Junior 26-27",
+      "count": 15,
+      "amount": 981.5,
+      "succeeded": 15,
+      "refunded": 0,
+      "processing": 0,
+      "minDate": "2026-08-14",
+      "maxDate": "2026-08-29",
+      "uniqueEmails": 5,
+      "uniqueTxnIds": 10,
+      "secondaries": {
+        "(none)": 15
+      }
+    },
+    {
+      "reason": "Quran Institure for Ladies 2026-2027",
+      "count": 15,
+      "amount": 2075,
+      "succeeded": 14,
+      "refunded": 1,
+      "processing": 0,
+      "minDate": "2026-06-11",
+      "maxDate": "2026-08-24",
+      "uniqueEmails": 14,
+      "uniqueTxnIds": 14,
+      "secondaries": {
+        "Memorization (Surat Al-Baqara & Surat Aal Imran)": 15
+      }
+    },
+    {
+      "reason": "MAS Quran Institute/50/",
+      "count": 13,
+      "amount": 650,
+      "succeeded": 13,
+      "refunded": 0,
+      "processing": 0,
+      "minDate": "2023-09-16",
+      "maxDate": "2024-05-05",
+      "uniqueEmails": 2,
+      "uniqueTxnIds": 13,
+      "secondaries": {
+        "Qaeda Nouraeah / Recitation Improvement": 13
+      }
+    },
+    {
+      "reason": "MAS Quran Institute/Advanced/ متقدمـــــة - Summer 2023",
+      "count": 12,
+      "amount": 1200,
+      "succeeded": 12,
+      "refunded": 0,
+      "processing": 0,
+      "minDate": "2023-05-31",
+      "maxDate": "2023-06-01",
+      "uniqueEmails": 6,
+      "uniqueTxnIds": 6,
+      "secondaries": {
+        "(none)": 12
+      }
+    },
+    {
+      "reason": "MAS Quran Institute/ مراجعة الزّهراوين",
+      "count": 11,
+      "amount": 812,
+      "succeeded": 10,
+      "refunded": 1,
+      "processing": 0,
+      "minDate": "2022-09-09",
+      "maxDate": "2023-11-04",
+      "uniqueEmails": 5,
+      "uniqueTxnIds": 10,
+      "secondaries": {
+        "(none)": 11
+      }
+    },
+    {
+      "reason": "MAS Quran Institute/ حفظ القرآن الكريم",
+      "count": 10,
+      "amount": 640,
+      "succeeded": 10,
+      "refunded": 0,
+      "processing": 0,
+      "minDate": "2022-09-29",
+      "maxDate": "2023-05-06",
+      "uniqueEmails": 3,
+      "uniqueTxnIds": 9,
+      "secondaries": {
+        "(none)": 10
+      }
+    },
+    {
+      "reason": "MAS Quran Institute/30/",
+      "count": 9,
+      "amount": 270,
+      "succeeded": 9,
+      "refunded": 0,
+      "processing": 0,
+      "minDate": "2023-09-06",
+      "maxDate": "2024-05-05",
+      "uniqueEmails": 1,
+      "uniqueTxnIds": 9,
+      "secondaries": {
+        "/Qaeda Nouraneh/ Recitation Improvement": 9
+      }
+    },
+    {
+      "reason": "MAS Quran Institute/Arabic Grammar",
+      "count": 7,
+      "amount": 245,
+      "succeeded": 7,
+      "refunded": 0,
+      "processing": 0,
+      "minDate": "2022-11-06",
+      "maxDate": "2023-04-08",
+      "uniqueEmails": 1,
+      "uniqueTxnIds": 7,
+      "secondaries": {
+        "(none)": 7
+      }
+    },
+    {
+      "reason": "Quran Institute for Ladies 2026-2027",
+      "count": 6,
+      "amount": 300,
+      "succeeded": 5,
+      "refunded": 0,
+      "processing": 1,
+      "minDate": "2026-08-17",
+      "maxDate": "2026-08-29",
+      "uniqueEmails": 6,
+      "uniqueTxnIds": 6,
+      "secondaries": {
+        "Memorization (Course 1 & Course 2)": 6
+      }
+    },
+    {
+      "reason": "Quran Institute - Ijaza Lesson",
+      "count": 6,
+      "amount": 775,
+      "succeeded": 6,
+      "refunded": 0,
+      "processing": 0,
+      "minDate": "2026-04-10",
+      "maxDate": "2026-06-19",
+      "uniqueEmails": 1,
+      "uniqueTxnIds": 6,
+      "secondaries": {
+        "(none)": 6
+      }
+    },
+    {
+      "reason": "QI - Recitation Improvement (June)",
+      "count": 6,
+      "amount": 900,
+      "succeeded": 6,
+      "refunded": 0,
+      "processing": 0,
+      "minDate": "2026-05-30",
+      "maxDate": "2026-05-31",
+      "uniqueEmails": 6,
+      "uniqueTxnIds": 6,
+      "secondaries": {
+        "(none)": 6
+      }
+    },
+    {
+      "reason": "QI - Recitation Improvement (July)",
+      "count": 5,
+      "amount": 550,
+      "succeeded": 4,
+      "refunded": 1,
+      "processing": 0,
+      "minDate": "2026-06-22",
+      "maxDate": "2026-07-06",
+      "uniqueEmails": 4,
+      "uniqueTxnIds": 4,
+      "secondaries": {
+        "(none)": 5
+      }
+    },
+    {
+      "reason": "MAS Quran Institute /",
+      "count": 5,
+      "amount": 600,
+      "succeeded": 5,
+      "refunded": 0,
+      "processing": 0,
+      "minDate": "2023-11-05",
+      "maxDate": "2024-03-05",
+      "uniqueEmails": 1,
+      "uniqueTxnIds": 5,
+      "secondaries": {
+        "Ijaza & Sanad": 5
+      }
+    },
+    {
+      "reason": "MAS Quran Institute/ Beginner/ مبتدئة - Summer 2023",
+      "count": 5,
+      "amount": 200,
+      "succeeded": 4,
+      "refunded": 1,
+      "processing": 0,
+      "minDate": "2023-06-01",
+      "maxDate": "2023-06-13",
+      "uniqueEmails": 2,
+      "uniqueTxnIds": 2,
+      "secondaries": {
+        "(none)": 5
+      }
+    },
+    {
+      "reason": "MAS Quran Institute/ رواية شعبة عن عاصم",
+      "count": 5,
+      "amount": 140,
+      "succeeded": 5,
+      "refunded": 0,
+      "processing": 0,
+      "minDate": "2022-10-02",
+      "maxDate": "2022-10-26",
+      "uniqueEmails": 4,
+      "uniqueTxnIds": 4,
+      "secondaries": {
+        "(none)": 5
+      }
+    },
+    {
+      "reason": "MAS Quran Institute (5) /Twice/",
+      "count": 4,
+      "amount": 180,
+      "succeeded": 3,
+      "refunded": 1,
+      "processing": 0,
+      "minDate": "2024-01-18",
+      "maxDate": "2024-05-08",
+      "uniqueEmails": 2,
+      "uniqueTxnIds": 2,
+      "secondaries": {
+        "Hifz and Arabic Grammar": 4
+      }
+    },
+    {
+      "reason": "MAS Quran Institute (3) /Monthly/",
+      "count": 4,
+      "amount": 296,
+      "succeeded": 4,
+      "refunded": 0,
+      "processing": 0,
+      "minDate": "2024-02-05",
+      "maxDate": "2024-05-05",
+      "uniqueEmails": 1,
+      "uniqueTxnIds": 4,
+      "secondaries": {
+        "Tajweed Section": 4
+      }
+    },
+    {
+      "reason": "MAS Quran Institute/40/",
+      "count": 4,
+      "amount": 160,
+      "succeeded": 4,
+      "refunded": 0,
+      "processing": 0,
+      "minDate": "2023-09-07",
+      "maxDate": "2023-12-05",
+      "uniqueEmails": 1,
+      "uniqueTxnIds": 4,
+      "secondaries": {
+        "/Qaeda Nouranea/Recitation Improvement": 4
+      }
+    },
+    {
+      "reason": "Ladies Quran Recitation",
+      "count": 3,
+      "amount": 600,
+      "succeeded": 3,
+      "refunded": 0,
+      "processing": 0,
+      "minDate": "2024-04-23",
+      "maxDate": "2024-05-13",
+      "uniqueEmails": 3,
+      "uniqueTxnIds": 3,
+      "secondaries": {
+        "(none)": 3
+      }
+    },
+    {
+      "reason": "Quran Institute",
+      "count": 2,
+      "amount": 580,
+      "succeeded": 2,
+      "refunded": 0,
+      "processing": 0,
+      "minDate": "2024-05-06",
+      "maxDate": "2024-05-14",
+      "uniqueEmails": 2,
+      "uniqueTxnIds": 2,
+      "secondaries": {
+        "Qaeda Nouranea/Beginner/Advance/ Ousol": 2
+      }
+    },
+    {
+      "reason": "Quran Institute/Ijaza & Sanad/ إجازة تلاوة وسند حفظ",
+      "count": 2,
+      "amount": 300,
+      "succeeded": 2,
+      "refunded": 0,
+      "processing": 0,
+      "minDate": "2022-11-25",
+      "maxDate": "2023-05-06",
+      "uniqueEmails": 2,
+      "uniqueTxnIds": 2,
+      "secondaries": {
+        "(none)": 2
+      }
+    },
+    {
+      "reason": "MAS Quran Institute/ pre Ijaza/ الإعداد للإجازة",
+      "count": 1,
+      "amount": 390,
+      "succeeded": 1,
+      "refunded": 0,
+      "processing": 0,
+      "minDate": "2022-12-15",
+      "maxDate": "2022-12-15",
+      "uniqueEmails": 1,
+      "uniqueTxnIds": 1,
+      "secondaries": {
+        "(none)": 1
+      }
+    }
+  ],
+  "qil2026": {
+    "rows": 67,
+    "succeeded": 60,
+    "refunded": 6,
+    "processing": [
+      {
+        "row": 7,
+        "reason": "Quran Institute for Ladies 2026-2027",
+        "secondary": "Memorization (Course 1 & Course 2)",
+        "amount": 50,
+        "amountType": "SUBSCRIPTION_AMOUNT",
+        "status": "processing",
+        "email": "be_happy_0505@hotmail.com",
+        "date": "2026-08-29",
+        "txnId": "py_3U9pzxHFcF18bCZG0X1f9VFS",
+        "name": "hassnae bellamine"
+      }
+    ],
+    "afterAug24": [
+      {
+        "row": 17,
+        "reason": "Quran Institute For Ladies 2026-2027",
+        "secondary": "Tajweed & Recitation",
+        "amount": 450,
+        "amountType": "SUBSCRIPTION_AMOUNT",
+        "status": "succeeded",
+        "email": "suzan@abudalu.com",
+        "date": "2026-08-27",
+        "txnId": "ch_3U9BhyHFcF18bCZG1gS20G7X",
+        "name": "Suzan Qawouq"
+      }
+    ],
+    "txnIds": [
+      "py_3U9pzxHFcF18bCZG0X1f9VFS",
+      "ch_3U9BhyHFcF18bCZG1gS20G7X",
+      "ch_3U7IXmHFcF18bCZG0TUWcmVg",
+      "ch_3U853tHFcF18bCZG0DNVdkai",
+      "ch_3ToVa7HFcF18bCZG0q4DsX2U",
+      "ch_3U71ExHFcF18bCZG1EfFu5Ud",
+      "ch_3U7mmJHFcF18bCZG1crKXr71",
+      "ch_3U6vO1HFcF18bCZG0XpBzci8",
+      "ch_3U68ZuHFcF18bCZG0rBFODxd",
+      "ch_3U5xghHFcF18bCZG04qnsaeJ",
+      "ch_3U5dVhHFcF18bCZG0i6ecFK1",
+      "ch_3U5YhFHFcF18bCZG1NvLHkUd",
+      "ch_3U5W11HFcF18bCZG1Dhnqyn8",
+      "ch_3U5TFgHFcF18bCZG1jHy4D3S",
+      "ch_3U5TFdHFcF18bCZG06psK8nX",
+      "ch_3U5TFZHFcF18bCZG0OsmR8RB",
+      "py_3U5TFVHFcF18bCZG1960VEid",
+      "ch_3U5TFUHFcF18bCZG0PWEV5YD",
+      "ch_3U5TFSHFcF18bCZG1RMSr3Wz",
+      "ch_3U5TFQHFcF18bCZG0kKIMqNb",
+      "ch_3U5TFOHFcF18bCZG0kcsPfSK",
+      "ch_3U5TFMHFcF18bCZG1QMiwYcF",
+      "ch_3U5TFLHFcF18bCZG1hVEftNN",
+      "ch_3U5TFFHFcF18bCZG0LmAwtgs",
+      "ch_3U5TFEHFcF18bCZG1Jd3Iss4",
+      "ch_3U5TFCHFcF18bCZG0cR0ZjBA",
+      "ch_3U5TFAHFcF18bCZG16LewMpZ",
+      "ch_3U5TF9HFcF18bCZG0a76jbPc",
+      "ch_3U5TF7HFcF18bCZG1okojjZf",
+      "ch_3U5TF6HFcF18bCZG18K88pOQ",
+      "ch_3U5TF3HFcF18bCZG15XEeGtp",
+      "ch_3U5TF0HFcF18bCZG1r2sCQa5",
+      "ch_3U5TEzHFcF18bCZG1zrmQw2u",
+      "ch_3U5TEqHFcF18bCZG0zlSPiQV",
+      "ch_3U5TEoHFcF18bCZG08jL9lEH",
+      "ch_3U5TEmHFcF18bCZG1Oui8rkP",
+      "py_3U5TEiHFcF18bCZG1KcPDWvQ",
+      "ch_3U5TDxHFcF18bCZG1ifX2CiS",
+      "ch_3U5TDOHFcF18bCZG1SvzlPrg",
+      "ch_3U5PaJHFcF18bCZG0MivQBcX",
+      "ch_3U5H8xHFcF18bCZG0daZ9rpL",
+      "ch_3U4BmLHFcF18bCZG0hprE0kh",
+      "ch_3U3SrVHFcF18bCZG1oshlxnp",
+      "ch_3U2uLYHFcF18bCZG0kfCMAhU",
+      "ch_3U2uJzHFcF18bCZG1Sox8bih",
+      "ch_3U2Y2KHFcF18bCZG0RX7WA0T",
+      "ch_3U2DHjHFcF18bCZG0AdcZINo",
+      "ch_3U2AOhHFcF18bCZG1aQleElE",
+      "ch_3U1UX6HFcF18bCZG0b8Nvv7u",
+      "ch_3Tzo7LHFcF18bCZG1iAXyx1z",
+      "ch_3Twj3NHFcF18bCZG1qS1odNh",
+      "ch_3ToVZCHFcF18bCZG0vm8glj7",
+      "ch_3TkzKYHFcF18bCZG0bCIcVBJ",
+      "ch_3Tj1BGHFcF18bCZG0nWRX5hD",
+      "ch_3TizcZHFcF18bCZG0DbyWNpe",
+      "ch_3TiwUbHFcF18bCZG1KGPL0ic",
+      "ch_3ThbJrHFcF18bCZG1cFak1WF",
+      "ch_3Th7lVHFcF18bCZG0f3K8CUH",
+      "ch_3Th7k5HFcF18bCZG1NOzhed4"
+    ]
+  },
+  "missingEmail": 8,
+  "missingTxn": 9
+}

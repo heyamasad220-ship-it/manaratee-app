@@ -4,17 +4,35 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { ArrowLeft, Plus } from "lucide-react"
+import dynamic from "next/dynamic"
 
 import { ContactProfileDialog } from "@/components/contacts/contact-profile-dialog"
 import { Button } from "@/components/ui/button"
 import { CampaignEditDialog } from "@/components/donations/campaign-edit-dialog"
 import { PledgeDetailsDialog } from "@/components/donations/pledge-details-dialog"
 import { CampaignGroupsTab } from "@/components/donations/campaign-groups-tab"
-import { CampaignOverviewTab } from "@/components/donations/campaign-overview-tab"
-import { CampaignFundraisingPlanTab } from "@/components/donations/campaign-fundraising-plan-tab"
+import {
+  CampaignFundraisingPlanHeader,
+  CampaignFundraisingPlanTab,
+} from "@/components/donations/campaign-fundraising-plan-tab"
+import { CampaignEventKpis } from "@/components/donations/campaign-event-kpis"
+import { CampaignOverviewSummary, CampaignOverviewTab } from "@/components/donations/campaign-overview-tab"
 import { CampaignSponsorsTab } from "@/components/donations/campaign-sponsors-tab"
 import { CampaignWorkspaceNav } from "@/components/donations/campaign-workspace-nav"
 import { CampaignWishlistTab } from "@/components/donations/campaign-wishlist-tab"
+
+const CampaignEventsTab = dynamic(
+  () =>
+    import("@/components/donations/campaign-events-tab").then((mod) => ({
+      default: mod.CampaignEventsTab,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="text-sm text-muted-foreground">Loading event...</div>
+    ),
+  }
+)
 import { Card, CardContent } from "@/components/ui/card"
 import {
   Table,
@@ -34,6 +52,7 @@ import {
   type CampaignSourceBreakdown,
 } from "@/lib/donations/campaign-analytics"
 import { getCampaignDetailAction } from "@/lib/donations/donation-reports-actions"
+import type { CampaignEventStats } from "@/lib/events/campaign-event-actions"
 import type { CampaignOverviewMetricKey } from "@/lib/donations/campaign-overview-metrics"
 import type {
   CampaignAskLevelMetrics,
@@ -47,6 +66,8 @@ import {
 import { donationPledgesHref } from "@/lib/donations/donation-pledge-paths"
 import { formatPaymentAllocationStatus, isOpenAllocatablePledge } from "@/lib/donations/donation-status"
 import { createClient } from "@/lib/supabase/client"
+import { STAFF_MAIN_CONTENT_STICKY_TOP_CLASS } from "@/lib/layout/staff-dashboard-chrome"
+import { cn } from "@/lib/utils"
 
 type ContactProfileTarget = {
   contactId?: string | null
@@ -298,6 +319,7 @@ export default function CampaignDetailPage() {
   const [showContactProfile, setShowContactProfile] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [detailsPledgeId, setDetailsPledgeId] = useState<string | null>(null)
+  const [eventStats, setEventStats] = useState<CampaignEventStats | null>(null)
 
   const supabase = useMemo(() => createClient(), [])
 
@@ -514,7 +536,32 @@ export default function CampaignDetailPage() {
             </div>
           </div>
 
-          <CampaignWorkspaceNav campaignId={campaign.id} activeTab={activeTab} />
+          <div
+            className={cn(
+              "sticky z-40 -mx-6 min-w-0 space-y-4 border-b border-border bg-background px-6 pb-4 pt-1",
+              STAFF_MAIN_CONTENT_STICKY_TOP_CLASS
+            )}
+          >
+            <CampaignWorkspaceNav campaignId={campaign.id} activeTab={activeTab} />
+            {activeTab === "overview" ? (
+              <CampaignOverviewSummary
+                campaign={campaign}
+                entry={entry}
+                insights={insights}
+                onShowDonorsDialogChange={setShowDonorsDialog}
+                onOpenContactProfile={(target) => void openContactProfile(target)}
+              />
+            ) : null}
+            {isFundraisingPlanTab(activeTab) ? (
+              <CampaignFundraisingPlanHeader
+                campaignId={campaign.id}
+                askLevelMetrics={askLevelMetrics}
+              />
+            ) : null}
+            {activeTab === "events" && eventStats ? (
+              <CampaignEventKpis stats={eventStats} />
+            ) : null}
+          </div>
 
           {activeTab === "overview" ? (
             <CampaignOverviewTab
@@ -536,6 +583,14 @@ export default function CampaignDetailPage() {
                 setDetailsOpen(true)
               }}
               onReload={() => void loadCampaign()}
+              showSummary={false}
+            />
+          ) : null}
+
+          {activeTab === "events" ? (
+            <CampaignEventsTab
+              campaignId={campaign.id}
+              onStatsChange={setEventStats}
             />
           ) : null}
 
@@ -568,6 +623,7 @@ export default function CampaignDetailPage() {
               }
               initialAskLevelId={prospectAskLevelId}
               initialAsked={prospectAsked}
+              showHeader={false}
             />
           ) : null}
 

@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 
+import { resolveStaffIdentityForUser } from "@/lib/organizations/work-email-lookups"
+
 export type DepartmentHeadship = {
   organizationId: string
   departmentId: string
@@ -8,22 +10,23 @@ export type DepartmentHeadship = {
 }
 
 /**
- * Active staff row marked Department Head for the signed-in contact
- * (`contacts.auth_user_id` → `staff.is_department_head` + `department_id`).
+ * Active staff row marked Department Head for the signed-in contact.
+ * Uses the work-email assignment when this login is an org mailbox;
+ * otherwise `contacts.auth_user_id`. Personal logins whose contact already
+ * has a work email assigned to someone else do not get headship here.
  */
 export async function resolveDepartmentHeadship(
   supabase: SupabaseClient,
   organizationId: string,
   userId: string
 ): Promise<DepartmentHeadship | null> {
-  const { data: contact } = await supabase
-    .from("contacts")
-    .select("id")
-    .eq("organization_id", organizationId)
-    .eq("auth_user_id", userId)
-    .maybeSingle()
-
-  if (!contact?.id) return null
+  const identity = await resolveStaffIdentityForUser(
+    supabase,
+    organizationId,
+    userId
+  )
+  const contactId = identity.staffContactId
+  if (!contactId) return null
 
   const { data: staff, error } = await supabase
     .from("staff")
@@ -37,7 +40,7 @@ export async function resolveDepartmentHeadship(
     `
     )
     .eq("organization_id", organizationId)
-    .eq("contact_id", contact.id)
+    .eq("contact_id", contactId)
     .eq("is_department_head", true)
     .not("department_id", "is", null)
     .maybeSingle()

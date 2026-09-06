@@ -39,7 +39,6 @@ export const DEPARTMENT_LEVEL_WORKSPACE_TABS = [
   "overview",
   "programs",
   "activity",
-  "employees",
   "group-giving",
   "financial",
   "settings",
@@ -63,7 +62,7 @@ export function isDepartmentLevelWorkspaceTab(
   return (DEPARTMENT_LEVEL_WORKSPACE_TABS as readonly string[]).includes(tab)
 }
 
-/** Sub-tabs under Department → Financial. `employees` is leftover (`?tab=financial&section=employees`). */
+/** Sub-tabs under Department → Financial. */
 export type DepartmentFinanceSection =
   | "employees"
   | "payroll"
@@ -120,20 +119,18 @@ export function departmentGroupWorkspaceHref(
   }
 ): string {
   const params = new URLSearchParams()
-  const tab =
-    options?.tab === "financial" && options.finance === "employees"
-      ? "employees"
-      : options?.tab
+  const tab = options?.tab === "employees" ? "financial" : options?.tab
+  const finance =
+    options?.tab === "employees" ? "employees" : options?.finance
   if (tab && tab !== "overview") {
     params.set("tab", tab)
   }
   if (
     tab === "financial" &&
-    options?.finance &&
-    options.finance !== "employees" &&
-    options.finance !== "payroll"
+    finance &&
+    finance !== "payroll"
   ) {
-    params.set("section", options.finance)
+    params.set("section", finance)
   }
   if (
     options?.tab === "students" &&
@@ -221,7 +218,6 @@ export function parseDepartmentWorkspaceTab(
     tab === "overview" ||
     tab === "programs" ||
     tab === "students" ||
-    tab === "employees" ||
     tab === "financial" ||
     tab === "group-giving" ||
     tab === "activity" ||
@@ -235,6 +231,10 @@ export function parseDepartmentWorkspaceTab(
   }
   // Retired department Reports tab — same content as Financial.
   if (tab === "reports") {
+    return "financial"
+  }
+  // Employees lives under Financial.
+  if (tab === "employees") {
     return "financial"
   }
   // Legacy Years/Seasons catalog tab → Overview.
@@ -305,6 +305,7 @@ export function parseDepartmentFinanceSection(
   if (tab === "expenses") return "expenses"
   if (tab === "budget") return "budget"
   if (tab === "payroll" || tab === "babysitting") return "payroll"
+  if (tab === "employees") return "employees"
   if (tab !== "financial") return "payroll"
   if (section === "expenses") return "expenses"
   if (section === "budget") return "budget"

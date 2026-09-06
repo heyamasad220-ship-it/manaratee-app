@@ -18,20 +18,20 @@ export type InternalEventCalendarColor = "green" | "yellow" | "orange"
 /** Simplified workspace visibility: Draft or Published. */
 export type InternalEventWorkspaceStatus = "draft" | "published"
 
-/** Compact event-workspace status menu. */
+/** Compact event-workspace status menu. Live replaces the old Approved tag. */
 export type InternalEventStatusMenuValue =
   | "draft"
   | "pending"
-  | "approved"
+  | "live"
   | "completed"
   | "cancelled"
 
 const STATUS_LABELS: Record<InternalEventStatus, string> = {
   draft: "Draft",
-  submitted: "Submitted",
-  awaiting_approval: "Awaiting approval",
-  approved: "Approved",
-  confirmed: "Confirmed",
+  submitted: "Pending",
+  awaiting_approval: "Pending",
+  approved: "Live",
+  confirmed: "Live",
   scheduled: "Scheduled",
   declined: "Declined",
   cancelled: "Cancelled",
@@ -55,7 +55,7 @@ export function fromWorkspaceEventStatus(
 ): InternalEventStatus {
   return workspaceStatus === "draft"
     ? INTERNAL_EVENT_STATUSES.draft
-    : INTERNAL_EVENT_STATUSES.approved
+    : INTERNAL_EVENT_STATUSES.confirmed
 }
 
 export function getInternalEventWorkspaceStatusLabel(
@@ -86,7 +86,7 @@ export function getInternalEventWorkspaceStatusOptions() {
 const STATUS_MENU_LABELS: Record<InternalEventStatusMenuValue, string> = {
   draft: "Draft",
   pending: "Pending",
-  approved: "Approved",
+  live: "Live",
   completed: "Completed",
   cancelled: "Cancelled",
 }
@@ -108,7 +108,7 @@ export function toInternalEventStatusMenuValue(
   ) {
     return "cancelled"
   }
-  return "approved"
+  return "live"
 }
 
 export function fromInternalEventStatusMenuValue(

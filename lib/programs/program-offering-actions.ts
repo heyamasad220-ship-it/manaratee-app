@@ -9,6 +9,7 @@ import {
   mergeOfferingAttributes,
 } from "@/lib/programs/program-offering-attributes"
 import { DEFAULT_NEW_OFFERING_INHERIT_FLAGS } from "@/lib/programs/program-offering-inherit"
+import { assertCanManageProgram, canManageOffering } from "@/lib/programs/program-access"
 import type {
   ProgramOfferingInput,
   ProgramOfferingType,
@@ -225,6 +226,7 @@ export async function reorderProgramOfferings(input: {
   programId: string
   orderedOfferingIds: string[]
 }) {
+  await assertCanManageProgram(input.programId)
   const supabase = await createClient()
   const organizationId = await getSelectedOrganizationId()
 
@@ -283,6 +285,7 @@ export async function createProgramOffering(
   input: ProgramOfferingInput,
   organizationId?: string
 ) {
+  await assertCanManageProgram(programId)
   const supabase = await createClient()
   const resolvedOrganizationId = await resolveOrganizationId(organizationId)
 
@@ -377,6 +380,9 @@ export async function updateProgramOffering(
   offeringId: string,
   input: ProgramOfferingInput
 ) {
+  if (!(await canManageOffering(offeringId))) {
+    throw new Error("You do not have permission to manage this offering.")
+  }
   const supabase = await createClient()
   const organizationId = await getSelectedOrganizationId()
 
@@ -464,6 +470,9 @@ export async function updateProgramOffering(
 }
 
 export async function archiveProgramOffering(offeringId: string) {
+  if (!(await canManageOffering(offeringId))) {
+    throw new Error("You do not have permission to manage this offering.")
+  }
   const supabase = await createClient()
   const organizationId = await getSelectedOrganizationId()
 
@@ -519,6 +528,9 @@ const CANCEL_BLOCKING_ENROLLMENT_STATUSES = [
 ] as const
 
 export async function cancelProgramOffering(offeringId: string) {
+  if (!(await canManageOffering(offeringId))) {
+    throw new Error("You do not have permission to manage this offering.")
+  }
   const supabase = await createClient()
   const organizationId = await getSelectedOrganizationId()
 
@@ -577,6 +589,9 @@ export async function cancelProgramOffering(offeringId: string) {
 }
 
 export async function deleteProgramOffering(offeringId: string) {
+  if (!(await canManageOffering(offeringId))) {
+    throw new Error("You do not have permission to manage this offering.")
+  }
   const supabase = await createClient()
   const organizationId = await getSelectedOrganizationId()
 

@@ -7,6 +7,16 @@ import { cn } from "@/lib/utils"
 
 const settingsTabs = [
   {
+    label: "General",
+    href: "/event-management/settings/general",
+    matchPrefix: "/event-management/settings/general",
+  },
+  {
+    label: "Categories",
+    href: "/event-management/settings/categories",
+    matchPrefix: "/event-management/settings/categories",
+  },
+  {
     label: "Notifications",
     href: "/event-management/settings/notifications",
     matchPrefix: "/event-management/settings/notifications",

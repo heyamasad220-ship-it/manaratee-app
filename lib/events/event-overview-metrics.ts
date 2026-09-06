@@ -75,10 +75,10 @@ export type EventOverviewSummary = {
 }
 
 const MODE_LABELS: Record<EventAttendanceMode, string> = {
-  paid: "Paid tickets",
-  free: "Free registration",
-  paid_and_free: "Paid + free registration",
-  open_public: "Open to public",
+  paid: "Paid",
+  free: "Free",
+  paid_and_free: "Paid",
+  open_public: "Free",
 }
 
 export async function getEventOverviewSummary(input: {

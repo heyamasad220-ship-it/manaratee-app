@@ -8,6 +8,7 @@
  *   node scripts/sync-summer-camp-households.mjs
  *   node scripts/sync-summer-camp-households.mjs --execute
  *   node scripts/sync-summer-camp-households.mjs --all-parents --execute
+ *   node scripts/sync-summer-camp-households.mjs --camp-parents --execute
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { dirname, resolve } from "node:path"
@@ -18,6 +19,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const root = resolve(__dirname, "..")
 const ORG_ID = "e057e00a-e4e3-4adf-9af5-f465db1894be"
 const PROGRAM_ID = "e6436c28-666c-4327-b3c1-4234d2379a42"
+const CAMP_DEPARTMENT_ID = "d0c78557-1574-487d-8278-e17009fc7ecf"
 
 function loadEnvLocal() {
   const path = resolve(root, ".env.local")
@@ -332,6 +334,7 @@ async function main() {
   loadEnvLocal()
   const execute = process.argv.includes("--execute")
   const allParents = process.argv.includes("--all-parents")
+  const campParents = process.argv.includes("--camp-parents")
   const sb = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.SUPABASE_SERVICE_ROLE_KEY,
@@ -362,7 +365,40 @@ async function main() {
   }
 
   let parentContactIds = []
-  if (allParents) {
+  if (campParents) {
+    const programs = await must(
+      "camp programs",
+      sb
+        .from("programs")
+        .select("id")
+        .eq("organization_id", ORG_ID)
+        .eq("department_id", CAMP_DEPARTMENT_ID)
+    )
+    const programIds = (programs || []).map((p) => p.id)
+    const ids = new Set()
+    for (let i = 0; i < programIds.length; i += 50) {
+      const chunk = programIds.slice(i, i + 50)
+      let from = 0
+      for (;;) {
+        const { data, error } = await sb
+          .from("program_enrollments")
+          .select("registrant_contact_id")
+          .eq("organization_id", ORG_ID)
+          .in("program_id", chunk)
+          .not("registrant_contact_id", "is", null)
+          .range(from, from + 999)
+        if (error) throw new Error(`camp enrollments: ${error.message}`)
+        const page = data || []
+        for (const row of page) {
+          if (row.registrant_contact_id) ids.add(row.registrant_contact_id)
+        }
+        if (page.length < 1000) break
+        from += 1000
+      }
+    }
+    parentContactIds = [...ids]
+    console.log(`Camp parents to sync: ${parentContactIds.length}`)
+  } else if (allParents) {
     const { data: rels } = await sb
       .from("person_relationships")
       .select("person_id")
@@ -397,7 +433,9 @@ async function main() {
 
   parentContactIds = [...new Set(parentContactIds)]
   report.actions.push(`Parents to sync: ${parentContactIds.length}`)
+  console.log(`Parents to sync: ${parentContactIds.length}`)
 
+  let synced = 0
   for (let i = 0; i < parentContactIds.length; i += 100) {
     const chunk = parentContactIds.slice(i, i + 100)
     const contacts = await must(
@@ -410,6 +448,12 @@ async function main() {
     )
     for (const contact of contacts) {
       await syncParent(sb, contact, execute, report)
+      synced += 1
+      if (synced % 25 === 0 || synced === parentContactIds.length) {
+        console.log(
+          `Synced ${synced}/${parentContactIds.length} (${report.counts.familiesCreated} households created)`
+        )
+      }
     }
   }
 

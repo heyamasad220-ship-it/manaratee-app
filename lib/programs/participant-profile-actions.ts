@@ -7,10 +7,7 @@ import {
 } from "@/lib/contacts/contact-constants"
 import { normalizeDateOfBirth } from "@/lib/dates/date-input-utils"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
-import {
-  hasAnyPermission,
-  PERMISSIONS,
-} from "@/lib/permissions/permissions"
+import { canManageParticipantPerson } from "@/lib/programs/program-access"
 import { PARTICIPANT_PROFILE_BASE_PATH } from "@/lib/programs/participant-profile-path"
 import { upsertParticipantDetailNotes } from "@/lib/programs/registration-report-helpers"
 import { createClient } from "@/lib/supabase/server"
@@ -84,10 +81,7 @@ export async function updateParticipantDetailsAction(
   input: UpdateParticipantDetailsInput
 ): Promise<{ success: true } | { success: false; error: string }> {
   try {
-    const canManage = await hasAnyPermission(
-      PERMISSIONS.PROGRAMS_MANAGE,
-      PERMISSIONS.CONTACTS_MANAGE
-    )
+    const canManage = await canManageParticipantPerson(input.personId)
     if (!canManage) {
       return { success: false, error: "You do not have permission to edit participants." }
     }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
@@ -20,6 +20,7 @@ import {
 
 import { DepartmentBudgetPanel } from "@/components/departments/department-budget-panel"
 import { DepartmentEventsPanel } from "@/components/departments/department-events-panel"
+import { DepartmentFinanceKpiRow } from "@/components/departments/department-finance-kpi-row"
 import { DepartmentExpensesPanel } from "@/components/departments/department-expenses-panel"
 import { DepartmentGroupGivingPanel } from "@/components/departments/department-group-giving-panel"
 import { DepartmentOverviewPanel } from "@/components/departments/department-overview-panel"
@@ -69,10 +70,7 @@ import {
   isSafeReturnToPath,
   RETURN_TO_QUERY_PARAM,
 } from "@/lib/navigation/return-to"
-import {
-  STAFF_MAIN_CONTENT_STICKY_TOP_CLASS,
-  STAFF_MAIN_CONTENT_STICKY_TOP_REM,
-} from "@/lib/layout/staff-dashboard-chrome"
+import { STAFF_MAIN_CONTENT_STICKY_TOP_CLASS } from "@/lib/layout/staff-dashboard-chrome"
 import {
   getHierarchyLabels,
   YEAR_SEASON_LABEL_PLURAL,
@@ -123,8 +121,7 @@ export function DepartmentGroupWorkspaceClient({
   const [yearProgramKind, setYearProgramKind] = useState<ProgramKind | null>(
     null
   )
-  const stickyChromeRef = useRef<HTMLDivElement>(null)
-  const [stickyChromeHeight, setStickyChromeHeight] = useState(0)
+  const [financeKpiTick, setFinanceKpiTick] = useState(0)
 
   const returnTo = searchParams.get(RETURN_TO_QUERY_PARAM)
   const rawTab = searchParams.get("tab")
@@ -151,35 +148,9 @@ export function DepartmentGroupWorkspaceClient({
 
   const backLabel = entryPoint === "donations" ? "Group Giving" : "Departments"
 
-  const hasGivingPreview = Boolean(pair?.groupContactId)
-  const resolvedTabPreview: GroupWorkspaceTab =
-    !hasGivingPreview && activeTab === "group-giving" ? "overview" : activeTab
-  const yearModePreview =
-    Boolean(yearProgramId) && isDepartmentYearWorkspaceTab(resolvedTabPreview)
-  const showFinanceChromePreview =
-    resolvedTabPreview === "financial" && !yearModePreview
-
-  useLayoutEffect(() => {
-    const el = stickyChromeRef.current
-    if (!el) return
-    const sync = () => setStickyChromeHeight(el.offsetHeight)
-    sync()
-    const observer = new ResizeObserver(sync)
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [
-    resolvedTabPreview,
-    yearModePreview,
-    hasGivingPreview,
-    showFinanceChromePreview,
-    loading,
-    department,
-  ])
-
-  const financeStatsStickyTop =
-    stickyChromeHeight > 0
-      ? `calc(${STAFF_MAIN_CONTENT_STICKY_TOP_REM}rem + ${stickyChromeHeight}px)`
-      : `${STAFF_MAIN_CONTENT_STICKY_TOP_REM}rem`
+  const bumpFinanceKpis = useCallback(() => {
+    setFinanceKpiTick((tick) => tick + 1)
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -290,10 +261,11 @@ export function DepartmentGroupWorkspaceClient({
     if (loading || !department) return
 
     const leftoverSettingsSection = searchParams.get("section")
-    if (rawTab === "financial" && leftoverSettingsSection === "employees") {
+    if (rawTab === "employees") {
       router.replace(
         departmentGroupWorkspaceHref(departmentId, {
-          tab: "employees",
+          tab: "financial",
+          finance: "employees",
           returnTo: safeReturnTo,
         }),
         { scroll: false }
@@ -395,12 +367,7 @@ export function DepartmentGroupWorkspaceClient({
     router.replace(
       departmentGroupWorkspaceHref(departmentId, {
         tab: safeTab,
-        finance:
-          safeTab === "financial"
-            ? financeSection === "employees"
-              ? "payroll"
-              : financeSection
-            : undefined,
+        finance: safeTab === "financial" ? financeSection : undefined,
         returnTo: safeReturnTo,
       }),
       { scroll: false }
@@ -524,7 +491,6 @@ export function DepartmentGroupWorkspaceClient({
         </div>
 
         <div
-          ref={stickyChromeRef}
           className={cn(
             "sticky z-40 -mx-6 space-y-3 border-b border-border bg-background/95 px-6 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/90",
             STAFF_MAIN_CONTENT_STICKY_TOP_CLASS
@@ -565,10 +531,6 @@ export function DepartmentGroupWorkspaceClient({
                     <CalendarDays className="size-4" />
                     Events
                   </TabsTrigger>
-                  <TabsTrigger value="employees" className="gap-2">
-                    <Users className="size-4" />
-                    Employees
-                  </TabsTrigger>
                   {hasGiving ? (
                     <TabsTrigger value="group-giving" className="gap-2">
                       <Heart className="size-4" />
@@ -589,12 +551,26 @@ export function DepartmentGroupWorkspaceClient({
           </Tabs>
 
           {showFinanceChrome ? (
+            <DepartmentFinanceKpiRow
+              departmentId={department.id}
+              staff={department.staff}
+              activeSection={financeSection}
+              onSelectSection={(section) => handleFinanceSectionChange(section)}
+              refreshToken={financeKpiTick}
+            />
+          ) : null}
+
+          {showFinanceChrome ? (
             <Tabs
-              value={financeSection === "employees" ? "payroll" : financeSection}
+              value={financeSection}
               onValueChange={handleFinanceSectionChange}
               className="gap-0"
             >
               <TabsList className="flex h-auto flex-wrap justify-start gap-1">
+                <TabsTrigger value="employees" className="gap-2">
+                  <Users className="size-4" />
+                  Employees
+                </TabsTrigger>
                 <TabsTrigger value="payroll" className="gap-2">
                   <Wallet className="size-4" />
                   Payroll
@@ -647,26 +623,24 @@ export function DepartmentGroupWorkspaceClient({
           />
         ) : null}
 
-        {resolvedTab === "employees" && !yearMode ? (
-          <DepartmentPayrollPanel
-            departmentId={department.id}
-            departmentName={displayName}
-            staff={department.staff}
-            onStaffChanged={load}
-            stickyStatsTop={financeStatsStickyTop}
-            variant="roster"
-          />
-        ) : null}
-
         {resolvedTab === "financial" && !yearMode ? (
           <div className="space-y-4">
+            {financeSection === "employees" ? (
+              <DepartmentPayrollPanel
+                departmentId={department.id}
+                departmentName={displayName}
+                staff={department.staff}
+                onStaffChanged={load}
+                hideStats
+                variant="roster"
+              />
+            ) : null}
+
             {financeSection === "payroll" ? (
               <FinancePayrollQueuePanel
                 departmentId={department.id}
                 departmentName={displayName}
-                stickyStatsTop={financeStatsStickyTop}
-                employeeCount={department.staff.length}
-                compactStats
+                hideStats
                 actions={
                   <DepartmentPayrollPanel
                     departmentId={department.id}
@@ -683,7 +657,7 @@ export function DepartmentGroupWorkspaceClient({
               <DepartmentExpensesPanel
                 departmentId={department.id}
                 departmentName={displayName}
-                stickyStatsTop={financeStatsStickyTop}
+                hideStats
               />
             ) : null}
 
@@ -691,7 +665,8 @@ export function DepartmentGroupWorkspaceClient({
               <DepartmentBudgetPanel
                 departmentId={department.id}
                 departmentName={displayName}
-                stickyStatsTop={financeStatsStickyTop}
+                hideStats
+                onDataChanged={bumpFinanceKpis}
               />
             ) : null}
           </div>

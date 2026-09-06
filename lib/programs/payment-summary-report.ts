@@ -1,5 +1,6 @@
 "use server"
 
+import { isTransactionFeeAddon } from "@/lib/programs/addon-display"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import {
   PROGRAM_LABEL,
@@ -550,7 +551,7 @@ export async function getPaymentSummaryRows(): Promise<
 
             if (activeLines.length > 0) {
               for (const line of activeLines) {
-                const feeType = additionalFeeType({
+                const feeInput = {
                   label: line.label,
                   lineType: line.line_type,
                   chargeType: charge.charge_type,
@@ -559,7 +560,9 @@ export async function getPaymentSummaryRows(): Promise<
                     ...(line.metadata || {}),
                   },
                   quote: charge.quote_snapshot,
-                })
+                }
+                if (isTransactionFeeAddon(feeInput)) continue
+                const feeType = additionalFeeType(feeInput)
                 const amount = Number(line.amount || 0)
                 additionalByType.set(
                   feeType,
@@ -567,11 +570,13 @@ export async function getPaymentSummaryRows(): Promise<
                 )
               }
             } else if (Number(charge.total || 0) > 0.009) {
-              const feeType = additionalFeeType({
+              const feeInput = {
                 chargeType: charge.charge_type,
                 metadata: charge.metadata,
                 quote: charge.quote_snapshot,
-              })
+              }
+              if (isTransactionFeeAddon(feeInput)) continue
+              const feeType = additionalFeeType(feeInput)
               additionalByType.set(
                 feeType,
                 (additionalByType.get(feeType) || 0) + Number(charge.total || 0)

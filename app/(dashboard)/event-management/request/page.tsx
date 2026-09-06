@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation"
 
-import { buildFacilitiesBookSpaceHref } from "@/lib/events/facility-event-request-href"
 import { isSafeReturnToPath } from "@/lib/navigation/return-to"
 import {
   PERMISSIONS,
@@ -8,7 +7,7 @@ import {
 } from "@/lib/permissions/permissions"
 
 /**
- * Legacy request route — event requests now open from Facilities calendar.
+ * Legacy request route — event creation stays on Event Management (or returnTo).
  */
 export default async function RequestInternalEventRedirectPage({
   searchParams,
@@ -30,15 +29,9 @@ export default async function RequestInternalEventRedirectPage({
 
   const params = await searchParams
   const returnTo = isSafeReturnToPath(params?.returnTo) ? params?.returnTo : null
+  if (returnTo) {
+    redirect(returnTo)
+  }
 
-  redirect(
-    buildFacilitiesBookSpaceHref({
-      departmentId: params?.department || null,
-      returnTo,
-      openNew: true,
-      venueId: params?.venueId || null,
-      start: params?.start || null,
-      end: params?.end || null,
-    })
-  )
+  redirect("/event-management/events?create=1")
 }

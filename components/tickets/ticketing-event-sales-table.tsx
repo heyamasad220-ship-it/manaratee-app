@@ -112,7 +112,7 @@ function EventSalesStatusSelect({
   )
 }
 
-function EventCategorySelect({
+export function EventCategorySelect({
   eventId,
   value,
   categories,

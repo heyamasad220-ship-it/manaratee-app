@@ -1,7 +1,6 @@
 "use client"
 
 import type { LucideIcon } from "lucide-react"
-import type { ReactNode } from "react"
 import {
   Activity,
   AlertTriangle,
@@ -58,12 +57,45 @@ function formatOptionalDate(value: string | null) {
   })
 }
 
+export function InternalEventOverviewKpis({
+  overview,
+}: {
+  overview: EventOverviewSummary
+}) {
+  const { kpis } = overview
+  if (kpis.length === 0) return null
+
+  const kpiColumns = Math.min(6, Math.max(2, kpis.length)) as 2 | 3 | 4 | 5 | 6
+
+  return (
+    <StatCardsRow equal columns={kpiColumns}>
+      {kpis.map((kpi) => {
+        const style = KPI_STYLES[kpi.id] ?? {
+          tone: "slate" as const,
+          icon: ClipboardList,
+        }
+        return (
+          <StatCard
+            key={kpi.id}
+            label={kpi.label}
+            value={kpi.value}
+            hint={kpi.hint}
+            icon={style.icon}
+            tone={style.tone}
+            layout="compact"
+            fill
+          />
+        )
+      })}
+    </StatCardsRow>
+  )
+}
+
 export function InternalEventOverviewDashboard({
   overview,
   canManage,
   eventId: _eventId,
   coordinatorName,
-  details,
   recentActivity = [],
   onNavigateTab,
 }: {
@@ -71,11 +103,10 @@ export function InternalEventOverviewDashboard({
   canManage: boolean
   eventId: string
   coordinatorName?: string | null
-  details: ReactNode
   recentActivity?: EventRecentActivityItem[]
   onNavigateTab: (tab: string) => void
 }) {
-  const { features, kpis, alerts, registration, youth, staff, vendors, finance } =
+  const { features, alerts, registration, youth, staff, vendors, finance } =
     overview
 
   const showYouth = features.youth
@@ -88,8 +119,6 @@ export function InternalEventOverviewDashboard({
     finance.ticketRevenueCents > 0 ||
     finance.refundCents > 0
 
-  const kpiColumns = Math.min(6, Math.max(2, kpis.length)) as 2 | 3 | 4 | 5 | 6
-
   return (
     <div className="flex flex-col gap-6">
       {coordinatorName ? (
@@ -99,29 +128,6 @@ export function InternalEventOverviewDashboard({
             Coordinator: {coordinatorName}
           </span>
         </div>
-      ) : null}
-
-      {kpis.length > 0 ? (
-        <StatCardsRow equal columns={kpiColumns}>
-          {kpis.map((kpi) => {
-            const style = KPI_STYLES[kpi.id] ?? {
-              tone: "slate" as const,
-              icon: ClipboardList,
-            }
-            return (
-              <StatCard
-                key={kpi.id}
-                label={kpi.label}
-                value={kpi.value}
-                hint={kpi.hint}
-                icon={style.icon}
-                tone={style.tone}
-                layout="compact"
-                fill
-              />
-            )
-          })}
-        </StatCardsRow>
       ) : null}
 
       {alerts.length > 0 ? (
@@ -161,7 +167,7 @@ export function InternalEventOverviewDashboard({
             <div>
               <CardTitle className="flex items-center gap-2 text-base">
                 <ClipboardList className="h-4 w-4" />
-                Registration
+                Tickets
               </CardTitle>
               <p className="mt-1 text-sm text-muted-foreground">
                 {registration.modeLabel}
@@ -172,7 +178,7 @@ export function InternalEventOverviewDashboard({
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => onNavigateTab("registration")}
+                onClick={() => onNavigateTab("tickets")}
               >
                 Manage
               </Button>
@@ -193,8 +199,8 @@ export function InternalEventOverviewDashboard({
               </p>
             ) : null}
             <p className="text-muted-foreground">
-              Sales: {formatOptionalDate(registration.salesOpenAt)} →{" "}
-              {formatOptionalDate(registration.salesCloseAt)}
+            Starts / ends: {formatOptionalDate(registration.salesOpenAt)} →{" "}
+            {formatOptionalDate(registration.salesCloseAt)}
             </p>
           </CardContent>
         </Card>
@@ -349,8 +355,6 @@ export function InternalEventOverviewDashboard({
           </Card>
         ) : null}
       </div>
-
-      {details}
 
       <Card>
         <CardHeader>

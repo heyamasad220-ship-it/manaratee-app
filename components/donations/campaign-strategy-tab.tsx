@@ -5,7 +5,7 @@ import Link from "next/link"
 import { Plus, Trash2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -62,19 +62,6 @@ export function CampaignStrategyTab({
     return { targetGifts, targetValue, amountSecured, gap }
   }, [askLevelMetrics])
 
-  const draftTotals = useMemo(() => {
-    return drafts.reduce(
-      (acc, draft) => {
-        const askAmount = Number(draft.askAmount) || 0
-        const targetCount = Math.max(0, Math.floor(Number(draft.targetCount) || 0))
-        acc.targetGifts += targetCount
-        acc.targetValue += askLevelTargetValue(askAmount, targetCount)
-        return acc
-      },
-      { targetGifts: 0, targetValue: 0 }
-    )
-  }, [drafts])
-
   function updateDraft(clientKey: string, patch: Partial<CampaignAskLevelDraft>) {
     setDrafts((prev) =>
       prev.map((draft) => (draft.clientKey === clientKey ? { ...draft, ...patch } : draft))
@@ -120,16 +107,9 @@ export function CampaignStrategyTab({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-base font-semibold text-foreground">Gift / Ask Strategy</h2>
-          <p className="text-sm text-muted-foreground">
-            Plan how many gifts you need at each ask level and track progress toward your campaign
-            target.
-          </p>
-        </div>
-        {canManage ? (
-          editing ? (
+      {canManage ? (
+        <div className="flex justify-end">
+          {editing ? (
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" onClick={handleCancel} disabled={saving}>
                 Cancel
@@ -140,52 +120,9 @@ export function CampaignStrategyTab({
             </div>
           ) : (
             <Button onClick={() => setEditing(true)}>Edit Strategy</Button>
-          )
-        ) : null}
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="border border-border shadow-sm">
-          <CardHeader className="pb-1 pt-4">
-            <CardTitle className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Targeted Gifts
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pb-4 text-xl font-semibold tabular-nums">
-            {editing ? draftTotals.targetGifts : totals.targetGifts}
-          </CardContent>
-        </Card>
-        <Card className="border border-border shadow-sm">
-          <CardHeader className="pb-1 pt-4">
-            <CardTitle className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Target Value
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pb-4 text-xl font-semibold tabular-nums">
-            {formatDonationCurrency(editing ? draftTotals.targetValue : totals.targetValue)}
-          </CardContent>
-        </Card>
-        <Card className="border border-border shadow-sm">
-          <CardHeader className="pb-1 pt-4">
-            <CardTitle className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Amount Secured
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pb-4 text-xl font-semibold tabular-nums">
-            {formatDonationCurrency(totals.amountSecured)}
-          </CardContent>
-        </Card>
-        <Card className="border border-border shadow-sm">
-          <CardHeader className="pb-1 pt-4">
-            <CardTitle className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Gap
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pb-4 text-xl font-semibold tabular-nums">
-            {formatDonationCurrency(totals.gap)}
-          </CardContent>
-        </Card>
-      </div>
+          )}
+        </div>
+      ) : null}
 
       {editing ? (
         <Card className="border border-border shadow-sm">
@@ -379,12 +316,6 @@ export function CampaignStrategyTab({
           </CardContent>
         </Card>
       )}
-
-      <p className="text-xs text-muted-foreground">
-        Prospects counts donation prospects assigned to that ask level. Asked uses the Asked and
-        Pledged stages. Secured uses valid pledges linked to the ask level (or matching ask amount),
-        not a manually set prospect stage. Prospects may exceed the target number of gifts.
-      </p>
     </div>
   )
 }

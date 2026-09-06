@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache"
 
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { getServiceRoleClient } from "@/lib/platform/require-platform-admin"
-import { hasAnyPermission, PERMISSIONS } from "@/lib/permissions/permissions"
+import { canManageInternalEvent } from "@/lib/events/event-access"
 import { createClient } from "@/lib/supabase/server"
 import type {
   EventDocument,
@@ -20,11 +20,8 @@ const EVENT_DOCS_MIME = [
   "image/webp",
 ] as const
 
-async function assertEventManage() {
-  const canManage = await hasAnyPermission(
-    PERMISSIONS.EVENTS_MANAGE,
-    PERMISSIONS.PROGRAMS_MANAGE
-  )
+async function assertEventManage(eventId: string) {
+  const canManage = await canManageInternalEvent(eventId)
   if (!canManage) {
     throw new Error("You do not have permission to manage event documents.")
   }
@@ -91,14 +88,13 @@ export async function uploadEventDocument(formData: FormData): Promise<
   { success: true } | { success: false; error: string }
 > {
   try {
-    await assertEventManage()
-
     const eventId = String(formData.get("eventId") || "").trim()
+    if (!eventId) return { success: false, error: "Event is required." }
+    await assertEventManage(eventId)
     const title = String(formData.get("title") || "").trim()
     const visibility =
       String(formData.get("visibility") || "staff") === "public" ? "public" : "staff"
     const file = formData.get("file")
-    if (!eventId) return { success: false, error: "Event is required." }
     if (!title) return { success: false, error: "Title is required." }
     if (!(file instanceof File) || file.size === 0) {
       return { success: false, error: "Choose a PDF or image file." }
@@ -180,7 +176,7 @@ export async function deleteEventDocument(input: {
   documentId: string
 }): Promise<{ success: true } | { success: false; error: string }> {
   try {
-    await assertEventManage()
+    await assertEventManage(input.eventId)
     const organizationId = await getSelectedOrganizationId()
     if (!organizationId) return { success: false, error: "No organization selected." }
 
@@ -227,7 +223,7 @@ export async function updateEventDocumentVisibility(input: {
   visibility: EventDocumentVisibility
 }): Promise<{ success: true } | { success: false; error: string }> {
   try {
-    await assertEventManage()
+    await assertEventManage(input.eventId)
     const organizationId = await getSelectedOrganizationId()
     if (!organizationId) return { success: false, error: "No organization selected." }
 

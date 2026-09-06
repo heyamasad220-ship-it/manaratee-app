@@ -6,9 +6,14 @@ import { createEmployeeFromContact } from "@/lib/contacts/contact-actions"
 import { canManageDepartment, canViewDepartment } from "@/lib/departments/department-access"
 import { workforceDepartmentDetailPath } from "@/lib/departments/department-paths"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
+import {
+  loadWorkLoginAssignmentForContact,
+  unassignWorkLoginForContactAction,
+} from "@/lib/organizations/work-email-assignment"
 import { hasPermission } from "@/lib/permissions/permissions"
 import { PERMISSIONS } from "@/lib/permissions/permission-keys"
 import { createClient } from "@/lib/supabase/server"
+import { createServiceRoleClient } from "@/lib/supabase/service-role"
 
 function escapeIlike(value: string) {
   return value.replace(/[%_\\,]/g, "\\$&")
@@ -99,7 +104,14 @@ export type DepartmentEmployeeProfile = {
   staffId: string
   contactId: string | null
   fullName: string
+  firstName: string
+  lastName: string
   email: string | null
+  personalEmail: string | null
+  workEmail: string | null
+  workLoginName: string | null
+  workMembershipId: string | null
+  canAssignWorkEmail: boolean
   phone: string | null
   employmentStatus: "active" | "inactive" | "on_leave" | "pending"
   staffType: "full_time" | "part_time" | "temporary" | "contract" | "seasonal"
@@ -279,14 +291,46 @@ export async function fetchDepartmentEmployeeProfileAction(input: {
         }, ${financial.hourCount} hour log${financial.hourCount === 1 ? "" : "s"}).`
       : null
 
+  const contactId = (data.contact_id as string | null) ?? null
+  let personalEmail = (data.email as string | null) ?? null
+  let phone = (data.phone as string | null) ?? null
+  let workEmail: string | null = null
+  let workLoginName: string | null = null
+  let workMembershipId: string | null = null
+
+  if (contactId) {
+    const admin = createServiceRoleClient()
+    const [{ data: contact }, assignment] = await Promise.all([
+      admin
+        .from("contacts")
+        .select("email, phone")
+        .eq("id", contactId)
+        .eq("organization_id", organizationId)
+        .maybeSingle(),
+      loadWorkLoginAssignmentForContact(admin, organizationId, contactId),
+    ])
+    if (contact?.email) personalEmail = contact.email as string
+    if (contact?.phone) phone = contact.phone as string
+    workEmail = assignment?.email ?? null
+    workLoginName = assignment?.name ?? null
+    workMembershipId = assignment?.membershipId ?? null
+  }
+
   const profile: DepartmentEmployeeProfile = {
     staffId: data.id as string,
-    contactId: (data.contact_id as string | null) ?? null,
+    contactId,
     fullName:
       `${(data.first_name as string) || ""} ${(data.last_name as string) || ""}`.trim() ||
       "Unnamed",
-    email: (data.email as string | null) ?? null,
-    phone: (data.phone as string | null) ?? null,
+    firstName: (data.first_name as string) || "",
+    lastName: (data.last_name as string) || "",
+    email: personalEmail,
+    personalEmail,
+    workEmail,
+    workLoginName,
+    workMembershipId,
+    canAssignWorkEmail: canEdit && Boolean(contactId),
+    phone,
     employmentStatus: ((data.status as string) || "active") as DepartmentEmployeeProfile["employmentStatus"],
     staffType: ((data.staff_type as string) || "full_time") as DepartmentEmployeeProfile["staffType"],
     positionId: (data.position_id as string | null) ?? null,
@@ -457,6 +501,17 @@ export async function removeStaffFromDepartmentAction(input: {
   const access = await requireStaffManage(input.departmentId)
   if (!access.ok) return { success: false as const, error: access.error }
 
+  const { data: staffRow, error: staffRowError } = await access.supabase
+    .from("staff")
+    .select("id, contact_id")
+    .eq("organization_id", access.organizationId)
+    .eq("id", input.staffId)
+    .maybeSingle()
+
+  if (staffRowError || !staffRow) {
+    return { success: false as const, error: "Employee not found." }
+  }
+
   const financial = await countStaffFinancialRows(
     access.supabase,
     access.organizationId,
@@ -483,6 +538,14 @@ export async function removeStaffFromDepartmentAction(input: {
     return { success: false as const, error: error.message || "Could not remove employee." }
   }
 
+  const contactId = (staffRow.contact_id as string | null) ?? null
+  if (contactId) {
+    await unassignWorkLoginForContactAction({
+      contactId,
+      departmentId: input.departmentId,
+    })
+  }
+
   revalidateDepartmentStaff(input.departmentId)
   return { success: true as const }
 }
@@ -499,13 +562,14 @@ export async function updateDepartmentEmployeeAction(input: {
   hourly_rate?: number | null
   pay_basis?: "hourly" | "monthly"
   monthly_salary?: number | null
+  is_department_head?: boolean
 }) {
   const access = await requireStaffManage(input.departmentId)
   if (!access.ok) return { success: false as const, error: access.error }
 
   const { data: staff, error: staffError } = await access.supabase
     .from("staff")
-    .select("id, department_id")
+    .select("id, department_id, contact_id")
     .eq("organization_id", access.organizationId)
     .eq("id", input.staffId)
     .maybeSingle()
@@ -543,30 +607,63 @@ export async function updateDepartmentEmployeeAction(input: {
     patch.monthly_salary = normalizeHourlyRate(input.monthly_salary)
   }
 
-  if (Object.keys(patch).length === 0) {
+  const hasPatch = Object.keys(patch).length > 0
+  if (!hasPatch && input.is_department_head === undefined) {
     return { success: true as const }
   }
 
-  let { error } = await access.supabase
-    .from("staff")
-    .update(patch)
-    .eq("organization_id", access.organizationId)
-    .eq("id", input.staffId)
-
-  if (error && /hourly_rate|pay_basis|monthly_salary/i.test(error.message || "")) {
-    delete patch.hourly_rate
-    delete patch.pay_basis
-    delete patch.monthly_salary
-    const retry = await access.supabase
+  if (hasPatch) {
+    let { error } = await access.supabase
       .from("staff")
       .update(patch)
       .eq("organization_id", access.organizationId)
       .eq("id", input.staffId)
-    error = retry.error
+
+    if (error && /hourly_rate|pay_basis|monthly_salary/i.test(error.message || "")) {
+      delete patch.hourly_rate
+      delete patch.pay_basis
+      delete patch.monthly_salary
+      const retry = await access.supabase
+        .from("staff")
+        .update(patch)
+        .eq("organization_id", access.organizationId)
+        .eq("id", input.staffId)
+      error = retry.error
+    }
+
+    if (error) {
+      return { success: false as const, error: error.message || "Could not update employee." }
+    }
   }
 
-  if (error) {
-    return { success: false as const, error: error.message || "Could not update employee." }
+  if (input.is_department_head === true) {
+    const director = await setDepartmentDirectorAction({
+      departmentId: input.departmentId,
+      staffId: input.staffId,
+    })
+    if (!director.success) return director
+  } else if (input.is_department_head === false) {
+    const { error: headError } = await access.supabase
+      .from("staff")
+      .update({ is_department_head: false })
+      .eq("organization_id", access.organizationId)
+      .eq("id", input.staffId)
+    if (headError && !/is_department_head/i.test(headError.message || "")) {
+      return {
+        success: false as const,
+        error: headError.message || "Could not update Department Head.",
+      }
+    }
+  }
+
+  if (input.status === "inactive") {
+    const contactId = (staff.contact_id as string | null) ?? null
+    if (contactId) {
+      await unassignWorkLoginForContactAction({
+        contactId,
+        departmentId: input.departmentId,
+      })
+    }
   }
 
   revalidateDepartmentStaff(input.departmentId)

@@ -8,6 +8,7 @@ const tabs = [
   { label: "Overview", href: "/event-management/ticketing" },
   { label: "Events", href: "/event-management/ticketing/events" },
   { label: "Orders", href: "/event-management/ticketing/orders" },
+  { label: "Check-in", href: "/event-management/ticketing/check-in" },
   { label: "Reports", href: "/event-management/ticketing/reports" },
   { label: "Settings", href: "/event-management/ticketing/settings" },
 ] as const

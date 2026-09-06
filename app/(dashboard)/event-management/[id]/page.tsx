@@ -20,13 +20,10 @@ import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-orga
 import { getServiceRoleClient } from "@/lib/platform/require-platform-admin"
 import { listEventDocuments } from "@/lib/events/event-document-actions"
 import {
+  canManageInternalEvent,
   hasEventCheckInPermission,
-  requireEventWorkspaceViewPermission,
+  requireInternalEventWorkspaceAccess,
 } from "@/lib/events/event-access"
-import {
-  hasAnyPermission,
-  PERMISSIONS,
-} from "@/lib/permissions/permissions"
 
 export default async function InternalEventWorkspacePage({
   params,
@@ -35,9 +32,8 @@ export default async function InternalEventWorkspacePage({
   params: Promise<{ id: string }>
   searchParams: Promise<{ tab?: string }>
 }) {
-  await requireEventWorkspaceViewPermission()
-
   const { id } = await params
+  await requireInternalEventWorkspaceAccess(id)
   const { tab } = await searchParams
   const initialTab = resolveWorkspaceTabId(tab) ?? "overview"
 
@@ -53,7 +49,7 @@ export default async function InternalEventWorkspacePage({
     expenses,
   ] = await Promise.all([
     getInternalEventById(id),
-    hasAnyPermission(PERMISSIONS.EVENTS_MANAGE, PERMISSIONS.PROGRAMS_MANAGE),
+    canManageInternalEvent(id),
     hasEventCheckInPermission(),
     getParticipationsForSource({ sourceType: "internal_event", sourceId: id }),
     getEventTicketTypes(id),

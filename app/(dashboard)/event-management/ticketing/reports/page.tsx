@@ -1,30 +1,15 @@
-import { TicketingReportsClient } from "@/components/tickets/ticketing-reports-client"
-import {
-  getTicketingReports,
-  parseTicketingReportRangeKey,
-} from "@/lib/tickets/ticketing-reports-queries"
-import {
-  PERMISSIONS,
-  requireAnyPermission,
-} from "@/lib/permissions/permissions"
+import { redirect } from "next/navigation"
 
-export default async function TicketingReportsPage({
+import { EVENT_MANAGEMENT_TICKETS_REPORTS_PATH } from "@/lib/events/event-management-reports-path"
+
+export default async function EventManagementTicketingReportsPage({
   searchParams,
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>
 }) {
-  await requireAnyPermission(
-    PERMISSIONS.TICKETING_VIEW,
-    PERMISSIONS.EVENTS_VIEW,
-    PERMISSIONS.REPORTS_VIEW
-  )
-
   const resolved = await searchParams
   const rangeParam = resolved?.range
-  const rangeKey = parseTicketingReportRangeKey(
-    Array.isArray(rangeParam) ? rangeParam[0] : rangeParam
-  )
-  const data = await getTicketingReports(rangeKey)
-
-  return <TicketingReportsClient data={data} rangeKey={rangeKey} />
+  const range = Array.isArray(rangeParam) ? rangeParam[0] : rangeParam
+  const query = range ? `?range=${encodeURIComponent(range)}` : ""
+  redirect(`${EVENT_MANAGEMENT_TICKETS_REPORTS_PATH}${query}`)
 }

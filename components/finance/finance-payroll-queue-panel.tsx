@@ -51,6 +51,7 @@ export function FinancePayrollQueuePanel({
   stickyStatsTop,
   employeeCount,
   compactStats = false,
+  hideStats = false,
   actions,
 }: {
   /** When set, show only this department's pay entries (department Financial → Payroll). */
@@ -62,6 +63,8 @@ export function FinancePayrollQueuePanel({
   employeeCount?: number
   /** Department Payroll: only Employees + Amount cards. */
   compactStats?: boolean
+  /** Hide local KPIs when the parent Financial tab shows the combined row. Org Finance → Payroll keeps its cards. */
+  hideStats?: boolean
   /** Optional actions rendered under the KPI cards (e.g. Log hours / Create pay period). */
   actions?: ReactNode
 } = {}) {
@@ -160,7 +163,7 @@ export function FinancePayrollQueuePanel({
 
   return (
     <div className="space-y-6">
-      {!loading && !error ? (
+      {!hideStats && !loading && !error ? (
         <div
           className={
             stickyStatsTop

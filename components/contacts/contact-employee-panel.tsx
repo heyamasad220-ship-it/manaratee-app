@@ -32,7 +32,9 @@ import {
 import { EmployeeStaffAssignmentsPanel } from "@/components/hr/employee-staff-assignments-panel"
 import { EmployeeStaffDocumentsPanel } from "@/components/hr/employee-staff-documents-panel"
 import { ContactDepartmentWorkspacePanel } from "@/components/contacts/contact-department-workspace-panel"
+import { ContactProgramWorkspacePanel } from "@/components/contacts/contact-program-workspace-panel"
 import { Checkbox } from "@/components/ui/checkbox"
+import { listProgramsLedByContactAction } from "@/lib/programs/program-lead-actions"
 
 type StaffStatus = "active" | "inactive" | "on_leave" | "pending"
 
@@ -78,14 +80,19 @@ export function ContactEmployeePanel({
   staffId,
   organizationId,
   contactRoles = [],
+  contactId = null,
 }: {
   staffId: string
   organizationId: string | null
   contactRoles?: ContactRoleValue[]
+  contactId?: string | null
 }) {
   const supabase = createClient()
   const [loading, setLoading] = useState(true)
   const [employee, setEmployee] = useState<EmployeeRecord | null>(null)
+  const [ledPrograms, setLedPrograms] = useState<
+    Array<{ programId: string; programName: string }>
+  >([])
   const [departments, setDepartments] = useState<DepartmentOption[]>([])
   const [hrPositions, setHrPositions] = useState<HrPositionOption[]>([])
   const [hrJobRoles, setHrJobRoles] = useState<HrJobRoleOption[]>([])
@@ -272,6 +279,22 @@ export function ContactEmployeePanel({
   }, [loadEmployee])
 
   useEffect(() => {
+    let cancelled = false
+    async function loadLedPrograms() {
+      if (!contactId) {
+        setLedPrograms([])
+        return
+      }
+      const programs = await listProgramsLedByContactAction(contactId)
+      if (!cancelled) setLedPrograms(programs)
+    }
+    void loadLedPrograms()
+    return () => {
+      cancelled = true
+    }
+  }, [contactId])
+
+  useEffect(() => {
     if (employee && !isEditing) {
       resetForm(employee)
     }
@@ -393,6 +416,8 @@ export function ContactEmployeePanel({
           departmentName={employee.department_name}
         />
       ) : null}
+
+      <ContactProgramWorkspacePanel programs={ledPrograms} />
 
       <Card>
         <CardHeader className="flex flex-row items-start justify-between space-y-0">

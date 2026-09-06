@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 
-/** One row per vendor for Network → Participation History. */
+/** One row per vendor for Reports → Participation History. */
 export type ParticipationHistoryRow = {
   contactId: string
   businessName: string

@@ -156,7 +156,7 @@ export function ContactVendorEvaluationsPanel({ contactId }: { contactId: string
         ) : null}
 
         <Button variant="outline" size="sm" className="w-fit" asChild>
-          <Link href={`${VENDOR_HUB_ROUTES.network.history}?contact=${contactId}`}>
+          <Link href={VENDOR_HUB_ROUTES.reportsHistory(contactId)}>
             View full vendor history
           </Link>
         </Button>

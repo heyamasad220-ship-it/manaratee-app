@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -43,13 +42,9 @@ const emptyForm: CategoryFormState = {
   sort_order: 0,
 }
 
-export function TicketingEventCategoriesDialog({
-  open,
-  onOpenChange,
+export function TicketingEventCategoriesManager({
   categories,
 }: {
-  open: boolean
-  onOpenChange: (open: boolean) => void
   categories: TicketingEventCategory[]
 }) {
   const router = useRouter()
@@ -125,22 +120,14 @@ export function TicketingEventCategoriesDialog({
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-xl">
-          <DialogHeader>
-            <DialogTitle>Event categories</DialogTitle>
-            <DialogDescription>
-              Group ticketed events such as Kids Workshop, I Pray Party, or Bazaar.
-              You can rename these or add your own.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex justify-end">
-            <Button size="sm" onClick={openCreate}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add category
-            </Button>
-          </div>
-          <div className="overflow-hidden rounded-md border">
+      <div className="space-y-4">
+        <div className="flex justify-end">
+          <Button size="sm" onClick={openCreate}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add category
+          </Button>
+        </div>
+        <div className="overflow-hidden rounded-md border">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -191,8 +178,7 @@ export function TicketingEventCategoriesDialog({
               </TableBody>
             </Table>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
 
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
         <DialogContent>
@@ -235,5 +221,26 @@ export function TicketingEventCategoriesDialog({
         </DialogContent>
       </Dialog>
     </>
+  )
+}
+
+export function TicketingEventCategoriesDialog({
+  open,
+  onOpenChange,
+  categories,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  categories: TicketingEventCategory[]
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Event categories</DialogTitle>
+        </DialogHeader>
+        <TicketingEventCategoriesManager categories={categories} />
+      </DialogContent>
+    </Dialog>
   )
 }

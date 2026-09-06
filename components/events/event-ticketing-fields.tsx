@@ -32,6 +32,12 @@ type EventTicketingFieldsProps = {
   onChange: (next: EventTicketingFormState) => void
   /** Hide the Enable switch when the parent already handles enable/save. */
   hideEnableSwitch?: boolean
+  /** Hide sales open/close when the parent shows Starts / Ends. */
+  hideSalesWindow?: boolean
+  /** Hide Paid / Complimentary — mix complimentary seats with promo codes instead. */
+  hideKind?: boolean
+  /** Force $0 prices (free attendance). */
+  lockFreePricing?: boolean
 }
 
 function splitDatetimeLocal(value: string) {
@@ -66,14 +72,14 @@ function roundTimeToStep(time: string, stepMinutes: number) {
   return `${String(hours).padStart(2, "0")}:${String(rounded).padStart(2, "0")}`
 }
 
-function createEmptyTicketType(): EventTicketTypeFormRow {
+function createEmptyTicketType(free = false): EventTicketTypeFormRow {
   return {
     id: `new-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     name: "",
-    price: "",
+    price: free ? "0" : "",
     quantity: "",
     description: "",
-    offeringKind: "standard",
+    offeringKind: free ? "complimentary" : "standard",
     visibility: "public",
     minPerOrder: "1",
     maxPerOrder: "",
@@ -86,6 +92,9 @@ export function EventTicketingFields({
   value,
   onChange,
   hideEnableSwitch = false,
+  hideSalesWindow = false,
+  hideKind = false,
+  lockFreePricing = false,
 }: EventTicketingFieldsProps) {
   const showDetails = hideEnableSwitch || value.requiresTicketing
 
@@ -95,7 +104,7 @@ export function EventTicketingFields({
 
   useEffect(() => {
     if (!showDetails || value.ticketTypes.length > 0) return
-    onChange({ ...value, ticketTypes: [createEmptyTicketType()] })
+    onChange({ ...value, ticketTypes: [createEmptyTicketType(lockFreePricing)] })
     // Only seed when details become visible with no rows.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional one-shot seed
   }, [showDetails, value.ticketTypes.length])
@@ -150,7 +159,7 @@ export function EventTicketingFields({
   function removeTicketType(id: string) {
     const next = value.ticketTypes.filter((row) => row.id !== id)
     update({
-      ticketTypes: next.length > 0 ? next : [createEmptyTicketType()],
+      ticketTypes: next.length > 0 ? next : [createEmptyTicketType(lockFreePricing)],
     })
   }
 
@@ -168,7 +177,7 @@ export function EventTicketingFields({
     if (!row.name.trim() && !row.price.trim() && !row.quantity.trim()) return
 
     event.preventDefault()
-    const next = createEmptyTicketType()
+    const next = createEmptyTicketType(lockFreePricing)
     update({ ticketTypes: [...value.ticketTypes, next] })
 
     requestAnimationFrame(() => {
@@ -183,7 +192,13 @@ export function EventTicketingFields({
   const salesClose = splitDatetimeLocal(value.salesCloseAt)
 
   return (
-    <div className="space-y-4 rounded-lg border p-4">
+    <div
+      className={
+        hideEnableSwitch && hideSalesWindow
+          ? "space-y-4"
+          : "space-y-4 rounded-lg border p-4"
+      }
+    >
       {hideEnableSwitch ? null : (
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -207,7 +222,7 @@ export function EventTicketingFields({
                   requiresTicketing: checked,
                   ticketTypes:
                     checked && value.ticketTypes.length === 0
-                      ? [createEmptyTicketType()]
+                      ? [createEmptyTicketType(lockFreePricing)]
                       : value.ticketTypes,
                 })
               }
@@ -218,6 +233,7 @@ export function EventTicketingFields({
 
       {showDetails ? (
         <div className="space-y-4">
+          {hideSalesWindow ? null : (
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="sales-open-date">Sales open date</Label>
@@ -271,25 +287,32 @@ export function EventTicketingFields({
               />
             </div>
           </div>
+          )}
 
           <div className="space-y-3">
+            {hideSalesWindow ? null : (
             <div>
-              <p className="text-sm font-medium">Registration offerings</p>
+              <p className="text-sm font-medium">Ticket types</p>
               <p className="text-xs text-muted-foreground">
                 Use Complimentary for free/VIP types. Optional sale-from/until dates
                 override the event window for that offering. Enter quantity and press
                 Enter or Tab to add another row.
               </p>
             </div>
+            )}
 
             <div className="overflow-hidden rounded-md border">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Name</TableHead>
-                    <TableHead className="w-[120px]">Kind</TableHead>
+                    {hideKind ? null : (
+                      <TableHead className="w-[120px]">Kind</TableHead>
+                    )}
                     <TableHead className="w-[120px]">Visibility</TableHead>
-                    <TableHead className="w-[100px]">Price ($)</TableHead>
+                    {lockFreePricing ? null : (
+                      <TableHead className="w-[100px]">Price ($)</TableHead>
+                    )}
                     <TableHead className="w-[90px]">Qty</TableHead>
                     <TableHead className="w-[70px]">Min</TableHead>
                     <TableHead className="w-[70px]">Max</TableHead>
@@ -311,6 +334,7 @@ export function EventTicketingFields({
                           placeholder="General admission"
                         />
                       </TableCell>
+                      {hideKind ? null : (
                       <TableCell>
                         <Select
                           value={row.offeringKind || "standard"}
@@ -329,6 +353,7 @@ export function EventTicketingFields({
                           </SelectContent>
                         </Select>
                       </TableCell>
+                      )}
                       <TableCell>
                         <Select
                           value={row.visibility || "public"}
@@ -346,6 +371,7 @@ export function EventTicketingFields({
                           </SelectContent>
                         </Select>
                       </TableCell>
+                      {lockFreePricing ? null : (
                       <TableCell>
                         <Input
                           type="number"
@@ -359,6 +385,7 @@ export function EventTicketingFields({
                           placeholder="25.00"
                         />
                       </TableCell>
+                      )}
                       <TableCell>
                         <Input
                           type="number"

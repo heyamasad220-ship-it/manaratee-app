@@ -4,7 +4,6 @@ import { VENDOR_HUB_ROUTES } from "@/lib/vendor-hub/vendor-hub-routes"
 export const VENDOR_NETWORK_TABS: ModuleTabNavItem[] = [
   { label: "Vendors", href: VENDOR_HUB_ROUTES.network.vendors },
   { label: "Onboarding", href: VENDOR_HUB_ROUTES.network.onboarding },
-  { label: "Participation History", href: VENDOR_HUB_ROUTES.network.history },
   { label: "Documents", href: VENDOR_HUB_ROUTES.network.documents },
   { label: "Invitations", href: VENDOR_HUB_ROUTES.network.invitations },
 ]

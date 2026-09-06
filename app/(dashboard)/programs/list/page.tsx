@@ -9,12 +9,14 @@ import { hasPermission, PERMISSIONS } from "@/lib/permissions/permissions"
 import { getProgramListStatsByProgramIds } from "@/lib/programs/program-offering-queries"
 import { getStaffListPrograms } from "@/lib/programs/program-queries"
 import { parseProgramsListFilters } from "@/lib/programs/programs-list-filters"
+import { redirectOrgWideProgramPagesForDepartmentHead } from "@/lib/programs/program-access"
 
 export default async function ProgramsListPage({
   searchParams,
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>
 }) {
+  await redirectOrgWideProgramPagesForDepartmentHead()
   const resolvedSearchParams = await searchParams
   const initialFilters = parseProgramsListFilters(resolvedSearchParams || {})
 

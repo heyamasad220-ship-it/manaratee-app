@@ -52,6 +52,8 @@ import {
   normalizeOrganizationProgramKinds,
   type OrganizationProgramKindsEntitlement,
 } from "@/lib/programs/program-kind-policy"
+import { programLeadNavEntries } from "@/lib/programs/program-lead-nav"
+import { programWorkspaceHref } from "@/lib/programs/program-workspace-path"
 import {
   buildSubExpandKey,
   filterSubItemsByPermission,
@@ -261,6 +263,7 @@ const modulePermissionFallbacks: Record<string, string[]> = {
 const subItemPermissionFallbacks: Record<string, string[]> = {
   "events.view": ["programs.view"],
   "events.manage": ["programs.manage"],
+  "events.checkin": ["events.view", "ticketing.view"],
   "reports.view": ["events.view", "programs.view"],
   "ticketing.view": ["events.view", "programs.view", "ticketing.manage"],
   "ticketing.manage": ["events.manage", "programs.manage"],
@@ -365,7 +368,7 @@ const moduleChildren: Record<string, SubItem[]> = {
     },
   ],
   "vendor-hub": [
-    { label: "Dashboard", href: "/vendor-hub", matchPrefix: "/vendor-hub", permissionKey: "vendor_hub.view" },
+    { label: "Overview", href: "/vendor-hub", matchPrefix: "/vendor-hub", exact: true, permissionKey: "vendor_hub.view" },
     { label: "Vendor Network", href: "/vendor-hub/network/vendors", matchPrefix: "/vendor-hub/network", permissionKey: "vendor_hub.view" },
     { label: "Bazaar Events", href: "/vendor-hub/events", matchPrefix: "/vendor-hub/events", permissionKey: "vendor_hub.manage" },
     { label: "Reports", href: "/vendor-hub/reports", matchPrefix: "/vendor-hub/reports", permissionKey: "reports.view" },
@@ -685,7 +688,8 @@ function buildNavItems(
   permissionContext: UserPermissionContext,
   myDepartment?: { id: string; name: string } | null,
   directoryRoleCounts: DirectoryRoleCountMap = {},
-  programKinds: OrganizationProgramKindsEntitlement = "both"
+  programKinds: OrganizationProgramKindsEntitlement = "both",
+  myPrograms: Array<{ id: string; name: string }> = []
 ): NavItem[] {
   const availableSlugs = new Set(
     rows.map((row) => normalizeModuleSlug(row.slug))
@@ -772,6 +776,11 @@ function buildNavItems(
     permissionContext.isOwner ||
     permissionContext.enabledPermissions.has("staff.view")
 
+  const hasProgramsView =
+    permissionContext.isOwner ||
+    permissionContext.enabledPermissions.has("programs.view") ||
+    permissionContext.enabledPermissions.has("programs.manage")
+
   const myDepartmentItem: NavItem | null =
     myDepartment && !hasStaffView
       ? {
@@ -782,9 +791,25 @@ function buildNavItems(
         }
       : null
 
+  const myProgramItems: NavItem[] =
+    !hasProgramsView && !myDepartmentItem && myPrograms.length > 0
+      ? programLeadNavEntries(
+          myPrograms.map((program) => ({
+            programId: program.id,
+            programName: program.name,
+          }))
+        ).map((entry) => ({
+          label: entry.label,
+          href: programWorkspaceHref(entry.programId, { tab: "offerings" }),
+          icon: GraduationCap,
+          matchPrefix: `/programs/${entry.programId}`,
+        }))
+      : []
+
   const allItems: NavItem[] = [
     { label: "Dashboard", href: "/dashboard", icon: Home, matchPrefix: "/dashboard" },
     ...(myDepartmentItem ? [myDepartmentItem] : []),
+    ...myProgramItems,
     ...dynamicItems,
     {
       label: "Billing",
@@ -922,6 +947,18 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
               }
             : null
 
+        const myPrograms = Array.isArray(modulesPayload.myPrograms)
+          ? (modulesPayload.myPrograms as Array<{ id?: unknown; name?: unknown }>)
+              .filter(
+                (row): row is { id: string; name: unknown } =>
+                  typeof row?.id === "string"
+              )
+              .map((row) => ({
+                id: row.id,
+                name: String(row.name || "Program"),
+              }))
+          : []
+
         const directoryRoleCounts = (modulesPayload.directoryRoleCounts ||
           {}) as DirectoryRoleCountMap
         const programKinds = normalizeOrganizationProgramKinds(
@@ -934,7 +971,8 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
             permissionContext,
             myDepartment,
             directoryRoleCounts,
-            programKinds
+            programKinds,
+            myPrograms
           )
         )
       } catch (error) {

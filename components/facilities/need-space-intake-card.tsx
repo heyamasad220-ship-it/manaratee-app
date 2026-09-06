@@ -7,8 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 const intakeOptions = [
   {
     title: "Department event",
-    description: "Book Center, Online, or External Venue events from the Facilities calendar.",
-    href: "/facilities/calendar?openNew=1",
+    description: "Create Center, Online, or External Venue events from Event Management.",
+    href: "/event-management/events?create=1",
     icon: CalendarDays,
   },
   {

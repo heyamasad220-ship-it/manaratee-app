@@ -47,8 +47,8 @@ const SEASONAL_TERMINOLOGY: ProgramKindTerminology = {
   modeLabel: "Seasonal Programs",
   containerPlural: "Seasons",
   containerSingular: "Season",
-  offeringPlural: "Programs",
-  offeringSingular: "Program",
+  offeringPlural: "Offerings",
+  offeringSingular: "Offering",
   sessionPlural: "Sessions",
   sessionSingular: "Session",
 }

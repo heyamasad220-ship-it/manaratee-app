@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
 
 import { Header } from "@/components/layout/header"
 import { FacilityEventEditPageClient } from "@/components/events/facility-event-edit-page-client"
@@ -8,19 +8,18 @@ import { getInternalEventById } from "@/lib/events/internal-event-queries"
 import { getInternalEventFormDefaults } from "@/lib/events/internal-event-form-defaults"
 import { getActiveCalendarVenues } from "@/lib/bookings/venue-calendar-venues"
 import { getRoomSetupStyles } from "@/lib/setup-styles/setup-style-queries"
-import {
-  PERMISSIONS,
-  requireAnyPermission,
-} from "@/lib/permissions/permissions"
+import { canManageInternalEvent } from "@/lib/events/event-access"
 
 export default async function EditInternalEventPage({
   params,
 }: {
   params: Promise<{ id: string }>
 }) {
-  await requireAnyPermission(PERMISSIONS.EVENTS_MANAGE, PERMISSIONS.PROGRAMS_MANAGE)
-
   const { id } = await params
+  if (!(await canManageInternalEvent(id))) {
+    redirect("/unauthorized")
+  }
+
   const [event, departments, eventTypes, venues, setupStyles, defaults] =
     await Promise.all([
       getInternalEventById(id),

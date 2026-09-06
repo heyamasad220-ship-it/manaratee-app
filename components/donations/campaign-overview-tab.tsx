@@ -30,6 +30,94 @@ type ContactProfileTarget = {
   donorId?: string | null
 }
 
+type CampaignOverviewSummaryProps = {
+  campaign: CampaignRow
+  entry: CampaignAnalyticsEntry
+  insights: CampaignDonorInsights | null
+  onShowDonorsDialogChange: (open: boolean) => void
+  onOpenContactProfile: (target: ContactProfileTarget) => void
+}
+
+export function CampaignOverviewSummary({
+  campaign,
+  entry,
+  insights,
+  onShowDonorsDialogChange,
+  onOpenContactProfile,
+}: CampaignOverviewSummaryProps) {
+  const { metrics } = entry
+  const goalAmount = Number(campaign.goal_amount || 0) || null
+  const committed = metrics.pledged
+  const collected = metrics.raised
+  const outstanding = metrics.outstanding
+
+  return (
+    <Card className="border border-border shadow-sm">
+      <CardHeader className="flex flex-row flex-wrap items-center gap-x-3 gap-y-1 space-y-0 pb-2">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Target className="h-4 w-4" />
+          Campaign Goal
+        </CardTitle>
+        <p className="text-2xl font-semibold tabular-nums text-foreground">
+          {goalAmount != null ? formatDonationCurrency(goalAmount) : "No goal set"}
+        </p>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        <DonationMetricCardGrid colorful columns={5} compact>
+          <DonationMetricCard
+            compact
+            title="Total Committed"
+            value={formatDonationCurrency(committed)}
+            icon={Heart}
+            accent="blue"
+            description="Valid pledge commitments"
+          />
+          <DonationMetricCard
+            compact
+            title="Total Collected"
+            value={formatDonationCurrency(collected)}
+            icon={DollarSign}
+            accent="emerald"
+            description="Payments received"
+          />
+          <DonationMetricCard
+            compact
+            title="Outstanding"
+            value={formatDonationCurrency(outstanding)}
+            icon={AlertCircle}
+            accent="amber"
+            description="Committed, not yet collected"
+          />
+          <DonationMetricCard
+            compact
+            title="Donors"
+            value={String(metrics.donorCount)}
+            icon={Users}
+            accent="purple"
+            onValueClick={() => onShowDonorsDialogChange(true)}
+          />
+          <DonationMetricCard
+            compact
+            title="Largest Gift"
+            value={formatDonationCurrency(metrics.largestGift)}
+            icon={Gift}
+            accent="rose"
+            onValueClick={
+              insights?.largestGift?.contactId || insights?.largestGift?.donorId
+                ? () =>
+                    onOpenContactProfile({
+                      contactId: insights?.largestGift?.contactId,
+                      donorId: insights?.largestGift?.donorId,
+                    })
+                : undefined
+            }
+          />
+        </DonationMetricCardGrid>
+      </CardContent>
+    </Card>
+  )
+}
+
 type CampaignOverviewTabProps = {
   campaign: CampaignRow
   entry: CampaignAnalyticsEntry
@@ -46,6 +134,7 @@ type CampaignOverviewTabProps = {
   onOpenContactProfile: (target: ContactProfileTarget) => void
   onPledgeClick?: (pledgeId: string) => void
   onReload: () => void
+  showSummary?: boolean
 }
 
 export function CampaignOverviewTab({
@@ -64,6 +153,7 @@ export function CampaignOverviewTab({
   onOpenContactProfile,
   onPledgeClick,
   onReload,
+  showSummary = true,
 }: CampaignOverviewTabProps) {
   const { metrics } = entry
   const goalAmount = Number(campaign.goal_amount || 0) || null
@@ -78,64 +168,15 @@ export function CampaignOverviewTab({
   return (
     <>
       <div className="flex flex-col gap-6">
-        <Card className="border border-border shadow-sm">
-          <CardHeader className="flex flex-row items-center gap-3 space-y-0 pb-2">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Target className="h-4 w-4" />
-              Campaign Goal
-            </CardTitle>
-            <p className="text-2xl font-semibold tabular-nums text-foreground">
-              {goalAmount != null ? formatDonationCurrency(goalAmount) : "No goal set"}
-            </p>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
-            <DonationMetricCardGrid colorful columns={5}>
-              <DonationMetricCard
-                title="Total Committed"
-                value={formatDonationCurrency(committed)}
-                icon={Heart}
-                accent="blue"
-                description="Valid pledge commitments"
-              />
-              <DonationMetricCard
-                title="Total Collected"
-                value={formatDonationCurrency(collected)}
-                icon={DollarSign}
-                accent="emerald"
-                description="Payments received"
-              />
-              <DonationMetricCard
-                title="Outstanding"
-                value={formatDonationCurrency(outstanding)}
-                icon={AlertCircle}
-                accent="amber"
-                description="Committed, not yet collected"
-              />
-              <DonationMetricCard
-                title="Donors"
-                value={String(metrics.donorCount)}
-                icon={Users}
-                accent="purple"
-                onValueClick={() => onShowDonorsDialogChange(true)}
-              />
-              <DonationMetricCard
-                title="Largest Gift"
-                value={formatDonationCurrency(metrics.largestGift)}
-                icon={Gift}
-                accent="rose"
-                onValueClick={
-                  insights?.largestGift?.contactId || insights?.largestGift?.donorId
-                    ? () =>
-                        onOpenContactProfile({
-                          contactId: insights?.largestGift?.contactId,
-                          donorId: insights?.largestGift?.donorId,
-                        })
-                    : undefined
-                }
-              />
-            </DonationMetricCardGrid>
-          </CardContent>
-        </Card>
+        {showSummary ? (
+          <CampaignOverviewSummary
+            campaign={campaign}
+            entry={entry}
+            insights={insights}
+            onShowDonorsDialogChange={onShowDonorsDialogChange}
+            onOpenContactProfile={onOpenContactProfile}
+          />
+        ) : null}
 
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,0.9fr)] xl:items-stretch">
           <CampaignOverviewMetricsTable

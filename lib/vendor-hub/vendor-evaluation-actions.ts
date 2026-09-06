@@ -98,6 +98,7 @@ export async function upsertVendorParticipationEvaluation(input: {
 
   revalidatePath(VENDOR_HUB_ROUTES.events.evaluations(input.eventId))
   revalidatePath(VENDOR_HUB_ROUTES.events.detail(input.eventId))
+  revalidatePath(VENDOR_HUB_ROUTES.reports)
   revalidatePath(VENDOR_HUB_ROUTES.network.history)
   revalidatePath(`/contacts/${input.contactId}`)
 

@@ -43,6 +43,7 @@ function lifecycleStatusFromApplicationStatus(
 }
 
 function revalidateVendorHubParticipationPaths(eventId?: string | null) {
+  revalidatePath(VENDOR_HUB_ROUTES.reports)
   revalidatePath(VENDOR_HUB_ROUTES.network.history)
   revalidatePath(VENDOR_HUB_ROUTES.events.list)
   if (eventId) {
