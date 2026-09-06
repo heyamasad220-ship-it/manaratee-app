@@ -1,3 +1,5 @@
+import { eventHasEnded } from "@/lib/events/internal-event-format"
+
 export const INTERNAL_EVENT_STATUSES = {
   draft: "draft",
   submitted: "submitted",
@@ -62,6 +64,37 @@ export function getInternalEventWorkspaceStatusLabel(
   status: InternalEventStatus | string
 ): string {
   return toWorkspaceEventStatus(status) === "draft" ? "Draft" : "Published"
+}
+
+/** Events list badge: Draft, Published, or Completed once the date has passed. */
+export type EventListDisplayStatus = "draft" | "published" | "completed"
+
+export function getEventListDisplayStatus(
+  event: {
+    status: InternalEventStatus | string
+    start_at?: string | null
+    end_at?: string | null
+  },
+  now = new Date()
+): EventListDisplayStatus {
+  if (toWorkspaceEventStatus(event.status) === "draft") return "draft"
+  if (event.status === INTERNAL_EVENT_STATUSES.completed) return "completed"
+  if (eventHasEnded(event, now)) return "completed"
+  return "published"
+}
+
+export function getEventListDisplayStatusLabel(
+  event: {
+    status: InternalEventStatus | string
+    start_at?: string | null
+    end_at?: string | null
+  },
+  now = new Date()
+): string {
+  const display = getEventListDisplayStatus(event, now)
+  if (display === "draft") return "Draft"
+  if (display === "completed") return "Completed"
+  return "Published"
 }
 
 export function getInternalEventStatusOptions(includeWorkflow = true) {

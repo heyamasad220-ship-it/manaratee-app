@@ -130,6 +130,34 @@ describe("event management events filters", () => {
     )
   })
 
+  it("sorts events newest first", () => {
+    const now = new Date("2026-08-27T12:00:00.000Z")
+    const events = [
+      event({
+        id: "older",
+        name: "Older",
+        start_at: "2026-08-29T18:00:00.000Z",
+        end_at: "2026-08-29T20:00:00.000Z",
+      }),
+      event({
+        id: "newer",
+        name: "Newer",
+        start_at: "2026-09-12T18:00:00.000Z",
+        end_at: "2026-09-12T22:00:00.000Z",
+      }),
+    ]
+
+    const all = filterEventManagementEvents(
+      events,
+      { q: "", department: "all", status: "all", ticketed: "all", category: "all" },
+      now
+    )
+    assert.deepEqual(
+      all.map((item) => item.id),
+      ["newer", "older"]
+    )
+  })
+
   it("filters ticketed events and category", () => {
     const now = new Date("2026-08-27T12:00:00.000Z")
     const events = [

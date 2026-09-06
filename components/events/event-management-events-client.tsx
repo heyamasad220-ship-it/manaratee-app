@@ -156,7 +156,11 @@ function EventRow({
       ) : null}
       {visible.has("status") ? (
         <TableCell>
-          <InternalEventDbStatusBadge status={event.status} />
+          <InternalEventDbStatusBadge
+            status={event.status}
+            startAt={event.start_at}
+            endAt={event.end_at}
+          />
         </TableCell>
       ) : null}
       {visible.has("category") ? (

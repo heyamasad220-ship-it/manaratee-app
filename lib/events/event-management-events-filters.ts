@@ -139,26 +139,15 @@ function matchesEventStatus(
   )
 }
 
-function sortEventsForStatus(
-  events: InternalEventWithRelations[],
-  status: EventManagementEventsStatusFilter
-) {
-  const copy = [...events]
-  if (status === "past") {
-    return copy.sort((left, right) => {
-      const leftTime = left.start_at ? new Date(left.start_at).getTime() : 0
-      const rightTime = right.start_at ? new Date(right.start_at).getTime() : 0
-      return rightTime - leftTime
-    })
-  }
-  return copy.sort((left, right) => {
+function sortEventsByStartDesc(events: InternalEventWithRelations[]) {
+  return [...events].sort((left, right) => {
     const leftTime = left.start_at
       ? new Date(left.start_at).getTime()
-      : Number.MAX_SAFE_INTEGER
+      : Number.NEGATIVE_INFINITY
     const rightTime = right.start_at
       ? new Date(right.start_at).getTime()
-      : Number.MAX_SAFE_INTEGER
-    return leftTime - rightTime
+      : Number.NEGATIVE_INFINITY
+    return rightTime - leftTime
   })
 }
 
@@ -201,5 +190,5 @@ export function filterEventManagementEvents(
     if (!matchesCategoryFilter(event, filters.category)) return false
     return matchesEventStatus(event, filters.status, now)
   })
-  return sortEventsForStatus(filtered, filters.status)
+  return sortEventsByStartDesc(filtered)
 }

@@ -4,6 +4,7 @@ import { describe, it } from "node:test"
 import {
   INTERNAL_EVENT_STATUSES,
   fromInternalEventStatusMenuValue,
+  getEventListDisplayStatus,
   getInternalEventCalendarColor,
   isInternalEventPendingApproval,
   mapInternalEventStatusToReservationStatus,
@@ -76,6 +77,43 @@ describe("internal event approval status", () => {
     assert.equal(
       getInternalEventCalendarColor(INTERNAL_EVENT_STATUSES.declined),
       "orange"
+    )
+  })
+
+  it("shows Draft, Published, or Completed on the Events list", () => {
+    const now = new Date("2026-09-06T12:00:00.000Z")
+    assert.equal(
+      getEventListDisplayStatus(
+        {
+          status: INTERNAL_EVENT_STATUSES.draft,
+          start_at: "2026-09-12T18:00:00.000Z",
+          end_at: "2026-09-12T22:00:00.000Z",
+        },
+        now
+      ),
+      "draft"
+    )
+    assert.equal(
+      getEventListDisplayStatus(
+        {
+          status: INTERNAL_EVENT_STATUSES.confirmed,
+          start_at: "2026-09-12T18:00:00.000Z",
+          end_at: "2026-09-12T22:00:00.000Z",
+        },
+        now
+      ),
+      "published"
+    )
+    assert.equal(
+      getEventListDisplayStatus(
+        {
+          status: INTERNAL_EVENT_STATUSES.confirmed,
+          start_at: "2018-01-06T18:00:00.000Z",
+          end_at: "2018-01-06T22:00:00.000Z",
+        },
+        now
+      ),
+      "completed"
     )
   })
 })
