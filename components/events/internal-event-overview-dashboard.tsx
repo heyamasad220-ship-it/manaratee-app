@@ -32,6 +32,7 @@ import {
 const KPI_STYLES: Record<string, { tone: StatCardTone; icon: LucideIcon }> = {
   phase: { tone: "indigo", icon: ClipboardCheck },
   "ticket-revenue": { tone: "blue", icon: DollarSign },
+  "ticket-donations": { tone: "rose", icon: HeartHandshake },
   "checked-in": { tone: "emerald", icon: UserCheck },
   youth: { tone: "violet", icon: Baby },
   staff: { tone: "amber", icon: Users },

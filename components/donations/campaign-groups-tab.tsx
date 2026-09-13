@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
-import { Copy, ExternalLink, Plus, QrCode } from "lucide-react"
+import { Copy, Download, ExternalLink, Plus, QrCode } from "lucide-react"
 
 import { PledgeContactPicker } from "@/components/donations/pledge-contact-picker"
 import { Button } from "@/components/ui/button"
@@ -93,6 +93,19 @@ function emptyForm(): GroupFormState {
     publicProgressEnabled: false,
     linkActive: true,
   }
+}
+
+function downloadCsv(filename: string, header: string[], rows: Array<Array<string | number>>) {
+  const csv = [header, ...rows]
+    .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+    .join("\n")
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement("a")
+  link.href = url
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(url)
 }
 
 function GroupLinkIconButton({
@@ -461,12 +474,37 @@ export function CampaignGroupsTab({
                 Campaign fundraising teams with unique donation links.
               </p>
             </div>
-            {canManage ? (
-              <Button onClick={openCreate}>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Group
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                disabled={loading || metrics.length === 0}
+                onClick={() =>
+                  downloadCsv(
+                    `${campaignName.replace(/[^\w]+/g, "-").toLowerCase()}-campaign-groups.csv`,
+                    ["Group", "Org group", "Lead", "Status", "Donors", "Pledged", "Collected", "Outstanding"],
+                    metrics.map((row) => [
+                      row.name,
+                      row.organizationalGroupName || "",
+                      row.leadName || "",
+                      CAMPAIGN_GROUP_STATUS_LABELS[row.status],
+                      row.donorCount,
+                      row.pledged,
+                      row.collected,
+                      row.outstanding,
+                    ])
+                  )
+                }
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Export CSV
               </Button>
-            ) : null}
+              {canManage ? (
+                <Button onClick={openCreate}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Group
+                </Button>
+              ) : null}
+            </div>
           </div>
 
           {errorMessage ? <p className="text-sm text-red-600">{errorMessage}</p> : null}

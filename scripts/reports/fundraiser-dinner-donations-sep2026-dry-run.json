@@ -1,0 +1,146 @@
+{
+  "execute": false,
+  "file": "C:/Users/danan/Downloads/September12Donations.csv",
+  "organizationId": "e057e00a-e4e3-4adf-9af5-f465db1894be",
+  "campaignId": "74fc4ba9-a7f1-4aec-af12-a62909e32afc",
+  "campaignName": "Annual Fundraiser - September 2026",
+  "csvRowsParsed": 95,
+  "eligibleRows": 95,
+  "skippedZeroOrInvalid": 0,
+  "unknownReasons": [],
+  "skippedCsvDuplicates": 0,
+  "skippedAlreadyImported": 0,
+  "groupsCreated": 2,
+  "campaignGroupsCreated": 8,
+  "fundsCreated": 1,
+  "contactsMatched": 77,
+  "contactsCreated": 13,
+  "donorsCreated": 45,
+  "paymentsCreated": 95,
+  "affiliationsSynced": 0,
+  "totalsByReason": {
+    "Annual Fundraiser - Quran Institute for Ladies": {
+      "n": 37,
+      "amount": 5316
+    },
+    "Annual Fundraiser - Tarbiya Dept.": {
+      "n": 3,
+      "amount": 800
+    },
+    "Annual Fundraiser - September 12, 2026": {
+      "n": 9,
+      "amount": 5700
+    },
+    "Annual Fundraiser - Ladies Wednesday Halaqa": {
+      "n": 16,
+      "amount": 7275
+    },
+    "Annual Fundraiser - Ladies Thursday Halaqa": {
+      "n": 9,
+      "amount": 5875
+    },
+    "Annual Fundraiser - CYP Usrat Al-Islah": {
+      "n": 9,
+      "amount": 5750
+    },
+    "Annual Fundraiser - Education Dept.": {
+      "n": 10,
+      "amount": 1275
+    },
+    "Annual Fundraiser - Center": {
+      "n": 1,
+      "amount": 100
+    },
+    "Annual Fundraiser - RSA": {
+      "n": 1,
+      "amount": 100
+    }
+  },
+  "monthlyRows": 2,
+  "monthlyAmount": 130,
+  "errors": [],
+  "samples": [
+    {
+      "name": "Sabreen F I Taha",
+      "amount": 200,
+      "date": "2026-09-13T13:34:00.000Z",
+      "reason": "Annual Fundraiser - Quran Institute for Ladies",
+      "group": "Quran Institute for Ladies",
+      "remarks": null
+    },
+    {
+      "name": "Mohammad Aladra",
+      "amount": 400,
+      "date": "2026-09-13T04:29:00.000Z",
+      "reason": "Annual Fundraiser - Tarbiya Dept.",
+      "group": "Tarbiya",
+      "remarks": null
+    },
+    {
+      "name": "Iman Ettabaq",
+      "amount": 50,
+      "date": "2026-09-13T03:45:00.000Z",
+      "reason": "Annual Fundraiser - Quran Institute for Ladies",
+      "group": "Quran Institute for Ladies",
+      "remarks": "تلاوة القرآن"
+    },
+    {
+      "name": "Hamdeh Elawad",
+      "amount": 45,
+      "date": "2026-09-13T01:35:00.000Z",
+      "reason": "Annual Fundraiser - Quran Institute for Ladies",
+      "group": "Quran Institute for Ladies",
+      "remarks": null
+    },
+    {
+      "name": "ALKHAWALDEH ABDERRAOOF",
+      "amount": 100,
+      "date": "2026-09-13T01:08:00.000Z",
+      "reason": "Annual Fundraiser - September 12, 2026",
+      "group": null,
+      "remarks": null
+    },
+    {
+      "name": "Rahmatullah Akbar",
+      "amount": 300,
+      "date": "2026-09-13T00:56:00.000Z",
+      "reason": "Annual Fundraiser - Tarbiya Dept.",
+      "group": "Tarbiya",
+      "remarks": null
+    },
+    {
+      "name": "Mona Alnaeemi",
+      "amount": 900,
+      "date": "2026-09-13T00:56:00.000Z",
+      "reason": "Annual Fundraiser - Quran Institute for Ladies",
+      "group": "Quran Institute for Ladies",
+      "remarks": null
+    },
+    {
+      "name": "Aliya Asdi",
+      "amount": 100,
+      "date": "2026-09-13T00:44:00.000Z",
+      "reason": "Annual Fundraiser - September 12, 2026",
+      "group": null,
+      "remarks": null
+    },
+    {
+      "name": "Helwa Aburas",
+      "amount": 100,
+      "date": "2026-09-13T00:41:00.000Z",
+      "reason": "Annual Fundraiser - September 12, 2026",
+      "group": null,
+      "remarks": null
+    },
+    {
+      "name": "Rubbiyah Salman",
+      "amount": 25,
+      "date": "2026-09-13T00:35:00.000Z",
+      "reason": "Annual Fundraiser - Ladies Wednesday Halaqa",
+      "group": "Wednesday Halaqa",
+      "remarks": null
+    }
+  ],
+  "rowsQueued": 95,
+  "totalAmount": 32191
+}

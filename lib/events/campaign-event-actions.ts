@@ -12,6 +12,7 @@ import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-orga
 import { createClient } from "@/lib/supabase/server"
 import { createServiceRoleClient } from "@/lib/supabase/service-role"
 import type { EventTicketingConfig } from "@/lib/tickets/ticket-types"
+import { splitTicketOrderRevenue, ticketOrderCheckoutDonationCents } from "@/lib/tickets/ticket-checkout-donation"
 import { ticketOrderNetRevenueCents } from "@/lib/tickets/ticket-refund-math"
 import {
   isOrganizationModuleEnabled,
@@ -55,6 +56,7 @@ export type CampaignEventStats = {
   checkedIn: number
   waitlisted: number
   revenueCents: number
+  checkoutDonationCents: number
   currency: string
   types: CampaignEventTicketTypeStat[]
 }
@@ -132,6 +134,7 @@ async function loadCampaignEventStats(
     checkedIn: 0,
     waitlisted: 0,
     revenueCents: 0,
+    checkoutDonationCents: 0,
     currency: "USD",
     types: [],
   }
@@ -146,7 +149,7 @@ async function loadCampaignEventStats(
         .order("sort_order"),
       writeClient
         .from("ticket_orders")
-        .select("total_cents, refunded_amount_cents, currency, status")
+        .select("total_cents, refunded_amount_cents, currency, status, metadata")
         .eq("organization_id", organizationId)
         .eq("internal_event_id", event.id)
         .in("status", ["completed", "partially_refunded"]),
@@ -168,7 +171,7 @@ async function loadCampaignEventStats(
   if (ordersResult.error?.code === "42703") {
     const fallback = await writeClient
       .from("ticket_orders")
-      .select("total_cents, currency, status")
+      .select("total_cents, currency, status, metadata")
       .eq("organization_id", organizationId)
       .eq("internal_event_id", event.id)
       .in("status", ["completed", "partially_refunded"])
@@ -203,16 +206,24 @@ async function loadCampaignEventStats(
   }
 
   let revenueCents = 0
+  let checkoutDonationCents = 0
   let currency = "USD"
   for (const row of orderRows) {
     currency = (row.currency as string) || currency
-    revenueCents += ticketOrderNetRevenueCents({
+    const money = {
       status: row.status as string,
       totalCents: Number(row.total_cents || 0),
       refundedAmountCents: Number(
         (row as { refunded_amount_cents?: number }).refunded_amount_cents || 0
       ),
+    }
+    const split = splitTicketOrderRevenue({
+      ...money,
+      checkoutDonationCents: ticketOrderCheckoutDonationCents(row.metadata),
+      netRevenueCents: ticketOrderNetRevenueCents(money),
     })
+    revenueCents += split.ticketRevenueCents
+    checkoutDonationCents += split.checkoutDonationCents
   }
 
   return {
@@ -224,6 +235,7 @@ async function loadCampaignEventStats(
     checkedIn: checkedInResult.count || 0,
     waitlisted: waitlistedResult.count || 0,
     revenueCents,
+    checkoutDonationCents,
     currency,
     types,
   }

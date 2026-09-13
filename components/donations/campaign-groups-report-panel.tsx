@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 
+import { Download } from "lucide-react"
+
 import { CampaignProgressBar } from "@/components/donations/campaign-progress-bar"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Select,
@@ -29,6 +32,19 @@ import { CAMPAIGN_GROUP_STATUS_LABELS } from "@/lib/donations/campaign-group-typ
 import { donationCampaignWorkspaceHref } from "@/lib/donations/campaign-workspace-paths"
 
 const ALL = "all"
+
+function downloadCsv(filename: string, header: string[], rows: Array<Array<string | number>>) {
+  const csv = [header, ...rows]
+    .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+    .join("\n")
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement("a")
+  link.href = url
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(url)
+}
 
 export function CampaignGroupsReportPanel({ embedded = false }: { embedded?: boolean }) {
   const [rows, setRows] = useState<OrgCampaignGroupReportRow[]>([])
@@ -136,6 +152,39 @@ export function CampaignGroupsReportPanel({ embedded = false }: { embedded?: boo
             ))}
           </SelectContent>
         </Select>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={loading || rows.length === 0}
+          onClick={() =>
+            downloadCsv(
+              "campaign-groups.csv",
+              [
+                "Campaign",
+                "Group",
+                "Lead",
+                "Status",
+                "Goal",
+                "Donors",
+                "Pledged",
+                "Collected",
+              ],
+              rows.map((row) => [
+                row.campaignName,
+                row.name,
+                row.leadName || "",
+                CAMPAIGN_GROUP_STATUS_LABELS[row.status],
+                row.goalAmount ?? "",
+                row.donorCount,
+                row.pledged,
+                row.collected,
+              ])
+            )
+          }
+        >
+          <Download className="mr-2 h-4 w-4" />
+          Export CSV
+        </Button>
       </div>
 
       {errorMessage ? <p className="text-sm text-red-600">{errorMessage}</p> : null}

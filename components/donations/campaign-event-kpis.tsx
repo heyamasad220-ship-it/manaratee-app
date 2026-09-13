@@ -1,6 +1,6 @@
 "use client"
 
-import { DollarSign, Ticket, UserCheck, Users } from "lucide-react"
+import { DollarSign, HeartHandshake, Ticket, UserCheck, Users } from "lucide-react"
 
 import { StatCard, StatCardsRow, type StatCardTone } from "@/components/ui/stat-card"
 import type { CampaignEventStats } from "@/lib/events/campaign-event-actions"
@@ -59,6 +59,18 @@ export function CampaignEventKpis({ stats }: { stats: CampaignEventStats }) {
       tone: "violet" as const,
       icon: DollarSign,
     },
+    ...(stats.checkoutDonationCents > 0
+      ? [
+          {
+            key: "ticket-donations",
+            label: "Ticket donations",
+            value: formatMoney(stats.checkoutDonationCents, stats.currency),
+            hint: "Collected with ticket purchase",
+            tone: "rose" as const,
+            icon: HeartHandshake,
+          },
+        ]
+      : []),
     ...(stats.waitlisted > 0
       ? [
           {

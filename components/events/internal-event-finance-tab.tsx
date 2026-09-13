@@ -63,6 +63,7 @@ export function InternalEventFinanceTab({
   initialExpenses?: EventExpense[]
   financeSummary?: {
     ticketRevenueCents: number
+    checkoutDonationCents?: number
     donationRevenueCents?: number
     expenseCents: number
     refundCents: number
@@ -294,6 +295,23 @@ export function InternalEventFinanceTab({
               </p>
             </CardContent>
           </Card>
+          {(financeSummary.checkoutDonationCents ?? 0) > 0 ? (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Ticket donations
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-semibold">
+                  {formatMoney(
+                    financeSummary.checkoutDonationCents ?? 0,
+                    financeSummary.currency
+                  )}
+                </p>
+              </CardContent>
+            </Card>
+          ) : null}
           {(financeSummary.donationRevenueCents ?? 0) > 0 ? (
             <Card>
               <CardHeader className="pb-2">
