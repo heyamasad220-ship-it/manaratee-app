@@ -16,6 +16,11 @@ import { PageBreadcrumbs } from "@/components/navigation/page-breadcrumbs"
 import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
 import { loadContactProgramAssignments } from "@/lib/programs/program-staff-assignment-actions"
 import type { ProgramStaffAssignmentWithDetails } from "@/lib/programs/program-staff-assignment-types"
+import {
+  formatStaffPayRate,
+  parseStaffPayBasis,
+  type StaffPayBasis,
+} from "@/lib/departments/staff-pay-basis"
 
 type StaffStatus = "active" | "inactive" | "on_leave" | "pending"
 type StaffType = "full_time" | "part_time" | "temporary" | "contract" | "seasonal"
@@ -33,7 +38,7 @@ type EmployeeRecord = {
   position_name: string | null
   department_name: string | null
   hr_job_role_name: string | null
-  pay_basis: "hourly" | "monthly"
+  pay_basis: StaffPayBasis
   hourly_rate: number | null
   monthly_salary: number | null
 }
@@ -120,7 +125,7 @@ export function EmployeeProfileClient({
           position_name: (data as any).hr_positions?.name || data.position || null,
           department_name: (data as any).departments?.name || null,
           hr_job_role_name: (data as any).hr_job_roles?.name || null,
-          pay_basis: (data as any).pay_basis === "monthly" ? "monthly" : "hourly",
+          pay_basis: parseStaffPayBasis((data as any).pay_basis),
           hourly_rate:
             (data as any).hourly_rate == null ? null : Number((data as any).hourly_rate),
           monthly_salary:
@@ -261,19 +266,11 @@ export function EmployeeProfileClient({
             <div>
               <dt className="text-xs text-muted-foreground">Pay</dt>
               <dd className="text-sm font-medium">
-                {employee.pay_basis === "monthly"
-                  ? employee.monthly_salary == null
-                    ? "Monthly"
-                    : `${new Intl.NumberFormat("en-US", {
-                        style: "currency",
-                        currency: "USD",
-                      }).format(employee.monthly_salary)}/mo`
-                  : employee.hourly_rate == null
-                    ? "Hourly"
-                    : `${new Intl.NumberFormat("en-US", {
-                        style: "currency",
-                        currency: "USD",
-                      }).format(employee.hourly_rate)}/hr`}
+                {formatStaffPayRate({
+                  payBasis: employee.pay_basis,
+                  hourlyRate: employee.hourly_rate,
+                  monthlySalary: employee.monthly_salary,
+                })}
               </dd>
             </div>
             <div>

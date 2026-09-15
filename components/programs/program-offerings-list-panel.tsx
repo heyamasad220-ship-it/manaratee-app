@@ -8,6 +8,7 @@ import { Ban, Copy, Eye, GripVertical, Link2, Loader2, MoreHorizontal, Plus, Tra
 import type { ProgramGender } from "@/components/programs/edit/types"
 import { ADULT_MIN_AGE } from "@/components/programs/edit/utils"
 import { OfferingBasicsForm } from "@/components/programs/offering-basics-form"
+import { CancelOfferingDialog } from "@/components/programs/cancel-offering-dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
@@ -29,6 +30,13 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
   Table,
   TableBody,
   TableCell,
@@ -36,6 +44,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { TableColumnHeaderFilter } from "@/components/ui/table-column-header-filter"
 import { formatOfferingEnrollmentLabel } from "@/lib/programs/program-catalog-capacity"
 import {
   getHierarchyLabels,
@@ -94,6 +103,12 @@ function moveOfferingRow<T>(items: T[], fromIndex: number, toIndex: number) {
   return next
 }
 
+const STATUS_FILTER_ALL = "all"
+const STATUS_FILTER_ACTIVE = "active"
+const STATUS_FILTER_CANCELLED = "cancelled"
+const INSTRUCTOR_FILTER_ALL = "all"
+const INSTRUCTOR_FILTER_NONE = "none"
+
 function offeringRowsSignature(rows: ProgramDetailOfferingRow[]) {
   return rows
     .map(
@@ -123,6 +138,11 @@ export type ProgramDetailOfferingRow = {
   tuitionAmount?: number | null
   daysLabel?: string | null
   timesLabel?: string | null
+}
+
+function offeringInstructorKey(row: ProgramDetailOfferingRow) {
+  const name = row.primaryInstructor?.trim()
+  return name ? name : INSTRUCTOR_FILTER_NONE
 }
 
 export function ProgramOfferingsListPanel({
@@ -196,20 +216,49 @@ export function ProgramOfferingsListPanel({
   const [deletingOfferingId, setDeletingOfferingId] = React.useState<string | null>(
     null
   )
-  const [cancellingOfferingId, setCancellingOfferingId] = React.useState<
-    string | null
-  >(null)
   const [duplicateTarget, setDuplicateTarget] =
     React.useState<ProgramOffering | null>(null)
   const [duplicateName, setDuplicateName] = React.useState("")
   const [isDuplicating, setIsDuplicating] = React.useState(false)
   const [duplicateError, setDuplicateError] = React.useState<string | null>(null)
+  const [cancelTarget, setCancelTarget] = React.useState<{
+    id: string
+    name: string
+  } | null>(null)
   const [orderedRows, setOrderedRows] = React.useState(rows)
   const [draggedIndex, setDraggedIndex] = React.useState<number | null>(null)
   const [dropTargetIndex, setDropTargetIndex] = React.useState<number | null>(
     null
   )
   const [isReordering, setIsReordering] = React.useState(false)
+  const [statusFilter, setStatusFilter] = React.useState(STATUS_FILTER_ACTIVE)
+  const [instructorFilter, setInstructorFilter] = React.useState(
+    INSTRUCTOR_FILTER_ALL
+  )
+
+  const instructorOptions = React.useMemo(() => {
+    const names = [
+      ...new Set(
+        orderedRows
+          .map((row) => row.primaryInstructor?.trim())
+          .filter((name): name is string => Boolean(name))
+      ),
+    ].sort((left, right) => left.localeCompare(right))
+    const hasUnassigned = orderedRows.some(
+      (row) => !row.primaryInstructor?.trim()
+    )
+    return { names, hasUnassigned }
+  }, [orderedRows])
+
+  const displayedRows = React.useMemo(() => {
+    return orderedRows.filter((row) => {
+      const cancelled = isCancelledOfferingStatus(row.offering.status)
+      if (statusFilter === STATUS_FILTER_ACTIVE && cancelled) return false
+      if (statusFilter === STATUS_FILTER_CANCELLED && !cancelled) return false
+      if (instructorFilter === INSTRUCTOR_FILTER_ALL) return true
+      return offeringInstructorKey(row) === instructorFilter
+    })
+  }, [orderedRows, statusFilter, instructorFilter])
 
   const rowsSignature = offeringRowsSignature(rows)
   React.useEffect(() => {
@@ -265,7 +314,12 @@ export function ProgramOfferingsListPanel({
       setDropTargetIndex(null)
       return
     }
-    const nextRows = moveOfferingRow(orderedRows, draggedIndex, toIndex)
+    const nextVisible = moveOfferingRow(displayedRows, draggedIndex, toIndex)
+    const visibleIds = new Set(nextVisible.map((row) => row.offering.id))
+    let nextIndex = 0
+    const nextRows = orderedRows.map((row) =>
+      visibleIds.has(row.offering.id) ? nextVisible[nextIndex++] : row
+    )
     setDraggedIndex(null)
     setDropTargetIndex(null)
     void persistOfferingOrder(nextRows)
@@ -645,18 +699,93 @@ export function ProgramOfferingsListPanel({
                   <TableHead>{hierarchy.offeringSingular}</TableHead>
                   <TableHead>Delivery</TableHead>
                   <TableHead>Program Fee</TableHead>
-                  <TableHead>Primary Instructor</TableHead>
+                  <TableHead>
+                    <TableColumnHeaderFilter
+                      label="Primary Instructor"
+                      active={instructorFilter !== INSTRUCTOR_FILTER_ALL}
+                    >
+                      {({ close }) => (
+                        <Select
+                          value={instructorFilter}
+                          onValueChange={(value) => {
+                            setInstructorFilter(value)
+                            close()
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Instructor" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={INSTRUCTOR_FILTER_ALL}>
+                              All instructors
+                            </SelectItem>
+                            {instructorOptions.hasUnassigned ? (
+                              <SelectItem value={INSTRUCTOR_FILTER_NONE}>
+                                No instructor
+                              </SelectItem>
+                            ) : null}
+                            {instructorOptions.names.map((name) => (
+                              <SelectItem key={name} value={name}>
+                                {name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </TableColumnHeaderFilter>
+                  </TableHead>
                   <TableHead>Days</TableHead>
                   <TableHead>Times</TableHead>
                   <TableHead>Enrollment</TableHead>
-                  <TableHead>Offering Status</TableHead>
+                  <TableHead>
+                    <TableColumnHeaderFilter
+                      label="Offering Status"
+                      active={statusFilter !== STATUS_FILTER_ACTIVE}
+                    >
+                      {({ close }) => (
+                        <Select
+                          value={statusFilter}
+                          onValueChange={(value) => {
+                            setStatusFilter(value)
+                            close()
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={STATUS_FILTER_ACTIVE}>
+                              Active
+                            </SelectItem>
+                            <SelectItem value={STATUS_FILTER_CANCELLED}>
+                              Cancelled
+                            </SelectItem>
+                            <SelectItem value={STATUS_FILTER_ALL}>
+                              All
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </TableColumnHeaderFilter>
+                  </TableHead>
                   <TableHead className="w-12">
                     <span className="sr-only">Actions</span>
                   </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {orderedRows.map(
+                {displayedRows.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={10}
+                      className="py-8 text-center text-muted-foreground"
+                    >
+                      No {hierarchy.offeringPlural.toLowerCase()} match these
+                      filters.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                displayedRows.map(
                   (
                     {
                       offering,
@@ -824,10 +953,7 @@ export function ProgramOfferingsListPanel({
                               size="icon"
                               className="h-8 w-8"
                               aria-label={`Actions for ${offering.name}`}
-                              disabled={
-                                deletingOfferingId === offering.id ||
-                                cancellingOfferingId === offering.id
-                              }
+                              disabled={deletingOfferingId === offering.id}
                             >
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
@@ -887,44 +1013,12 @@ export function ProgramOfferingsListPanel({
                             </DropdownMenuItem>
                             {!isCancelledOfferingStatus(offering.status) ? (
                               <DropdownMenuItem
-                                disabled={enrolled > 0}
-                                title={
-                                  enrolled > 0
-                                    ? "Move enrolled students to another offering or cancel their registration first."
-                                    : undefined
+                                onClick={() =>
+                                  setCancelTarget({
+                                    id: offering.id,
+                                    name: offering.name,
+                                  })
                                 }
-                                onClick={() => {
-                                  void (async () => {
-                                    if (enrolled > 0) {
-                                      showActionFeedback(
-                                        "Move enrolled students to another offering or cancel their registration before cancelling this offering."
-                                      )
-                                      return
-                                    }
-                                    const confirmed = window.confirm(
-                                      `Cancel ${offering.name}? Families will no longer see this offering. Students must already be moved or have their registration cancelled.`
-                                    )
-                                    if (!confirmed) return
-                                    setCancellingOfferingId(offering.id)
-                                    try {
-                                      const { cancelProgramOffering } =
-                                        await import(
-                                          "@/lib/programs/program-offering-actions"
-                                        )
-                                      await cancelProgramOffering(offering.id)
-                                      showActionFeedback("Offering cancelled.")
-                                      await refreshOfferingsList()
-                                    } catch (error) {
-                                      showActionFeedback(
-                                        error instanceof Error
-                                          ? error.message
-                                          : "Could not cancel offering."
-                                      )
-                                    } finally {
-                                      setCancellingOfferingId(null)
-                                    }
-                                  })()
-                                }}
                               >
                                 <Ban className="mr-2 h-4 w-4" />
                                 Cancel offering
@@ -975,7 +1069,8 @@ export function ProgramOfferingsListPanel({
                       </TableCell>
                     </TableRow>
                   )
-                })}
+                })
+                )}
               </TableBody>
             </Table>
           </div>
@@ -1002,6 +1097,19 @@ export function ProgramOfferingsListPanel({
             </ul>
           </div>
         ) : null}
+
+        <CancelOfferingDialog
+          offeringId={cancelTarget?.id ?? null}
+          offeringName={cancelTarget?.name ?? "this offering"}
+          open={cancelTarget !== null}
+          onOpenChange={(open) => {
+            if (!open) setCancelTarget(null)
+          }}
+          onCancelled={(message) => {
+            showActionFeedback(message)
+            void refreshOfferingsList()
+          }}
+        />
 
         <Dialog
           open={duplicateTarget !== null}

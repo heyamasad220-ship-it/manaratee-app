@@ -35,6 +35,8 @@ export function OfferingSchedulePanel({
   offering,
   workspaceData,
   variant = "full",
+  deliveryFormat,
+  facilityVenueId,
   saveHandlerRef,
   disabled = false,
 }: {
@@ -43,6 +45,8 @@ export function OfferingSchedulePanel({
   workspaceData: OfferingWorkspaceData
   /** `simple` = time / repeat / days only (edit dialog Advanced Settings). */
   variant?: "full" | "simple"
+  deliveryFormat?: ProgramOffering["delivery_format"]
+  facilityVenueId?: string
   saveHandlerRef?: React.MutableRefObject<(() => Promise<boolean>) | null>
   disabled?: boolean
 }) {
@@ -52,6 +56,8 @@ export function OfferingSchedulePanel({
         offering={offering}
         programId={programId}
         items={workspaceData.scheduleItems}
+        deliveryFormat={deliveryFormat}
+        facilityVenueId={facilityVenueId}
         saveHandlerRef={saveHandlerRef}
         disabled={disabled}
       />

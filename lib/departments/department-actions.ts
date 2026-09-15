@@ -14,6 +14,9 @@ import {
 } from "@/lib/departments/department-delete-blockers"
 import { hasPermission, PERMISSIONS } from "@/lib/permissions/permissions"
 import { isRichTextEmpty, sanitizeRichTextHtml } from "@/lib/ui/rich-text"
+import { DEPARTMENT_OPEN_PROGRAM_STATUSES } from "@/lib/departments/department-program-statuses"
+import { isStaffVisibleOfferingStatus } from "@/lib/programs/program-offering-queries"
+import { parseStaffPayBasis, type StaffPayBasis } from "@/lib/departments/staff-pay-basis"
 
 function normalizeDepartmentDescription(value?: string | null) {
   const sanitized = sanitizeRichTextHtml(value)
@@ -379,6 +382,46 @@ export async function fetchDepartmentsWithProgramCounts(): Promise<
   })
 }
 
+async function loadAssignedClassContactIds(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  organizationId: string,
+  departmentId: string
+) {
+  const { data: programs } = await supabase
+    .from("programs")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("department_id", departmentId)
+    .in("status", [...DEPARTMENT_OPEN_PROGRAM_STATUSES])
+
+  const programIds = (programs || []).map((row) => row.id as string)
+  if (programIds.length === 0) return new Set<string>()
+
+  const { data: offerings } = await supabase
+    .from("program_offerings")
+    .select("id, status")
+    .eq("organization_id", organizationId)
+    .in("program_id", programIds)
+
+  const offeringIds = (offerings || [])
+    .filter((row) => isStaffVisibleOfferingStatus(row.status as string | null))
+    .map((row) => row.id as string)
+  if (offeringIds.length === 0) return new Set<string>()
+
+  const { data: assignments } = await supabase
+    .from("program_staff_assignments")
+    .select("contact_id")
+    .eq("organization_id", organizationId)
+    .eq("is_active", true)
+    .in("offering_id", offeringIds)
+
+  return new Set(
+    (assignments || [])
+      .map((row) => row.contact_id as string | null)
+      .filter((id): id is string => Boolean(id))
+  )
+}
+
 export type DepartmentStaffMember = {
   staffId: string
   contactId: string | null
@@ -390,9 +433,10 @@ export type DepartmentStaffMember = {
   positionId: string | null
   positionName: string | null
   hourlyRate: number | null
-  payBasis: "hourly" | "monthly"
+  payBasis: StaffPayBasis
   monthlySalary: number | null
   isDepartmentHead: boolean
+  assignedToClass: boolean
 }
 
 export type DepartmentDetail = {
@@ -498,12 +542,13 @@ export async function fetchDepartmentDetail(
     staffRows = (staffWithPay.data || []) as any[]
   }
 
-  const [{ count: programsCount }] = await Promise.all([
+  const [{ count: programsCount }, assignedClassContactIds] = await Promise.all([
     supabase
       .from("programs")
       .select("id", { count: "exact", head: true })
       .eq("organization_id", organizationId)
       .eq("department_id", departmentId),
+    loadAssignedClassContactIds(supabase, organizationId, departmentId),
   ])
 
   const contactIds = [
@@ -551,9 +596,12 @@ export async function fetchDepartmentDetail(
       positionId: (row.position_id as string | null) ?? null,
       positionName,
       hourlyRate,
-      payBasis: (row.pay_basis as string) === "monthly" ? "monthly" : "hourly",
+      payBasis: parseStaffPayBasis(row.pay_basis),
       monthlySalary,
       isDepartmentHead: Boolean(row.is_department_head),
+      assignedToClass: Boolean(
+        contactId && assignedClassContactIds.has(contactId)
+      ),
     }
   })
 

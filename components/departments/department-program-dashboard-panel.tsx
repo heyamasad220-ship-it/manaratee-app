@@ -20,16 +20,6 @@ import {
 } from "@/components/ui/card"
 import { STAT_CARD_TONES, type StatCardTone } from "@/components/ui/stat-card"
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import { OFFERING_REGISTRATION_STATE_LABELS } from "@/lib/programs/program-offering-display"
-import { programOfferingManageHref } from "@/lib/programs/program-offering-paths"
-import {
   fetchProgramOverviewMetricsAction,
   type ProgramOverviewActivityItem,
   type ProgramOverviewAttentionHref,
@@ -299,58 +289,6 @@ export function DepartmentProgramDashboardPanel({
                 </div>
               )
             })}
-          </div>
-        )}
-      </section>
-
-      <section className="space-y-3">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Offerings
-          </h2>
-          <SectionLink href={href("offerings")}>View all offerings</SectionLink>
-        </div>
-        {metrics.offeringRows.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            No offerings yet. Add one from the Offerings tab.
-          </p>
-        ) : (
-          <div className="overflow-hidden rounded-lg border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Offering</TableHead>
-                  <TableHead>Instructor</TableHead>
-                  <TableHead>Enrollment</TableHead>
-                  <TableHead>Registration</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {metrics.offeringRows.map((row) => (
-                  <TableRow key={row.id}>
-                    <TableCell className="font-medium">
-                      <Link
-                        href={programOfferingManageHref(yearProgramId, row.id)}
-                        className="hover:underline"
-                      >
-                        {row.name}
-                      </Link>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {row.instructorName || "—"}
-                    </TableCell>
-                    <TableCell className="tabular-nums">
-                      {row.capacity
-                        ? `${formatCount(row.enrolled)} / ${formatCount(row.capacity)}`
-                        : formatCount(row.enrolled)}
-                    </TableCell>
-                    <TableCell>
-                      {OFFERING_REGISTRATION_STATE_LABELS[row.registrationState]}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
           </div>
         )}
       </section>

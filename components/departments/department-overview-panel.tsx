@@ -9,7 +9,6 @@ import {
   Loader2,
   UserCheck,
   Users,
-  UsersRound,
 } from "lucide-react"
 
 import { DepartmentEnrollmentTrendChart } from "@/components/departments/department-enrollment-trend-chart"
@@ -107,7 +106,6 @@ export function DepartmentOverviewPanel({
       ),
     [facts, departmentId]
   )
-  const latestYear = yearRows[yearRows.length - 1] ?? null
 
   if (loading) {
     return (
@@ -142,6 +140,14 @@ export function DepartmentOverviewPanel({
   const programsHref = departmentGroupWorkspaceHref(departmentId, {
     tab: "programs",
   })
+  const offeringsHref =
+    activePrograms.length === 1
+      ? programWorkspaceHref(activePrograms[0].id, { tab: "offerings" })
+      : programsHref
+  const studentsHref =
+    activePrograms.length === 1
+      ? programWorkspaceHref(activePrograms[0].id, { tab: "students" })
+      : programsHref
   const employeesHref = departmentGroupWorkspaceHref(departmentId, {
     tab: "financial",
     finance: "employees",
@@ -163,7 +169,7 @@ export function DepartmentOverviewPanel({
         </p>
       </div>
 
-      <StatCardsRow equal columns={6}>
+      <StatCardsRow equal columns={5}>
         <Link href={programsHref} className="min-w-0">
           <StatCard
             fill
@@ -173,7 +179,7 @@ export function DepartmentOverviewPanel({
             value={`${formatCount(activePrograms.length)} Active`}
           />
         </Link>
-        <Link href={programsHref} className="min-w-0">
+        <Link href={offeringsHref} className="min-w-0">
           <StatCard
             fill
             tone="violet"
@@ -191,13 +197,14 @@ export function DepartmentOverviewPanel({
             value={formatCount(overview.staffCount)}
           />
         </Link>
-        <Link href={programsHref} className="min-w-0">
+        <Link href={studentsHref} className="min-w-0">
           <StatCard
             fill
             tone="emerald"
             icon={UserCheck}
             label="Students"
             value={formatCount(overview.studentsCount)}
+            hint="Unique people on active offerings"
           />
         </Link>
         <Link href={eventsHref} className="min-w-0">
@@ -207,20 +214,6 @@ export function DepartmentOverviewPanel({
             icon={CalendarDays}
             label="Upcoming events"
             value={formatCount(overview.upcomingEventsCount)}
-          />
-        </Link>
-        <Link href={programsHref} className="min-w-0">
-          <StatCard
-            fill
-            tone="indigo"
-            icon={UsersRound}
-            label="Families"
-            value={formatCount(latestYear?.families ?? 0)}
-            hint={
-              latestYear
-                ? `${formatCount(latestYear.returningFamilies)} returning, ${formatCount(latestYear.newFamilies)} new`
-                : undefined
-            }
           />
         </Link>
       </StatCardsRow>

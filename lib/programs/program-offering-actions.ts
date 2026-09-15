@@ -20,6 +20,7 @@ import {
   ROSTER_ENROLLMENT_STATUSES,
 } from "@/lib/programs/enrollment-process"
 import { syncRegistrationOptionsFromProgramFlags } from "@/lib/programs/program-registration-option-actions"
+import { setOfferingScheduleFacility } from "@/lib/programs/program-schedule-actions"
 
 const PROGRAM_ATTRIBUTE_SELECT =
   "id, organization_id, start_date, end_date, enrollment_open_date, enrollment_close_date, status, full_program_registration_enabled, session_registration_enabled, single_session_registration_enabled, program_type, min_age, max_age, min_grade, max_grade, grade_levels, gender, require_guardian, require_grade, require_emergency_contact, capacity, enable_waitlist, waitlist_capacity, waitlist_offer_deadline_days"
@@ -462,6 +463,15 @@ export async function updateProgramOffering(
 
   if (error) {
     throw new Error(error.message)
+  }
+
+  if (input.attributes?.delivery_format === "online") {
+    await setOfferingScheduleFacility({
+      program_id: data.program_id as string,
+      offering_id: offeringId,
+      venue_id: null,
+      location: null,
+    })
   }
 
   revalidateProgramPaths(data.program_id as string)

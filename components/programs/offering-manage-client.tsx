@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { ArrowLeft, CalendarDays, UserRound, Users } from "lucide-react"
 
 import { OfferingEditDialog } from "@/components/programs/offering-edit-dialog"
+import { CancelOfferingDialog } from "@/components/programs/cancel-offering-dialog"
 import { MoveEnrollmentOfferingDialog } from "@/components/programs/move-enrollment-offering-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -32,6 +33,7 @@ import {
 } from "@/lib/programs/program-catalog-capacity"
 import {
   PROGRAM_OFFERING_STATUS_LABELS,
+  isCancelledOfferingStatus,
   type ProgramOffering,
 } from "@/lib/programs/program-offering-types"
 import { programOfferingManageHref } from "@/lib/programs/program-offering-paths"
@@ -123,6 +125,7 @@ export function OfferingManageClient({
   const [moveToOfferingId, setMoveToOfferingId] = React.useState("")
   const [moveBusy, setMoveBusy] = React.useState(false)
   const [moveError, setMoveError] = React.useState<string | null>(null)
+  const [cancelOpen, setCancelOpen] = React.useState(false)
 
   React.useEffect(() => {
     setSelected(initialSelected)
@@ -273,7 +276,8 @@ export function OfferingManageClient({
     <div className="flex flex-col bg-slate-50/60">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-6">
         <div className="space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => setEditOpen(true)}
@@ -298,6 +302,17 @@ export function OfferingManageClient({
               />
               {PROGRAM_OFFERING_STATUS_LABELS[selected.status]}
             </Badge>
+            </div>
+            {!isCancelledOfferingStatus(selected.status) ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setCancelOpen(true)}
+              >
+                Cancel offering
+              </Button>
+            ) : null}
           </div>
           <p className="text-sm text-muted-foreground">{subtitle}</p>
         </div>
@@ -623,6 +638,16 @@ export function OfferingManageClient({
         }
         onOpenChange={closeMoveDialog}
         onConfirm={() => void handleMoveStudent()}
+      />
+
+      <CancelOfferingDialog
+        offeringId={selected.id}
+        offeringName={selected.name}
+        open={cancelOpen}
+        onOpenChange={setCancelOpen}
+        onCancelled={() => {
+          router.push(nav.backHref)
+        }}
       />
 
       <OfferingEditDialog

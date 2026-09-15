@@ -49,6 +49,12 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import type { DepartmentStaffMember } from "@/lib/departments/department-actions"
 import {
+  formatStaffPayRate,
+  parseStaffPayBasis,
+  STAFF_PAY_BASIS_OPTIONS,
+  type StaffPayBasis,
+} from "@/lib/departments/staff-pay-basis"
+import {
   addEmployeeToDepartmentAction,
   listHrPositionsForDepartmentFormAction,
 } from "@/lib/departments/department-staff-actions"
@@ -91,18 +97,11 @@ function formatPeriodRange(start: string, end: string) {
 }
 
 function formatPayRate(input: {
-  payBasis: "hourly" | "monthly"
+  payBasis: StaffPayBasis | "hourly" | "monthly"
   hourlyRate: number | null
   monthlySalary: number | null
 }) {
-  if (input.payBasis === "monthly") {
-    return input.monthlySalary == null
-      ? "Monthly"
-      : `${formatCurrency(input.monthlySalary)}/mo`
-  }
-  return input.hourlyRate == null
-    ? "Hourly"
-    : `${formatCurrency(input.hourlyRate)}/hr`
+  return formatStaffPayRate(input)
 }
 
 const STAFF_TYPE_OPTIONS = [
@@ -187,12 +186,16 @@ export function DepartmentPayrollPanel({
   const [staffType, setStaffType] = useState<string>("full_time")
   const [employmentStatus, setEmploymentStatus] = useState<string>("active")
   const [positionId, setPositionId] = useState<string>("")
-  const [employeePayBasis, setEmployeePayBasis] = useState<"hourly" | "monthly">("hourly")
+  const [employeePayBasis, setEmployeePayBasis] = useState<StaffPayBasis>("hourly")
   const [hourlyRate, setHourlyRate] = useState("")
   const [monthlySalary, setMonthlySalary] = useState("")
   const [positions, setPositions] = useState<Array<{ id: string; name: string }>>([])
   const [positionsLoading, setPositionsLoading] = useState(false)
   const [employeeError, setEmployeeError] = useState<string | null>(null)
+  const [statusFilter, setStatusFilter] = useState<"active" | "inactive" | "all">("active")
+  const [assignmentFilter, setAssignmentFilter] = useState<
+    "assigned" | "unassigned" | "all"
+  >("assigned")
   const [isPending, startTransition] = useTransition()
 
   const load = useCallback(async () => {
@@ -246,6 +249,19 @@ export function DepartmentPayrollPanel({
   const isRosterOnly = variant === "roster"
   const isPeriodsOnly = variant === "periods"
 
+  const visibleStaff = useMemo(() => {
+    if (!isRosterOnly) return staff
+    return staff.filter((member) => {
+      const status = (member.employmentStatus || "active").toLowerCase()
+      if (statusFilter === "active" && status !== "active") return false
+      if (statusFilter === "inactive" && status !== "inactive") return false
+      const assigned = member.assignedToClass || member.isDepartmentHead
+      if (assignmentFilter === "assigned" && !assigned) return false
+      if (assignmentFilter === "unassigned" && assigned) return false
+      return true
+    })
+  }, [staff, isRosterOnly, statusFilter, assignmentFilter])
+
   const mergedRows: MergedRow[] = useMemo(() => {
     const payRows: MergedRow[] = showPeriods
       ? rows.map((pay) => ({
@@ -257,11 +273,11 @@ export function DepartmentPayrollPanel({
     if (!showRoster) return payRows
 
     const staffIdsWithPay = new Set(rows.map((row) => row.staffId))
-    const staffOnly: MergedRow[] = staff
+    const staffOnly: MergedRow[] = visibleStaff
       .filter((member) => (isRosterOnly ? true : !staffIdsWithPay.has(member.staffId)))
       .map((member) => ({ kind: "staff", member }))
     return [...payRows, ...staffOnly]
-  }, [rows, staff, staffById, showPeriods, showRoster, isRosterOnly])
+  }, [rows, visibleStaff, staffById, showPeriods, showRoster, isRosterOnly])
 
   async function openDetail(row: DepartmentPayPeriodRow) {
     setDetailRow(row)
@@ -509,7 +525,7 @@ export function DepartmentPayrollPanel({
               {readOnly
                 ? `Historical employees for ${departmentName}. Switch program above to compare.`
                 : isRosterOnly
-                  ? `Employees assigned to ${departmentName}. Manage hours and pay periods under Financial → Payroll.`
+                  ? `Employees assigned to ${departmentName}. Mark volunteers Unpaid without clearing their rate. Manage hours under Financial → Payroll.`
                   : `Employees assigned to ${departmentName}. Log hours and create pay periods here; approved pay shows under Financial → Payroll.`}
             </CardDescription>
           </div>
@@ -557,10 +573,55 @@ export function DepartmentPayrollPanel({
                   ranges also need <code className="text-xs">172</code>.
                 </p>
               ) : null}
+              {isRosterOnly && staff.length > 0 ? (
+                <div className="mb-3 flex flex-wrap items-end gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Status</Label>
+                    <Select
+                      value={statusFilter}
+                      onValueChange={(value) =>
+                        setStatusFilter(value as "active" | "inactive" | "all")
+                      }
+                    >
+                      <SelectTrigger className="h-8 w-[140px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="inactive">Inactive</SelectItem>
+                        <SelectItem value="all">All statuses</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Assignment</Label>
+                    <Select
+                      value={assignmentFilter}
+                      onValueChange={(value) =>
+                        setAssignmentFilter(value as "assigned" | "unassigned" | "all")
+                      }
+                    >
+                      <SelectTrigger className="h-8 w-[200px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="assigned">Assigned to a class</SelectItem>
+                        <SelectItem value="unassigned">Not assigned to a class</SelectItem>
+                        <SelectItem value="all">All employees</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <p className="pb-1 text-xs text-muted-foreground">
+                    Showing {visibleStaff.length} of {staff.length}
+                  </p>
+                </div>
+              ) : null}
               {mergedRows.length === 0 ? (
                 <p className="py-8 text-center text-sm text-muted-foreground">
                   {isRosterOnly
-                    ? "No employees assigned yet. Add an employee to get started."
+                    ? staff.length === 0
+                      ? "No employees assigned yet. Add an employee to get started."
+                      : "No employees match these filters. Try All employees to see staff who are not assigned to a class."
                     : "No employees or pay periods yet. Add an employee, then create a pay period and log hours."}
                 </p>
               ) : (
@@ -888,7 +949,7 @@ export function DepartmentPayrollPanel({
                 <Select
                   value={employeePayBasis}
                   onValueChange={(value) =>
-                    setEmployeePayBasis(value as "hourly" | "monthly")
+                    setEmployeePayBasis(parseStaffPayBasis(value))
                   }
                   disabled={isPending}
                 >
@@ -896,17 +957,22 @@ export function DepartmentPayrollPanel({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="hourly">Hourly</SelectItem>
-                    <SelectItem value="monthly">Monthly salary</SelectItem>
+                    {STAFF_PAY_BASIS_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
-              {employeePayBasis === "hourly" ? (
+              {employeePayBasis === "hourly" || employeePayBasis === "unpaid" ? (
                 <div className="space-y-2">
-                  <Label htmlFor="dept-hourly-rate">Hourly rate</Label>
+                  <Label htmlFor="dept-hourly-rate">
+                    {employeePayBasis === "unpaid" ? "Saved hourly rate" : "Hourly rate"}
+                  </Label>
                   <Input
                     id="dept-hourly-rate"
                     type="number"
@@ -919,9 +985,14 @@ export function DepartmentPayrollPanel({
                     disabled={isPending}
                   />
                 </div>
-              ) : (
+              ) : null}
+              {employeePayBasis === "monthly" || employeePayBasis === "unpaid" ? (
                 <div className="space-y-2">
-                  <Label htmlFor="dept-monthly-salary">Monthly salary</Label>
+                  <Label htmlFor="dept-monthly-salary">
+                    {employeePayBasis === "unpaid"
+                      ? "Saved monthly salary"
+                      : "Monthly salary"}
+                  </Label>
                   <Input
                     id="dept-monthly-salary"
                     type="number"
@@ -934,8 +1005,14 @@ export function DepartmentPayrollPanel({
                     disabled={isPending}
                   />
                 </div>
-              )}
+              ) : null}
             </div>
+            {employeePayBasis === "unpaid" ? (
+              <p className="text-xs text-muted-foreground">
+                Unpaid volunteers are skipped in payroll. Saved rates stay on the record so you
+                can switch them back to paid later.
+              </p>
+            ) : null}
           </div>
 
           <DialogFooter>
@@ -1322,8 +1399,8 @@ function CreatePayPeriodDialog({
           <DialogTitle>Create pay period</DialogTitle>
           <DialogDescription>
             Set a custom date range (for example the academic year start Aug 17–Aug 31). This
-            creates a draft pay line for <strong>every department employee and every childcare
-            provider</strong>.
+            creates a draft pay line for <strong>every paid department employee and every childcare
+            provider</strong>. Unpaid volunteers are skipped.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-2">
@@ -1356,7 +1433,8 @@ function CreatePayPeriodDialog({
           </div>
           <p className="text-xs text-muted-foreground">
             Hourly staff: hours logged for this department in this range roll into these lines.
-            Monthly salary staff: one line with their salary amount (no hours).
+            Monthly salary staff: one line with their salary amount (no hours). Unpaid
+            volunteers are left out until you switch them back to Hourly or Monthly.
           </p>
         </div>
         <DialogFooter>

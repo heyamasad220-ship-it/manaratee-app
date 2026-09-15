@@ -8,6 +8,8 @@ import {
 } from "@/lib/departments/department-active-programs"
 import { summarizeDepartmentStaff } from "@/lib/departments/department-list-summary"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
+import { ROSTER_ENROLLMENT_STATUSES } from "@/lib/programs/enrollment-process"
+import { loadStaffVisibleOfferingsForPrograms } from "@/lib/programs/program-offering-queries"
 import { createClient } from "@/lib/supabase/server"
 
 export type DepartmentWorkspaceOverview = {
@@ -23,19 +25,13 @@ function todayIsoDate() {
   return new Date().toISOString().slice(0, 10)
 }
 
-const ACTIVE_ENROLLMENT_STATUSES = [
-  "pending_payment",
-  "pending",
-  "enrolled",
-  "active",
-  "completed",
-] as const
+const ROSTER_STATUSES = [...ROSTER_ENROLLMENT_STATUSES] as const
 
 /**
  * KPI strip for the department Overview tab.
- * Participants use **open** years only (draft / active / paused).
- * Closed years stay on cards and operating tabs for reports, but do not inflate
- * the live Overview KPIs.
+ * Offerings and students come from **active** (non-cancelled) offerings on
+ * open years only (draft / active / paused). Closed years stay on cards and
+ * operating tabs for reports, but do not inflate the live Overview KPIs.
  */
 export async function fetchDepartmentWorkspaceOverview(
   departmentId: string
@@ -66,34 +62,54 @@ export async function fetchDepartmentWorkspaceOverview(
     ),
   ])
 
-  // Prefer counting enrollments on open years only (not closed).
+  // Unique students on staff-visible offerings of open years only (not closed).
   const openProgramIds = openPrograms.map((p) => p.id)
   let studentsCount = 0
   if (openProgramIds.length > 0) {
-    const { data: enrollments } = await supabase
-      .from("program_enrollments")
-      .select("id, child_name, participant_contact_id, child_person_id")
-      .eq("organization_id", organizationId)
-      .in("program_id", openProgramIds)
-      .in("status", [...ACTIVE_ENROLLMENT_STATUSES])
-
-    const keys = new Set<string>()
-    for (const row of enrollments || []) {
-      const personId = row.child_person_id as string | null
-      const contactId = row.participant_contact_id as string | null
-      const name = String(row.child_name || "")
-        .trim()
-        .toLowerCase()
-      const key = personId
-        ? `person:${personId}`
-        : contactId
-          ? `contact:${contactId}`
-          : name
-            ? `name:${name}`
-            : `enrollment:${row.id}`
-      keys.add(key)
+    const visibleOfferings = await loadStaffVisibleOfferingsForPrograms(
+      supabase,
+      organizationId,
+      openProgramIds
+    )
+    const offeringIds = visibleOfferings.map((row) => row.id)
+    if (offeringIds.length > 0) {
+      const keys = new Set<string>()
+      const pageSize = 1000
+      for (let from = 0; ; from += pageSize) {
+        const { data: enrollments, error: enrollmentError } = await supabase
+          .from("program_enrollments")
+          .select("id, child_name, participant_contact_id, child_person_id")
+          .eq("organization_id", organizationId)
+          .in("program_id", openProgramIds)
+          .in("offering_id", offeringIds)
+          .in("status", [...ROSTER_STATUSES])
+          .range(from, from + pageSize - 1)
+        if (enrollmentError) {
+          console.error(
+            "fetchDepartmentWorkspaceOverview students:",
+            enrollmentError.message
+          )
+          break
+        }
+        for (const row of enrollments || []) {
+          const personId = row.child_person_id as string | null
+          const contactId = row.participant_contact_id as string | null
+          const name = String(row.child_name || "")
+            .trim()
+            .toLowerCase()
+          const key = personId
+            ? `person:${personId}`
+            : contactId
+              ? `contact:${contactId}`
+              : name
+                ? `name:${name}`
+                : `enrollment:${row.id}`
+          keys.add(key)
+        }
+        if (!enrollments || enrollments.length < pageSize) break
+      }
+      studentsCount = keys.size
     }
-    studentsCount = keys.size
   }
 
   const staffCount = detail?.staff.length ?? 0

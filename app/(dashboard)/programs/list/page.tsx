@@ -47,11 +47,11 @@ export default async function ProgramsListPage({
 
   return (
     <>
-      <Header title="Programs" />
+      <Header title="All programs" />
       <div className="flex flex-col gap-6 p-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Programs</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">All programs</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Manage programs across all departments.
             </p>

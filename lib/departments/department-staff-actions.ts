@@ -14,6 +14,7 @@ import { hasPermission } from "@/lib/permissions/permissions"
 import { PERMISSIONS } from "@/lib/permissions/permission-keys"
 import { createClient } from "@/lib/supabase/server"
 import { createServiceRoleClient } from "@/lib/supabase/service-role"
+import { parseStaffPayBasis, type StaffPayBasis } from "@/lib/departments/staff-pay-basis"
 
 function escapeIlike(value: string) {
   return value.replace(/[%_\\,]/g, "\\$&")
@@ -122,7 +123,7 @@ export type DepartmentEmployeeProfile = {
   departmentId: string | null
   departmentName: string | null
   hireDate: string | null
-  payBasis: "hourly" | "monthly"
+  payBasis: StaffPayBasis
   hourlyRate: number | null
   monthlySalary: number | null
   isDepartmentHead: boolean
@@ -351,7 +352,7 @@ export async function fetchDepartmentEmployeeProfileAction(input: {
         | string
         | undefined) || null,
     hireDate: (data.hire_date as string | null)?.slice(0, 10) || null,
-    payBasis: (data.pay_basis as string) === "monthly" ? "monthly" : "hourly",
+    payBasis: parseStaffPayBasis(data.pay_basis),
     hourlyRate:
       data.hourly_rate == null ? null : Number(data.hourly_rate),
     monthlySalary:
@@ -560,7 +561,7 @@ export async function updateDepartmentEmployeeAction(input: {
   hr_job_role_id?: string | null
   hire_date?: string | null
   hourly_rate?: number | null
-  pay_basis?: "hourly" | "monthly"
+  pay_basis?: StaffPayBasis
   monthly_salary?: number | null
   is_department_head?: boolean
 }) {
@@ -683,7 +684,7 @@ export async function addEmployeeToDepartmentAction(input: {
   position_id?: string | null
   position_name?: string | null
   hourly_rate?: number | null
-  pay_basis?: "hourly" | "monthly"
+  pay_basis?: StaffPayBasis
   monthly_salary?: number | null
 }) {
   const access = await requireStaffManage(input.departmentId)

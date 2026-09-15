@@ -410,7 +410,7 @@ Programs module home (`/programs`) titled **Overview**, with breadcrumb `Dashboa
 | `/programs/calendar` | Legacy redirect → `/facilities/calendar` (space availability) |
 | `/programs/reports` | Reports |
 | `/programs/reports/year-comparison` | Year-to-year enrollment growth (participants, families, new vs returning). Year and program names open `/programs/[id]?tab=reports&section=year-comparison` (a shared year opens the largest program). |
-| `/programs/settings` | Redirects to `/workforce?tab=departments` (settings live on each department / program / event) |
+| `/programs/settings` | Module Settings (placeholder for organization-wide program settings). Service Needs stays redirected. |
 | `/programs/settings/service-needs` | Redirects to `/event-management` (Service Needs is on Event workspace Settings) |
 
 ### Staff setup flow

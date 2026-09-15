@@ -49,12 +49,16 @@ export function OfferingSimpleScheduleForm({
   offering,
   programId,
   items: initialItems,
+  deliveryFormat,
+  facilityVenueId,
   saveHandlerRef,
   disabled = false,
 }: {
   offering: ProgramOffering
   programId: string
   items: ProgramScheduleItem[]
+  deliveryFormat?: ProgramOffering["delivery_format"]
+  facilityVenueId?: string
   saveHandlerRef?: React.MutableRefObject<(() => Promise<boolean>) | null>
   disabled?: boolean
 }) {
@@ -129,6 +133,7 @@ export function OfferingSimpleScheduleForm({
     }
 
     const seed = items[0]
+    const releaseSpace = deliveryFormat === "online"
 
     try {
       await replaceOfferingWeeklySchedule({
@@ -138,8 +143,12 @@ export function OfferingSimpleScheduleForm({
         days_of_week: days,
         start_time: startTime,
         end_time: endTime,
-        location: seed?.location || undefined,
-        venue_id: seed?.venue_id ?? null,
+        location: releaseSpace ? undefined : seed?.location || undefined,
+        venue_id: releaseSpace
+          ? null
+          : facilityVenueId !== undefined
+            ? facilityVenueId || null
+            : seed?.venue_id ?? null,
         instructor_name: seed?.instructor_name || undefined,
       })
       return true

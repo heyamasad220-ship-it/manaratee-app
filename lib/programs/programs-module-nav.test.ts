@@ -7,17 +7,17 @@ import {
 } from "./programs-module-nav"
 
 describe("programs module nav", () => {
-  it("lists Overview through Reports without Academic/Seasonal splits", () => {
+  it("lists Overview, All programs, Registrations, Finance, Financial Assistance, Reports, and Settings", () => {
     assert.deepEqual(
       PROGRAMS_MODULE_TABS.map((tab) => tab.label),
       [
         "Overview",
-        "Programs",
-        "Offerings",
+        "All programs",
         "Registrations",
         "Finance",
         "Financial Assistance",
         "Reports",
+        "Settings",
       ]
     )
   })
@@ -30,6 +30,7 @@ describe("programs module nav", () => {
       resolveProgramsModuleTab("/programs/catalog?kind=academic"),
       "offerings"
     )
+    assert.equal(resolveProgramsModuleTab("/programs/settings"), "settings")
   })
 
   it("keeps finance and reports on their own tabs", () => {

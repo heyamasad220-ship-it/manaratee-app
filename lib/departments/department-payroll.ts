@@ -15,8 +15,12 @@ import {
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
+import {
+  parseStaffPayBasis,
+  type StaffPayBasis,
+} from "@/lib/departments/staff-pay-basis"
 
-export type StaffPayBasis = "hourly" | "monthly"
+export type { StaffPayBasis } from "@/lib/departments/staff-pay-basis"
 export type PayPeriodStatus = "draft" | "pending" | "approved" | "rejected" | "paid"
 
 export type DepartmentPayPeriodRow = {
@@ -214,7 +218,7 @@ function toPayrollStaffOption(row: Record<string, unknown>): PayrollStaffOption 
   return {
     staffId: row.id as string,
     fullName: staffDisplayName(row),
-    payBasis: (row.pay_basis as string) === "monthly" ? "monthly" : "hourly",
+    payBasis: parseStaffPayBasis(row.pay_basis),
     positionName: positionLabel(row),
     isChildcareProvider: isChildcareProviderStaff(row),
     departmentId: (row.department_id as string | null) ?? null,
@@ -364,7 +368,7 @@ export async function listPayrollHourLogOptionsAction(departmentId: string) {
   )
 
   const hourlyStaff = eligible
-    .filter((row) => (row.pay_basis as string) !== "monthly")
+    .filter((row) => parseStaffPayBasis(row.pay_basis) === "hourly")
     .map((row) => toPayrollStaffOption(row as Record<string, unknown>))
 
   const self = access.userId
@@ -383,7 +387,7 @@ export async function listPayrollHourLogOptionsAction(departmentId: string) {
       ? hourlyStaff
       : self
         ? [toPayrollStaffOption(self as Record<string, unknown>)].filter(
-            (row) => row.payBasis !== "monthly"
+            (row) => row.payBasis === "hourly"
           )
         : [],
     selfStaffId: self ? (self.id as string) : null,
@@ -398,8 +402,10 @@ async function syncPayPeriodFromHours(input: {
   workDate: string
   staff: Record<string, unknown>
 }) {
-  const payBasis: StaffPayBasis =
-    (input.staff.pay_basis as string) === "monthly" ? "monthly" : "hourly"
+  const payBasis = parseStaffPayBasis(input.staff.pay_basis)
+  if (payBasis === "unpaid") {
+    return
+  }
   const hourlyRate =
     input.staff.hourly_rate == null ? null : Number(input.staff.hourly_rate)
   const monthlySalary =
@@ -536,10 +542,18 @@ export async function logDepartmentStaffHoursAction(input: {
     }
   }
 
-  if ((staff.pay_basis as string) === "monthly") {
+  const staffPayBasis = parseStaffPayBasis(staff.pay_basis)
+  if (staffPayBasis === "monthly") {
     return {
       success: false as const,
       error: "This employee is on a monthly salary — hours are not required.",
+    }
+  }
+  if (staffPayBasis === "unpaid") {
+    return {
+      success: false as const,
+      error:
+        "This employee is unpaid / volunteer. Switch their pay basis to Hourly before logging hours.",
     }
   }
 
@@ -714,8 +728,11 @@ export async function createPayPeriodForAllEmployeesAction(input: {
   let skipped = 0
 
   for (const staff of staffRows) {
-    const payBasis: StaffPayBasis =
-      (staff.pay_basis as string) === "monthly" ? "monthly" : "hourly"
+    const payBasis = parseStaffPayBasis(staff.pay_basis)
+    if (payBasis === "unpaid") {
+      skipped += 1
+      continue
+    }
     const hourlyRate =
       staff.hourly_rate == null ? null : Number(staff.hourly_rate)
     const monthlySalary =
@@ -939,8 +956,7 @@ export async function updatePayPeriodEntryAction(input: {
     }
   }
 
-  const payBasis =
-    (entry.pay_basis as string) === "monthly" ? "monthly" : "hourly"
+  const payBasis = parseStaffPayBasis(entry.pay_basis)
   const hourlyRate =
     entry.hourly_rate == null ? null : Number(entry.hourly_rate)
 
@@ -1180,11 +1196,9 @@ export async function fetchDepartmentPayrollList(
             }
           : periodBounds(entry.period_key as string)
 
-      const payBasis: StaffPayBasis =
-        (entry.pay_basis as string) === "monthly" ||
-        (staff?.pay_basis as string) === "monthly"
-          ? "monthly"
-          : "hourly"
+      const payBasis = parseStaffPayBasis(
+        entry.pay_basis || staff?.pay_basis
+      )
 
       return {
         id: entry.id as string,

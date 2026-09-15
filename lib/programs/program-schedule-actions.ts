@@ -424,6 +424,68 @@ export async function replaceOfferingWeeklySchedule(input: {
   })
 }
 
+/**
+ * Set or clear the bookable space on every weekly time for an offering.
+ * Online classes pass null to release the room from the Facilities calendar.
+ */
+export async function setOfferingScheduleFacility(input: {
+  program_id: string
+  offering_id: string
+  venue_id: string | null
+  location?: string | null
+}) {
+  const supabase = await createClient()
+  const organizationId = await getSelectedOrganizationId()
+
+  if (!organizationId) {
+    throw new Error("No organization selected")
+  }
+
+  await assertCanManageProgram(input.program_id)
+
+  if (!input.offering_id) {
+    throw new Error("Offering is required for schedule items")
+  }
+
+  const location = input.location?.trim() || null
+  const payload = {
+    venue_id: input.venue_id || null,
+    location,
+    updated_at: new Date().toISOString(),
+  }
+
+  const { error } = await supabase
+    .from("program_schedule_items")
+    .update(payload)
+    .eq("organization_id", organizationId)
+    .eq("program_id", input.program_id)
+    .eq("offering_id", input.offering_id)
+
+  if (error) {
+    if (error.message?.includes("venue_id") || error.code === "42703") {
+      const { error: fallbackError } = await supabase
+        .from("program_schedule_items")
+        .update({
+          location,
+          updated_at: payload.updated_at,
+        })
+        .eq("organization_id", organizationId)
+        .eq("program_id", input.program_id)
+        .eq("offering_id", input.offering_id)
+      if (fallbackError) {
+        console.error(fallbackError)
+        throw new Error("Failed to update the class space.")
+      }
+    } else {
+      console.error(error)
+      throw new Error("Failed to update the class space.")
+    }
+  }
+
+  await syncOperationalBriefForProgram(input.program_id, organizationId)
+  revalidateSchedulePaths(input.program_id, input.offering_id)
+}
+
 /** Clear all schedule items for an offering (simple editor with no days selected). */
 export async function clearOfferingWeeklySchedule(input: {
   program_id: string

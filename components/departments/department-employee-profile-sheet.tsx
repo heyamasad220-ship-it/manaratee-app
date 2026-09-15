@@ -42,6 +42,12 @@ import {
   type DepartmentEmployeeProfile,
 } from "@/lib/departments/department-staff-actions"
 import { setContactWorkEmailAction } from "@/lib/organizations/work-email-assignment"
+import {
+  parseStaffPayBasis,
+  staffPayBasisLabel,
+  STAFF_PAY_BASIS_OPTIONS,
+  type StaffPayBasis,
+} from "@/lib/departments/staff-pay-basis"
 
 const STAFF_TYPE_OPTIONS = [
   { value: "full_time", label: "Full time" },
@@ -109,7 +115,7 @@ export function DepartmentEmployeeProfileSheet({
   const [positionId, setPositionId] = useState("")
   const [jobRoleId, setJobRoleId] = useState("")
   const [hireDate, setHireDate] = useState("")
-  const [payBasis, setPayBasis] = useState<"hourly" | "monthly">("hourly")
+  const [payBasis, setPayBasis] = useState<StaffPayBasis>("hourly")
   const [hourlyRate, setHourlyRate] = useState("")
   const [monthlySalary, setMonthlySalary] = useState("")
   const [workEmail, setWorkEmail] = useState("")
@@ -471,30 +477,30 @@ export function DepartmentEmployeeProfileSheet({
                   {editable ? (
                     <Select
                       value={payBasis}
-                      onValueChange={(value) =>
-                        setPayBasis(value as "hourly" | "monthly")
-                      }
+                      onValueChange={(value) => setPayBasis(parseStaffPayBasis(value))}
                       disabled={isPending}
                     >
                       <SelectTrigger id="emp-pay-basis">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="hourly">Hourly</SelectItem>
-                        <SelectItem value="monthly">Monthly salary</SelectItem>
+                        {STAFF_PAY_BASIS_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   ) : (
-                    <Input
-                      value={payBasis === "monthly" ? "Monthly salary" : "Hourly"}
-                      disabled
-                    />
+                    <Input value={staffPayBasisLabel(payBasis)} disabled />
                   )}
                 </div>
 
-                {payBasis === "hourly" ? (
+                {payBasis === "hourly" || payBasis === "unpaid" ? (
                   <div className="space-y-2">
-                    <Label htmlFor="emp-hourly">Hourly rate</Label>
+                    <Label htmlFor="emp-hourly">
+                      {payBasis === "unpaid" ? "Saved hourly rate" : "Hourly rate"}
+                    </Label>
                     <Input
                       id="emp-hourly"
                       type="number"
@@ -507,9 +513,12 @@ export function DepartmentEmployeeProfileSheet({
                       placeholder="0.00"
                     />
                   </div>
-                ) : (
+                ) : null}
+                {payBasis === "monthly" || payBasis === "unpaid" ? (
                   <div className="space-y-2">
-                    <Label htmlFor="emp-salary">Monthly salary</Label>
+                    <Label htmlFor="emp-salary">
+                      {payBasis === "unpaid" ? "Saved monthly salary" : "Monthly salary"}
+                    </Label>
                     <Input
                       id="emp-salary"
                       type="number"
@@ -522,7 +531,13 @@ export function DepartmentEmployeeProfileSheet({
                       placeholder="0.00"
                     />
                   </div>
-                )}
+                ) : null}
+                {payBasis === "unpaid" ? (
+                  <p className="text-xs text-muted-foreground sm:col-span-2">
+                    Unpaid volunteers are skipped in payroll. Saved rates stay on file so you
+                    can switch this person back to Hourly or Monthly later.
+                  </p>
+                ) : null}
 
                 <div className="space-y-2">
                   <Label className="flex items-center gap-1">

@@ -355,7 +355,7 @@ const moduleChildren: Record<string, SubItem[]> = {
       permissionKey: "spaces.view",
     },
   ],
-  // Programs uses in-page module tabs (Overview, Programs, Offerings, …).
+  // Programs children come from buildProgramsChildren (Overview, All programs, …).
   programs: [],
   finance: [
     {

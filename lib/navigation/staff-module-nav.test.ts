@@ -23,10 +23,34 @@ describe("staff module nav", () => {
     assert.equal(isHiddenTopLevelStaffModule("finance", slugs), false)
   })
 
-  it("keeps Programs as a single rail item with no flyout children", () => {
-    assert.deepEqual(buildProgramsChildren("both"), [])
-    assert.deepEqual(buildProgramsChildren("academic"), [])
-    assert.deepEqual(buildProgramsChildren("seasonal"), [])
+  it("builds a Programs flyout with Overview through Settings", () => {
+    const labels = buildProgramsChildren("both").map((item) => item.label)
+    assert.deepEqual(labels, [
+      "Overview",
+      "All programs",
+      "Registrations",
+      "Finance",
+      "Financial Assistance",
+      "Reports",
+      "Settings",
+    ])
+    assert.deepEqual(
+      buildProgramsChildren("academic").map((item) => item.label),
+      labels
+    )
+    assert.deepEqual(
+      buildProgramsChildren("seasonal").map((item) => item.label),
+      labels
+    )
+    const overview = buildProgramsChildren("both").find(
+      (item) => item.label === "Overview"
+    )
+    const allPrograms = buildProgramsChildren("both").find(
+      (item) => item.label === "All programs"
+    )
+    assert.equal(overview?.href, "/programs")
+    assert.equal(overview?.exact, true)
+    assert.equal(allPrograms?.href, "/programs/list")
   })
 
   it("shows Volunteers when Programs or Event Management is on", () => {
