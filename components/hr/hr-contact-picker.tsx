@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
-import { Check, ChevronsUpDown, Loader2 } from "lucide-react"
+import { Check, ChevronsUpDown, Loader2, Plus } from "lucide-react"
 
+import { QuickAddContactDialog } from "@/components/contacts/quick-add-contact-dialog"
 import { Button } from "@/components/ui/button"
 import {
   Command,
@@ -32,6 +33,9 @@ type HrContactPickerProps = {
   onClear?: () => void
   disabled?: boolean
   label?: string
+  allowCreate?: boolean
+  createDescription?: string
+  individualOnly?: boolean
 }
 
 function formatContactLabel(contact: HrContactOption) {
@@ -47,8 +51,12 @@ export function HrContactPicker({
   onClear,
   disabled = false,
   label = "Contact",
+  allowCreate = false,
+  createDescription = "Create a Directory person, then they can be added here.",
+  individualOnly = false,
 }: HrContactPickerProps) {
   const [open, setOpen] = useState(false)
+  const [createOpen, setCreateOpen] = useState(false)
   const [search, setSearch] = useState("")
   const [loading, setLoading] = useState(false)
   const [contacts, setContacts] = useState<HrContactOption[]>([])
@@ -82,6 +90,11 @@ export function HrContactPicker({
 
     return () => window.clearTimeout(timer)
   }, [open, search, loadContacts])
+
+  function openCreate() {
+    setOpen(false)
+    setCreateOpen(true)
+  }
 
   const displayLabel =
     selectedLabel ||
@@ -130,17 +143,30 @@ export function HrContactPicker({
               <CommandEmpty>
                 <div className="space-y-2 px-2 py-3 text-sm">
                   <p>No contact found.</p>
-                  <p className="text-muted-foreground">
-                    Create the person in{" "}
-                    <Link
-                      href="/directory/people"
-                      className="font-medium text-primary underline-offset-4 hover:underline"
-                      onClick={() => setOpen(false)}
+                  {allowCreate ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={openCreate}
                     >
-                      Directory
-                    </Link>{" "}
-                    first, then return here to add them.
-                  </p>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Create new contact
+                    </Button>
+                  ) : (
+                    <p className="text-muted-foreground">
+                      Create the person in{" "}
+                      <Link
+                        href="/directory/people"
+                        className="font-medium text-primary underline-offset-4 hover:underline"
+                        onClick={() => setOpen(false)}
+                      >
+                        Directory
+                      </Link>{" "}
+                      first, then return here to add them.
+                    </p>
+                  )}
                 </div>
               </CommandEmpty>
               <CommandGroup>
@@ -165,6 +191,12 @@ export function HrContactPicker({
                     </CommandItem>
                   )
                 })}
+                {allowCreate && contacts.length > 0 ? (
+                  <CommandItem value="__create_new_contact" onSelect={openCreate}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Create new contact
+                  </CommandItem>
+                ) : null}
               </CommandGroup>
             </CommandList>
           </Command>
@@ -178,6 +210,15 @@ export function HrContactPicker({
         >
           Clear selection
         </button>
+      ) : allowCreate ? (
+        <button
+          type="button"
+          className="text-xs font-medium text-primary underline-offset-4 hover:underline"
+          onClick={openCreate}
+          disabled={disabled}
+        >
+          Can&apos;t find them? Create a new contact
+        </button>
       ) : (
         <p className="text-xs text-muted-foreground">
           People must exist in{" "}
@@ -187,6 +228,23 @@ export function HrContactPicker({
           before they can be added here.
         </p>
       )}
+      {allowCreate ? (
+        <QuickAddContactDialog
+          open={createOpen}
+          onOpenChange={setCreateOpen}
+          searchHint={search}
+          individualOnly={individualOnly}
+          description={createDescription}
+          onCreated={(contact) => {
+            onChange({
+              contactId: contact.contactId,
+              full_name: contact.full_name,
+              email: contact.email,
+              phone: contact.phone,
+            })
+          }}
+        />
+      ) : null}
     </div>
   )
 }

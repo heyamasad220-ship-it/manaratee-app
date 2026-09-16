@@ -317,8 +317,8 @@ export function DepartmentSettingsPanel({
             </Select>
             {staff.length === 0 ? (
               <p className="text-xs text-muted-foreground">
-                Add employees on the Employees tab, then choose the director
-                here.
+                Add employees under Financial → Employees, then choose the
+                director here.
               </p>
             ) : null}
           </div>

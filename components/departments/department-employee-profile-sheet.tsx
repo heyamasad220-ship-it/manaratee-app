@@ -14,6 +14,7 @@ import {
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -40,6 +41,13 @@ import {
   updateDepartmentEmployeeAction,
   type DepartmentEmployeeProfile,
 } from "@/lib/departments/department-staff-actions"
+import { setContactWorkEmailAction } from "@/lib/organizations/work-email-assignment"
+import {
+  parseStaffPayBasis,
+  staffPayBasisLabel,
+  STAFF_PAY_BASIS_OPTIONS,
+  type StaffPayBasis,
+} from "@/lib/departments/staff-pay-basis"
 
 const STAFF_TYPE_OPTIONS = [
   { value: "full_time", label: "Full time" },
@@ -107,9 +115,11 @@ export function DepartmentEmployeeProfileSheet({
   const [positionId, setPositionId] = useState("")
   const [jobRoleId, setJobRoleId] = useState("")
   const [hireDate, setHireDate] = useState("")
-  const [payBasis, setPayBasis] = useState<"hourly" | "monthly">("hourly")
+  const [payBasis, setPayBasis] = useState<StaffPayBasis>("hourly")
   const [hourlyRate, setHourlyRate] = useState("")
   const [monthlySalary, setMonthlySalary] = useState("")
+  const [workEmail, setWorkEmail] = useState("")
+  const [isDepartmentHead, setIsDepartmentHead] = useState(false)
 
   const editable = canEdit && !readOnly
 
@@ -123,6 +133,8 @@ export function DepartmentEmployeeProfileSheet({
     setPayBasis(next.payBasis)
     setHourlyRate(next.hourlyRate == null ? "" : String(next.hourlyRate))
     setMonthlySalary(next.monthlySalary == null ? "" : String(next.monthlySalary))
+    setWorkEmail(next.workEmail || "")
+    setIsDepartmentHead(next.isDepartmentHead)
   }, [])
 
   const load = useCallback(async () => {
@@ -147,6 +159,7 @@ export function DepartmentEmployeeProfileSheet({
     setCanEdit(profileResult.canEdit)
     setPositions(positionsResult.success ? positionsResult.positions : [])
     setJobRoles(rolesResult.success ? rolesResult.roles : [])
+
     setLoading(false)
   }, [applyProfile, departmentId, open, staffId])
 
@@ -165,12 +178,46 @@ export function DepartmentEmployeeProfileSheet({
     return parsed
   }
 
+  async function saveWorkEmail(confirmReassign = false) {
+    if (!profile?.contactId || !profile.canAssignWorkEmail) {
+      return { success: true as const }
+    }
+    const nextEmail = workEmail.trim()
+    const currentEmail = (profile.workEmail || "").trim()
+    if (nextEmail.toLowerCase() === currentEmail.toLowerCase()) {
+      return { success: true as const }
+    }
+
+    const result = await setContactWorkEmailAction({
+      contactId: profile.contactId,
+      email: nextEmail || null,
+      departmentId,
+      firstName: profile.firstName,
+      lastName: profile.lastName,
+      confirmReassign,
+    })
+    if (!result.success && result.needsConfirm) {
+      if (window.confirm(result.error)) {
+        return saveWorkEmail(true)
+      }
+      return { success: false as const, error: "Work email was not changed." }
+    }
+    if (!result.success) {
+      return result
+    }
+    return { success: true as const }
+  }
+
   function handleSave() {
     if (!staffId || !editable) return
     const parsedRate = parseMoney(hourlyRate, "hourly rate")
     if (parsedRate === undefined) return
     const parsedSalary = parseMoney(monthlySalary, "monthly salary")
     if (parsedSalary === undefined) return
+    if (workEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(workEmail.trim())) {
+      setError("Enter a valid work email address, or leave it blank.")
+      return
+    }
 
     const selectedPosition = positions.find((item) => item.id === positionId)
     setError(null)
@@ -187,9 +234,16 @@ export function DepartmentEmployeeProfileSheet({
         pay_basis: payBasis,
         hourly_rate: parsedRate,
         monthly_salary: parsedSalary,
+        is_department_head: isDepartmentHead,
       })
       if (!result.success) {
         setError(result.error)
+        return
+      }
+      const workResult = await saveWorkEmail()
+      if (!workResult.success) {
+        setError(workResult.error)
+        await load()
         return
       }
       await onChanged()
@@ -261,7 +315,7 @@ export function DepartmentEmployeeProfileSheet({
                   {STAFF_TYPE_OPTIONS.find((o) => o.value === profile.staffType)?.label ||
                     profile.staffType}
                 </Badge>
-                {profile.isDepartmentHead ? (
+                {isDepartmentHead ? (
                   <Badge variant="outline" className="font-normal">
                     Department head
                   </Badge>
@@ -386,6 +440,27 @@ export function DepartmentEmployeeProfileSheet({
                   )}
                 </div>
 
+                <div className="space-y-2 sm:col-span-2">
+                  <label className="flex items-start gap-2 text-sm">
+                    <Checkbox
+                      checked={isDepartmentHead}
+                      disabled={!editable || isPending}
+                      onCheckedChange={(checked) =>
+                        setIsDepartmentHead(checked === true)
+                      }
+                      className="mt-0.5"
+                    />
+                    <span>
+                      <span className="font-medium">Department Head (Director)</span>
+                      <span className="block text-xs text-muted-foreground">
+                        Can open this department&apos;s workspace from Staff Tools.
+                        One head per department — checking this replaces the current
+                        director.
+                      </span>
+                    </span>
+                  </label>
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="emp-hire">Hire date</Label>
                   <Input
@@ -402,30 +477,30 @@ export function DepartmentEmployeeProfileSheet({
                   {editable ? (
                     <Select
                       value={payBasis}
-                      onValueChange={(value) =>
-                        setPayBasis(value as "hourly" | "monthly")
-                      }
+                      onValueChange={(value) => setPayBasis(parseStaffPayBasis(value))}
                       disabled={isPending}
                     >
                       <SelectTrigger id="emp-pay-basis">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="hourly">Hourly</SelectItem>
-                        <SelectItem value="monthly">Monthly salary</SelectItem>
+                        {STAFF_PAY_BASIS_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   ) : (
-                    <Input
-                      value={payBasis === "monthly" ? "Monthly salary" : "Hourly"}
-                      disabled
-                    />
+                    <Input value={staffPayBasisLabel(payBasis)} disabled />
                   )}
                 </div>
 
-                {payBasis === "hourly" ? (
+                {payBasis === "hourly" || payBasis === "unpaid" ? (
                   <div className="space-y-2">
-                    <Label htmlFor="emp-hourly">Hourly rate</Label>
+                    <Label htmlFor="emp-hourly">
+                      {payBasis === "unpaid" ? "Saved hourly rate" : "Hourly rate"}
+                    </Label>
                     <Input
                       id="emp-hourly"
                       type="number"
@@ -438,9 +513,12 @@ export function DepartmentEmployeeProfileSheet({
                       placeholder="0.00"
                     />
                   </div>
-                ) : (
+                ) : null}
+                {payBasis === "monthly" || payBasis === "unpaid" ? (
                   <div className="space-y-2">
-                    <Label htmlFor="emp-salary">Monthly salary</Label>
+                    <Label htmlFor="emp-salary">
+                      {payBasis === "unpaid" ? "Saved monthly salary" : "Monthly salary"}
+                    </Label>
                     <Input
                       id="emp-salary"
                       type="number"
@@ -453,14 +531,33 @@ export function DepartmentEmployeeProfileSheet({
                       placeholder="0.00"
                     />
                   </div>
-                )}
+                ) : null}
+                {payBasis === "unpaid" ? (
+                  <p className="text-xs text-muted-foreground sm:col-span-2">
+                    Unpaid volunteers are skipped in payroll. Saved rates stay on file so you
+                    can switch this person back to Hourly or Monthly later.
+                  </p>
+                ) : null}
 
                 <div className="space-y-2">
                   <Label className="flex items-center gap-1">
                     <Mail className="size-3.5" />
-                    Email
+                    Personal email
                   </Label>
-                  <Input value={profile.email || "—"} disabled />
+                  <Input value={profile.personalEmail || profile.email || "—"} disabled />
+                </div>
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-1">
+                    <Briefcase className="size-3.5" />
+                    Work email
+                  </Label>
+                  <Input
+                    type="email"
+                    value={workEmail}
+                    onChange={(event) => setWorkEmail(event.target.value)}
+                    disabled={!profile.canAssignWorkEmail || !editable || isPending}
+                    placeholder="name@organization.org"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label className="flex items-center gap-1">
@@ -472,7 +569,10 @@ export function DepartmentEmployeeProfileSheet({
               </div>
 
               <p className="text-xs text-muted-foreground">
-                Email and phone are edited on the contact profile.
+                Personal email stays on the Directory contact and is used for My Account.
+                Type a work email here to assign it — if that mailbox is not in Settings
+                → Users yet, an invitation is sent. Clear the field to unassign it.
+                Phone is edited on the contact profile.
               </p>
 
               <section className="space-y-2">

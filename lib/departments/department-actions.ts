@@ -7,13 +7,16 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { getDepartments } from "@/lib/departments/department-queries"
 import { summarizeDepartmentStaff } from "@/lib/departments/department-list-summary"
-import { canViewDepartment } from "@/lib/departments/department-access"
+import { canManageDepartment, canViewDepartment } from "@/lib/departments/department-access"
 import {
   departmentDeleteBlockedReason,
   type DepartmentDeleteUsage,
 } from "@/lib/departments/department-delete-blockers"
 import { hasPermission, PERMISSIONS } from "@/lib/permissions/permissions"
 import { isRichTextEmpty, sanitizeRichTextHtml } from "@/lib/ui/rich-text"
+import { DEPARTMENT_OPEN_PROGRAM_STATUSES } from "@/lib/departments/department-program-statuses"
+import { isStaffVisibleOfferingStatus } from "@/lib/programs/program-offering-queries"
+import { parseStaffPayBasis, type StaffPayBasis } from "@/lib/departments/staff-pay-basis"
 
 function normalizeDepartmentDescription(value?: string | null) {
   const sanitized = sanitizeRichTextHtml(value)
@@ -76,12 +79,15 @@ function formatDepartmentError(error: { code?: string; message?: string }, actio
   return error.message || `Failed to ${action} department`
 }
 
-async function requireDepartmentWriteAccess() {
-  const canWrite =
+async function requireDepartmentWriteAccess(departmentId?: string) {
+  const canWriteOrgWide =
     (await hasPermission(PERMISSIONS.STAFF_MANAGE)) ||
     (await hasPermission(PERMISSIONS.STAFF_VIEW))
+  const canWriteThisDepartment = departmentId
+    ? await canManageDepartment(departmentId)
+    : false
 
-  if (!canWrite) {
+  if (!canWriteOrgWide && !canWriteThisDepartment) {
     throw new Error("You do not have permission to manage departments.")
   }
 
@@ -213,7 +219,7 @@ export async function updateDepartment(input: UpdateDepartmentInput) {
     throw new Error("Department name is required")
   }
 
-  const { organizationId, supabase } = await requireDepartmentWriteAccess()
+  const { organizationId, supabase } = await requireDepartmentWriteAccess(input.id)
 
   const updatePayload: Record<string, unknown> = {
     name,
@@ -244,7 +250,7 @@ export async function updateDepartmentFlyer(input: {
   id: string
   flyerUrl: string | null
 }) {
-  const { organizationId, supabase } = await requireDepartmentWriteAccess()
+  const { organizationId, supabase } = await requireDepartmentWriteAccess(input.id)
 
   const { error } = await supabase
     .from("departments")
@@ -376,6 +382,46 @@ export async function fetchDepartmentsWithProgramCounts(): Promise<
   })
 }
 
+async function loadAssignedClassContactIds(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  organizationId: string,
+  departmentId: string
+) {
+  const { data: programs } = await supabase
+    .from("programs")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("department_id", departmentId)
+    .in("status", [...DEPARTMENT_OPEN_PROGRAM_STATUSES])
+
+  const programIds = (programs || []).map((row) => row.id as string)
+  if (programIds.length === 0) return new Set<string>()
+
+  const { data: offerings } = await supabase
+    .from("program_offerings")
+    .select("id, status")
+    .eq("organization_id", organizationId)
+    .in("program_id", programIds)
+
+  const offeringIds = (offerings || [])
+    .filter((row) => isStaffVisibleOfferingStatus(row.status as string | null))
+    .map((row) => row.id as string)
+  if (offeringIds.length === 0) return new Set<string>()
+
+  const { data: assignments } = await supabase
+    .from("program_staff_assignments")
+    .select("contact_id")
+    .eq("organization_id", organizationId)
+    .eq("is_active", true)
+    .in("offering_id", offeringIds)
+
+  return new Set(
+    (assignments || [])
+      .map((row) => row.contact_id as string | null)
+      .filter((id): id is string => Boolean(id))
+  )
+}
+
 export type DepartmentStaffMember = {
   staffId: string
   contactId: string | null
@@ -387,9 +433,10 @@ export type DepartmentStaffMember = {
   positionId: string | null
   positionName: string | null
   hourlyRate: number | null
-  payBasis: "hourly" | "monthly"
+  payBasis: StaffPayBasis
   monthlySalary: number | null
   isDepartmentHead: boolean
+  assignedToClass: boolean
 }
 
 export type DepartmentDetail = {
@@ -495,12 +542,13 @@ export async function fetchDepartmentDetail(
     staffRows = (staffWithPay.data || []) as any[]
   }
 
-  const [{ count: programsCount }] = await Promise.all([
+  const [{ count: programsCount }, assignedClassContactIds] = await Promise.all([
     supabase
       .from("programs")
       .select("id", { count: "exact", head: true })
       .eq("organization_id", organizationId)
       .eq("department_id", departmentId),
+    loadAssignedClassContactIds(supabase, organizationId, departmentId),
   ])
 
   const contactIds = [
@@ -548,9 +596,12 @@ export async function fetchDepartmentDetail(
       positionId: (row.position_id as string | null) ?? null,
       positionName,
       hourlyRate,
-      payBasis: (row.pay_basis as string) === "monthly" ? "monthly" : "hourly",
+      payBasis: parseStaffPayBasis(row.pay_basis),
       monthlySalary,
       isDepartmentHead: Boolean(row.is_department_head),
+      assignedToClass: Boolean(
+        contactId && assignedClassContactIds.has(contactId)
+      ),
     }
   })
 
@@ -572,7 +623,7 @@ export async function updateDepartmentTerms(input: {
   termsHtml?: string | null
   termsPdfUrl?: string | null
 }) {
-  const { organizationId, supabase } = await requireDepartmentWriteAccess()
+  const { organizationId, supabase } = await requireDepartmentWriteAccess(input.id)
 
   const patch: Record<string, string | null> = {}
   if (input.termsHtml !== undefined) {

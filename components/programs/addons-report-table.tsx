@@ -5,6 +5,7 @@ import Link from "next/link"
 import { ShoppingBag } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
+import { PhoneText } from "@/components/ui/phone-text"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -514,7 +515,7 @@ export function AddonsReportTable({
                       ) : null}
                       {row.contactPhone ? (
                         <div className="text-xs text-muted-foreground">
-                          {row.contactPhone}
+                          <PhoneText value={row.contactPhone} empty="" />
                         </div>
                       ) : null}
                     </div>

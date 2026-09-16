@@ -9,6 +9,7 @@ import {
 import { getStaffOfferingsForManagement } from "@/lib/programs/offerings-management-queries"
 import { getOpenPrograms } from "@/lib/programs/program-queries"
 import { buildPublicProgramCatalogUrl } from "@/lib/programs/public-paths"
+import { redirectOrgWideProgramPagesForDepartmentHead } from "@/lib/programs/program-access"
 
 function getValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value
@@ -19,6 +20,7 @@ export default async function ProgramsOfferingsPage({
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>
 }) {
+  await redirectOrgWideProgramPagesForDepartmentHead()
   const resolvedSearchParams = await searchParams
   const filters = parseOfferingsManagementFilters(resolvedSearchParams || {})
   const urlView = parseOfferingsManagementView(

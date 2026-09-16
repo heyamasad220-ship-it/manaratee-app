@@ -21,8 +21,8 @@ const FEATURE_ROWS: Array<{
 }> = [
   {
     key: "registration",
-    label: "Registration",
-    description: "Tickets, free sign-up, and attendee lists.",
+    label: "Tickets",
+    description: "Paid or free tickets, and the Orders list.",
   },
   {
     key: "staff",

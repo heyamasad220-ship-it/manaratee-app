@@ -43,6 +43,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import type { OfferingManageSummary } from "@/lib/programs/offering-manage-summary"
+import {
+  getOfferingFacilityLabels,
+  offeringHasFacilitySpace,
+} from "@/lib/programs/offering-schedule-summary"
 import type { OfferingWorkspaceData } from "@/lib/programs/offering-workspace-types"
 import { pickPrimaryInstructorAssignment } from "@/lib/programs/primary-instructor"
 import type { ProgramCapacityGroupInput } from "@/lib/programs/program-capacity-group-types"
@@ -52,6 +56,7 @@ import {
   deleteProgramOffering,
   updateProgramOffering,
 } from "@/lib/programs/program-offering-actions"
+import { setOfferingScheduleFacility } from "@/lib/programs/program-schedule-actions"
 import {
   type ProgramOffering,
   type ProgramOfferingStatus,
@@ -92,6 +97,35 @@ function getPrimaryInstructorContactId(
 ): string {
   return pickPrimaryInstructorAssignment(workspaceData.staffAssignments)
     ?.contact_id ?? ""
+}
+
+function seedFacilityVenueId(workspaceData: OfferingWorkspaceData) {
+  const withVenue = workspaceData.scheduleItems.find((item) => item.venue_id)
+  if (withVenue?.venue_id) return withVenue.venue_id
+
+  const location = workspaceData.scheduleItems
+    .find((item) => item.location?.trim())
+    ?.location?.trim()
+  if (!location) return ""
+
+  const match = workspaceData.venues.find(
+    (venue) => venue.name.trim().toLowerCase() === location.toLowerCase()
+  )
+  return match?.id ?? ""
+}
+
+function seedFacilityLocationLabel(workspaceData: OfferingWorkspaceData) {
+  return (
+    workspaceData.scheduleItems
+      .map((item) => {
+        const venueName = item.venue_id
+          ? workspaceData.venues.find((venue) => venue.id === item.venue_id)
+              ?.name
+          : null
+        return (venueName || item.location || "").trim()
+      })
+      .find(Boolean) || ""
+  )
 }
 
 export function OfferingEditDialog({
@@ -151,6 +185,13 @@ export function OfferingEditDialog({
   const [primaryInstructorId, setPrimaryInstructorId] = React.useState(() =>
     getPrimaryInstructorContactId(initialWorkspaceData)
   )
+  const [facilityVenueId, setFacilityVenueId] = React.useState(() =>
+    seedFacilityVenueId(initialWorkspaceData)
+  )
+  const [facilityLocationLabel, setFacilityLocationLabel] = React.useState(() =>
+    seedFacilityLocationLabel(initialWorkspaceData)
+  )
+  const [spaceReleaseOpen, setSpaceReleaseOpen] = React.useState(false)
   const selectedInstructorIdRef = React.useRef(primaryInstructorId)
   const [gender, setGender] = React.useState<ProgramGender>(() =>
     normalizeGender(initialOffering.gender)
@@ -201,6 +242,9 @@ export function OfferingEditDialog({
     setEnrollmentOpenDate(initialOffering.enrollment_open_date || "")
     setEnrollmentCloseDate(initialOffering.enrollment_close_date || "")
     setPrimaryInstructorId(getPrimaryInstructorContactId(initialWorkspaceData))
+    setFacilityVenueId(seedFacilityVenueId(initialWorkspaceData))
+    setFacilityLocationLabel(seedFacilityLocationLabel(initialWorkspaceData))
+    setSpaceReleaseOpen(false)
     setGender(normalizeGender(initialOffering.gender))
     setMinAge(initialOffering.min_age ?? null)
     setMaxAge(initialOffering.max_age ?? null)
@@ -303,6 +347,35 @@ export function OfferingEditDialog({
     })
   }
 
+  async function persistFacilitySpace() {
+    const venueName =
+      facilityVenueId
+        ? workspaceData.venues.find((venue) => venue.id === facilityVenueId)
+            ?.name ?? null
+        : null
+    await setOfferingScheduleFacility({
+      program_id: program.id,
+      offering_id: offering.id,
+      venue_id: deliveryFormat === "online" ? null : facilityVenueId || null,
+      location:
+        deliveryFormat === "online"
+          ? null
+          : venueName || facilityLocationLabel.trim() || null,
+    })
+  }
+
+  function requestSave() {
+    if (
+      deliveryFormat === "online" &&
+      (offeringHasFacilitySpace(workspaceData.scheduleItems) ||
+        Boolean(facilityLocationLabel.trim()))
+    ) {
+      setSpaceReleaseOpen(true)
+      return
+    }
+    void handleSave()
+  }
+
   async function handleSave() {
     const trimmedName = name.trim()
     if (!trimmedName) {
@@ -367,6 +440,8 @@ export function OfferingEditDialog({
         }
       }
 
+      await persistFacilitySpace()
+
       setOffering(updated)
       setWorkspaceData((current) => ({
         ...current,
@@ -415,7 +490,19 @@ export function OfferingEditDialog({
     capacity: parseOptionalNumber(capacity) ?? 0,
   }
 
+  const reservedSpaceLabels = getOfferingFacilityLabels(
+    workspaceData.scheduleItems,
+    workspaceData.venues
+  )
+  const reservedSpaceText =
+    reservedSpaceLabels.length === 0
+      ? "the assigned space"
+      : reservedSpaceLabels.length === 1
+        ? reservedSpaceLabels[0]
+        : reservedSpaceLabels.join(" and ")
+
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[90vh] max-w-2xl flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
         <DialogHeader className="shrink-0 space-y-1.5 border-b px-6 py-4 text-left">
@@ -451,12 +538,21 @@ export function OfferingEditDialog({
               minAge,
               maxAge,
               capacity,
+              facilityVenueId,
+              facilityLocationLabel,
             }}
+            venues={workspaceData.venues}
             onChange={(patch) => {
               if (patch.kind !== undefined) setProgramKind(patch.kind)
               if (patch.name !== undefined) setName(patch.name)
               if (patch.deliveryFormat !== undefined) {
                 setDeliveryFormat(patch.deliveryFormat)
+              }
+              if (patch.facilityVenueId !== undefined) {
+                setFacilityVenueId(patch.facilityVenueId)
+              }
+              if (patch.facilityLocationLabel !== undefined) {
+                setFacilityLocationLabel(patch.facilityLocationLabel)
               }
               if (patch.status !== undefined) setStatus(patch.status)
               if (patch.startDate !== undefined) setStartDate(patch.startDate)
@@ -536,6 +632,8 @@ export function OfferingEditDialog({
                     offering={offering}
                     workspaceData={workspaceData}
                     variant="simple"
+                    deliveryFormat={deliveryFormat}
+                    facilityVenueId={facilityVenueId}
                     saveHandlerRef={scheduleSaveRef}
                     disabled={isSaving || isDeleting}
                   />
@@ -683,7 +781,7 @@ export function OfferingEditDialog({
             <Button
               type="button"
               className="bg-sky-600 hover:bg-sky-700"
-              onClick={() => void handleSave()}
+              onClick={() => void requestSave()}
               disabled={isSaving || isDeleting || !name.trim()}
             >
               {isSaving ? (
@@ -699,5 +797,39 @@ export function OfferingEditDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <AlertDialog open={spaceReleaseOpen} onOpenChange={setSpaceReleaseOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Release this space?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This class currently lists {reservedSpaceText} on the Facilities
+            calendar. Saving as Online will remove the space from this class
+            and clear those times from the calendar.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isSaving}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            disabled={isSaving}
+            onClick={(event) => {
+              event.preventDefault()
+              setSpaceReleaseOpen(false)
+              void handleSave()
+            }}
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Saving…
+              </>
+            ) : (
+              "Release space and save"
+            )}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   )
 }

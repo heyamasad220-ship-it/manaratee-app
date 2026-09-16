@@ -123,7 +123,7 @@ export function OrderDetailPanel({ order, open, onOpenChange }: OrderDetailPanel
           <Separator />
 
           <div className="py-4 text-sm text-muted-foreground">
-            Staff can issue full or partial refunds from the event Attendees tab.
+            Staff can issue full or partial refunds from the event Orders tab.
           </div>
         </div>
 

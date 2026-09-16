@@ -1,0 +1,2370 @@
+{
+  "totalsByClass": {
+    "other": {
+      "count": 1549,
+      "amount": 157250.11,
+      "zero": 40,
+      "programs": {
+        "Istiqamah Institute": 16,
+        "Quran Institute Junior 26-27": 5,
+        "Game Night": 24,
+        "Self-Defense & Taekwondo for All Levels": 8,
+        "Quran Institute for Brothers": 88,
+        "The Companion of The Quran 26-27": 3,
+        "Rijaal Age 14+ (Group 1)": 29,
+        "QI - Recitation Improvement (July)": 4,
+        "Self-Defense & Taekwondo for Women (April - June) 2026": 27,
+        "Ages 9-99 Qur’anic Arabic Summer Intensive on Zoom": 1,
+        "QI - Recitation Improvement (June)": 6,
+        "Kids Arabic Reading & Writing Summer Program": 1,
+        "Summer Hifth Review Program (Ages 8–16)": 1,
+        "Rijaal Age 10-13 (Group 1 - 2nd Year)": 70,
+        "Rijaal Age 10-13 (Group 2 - 1st Year)": 55,
+        "Rijaal Age 7-9 (Group 1)": 18,
+        "MUHSEN": 36,
+        "Arabic Language Club": 127,
+        "The Companion Of The Quran": 41,
+        "Kids Saturday Quranic Arabic Program": 86,
+        "Quranic Arabic Program 2025-2026": 79,
+        "Quran Institute Junior (Part Time Hifth)": 48,
+        "Self-Defense & Taekwondo with Samira: Nov 2025 - Feb 2026": 46,
+        "Winter Camp 2025 (Dec 22nd - Jan 1st)": 66,
+        "Zoom Quranic Arabic Intensive December": 2,
+        "Fall Camp 2025 (November 24 - 27)": 28,
+        "Self-Defense & Taekwondo with Samira": 39,
+        "الأربعين النووية & متن الأجرومية": 18,
+        "Zoom Arabic Intensive 1C": 2,
+        "Middle School Girls Soccor": 1,
+        "Swimming Course 2 - August": 26,
+        "Zoom Arabic Intensive 1B, and 1C": 3,
+        "Zoom Arabic Intensive Book 1A": 1,
+        "Zoom Arabic Intensive 1B": 1,
+        "Swimming Course 1 - Boys all ages": 20,
+        "Quranic Arabic - Intensive 3 Day Program": 15,
+        "Self-Defense & Taekwondo with Samira - Intermediate": 20,
+        "Self-Defense & Taekwondo with Samira - Beginner": 20,
+        "Field Trip 4-5 Yrs": 28,
+        "Field Trip 9-14 Girls": 55,
+        "Field Trip 6-9 Boys & 6-8 Girls": 63,
+        "Quranic Arabic Program": 105,
+        "Boys Juniors Leadership 7-9": 50,
+        "Boys Youth Leadership 10-13": 35,
+        "Spring Camp": 8,
+        "Self-Defense & Taekwondo with Samira - Beginners": 6,
+        "Winter Camp - Ready, Set, Pray": 57,
+        "MAS Fall Camp November 2024": 41,
+        "MAS Fall Camp 2024": 17,
+        "Self-Defense & Taekwondo with Samira Intermediate Class": 2,
+        "Self-Defense & Taekwondo with Samira Beginner’s Class": 1
+      },
+      "dateRange": null
+    },
+    "qil_2026_27": {
+      "count": 212,
+      "amount": 21265,
+      "zero": 4,
+      "programs": {
+        "Quran Institute for Ladies 2026-2027": 6,
+        "Quran Institute For Ladies 2026-2027": 41,
+        "Quran Institure for Ladies 2026-2027": 14,
+        "Quran Institute for Ladies 2025-2026": 151
+      },
+      "dateRange": {
+        "min": "2025-08-25",
+        "max": "2026-08-29"
+      }
+    },
+    "qlh_2026_27": {
+      "count": 25,
+      "amount": 3939,
+      "zero": 0,
+      "programs": {
+        "Quran 4 Little Hearts 26-27": 25
+      },
+      "dateRange": {
+        "min": "2026-08-01",
+        "max": "2026-08-28"
+      }
+    },
+    "camp_2026_main": {
+      "count": 367,
+      "amount": 223572.5,
+      "zero": 24,
+      "programs": {
+        "2026 MAS Summer Camp Two (6/29 - 7/23)": 141,
+        "2026 MAS Summer Camp One (June)": 226
+      },
+      "dateRange": {
+        "min": "2026-04-01",
+        "max": "2026-07-21"
+      }
+    },
+    "qlh_2025_26": {
+      "count": 427,
+      "amount": 68031.84,
+      "zero": 0,
+      "programs": {
+        "Quran 4 Little Hearts 25-26": 427
+      },
+      "dateRange": {
+        "min": "2025-08-01",
+        "max": "2026-06-29"
+      }
+    },
+    "camp_2026_youth": {
+      "count": 31,
+      "amount": 15150,
+      "zero": 1,
+      "programs": {
+        "3rd Annual Youth Intensive Summer Camp 2026": 31
+      },
+      "dateRange": {
+        "min": "2026-04-30",
+        "max": "2026-06-23"
+      }
+    },
+    "camp_special_needs": {
+      "count": 3,
+      "amount": 630,
+      "zero": 0,
+      "programs": {
+        "Special Needs Summer Camp": 3
+      },
+      "dateRange": {
+        "min": "2026-05-30",
+        "max": "2026-06-09"
+      }
+    },
+    "ss_2025_26": {
+      "count": 654,
+      "amount": 111998.82,
+      "zero": 2,
+      "programs": {
+        "25-26 Sunday School": 654
+      },
+      "dateRange": null
+    },
+    "ss_lunch": {
+      "count": 386,
+      "amount": 5860,
+      "zero": 0,
+      "programs": {
+        "Sunday School Lunch Ticket": 386
+      },
+      "dateRange": null
+    },
+    "ss_2026_27": {
+      "count": 16,
+      "amount": 4742.82,
+      "zero": 1,
+      "programs": {
+        "Sunday School 26/27": 16
+      },
+      "dateRange": {
+        "min": "2026-04-12",
+        "max": "2026-04-14"
+      }
+    },
+    "camp_2025": {
+      "count": 397,
+      "amount": 211167.5,
+      "zero": 40,
+      "programs": {
+        "2025 MAS Summer - Camp 2 (July)": 174,
+        "2025 MAS Summer - Camp 1 (June)": 190,
+        "2nd Annual Youth Intensive Summer Camp 2025": 33
+      },
+      "dateRange": null
+    },
+    "ss_muhsen": {
+      "count": 46,
+      "amount": 6440,
+      "zero": 0,
+      "programs": {
+        "Muhsen Sunday School": 46
+      },
+      "dateRange": {
+        "min": "2024-10-08",
+        "max": "2025-06-03"
+      }
+    },
+    "ss_2024_25": {
+      "count": 640,
+      "amount": 112772.8,
+      "zero": 0,
+      "programs": {
+        "2024/2025 Sunday School (Boys & Girls)": 640
+      },
+      "dateRange": null
+    },
+    "qlh_2024_25": {
+      "count": 210,
+      "amount": 30931,
+      "zero": 0,
+      "programs": {
+        "Quran 4 Little Hearts (2024/2025)": 210
+      },
+      "dateRange": {
+        "min": "2024-09-26",
+        "max": "2025-05-26"
+      }
+    },
+    "qil_other": {
+      "count": 37,
+      "amount": 8200,
+      "zero": 0,
+      "programs": {
+        "Quran Institute for Ladies": 31,
+        "Quran Institute For Ladies": 6
+      },
+      "dateRange": {
+        "min": "2024-09-24",
+        "max": "2025-02-05"
+      }
+    }
+  },
+  "zeroByProgram": {
+    "Quran Institute For Ladies 2026-2027": 2,
+    "2026 MAS Summer Camp Two (6/29 - 7/23)": 14,
+    "2026 MAS Summer Camp One (June)": 10,
+    "3rd Annual Youth Intensive Summer Camp 2026": 1,
+    "Sunday School 26/27": 1,
+    "25-26 Sunday School": 2,
+    "Winter Camp 2025 (Dec 22nd - Jan 1st)": 8,
+    "Fall Camp 2025 (November 24 - 27)": 1,
+    "Quran Institute for Ladies 2025-2026": 2,
+    "Rijaal Age 14+ (Group 1)": 1,
+    "Rijaal Age 10-13 (Group 1 - 2nd Year)": 1,
+    "الأربعين النووية & متن الأجرومية": 18,
+    "2025 MAS Summer - Camp 2 (July)": 19,
+    "Swimming Course 1 - Boys all ages": 1,
+    "2025 MAS Summer - Camp 1 (June)": 19,
+    "Field Trip 9-14 Girls": 1,
+    "2nd Annual Youth Intensive Summer Camp 2025": 2,
+    "Spring Camp": 1,
+    "Winter Camp - Ready, Set, Pray": 5,
+    "MAS Fall Camp November 2024": 1,
+    "Quran Institute for Brothers": 1,
+    "MAS Fall Camp 2024": 1
+  },
+  "afterCutoff": {
+    "qil_2026_27": [
+      {
+        "date": "2026-08-29",
+        "amount": 50,
+        "email": "be_happy_0505@hotmail.com",
+        "name": "hassnae bellamine",
+        "program": "Quran Institute for Ladies 2026-2027"
+      },
+      {
+        "date": "2026-08-27",
+        "amount": 450,
+        "email": "suzan@abudalu.com",
+        "name": "Suzan Qawouq",
+        "program": "Quran Institute For Ladies 2026-2027"
+      }
+    ],
+    "camp_2026_main": [],
+    "ss_2026_27": [],
+    "qlh_2026_27": []
+  },
+  "qil_2026_27": [
+    {
+      "email": "be_happy_0505@hotmail.com",
+      "date": "2026-08-29",
+      "amount": 50,
+      "name": "hassnae bellamine",
+      "program": "Quran Institute for Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "suzan@abudalu.com",
+      "date": "2026-08-27",
+      "amount": 450,
+      "name": "Suzan Qawouq",
+      "program": "Quran Institute For Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "narmeenjmal@gmail.com",
+      "date": "2026-08-24",
+      "amount": 50,
+      "name": "Narmeen Alfahal",
+      "program": "Quran Institute For Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "smm495@hotmail.com",
+      "date": "2026-08-24",
+      "amount": 25,
+      "name": "Abeer Zoubi",
+      "program": "Quran Institure for Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "rowaidaramadan@gmail.com",
+      "date": "2026-08-22",
+      "amount": 900,
+      "name": "Rowaida M Ramadan",
+      "program": "Quran Institute For Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "ymtse04@gmail.com",
+      "date": "2026-08-21",
+      "amount": 50,
+      "name": "Madihah Ahmed",
+      "program": "Quran Institute For Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "wabuelfarah@gmail.com",
+      "date": "2026-08-21",
+      "amount": 50,
+      "name": "Wessam Abuelfarah",
+      "program": "Quran Institute for Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "wafa.manasrah@gmail.com",
+      "date": "2026-08-19",
+      "amount": 50,
+      "name": "Wafa Manasrah",
+      "program": "Quran Institute For Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "rawya.tawfig@gmail.com",
+      "date": "2026-08-19",
+      "amount": 50,
+      "name": "Rawya Tawfig",
+      "program": "Quran Institute For Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "berlantialsawfta@gmail.com",
+      "date": "2026-08-18",
+      "amount": 50,
+      "name": "Birlanti abdalhamid Alsawfta",
+      "program": "Quran Institute For Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "bsoumia@hotmail.com",
+      "date": "2026-08-17",
+      "amount": 50,
+      "name": "Soumia B Bouhlal",
+      "program": "Quran Institute For Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "rhumayra@gmail.com",
+      "date": "2026-08-17",
+      "amount": 50,
+      "name": "Tonazzina Zaman",
+      "program": "Quran Institute For Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "farah.dabbura12@hotmail.com",
+      "date": "2026-08-17",
+      "amount": 50,
+      "name": "Farah Dabbura",
+      "program": "Quran Institute For Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "nematsedeeg@gmail.com",
+      "date": "2026-08-17",
+      "amount": 50,
+      "name": "Nemat Sedeeg Omer",
+      "program": "Quran Institute for Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "hanan.dabaja1@gmail.com",
+      "date": "2026-08-17",
+      "amount": 50,
+      "name": "Hanan Dabaja",
+      "program": "Quran Institute For Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "hiba.hurani@gmail.com",
+      "date": "2026-08-17",
+      "amount": 50,
+      "name": "Hiba Ayed Hurani",
+      "program": "Quran Institute For Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "hjandali@risingstarsacad.com",
+      "date": "2026-08-17",
+      "amount": 50,
+      "name": "Heba Jandali",
+      "program": "Quran Institute For Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "yousif.sarah06@gmail.com",
+      "date": "2026-08-17",
+      "amount": 50,
+      "name": "Sarah Yousif",
+      "program": "Quran Institute for Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "aldaqqanoha@gmail.com",
+      "date": "2026-08-17",
+      "amount": 50,
+      "name": "Nuha Aldaqqa",
+      "program": "Quran Institute For Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "uzma_1947@hotmail.com",
+      "date": "2026-08-17",
+      "amount": 50,
+      "name": "Uzma Shekha",
+      "program": "Quran Institute For Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "noha.el.hendy85@gmail.com",
+      "date": "2026-08-17",
+      "amount": 50,
+      "name": "Noha Abdellatif",
+      "program": "Quran Institute for Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "viola.kh2@gmail.com",
+      "date": "2026-08-17",
+      "amount": 50,
+      "name": "Ola AlKhousi",
+      "program": "Quran Institute For Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "om.kareem@hotmail.com",
+      "date": "2026-08-17",
+      "amount": 50,
+      "name": "Sana Hamdan",
+      "program": "Quran Institute For Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "noha.el.hendy85@gmail.com",
+      "date": "2026-08-17",
+      "amount": 50,
+      "name": "Noha Abdellatif",
+      "program": "Quran Institute For Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "raddwa.abdalla@yahoo.com",
+      "date": "2026-08-17",
+      "amount": 50,
+      "name": "Raddwa Sayed Abdalla",
+      "program": "Quran Institute For Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "ymaligeli@gmail.com",
+      "date": "2026-08-17",
+      "amount": 50,
+      "name": "Yasmeen Maligeli",
+      "program": "Quran Institute For Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "nada12ali@gmail.com",
+      "date": "2026-08-17",
+      "amount": 25,
+      "name": "Nada Saleh",
+      "program": "Quran Institure for Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "safaanwar28@gmail.com",
+      "date": "2026-08-17",
+      "amount": 50,
+      "name": "Safa S siddiqui",
+      "program": "Quran Institute For Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "doumameriem@yahoo.fr",
+      "date": "2026-08-17",
+      "amount": 25,
+      "name": "Meriem Douma",
+      "program": "Quran Institute For Ladies 2026-2027",
+      "coupon": "STAFF-QIL2627-50"
+    },
+    {
+      "email": "nagham.t.issa@gmail.com",
+      "date": "2026-08-17",
+      "amount": 50,
+      "name": "Nagham Issa",
+      "program": "Quran Institute For Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "ghadeerzarkani@yahoo.com",
+      "date": "2026-08-17",
+      "amount": 50,
+      "name": "Ghadeer iPhone Zarkani",
+      "program": "Quran Institute For Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "hmfl99@hotmail.com",
+      "date": "2026-08-17",
+      "amount": 50,
+      "name": "hadeel khuffash",
+      "program": "Quran Institute for Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "newfastlink@yahoo.com",
+      "date": "2026-08-17",
+      "amount": 25,
+      "name": "Fatema Odeh",
+      "program": "Quran Institure for Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "leahsen83@gmail.com",
+      "date": "2026-08-17",
+      "amount": 50,
+      "name": "Leah Antoinette Sen",
+      "program": "Quran Institute For Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "okezin@yahoo.com",
+      "date": "2026-08-17",
+      "amount": 50,
+      "name": "Ozlem Yurttas",
+      "program": "Quran Institute For Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "anum_ghani@hotmail.com",
+      "date": "2026-08-17",
+      "amount": 50,
+      "name": "Anum Zeeshan",
+      "program": "Quran Institute For Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "sadiashakeel123@gmail.com",
+      "date": "2026-08-17",
+      "amount": 50,
+      "name": "Sadia Shakeel",
+      "program": "Quran Institute For Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "ghadakotb35@gmail.com",
+      "date": "2026-08-17",
+      "amount": 50,
+      "name": "Ghada Abofarag",
+      "program": "Quran Institute For Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "rhelkomy@mm.st",
+      "date": "2026-08-17",
+      "amount": 0,
+      "name": "Reda Hussain Elkomy",
+      "program": "Quran Institute For Ladies 2026-2027",
+      "coupon": "FA-QIL2627-100"
+    },
+    {
+      "email": "wafayerrou@gmail.com",
+      "date": "2026-08-17",
+      "amount": 200,
+      "name": "wafa yerrou",
+      "program": "Quran Institure for Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "amin.sarfraz@gmail.com",
+      "date": "2026-08-17",
+      "amount": 400,
+      "name": "Sarfraz Amin",
+      "program": "Quran Institute For Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "m.asmaa0216@gmail.com",
+      "date": "2026-08-16",
+      "amount": 0,
+      "name": "Asmaa Ali",
+      "program": "Quran Institute For Ladies 2026-2027",
+      "coupon": "FA-QIL2627-100"
+    },
+    {
+      "email": "mona1137@yahoo.com",
+      "date": "2026-08-14",
+      "amount": 200,
+      "name": "Mona Alnaeemi",
+      "program": "Quran Institure for Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "hanooninoona@gmail.com",
+      "date": "2026-08-12",
+      "amount": 175,
+      "name": "Hanan Ahmed",
+      "program": "Quran Institute For Ladies 2026-2027",
+      "coupon": "STAFF-QIL2627-50"
+    },
+    {
+      "email": "zainab.irshaid@gmail.com",
+      "date": "2026-08-10",
+      "amount": 200,
+      "name": "Zainab Irshaid",
+      "program": "Quran Institure for Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "zainab.irshaid@gmail.com",
+      "date": "2026-08-10",
+      "amount": 400,
+      "name": "Zainab Irshaid",
+      "program": "Quran Institute For Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "marwataissir@gmail.com",
+      "date": "2026-08-09",
+      "amount": 400,
+      "name": "Marwa Taissir Elgamal",
+      "program": "Quran Institute For Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "nagham.t.issa@gmail.com",
+      "date": "2026-08-08",
+      "amount": 200,
+      "name": "Nagham Issa",
+      "program": "Quran Institure for Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "heba1987hassan@gmail.com",
+      "date": "2026-08-08",
+      "amount": 200,
+      "name": "Heba Hassan",
+      "program": "Quran Institure for Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "eelsaegh@gmail.com",
+      "date": "2026-08-06",
+      "amount": 200,
+      "name": "Enas Elsaegh",
+      "program": "Quran Institure for Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "noor.elaine@gmail.com",
+      "date": "2026-08-02",
+      "amount": 400,
+      "name": "NoorElaine Abushaaban",
+      "program": "Quran Institute For Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "ielghand@gmail.com",
+      "date": "2026-07-24",
+      "amount": 400,
+      "name": "Iman Elghandour",
+      "program": "Quran Institute For Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "elmanawyheba78@gmail.com",
+      "date": "2026-07-01",
+      "amount": 200,
+      "name": "Heba El Manawy",
+      "program": "Quran Institure for Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "elmanawyheba78@gmail.com",
+      "date": "2026-07-01",
+      "amount": 400,
+      "name": "Heba El Manawy",
+      "program": "Quran Institute For Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "imene_17@hotmail.com",
+      "date": "2026-06-22",
+      "amount": 200,
+      "name": "Imene Latreche",
+      "program": "Quran Institure for Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "nurercoskun@gmail.com",
+      "date": "2026-06-16",
+      "amount": 400,
+      "name": "Beyza Sahin",
+      "program": "Quran Institute For Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "emybaq81@hotmail.fr",
+      "date": "2026-06-16",
+      "amount": 200,
+      "name": "Iman Ettabaq",
+      "program": "Quran Institure for Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "bsoumia@hotmail.com",
+      "date": "2026-06-16",
+      "amount": 200,
+      "name": "Soumia B Bouhlal",
+      "program": "Quran Institure for Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "elmanawyheba78@gmail.com",
+      "date": "2026-06-12",
+      "amount": 400,
+      "name": "Heba El Manawy",
+      "program": "Quran Institute For Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "saralifecoach20@gmail.com",
+      "date": "2026-06-11",
+      "amount": 400,
+      "name": "Sara Kenana",
+      "program": "Quran Institute For Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "saralifecoach20@gmail.com",
+      "date": "2026-06-11",
+      "amount": 200,
+      "name": "Sara Kenana",
+      "program": "Quran Institure for Ladies 2026-2027",
+      "coupon": ""
+    },
+    {
+      "email": "maramahlas604@gmail.com",
+      "date": "2026-04-06",
+      "amount": 30,
+      "name": "Maram Alahlas",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": "FA-QI4L2526-40"
+    },
+    {
+      "email": "farahth.2012@yahoo.com",
+      "date": "2026-04-02",
+      "amount": 50,
+      "name": "Farah Hashim",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "haneenkhalil231@gmail.com",
+      "date": "2026-04-02",
+      "amount": 50,
+      "name": "Haneen Emad Mohammed",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "farah.dabbura12@hotmail.com",
+      "date": "2026-04-02",
+      "amount": 50,
+      "name": "Farah Dabbura",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "mimiaradi123@gmail.com",
+      "date": "2026-04-02",
+      "amount": 50,
+      "name": "Maha Abouradi",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "abeer.d3@gmail.com",
+      "date": "2026-04-02",
+      "amount": 50,
+      "name": "Abeer Alnaji",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "arooj.b@gmail.com",
+      "date": "2026-04-02",
+      "amount": 50,
+      "name": "Arooj Butt",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "rshiblaq90@gmail.com",
+      "date": "2026-04-02",
+      "amount": 50,
+      "name": "Rawand Shiblaq",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "myfa2008@gmail.com",
+      "date": "2026-04-02",
+      "amount": 50,
+      "name": "Maha Yousof Alaqrabi",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "hmfl99@hotmail.com",
+      "date": "2026-04-02",
+      "amount": 50,
+      "name": "hadeel khuffash",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "lakiyou13@gmail.com",
+      "date": "2026-04-02",
+      "amount": 50,
+      "name": "Mariam yasin",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "ayoubsouzan@yahoo.com",
+      "date": "2026-04-02",
+      "amount": 50,
+      "name": "Souzan Ayoub",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "farahth.2012@yahoo.com",
+      "date": "2026-03-02",
+      "amount": 50,
+      "name": "Farah Hashim",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "haneenkhalil231@gmail.com",
+      "date": "2026-03-02",
+      "amount": 50,
+      "name": "Haneen Emad Mohammed",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "maramahlas604@gmail.com",
+      "date": "2026-03-02",
+      "amount": 30,
+      "name": "Maram Alahlas",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": "FA-QI4L2526-40"
+    },
+    {
+      "email": "farah.dabbura12@hotmail.com",
+      "date": "2026-03-02",
+      "amount": 50,
+      "name": "Farah Dabbura",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "mimiaradi123@gmail.com",
+      "date": "2026-03-02",
+      "amount": 50,
+      "name": "Maha Abouradi",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "abeer.d3@gmail.com",
+      "date": "2026-03-02",
+      "amount": 50,
+      "name": "Abeer Alnaji",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "arooj.b@gmail.com",
+      "date": "2026-03-02",
+      "amount": 50,
+      "name": "Arooj Butt",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "rshiblaq90@gmail.com",
+      "date": "2026-03-02",
+      "amount": 50,
+      "name": "Rawand Shiblaq",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "myfa2008@gmail.com",
+      "date": "2026-03-02",
+      "amount": 50,
+      "name": "Maha Yousof Alaqrabi",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "hmfl99@hotmail.com",
+      "date": "2026-03-02",
+      "amount": 50,
+      "name": "hadeel khuffash",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "lakiyou13@gmail.com",
+      "date": "2026-03-02",
+      "amount": 50,
+      "name": "Mariam yasin",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "ayoubsouzan@yahoo.com",
+      "date": "2026-03-02",
+      "amount": 50,
+      "name": "Souzan Ayoub",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "narmeenjmal@gmail.com",
+      "date": "2026-02-02",
+      "amount": 50,
+      "name": "Narmeen Gamal Alfahal",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "farahth.2012@yahoo.com",
+      "date": "2026-02-02",
+      "amount": 50,
+      "name": "Farah Hashim",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "haneenkhalil231@gmail.com",
+      "date": "2026-02-02",
+      "amount": 50,
+      "name": "Haneen Emad Mohammed",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "maramahlas604@gmail.com",
+      "date": "2026-02-02",
+      "amount": 30,
+      "name": "Maram Alahlas",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": "FA-QI4L2526-40"
+    },
+    {
+      "email": "farah.dabbura12@hotmail.com",
+      "date": "2026-02-02",
+      "amount": 50,
+      "name": "Farah Dabbura",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "mimiaradi123@gmail.com",
+      "date": "2026-02-02",
+      "amount": 50,
+      "name": "Maha Abouradi",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "abeer.d3@gmail.com",
+      "date": "2026-02-02",
+      "amount": 50,
+      "name": "Abeer Alnaji",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "arooj.b@gmail.com",
+      "date": "2026-02-02",
+      "amount": 50,
+      "name": "Arooj Butt",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "rshiblaq90@gmail.com",
+      "date": "2026-02-02",
+      "amount": 50,
+      "name": "Rawand Shiblaq",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "myfa2008@gmail.com",
+      "date": "2026-02-02",
+      "amount": 50,
+      "name": "Maha Yousof Alaqrabi",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "hmfl99@hotmail.com",
+      "date": "2026-02-02",
+      "amount": 50,
+      "name": "hadeel khuffash",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "lakiyou13@gmail.com",
+      "date": "2026-02-02",
+      "amount": 50,
+      "name": "Mariam yasin",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "ayoubsouzan@yahoo.com",
+      "date": "2026-02-02",
+      "amount": 50,
+      "name": "Souzan Ayoub",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "laylaeido83@gmail.com",
+      "date": "2026-01-31",
+      "amount": 50,
+      "name": "Layla Hammoude",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "lena0809@gmail.com",
+      "date": "2026-01-12",
+      "amount": 200,
+      "name": "Lena Alkhateeb",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "narmeenjmal@gmail.com",
+      "date": "2026-01-02",
+      "amount": 50,
+      "name": "Narmeen Gamal Alfahal",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "farahth.2012@yahoo.com",
+      "date": "2026-01-02",
+      "amount": 50,
+      "name": "Farah Hashim",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "haneenkhalil231@gmail.com",
+      "date": "2026-01-02",
+      "amount": 50,
+      "name": "Haneen Emad Mohammed",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "maramahlas604@gmail.com",
+      "date": "2026-01-02",
+      "amount": 30,
+      "name": "Maram Alahlas",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": "FA-QI4L2526-40"
+    },
+    {
+      "email": "farah.dabbura12@hotmail.com",
+      "date": "2026-01-02",
+      "amount": 50,
+      "name": "Farah Dabbura",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "mimiaradi123@gmail.com",
+      "date": "2026-01-02",
+      "amount": 50,
+      "name": "Maha Abouradi",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "abeer.d3@gmail.com",
+      "date": "2026-01-02",
+      "amount": 50,
+      "name": "Abeer Alnaji",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "arooj.b@gmail.com",
+      "date": "2026-01-02",
+      "amount": 50,
+      "name": "Arooj Butt",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "rshiblaq90@gmail.com",
+      "date": "2026-01-02",
+      "amount": 50,
+      "name": "Rawand Shiblaq",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "myfa2008@gmail.com",
+      "date": "2026-01-02",
+      "amount": 50,
+      "name": "Maha Yousof Alaqrabi",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "hmfl99@hotmail.com",
+      "date": "2026-01-02",
+      "amount": 50,
+      "name": "hadeel khuffash",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "lakiyou13@gmail.com",
+      "date": "2026-01-02",
+      "amount": 50,
+      "name": "Mariam yasin",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "ayoubsouzan@yahoo.com",
+      "date": "2026-01-02",
+      "amount": 50,
+      "name": "Souzan Ayoub",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "narmeenjmal@gmail.com",
+      "date": "2025-12-02",
+      "amount": 50,
+      "name": "Narmeen Gamal Alfahal",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "farahth.2012@yahoo.com",
+      "date": "2025-12-02",
+      "amount": 50,
+      "name": "Farah Hashim",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "laylaeido83@gmail.com",
+      "date": "2025-12-02",
+      "amount": 50,
+      "name": "Layla Hammoude",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "haneenkhalil231@gmail.com",
+      "date": "2025-12-02",
+      "amount": 50,
+      "name": "Haneen Emad Mohammed",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "maramahlas604@gmail.com",
+      "date": "2025-12-02",
+      "amount": 30,
+      "name": "Maram Alahlas",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": "FA-QI4L2526-40"
+    },
+    {
+      "email": "farah.dabbura12@hotmail.com",
+      "date": "2025-12-02",
+      "amount": 50,
+      "name": "Farah Dabbura",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "mimiaradi123@gmail.com",
+      "date": "2025-12-02",
+      "amount": 50,
+      "name": "Maha Abouradi",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "abeer.d3@gmail.com",
+      "date": "2025-12-02",
+      "amount": 50,
+      "name": "Abeer Alnaji",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "rshiblaq90@gmail.com",
+      "date": "2025-12-02",
+      "amount": 50,
+      "name": "Rawand Shiblaq",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "myfa2008@gmail.com",
+      "date": "2025-12-02",
+      "amount": 50,
+      "name": "Maha Yousof Alaqrabi",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "hmfl99@hotmail.com",
+      "date": "2025-12-02",
+      "amount": 50,
+      "name": "hadeel khuffash",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "lakiyou13@gmail.com",
+      "date": "2025-12-02",
+      "amount": 50,
+      "name": "Mariam yasin",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "ayoubsouzan@yahoo.com",
+      "date": "2025-12-02",
+      "amount": 50,
+      "name": "Souzan Ayoub",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "narmeenjmal@gmail.com",
+      "date": "2025-11-02",
+      "amount": 50,
+      "name": "Narmeen Gamal Alfahal",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "farahth.2012@yahoo.com",
+      "date": "2025-11-02",
+      "amount": 50,
+      "name": "Farah Hashim",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "laylaeido83@gmail.com",
+      "date": "2025-11-02",
+      "amount": 50,
+      "name": "Layla Hammoude",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "haneenkhalil231@gmail.com",
+      "date": "2025-11-02",
+      "amount": 50,
+      "name": "Haneen Emad Mohammed",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "maramahlas604@gmail.com",
+      "date": "2025-11-02",
+      "amount": 30,
+      "name": "Maram Alahlas",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": "FA-QI4L2526-40"
+    },
+    {
+      "email": "farah.dabbura12@hotmail.com",
+      "date": "2025-11-02",
+      "amount": 50,
+      "name": "Farah Dabbura",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "mimiaradi123@gmail.com",
+      "date": "2025-11-02",
+      "amount": 50,
+      "name": "Maha Abouradi",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "abeer.d3@gmail.com",
+      "date": "2025-11-02",
+      "amount": 50,
+      "name": "Abeer Alnaji",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "arooj.b@gmail.com",
+      "date": "2025-11-02",
+      "amount": 50,
+      "name": "Arooj Butt",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "rshiblaq90@gmail.com",
+      "date": "2025-11-02",
+      "amount": 50,
+      "name": "Rawand Shiblaq",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "myfa2008@gmail.com",
+      "date": "2025-11-02",
+      "amount": 50,
+      "name": "Maha Yousof Alaqrabi",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "muna.hamadah@gmail.com",
+      "date": "2025-11-02",
+      "amount": 50,
+      "name": "Muna Hamadah",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "kokierek84@gmail.com",
+      "date": "2025-11-02",
+      "amount": 50,
+      "name": "Ghina Ereksousi",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "sab2008reen@live.com",
+      "date": "2025-11-02",
+      "amount": 50,
+      "name": "Sabreen F I Taha",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "ielghand@gmail.com",
+      "date": "2025-11-02",
+      "amount": 50,
+      "name": "Iman Elghandour",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "hmfl99@hotmail.com",
+      "date": "2025-11-02",
+      "amount": 50,
+      "name": "hadeel khuffash",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "nematsedeeg@gmail.com",
+      "date": "2025-11-02",
+      "amount": 50,
+      "name": "Nemat Sedeeg Omer",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "lakiyou13@gmail.com",
+      "date": "2025-11-02",
+      "amount": 50,
+      "name": "Mariam yasin",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "ayoubsouzan@yahoo.com",
+      "date": "2025-11-02",
+      "amount": 50,
+      "name": "Souzan Ayoub",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "maramahlas604@gmail.com",
+      "date": "2025-10-03",
+      "amount": 30,
+      "name": "Maram Alahlas",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": "FA-QI4L2526-40"
+    },
+    {
+      "email": "narmeenjmal@gmail.com",
+      "date": "2025-10-02",
+      "amount": 50,
+      "name": "Narmeen Gamal Alfahal",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "farahth.2012@yahoo.com",
+      "date": "2025-10-02",
+      "amount": 50,
+      "name": "Farah Hashim",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "houranialia3@gmail.com",
+      "date": "2025-10-02",
+      "amount": 50,
+      "name": "Alia Hourani",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "maha.medhat@gmail.com",
+      "date": "2025-10-02",
+      "amount": 12.5,
+      "name": "Maha Fakhry",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": "RF-QI4L2526-75"
+    },
+    {
+      "email": "laylaeido83@gmail.com",
+      "date": "2025-10-02",
+      "amount": 50,
+      "name": "Layla Hammoude",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "haneenkhalil231@gmail.com",
+      "date": "2025-10-02",
+      "amount": 50,
+      "name": "Haneen Emad Mohammed",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "yousra.eldemairy@gmail.com",
+      "date": "2025-10-02",
+      "amount": 12.5,
+      "name": "Yousra Eldemairy",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": "RF-QI4L2526-75"
+    },
+    {
+      "email": "farah.dabbura12@hotmail.com",
+      "date": "2025-10-02",
+      "amount": 50,
+      "name": "Farah Dabbura",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "mimiaradi123@gmail.com",
+      "date": "2025-10-02",
+      "amount": 50,
+      "name": "Maha Abouradi",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "abeer.d3@gmail.com",
+      "date": "2025-10-02",
+      "amount": 50,
+      "name": "Abeer Alnaji",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "arooj.b@gmail.com",
+      "date": "2025-10-02",
+      "amount": 50,
+      "name": "Arooj Butt",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "rshiblaq90@gmail.com",
+      "date": "2025-10-02",
+      "amount": 50,
+      "name": "Rawand Shiblaq",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "myfa2008@gmail.com",
+      "date": "2025-10-02",
+      "amount": 50,
+      "name": "Maha Yousof Alaqrabi",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "muna.hamadah@gmail.com",
+      "date": "2025-10-02",
+      "amount": 50,
+      "name": "Muna Hamadah",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "kokierek84@gmail.com",
+      "date": "2025-10-02",
+      "amount": 50,
+      "name": "Ghina Ereksousi",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "sab2008reen@live.com",
+      "date": "2025-10-02",
+      "amount": 50,
+      "name": "Sabreen F I Taha",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "ielghand@gmail.com",
+      "date": "2025-10-02",
+      "amount": 50,
+      "name": "Iman Elghandour",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "hmfl99@hotmail.com",
+      "date": "2025-10-02",
+      "amount": 50,
+      "name": "hadeel khuffash",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "lakiyou13@gmail.com",
+      "date": "2025-10-02",
+      "amount": 50,
+      "name": "Mariam yasin",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "ayoubsouzan@yahoo.com",
+      "date": "2025-10-02",
+      "amount": 50,
+      "name": "Souzan Ayoub",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "ameeraica@hotmail.com",
+      "date": "2025-10-02",
+      "amount": 350,
+      "name": "Ameera Mustafa Basheer",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "safamstf12@gmail.com",
+      "date": "2025-10-02",
+      "amount": 350,
+      "name": "Safa Mustafa",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "walkarkhi@gmail.com",
+      "date": "2025-10-01",
+      "amount": 0,
+      "name": "Roqaiyah Sameer Janabee",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": "FA-QI4L2526-100"
+    },
+    {
+      "email": "farahth.2012@yahoo.com",
+      "date": "2025-09-29",
+      "amount": 50,
+      "name": "Farah Hashim",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "lamiaa15@yahoo.com",
+      "date": "2025-09-28",
+      "amount": 100,
+      "name": "Lamyaa Moustafa",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": "RF-QI4L2526-75"
+    },
+    {
+      "email": "houranialia3@gmail.com",
+      "date": "2025-09-26",
+      "amount": 50,
+      "name": "Alia Hourani",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "rowaidaramadan@gmail.com",
+      "date": "2025-09-26",
+      "amount": 400,
+      "name": "Rowaida M Ramadan",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "maha.medhat@gmail.com",
+      "date": "2025-09-26",
+      "amount": 12.5,
+      "name": "Maha Fakhry",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": "RF-QI4L2526-75"
+    },
+    {
+      "email": "laylaeido83@gmail.com",
+      "date": "2025-09-26",
+      "amount": 50,
+      "name": "Layla Hammoude",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "haneenkhalil231@gmail.com",
+      "date": "2025-09-25",
+      "amount": 50,
+      "name": "Haneen Emad Mohammed",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "lubna.abdallah27@gmail.com",
+      "date": "2025-09-25",
+      "amount": 100,
+      "name": "Lubna Abdallah",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": "RF-QI4L2526-75"
+    },
+    {
+      "email": "wallaabdelghani@yahoo.com",
+      "date": "2025-09-25",
+      "amount": 100,
+      "name": "Abdallah Asmar",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": "RF-QI4L2526-75"
+    },
+    {
+      "email": "yousra.eldemairy@gmail.com",
+      "date": "2025-09-25",
+      "amount": 12.5,
+      "name": "Yousra Eldemairy",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": "RF-QI4L2526-75"
+    },
+    {
+      "email": "maramahlas604@gmail.com",
+      "date": "2025-09-22",
+      "amount": 30,
+      "name": "Maram Alahlas",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": "FA-QI4L2526-40"
+    },
+    {
+      "email": "farah.dabbura12@hotmail.com",
+      "date": "2025-09-19",
+      "amount": 50,
+      "name": "Farah Dabbura",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "mimiaradi123@gmail.com",
+      "date": "2025-09-17",
+      "amount": 50,
+      "name": "Maha Abouradi",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "abeer.d3@gmail.com",
+      "date": "2025-09-16",
+      "amount": 50,
+      "name": "Abeer Alnaji",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "yousif.sarah06@gmail.com",
+      "date": "2025-09-16",
+      "amount": 200,
+      "name": "Sarah Yousif",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": "HP-QI4L2526-50"
+    },
+    {
+      "email": "elmanawyheba78@gmail.com",
+      "date": "2025-09-16",
+      "amount": 400,
+      "name": "Heba El Manawy",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "arooj.b@gmail.com",
+      "date": "2025-09-16",
+      "amount": 50,
+      "name": "Arooj Butt",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "arooj.b@gmail.com",
+      "date": "2025-09-16",
+      "amount": 50,
+      "name": "Arooj Butt",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "rshiblaq90@gmail.com",
+      "date": "2025-09-14",
+      "amount": 50,
+      "name": "Rawand Shiblaq",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "amin.sarfraz@gmail.com",
+      "date": "2025-09-13",
+      "amount": 200,
+      "name": "Sarfraz Amin",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": "HP-QI4L2526-50"
+    },
+    {
+      "email": "marwataissir@gmail.com",
+      "date": "2025-09-13",
+      "amount": 100,
+      "name": "Marwa Taissir Elgamal",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": "RF-QI4L2526-75"
+    },
+    {
+      "email": "amalalahlas32@gmail.com",
+      "date": "2025-09-13",
+      "amount": 400,
+      "name": "Amal Alahlas",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "mtawfig88@gmail.com",
+      "date": "2025-09-12",
+      "amount": 100,
+      "name": "Magda A Tawfig",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": "RF-QI4L2526-75"
+    },
+    {
+      "email": "emanayed85@gmail.com",
+      "date": "2025-09-12",
+      "amount": 0,
+      "name": "Eman Alarja",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": "FA-QI4L2526-100"
+    },
+    {
+      "email": "berlantialsawfta@gmail.com",
+      "date": "2025-09-11",
+      "amount": 400,
+      "name": "Birlanti abdalhamid Alsawfta",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "noha.el.hendy85@gmail.com",
+      "date": "2025-09-11",
+      "amount": 400,
+      "name": "Noha Abdellatif",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "ansamizzat@gmail.com",
+      "date": "2025-09-11",
+      "amount": 100,
+      "name": "Ansam Abdelelah Izzat",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": "RF-QI4L2526-75"
+    },
+    {
+      "email": "susanqalawi@gmail.com",
+      "date": "2025-09-11",
+      "amount": 200,
+      "name": "Susan Basem Qalawi",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": "HP-QI4L2526-50"
+    },
+    {
+      "email": "imene_17@hotmail.com",
+      "date": "2025-09-11",
+      "amount": 100,
+      "name": "Imene Latreche",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": "RF-QI4L2526-75"
+    },
+    {
+      "email": "suzan@abudalu.com",
+      "date": "2025-09-11",
+      "amount": 400,
+      "name": "Suzan Qawouq",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "zohourhawa83@gmail.com",
+      "date": "2025-09-11",
+      "amount": 400,
+      "name": "Zohour Hawa",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "myfa2008@gmail.com",
+      "date": "2025-09-10",
+      "amount": 50,
+      "name": "Maha Yousof Alaqrabi",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "muna.hamadah@gmail.com",
+      "date": "2025-09-10",
+      "amount": 50,
+      "name": "Muna Hamadah",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "kokierek84@gmail.com",
+      "date": "2025-09-10",
+      "amount": 50,
+      "name": "Ghina Ereksousi",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "sab2008reen@live.com",
+      "date": "2025-09-10",
+      "amount": 50,
+      "name": "Sabreen F I Taha",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "aldaqqanoha@gmail.com",
+      "date": "2025-09-08",
+      "amount": 400,
+      "name": "Nuha Aldaqqa",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "zainab.irshaid@gmail.com",
+      "date": "2025-09-03",
+      "amount": 400,
+      "name": "Zainab Irshaid",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "ielghand@gmail.com",
+      "date": "2025-09-02",
+      "amount": 50,
+      "name": "Iman Elghandour",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "hmfl99@hotmail.com",
+      "date": "2025-09-02",
+      "amount": 50,
+      "name": "hadeel khuffash",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "lakiyou13@gmail.com",
+      "date": "2025-09-02",
+      "amount": 50,
+      "name": "Mariam yasin",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "ayoubsouzan@yahoo.com",
+      "date": "2025-09-02",
+      "amount": 50,
+      "name": "Souzan Ayoub",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    },
+    {
+      "email": "dania.alhanoun1@gmail.com",
+      "date": "2025-09-01",
+      "amount": 100,
+      "name": "Dania Alhanoun",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": "RF-QI4L2526-75"
+    },
+    {
+      "email": "saralifecoach20@gmail.com",
+      "date": "2025-08-25",
+      "amount": 400,
+      "name": "Sara Kenana",
+      "program": "Quran Institute for Ladies 2025-2026",
+      "coupon": ""
+    }
+  ],
+  "ss_2026_27": [
+    {
+      "email": "heyamasad220@gmail.com",
+      "date": "2026-04-14",
+      "amount": 0,
+      "name": "Heyam Asad",
+      "members": "Zachie Neel,Ihab Neel.",
+      "coupon": "TESTING",
+      "rec": "ONE_TIME"
+    },
+    {
+      "email": "amani.dietitian@gmail.com",
+      "date": "2026-04-14",
+      "amount": 234,
+      "name": "Anas Hallak",
+      "members": "Naya Al Hallak,Ahmad Al Hallak.",
+      "coupon": "",
+      "rec": "MONTHLY"
+    },
+    {
+      "email": "heba.jbara@yahoo.com",
+      "date": "2026-04-14",
+      "amount": 234,
+      "name": "Heba Zaher Jbara",
+      "members": "Sharef Zuhair Hamed,Shahed Zuhair Hamed.",
+      "coupon": "",
+      "rec": "MONTHLY"
+    },
+    {
+      "email": "ayat.abuloum@gmail.com",
+      "date": "2026-04-14",
+      "amount": 234,
+      "name": "Ayat Abuloum",
+      "members": "Layan Alawneh,Zaienh Alawneh.",
+      "coupon": "",
+      "rec": "MONTHLY"
+    },
+    {
+      "email": "ibrahimahsn@gmail.com",
+      "date": "2026-04-14",
+      "amount": 117,
+      "name": "Ibrahim Hassan",
+      "members": "Omar Hassan,Mariam Hassan.",
+      "coupon": "50STAFF",
+      "rec": "MONTHLY"
+    },
+    {
+      "email": "batoolawwad87@gmail.com",
+      "date": "2026-04-14",
+      "amount": 120,
+      "name": "Batool Abu darwish",
+      "members": "Hamzah Khalil.",
+      "coupon": "",
+      "rec": "MONTHLY"
+    },
+    {
+      "email": "raghadabuawwad1998@gmail.com",
+      "date": "2026-04-14",
+      "amount": 120,
+      "name": "Amal Jebarah",
+      "members": "Amal Jebarah.",
+      "coupon": "",
+      "rec": "MONTHLY"
+    },
+    {
+      "email": "majnurse@gmail.com",
+      "date": "2026-04-14",
+      "amount": 120,
+      "name": "Yamin AlQsalieh",
+      "members": "Yamin AlQsalieh.",
+      "coupon": "",
+      "rec": "MONTHLY"
+    },
+    {
+      "email": "yasmine.hisham.ali@gmail.com",
+      "date": "2026-04-14",
+      "amount": 117,
+      "name": "Yasmine Ali",
+      "members": "Jolie Hussein,Malek Hussein.",
+      "coupon": "50STAFF",
+      "rec": "MONTHLY"
+    },
+    {
+      "email": "habiba.irshad@gmail.com",
+      "date": "2026-04-14",
+      "amount": 2042.82,
+      "name": "Habiba Hassan",
+      "members": "Yusuf Hassan,Irha Hassan.",
+      "coupon": "",
+      "rec": "YEARLY"
+    },
+    {
+      "email": "yasminjbara2020@yahoo.com",
+      "date": "2026-04-12",
+      "amount": 120,
+      "name": "Yasmin Jbara",
+      "members": "Hamda Jibawi.",
+      "coupon": "",
+      "rec": "MONTHLY"
+    },
+    {
+      "email": "batoolawwad87@gmail.com",
+      "date": "2026-04-12",
+      "amount": 120,
+      "name": "Batool Abu darwish",
+      "members": "Omar Khalil.",
+      "coupon": "",
+      "rec": "MONTHLY"
+    },
+    {
+      "email": "mona.saleh87@gmail.com",
+      "date": "2026-04-12",
+      "amount": 234,
+      "name": "Mona Ibrahim",
+      "members": "Sahil Tareq,Ella Tareq.",
+      "coupon": "",
+      "rec": "MONTHLY"
+    },
+    {
+      "email": "fadeym5@gmail.com",
+      "date": "2026-04-12",
+      "amount": 462,
+      "name": "Fadey Suleiman",
+      "members": "Kareem Suleiman,Adam Suleiman,Layan Suleiman,Aida Suleiman.",
+      "coupon": "",
+      "rec": "MONTHLY"
+    },
+    {
+      "email": "jbaramalak@yahoo.com",
+      "date": "2026-04-12",
+      "amount": 234,
+      "name": "Malak Jbara",
+      "members": "Rasmi Hijazi,Zuhra Hijazi.",
+      "coupon": "",
+      "rec": "MONTHLY"
+    },
+    {
+      "email": "raghdaasply@gmail.com",
+      "date": "2026-04-12",
+      "amount": 234,
+      "name": "Raghda Kailany",
+      "members": "Rayann Nasir,Lelia Nasir.",
+      "coupon": "",
+      "rec": "MONTHLY"
+    }
+  ],
+  "qlh_2026_27": [
+    {
+      "email": "esraa.shatory@gmail.com",
+      "date": "2026-08-28",
+      "amount": 50,
+      "name": "Esraa Ahmed",
+      "members": "Hana Ahmed.",
+      "coupon": "STAFF-QLH2627-50",
+      "rec": "MONTHLY",
+      "reason": ""
+    },
+    {
+      "email": "manalhakeem@yahoo.com",
+      "date": "2026-08-27",
+      "amount": 100,
+      "name": "Manal Joudeh",
+      "members": "Sima Joudeh.",
+      "coupon": "",
+      "rec": "MONTHLY",
+      "reason": ""
+    },
+    {
+      "email": "nooralsham8073@gmail.com",
+      "date": "2026-08-27",
+      "amount": 145,
+      "name": "Nour Daghstani",
+      "members": "Hanan Abbas,Jana Abbas,Omar Abbas.",
+      "coupon": "STAFF-QLH2627-50",
+      "rec": "MONTHLY",
+      "reason": ""
+    },
+    {
+      "email": "oalnaser94@gmail.com",
+      "date": "2026-08-25",
+      "amount": 100,
+      "name": "Omar Z Alnaser",
+      "members": "Zuhair Omar AlNaser.",
+      "coupon": "",
+      "rec": "MONTHLY",
+      "reason": ""
+    },
+    {
+      "email": "maryam.elsawy@gmail.com",
+      "date": "2026-08-21",
+      "amount": 195,
+      "name": "Maryam Elsawy",
+      "members": "Jude Elbehy,Hana Elbehy.",
+      "coupon": "",
+      "rec": "MONTHLY",
+      "reason": ""
+    },
+    {
+      "email": "walkarkhi@gmail.com",
+      "date": "2026-08-20",
+      "amount": 29,
+      "name": "Roqaiyah Sameer Janabee",
+      "members": "Younis Jbraiel,Firdaus Jbraiel,Sidra Jbraiel",
+      "coupon": "FA-QLH2627-SD",
+      "rec": "MONTHLY",
+      "reason": ""
+    },
+    {
+      "email": "afsaam1234@hotmail.com",
+      "date": "2026-08-20",
+      "amount": 50,
+      "name": "Abdelrahman Afifi",
+      "members": "Lina Afifi.",
+      "coupon": "STAFF-QLH2627-50",
+      "rec": "MONTHLY",
+      "reason": ""
+    },
+    {
+      "email": "agomaa.5@gmail.com",
+      "date": "2026-08-19",
+      "amount": 195,
+      "name": "Amina Gomaa",
+      "members": "Jannah Hashem,Yasir Hashem.",
+      "coupon": "",
+      "rec": "MONTHLY",
+      "reason": ""
+    },
+    {
+      "email": "heshamalfayez@gmail.com",
+      "date": "2026-08-18",
+      "amount": 195,
+      "name": "Hisham Ahmad Bakhit Alfayez",
+      "members": "Yousef Bakhit ALFayez,Sara Bakhit ALFayez.",
+      "coupon": "",
+      "rec": "MONTHLY",
+      "reason": ""
+    },
+    {
+      "email": "hanooninoona@gmail.com",
+      "date": "2026-08-16",
+      "amount": 50,
+      "name": "Hanan Ahmed",
+      "members": "Haneen Ahmed.",
+      "coupon": "STAFF-QLH2627-50",
+      "rec": "MONTHLY",
+      "reason": ""
+    },
+    {
+      "email": "hebajabuali11@gmail.com",
+      "date": "2026-08-10",
+      "amount": 195,
+      "name": "Heba Jamal Matarieh",
+      "members": "Bella K Matarieh,Nabil Matarieh.",
+      "coupon": "",
+      "rec": "MONTHLY",
+      "reason": ""
+    },
+    {
+      "email": "alaashalabi91@yahoo.com",
+      "date": "2026-08-09",
+      "amount": 195,
+      "name": "Alaa Nezar Shalabi",
+      "members": "Sileen Abdel jawad Odeh,Saber Abdel jawad Odeh.",
+      "coupon": "",
+      "rec": "MONTHLY",
+      "reason": ""
+    },
+    {
+      "email": "farahakmohammad@gmail.com",
+      "date": "2026-08-08",
+      "amount": 290,
+      "name": "Farah Mohammad",
+      "members": "Salma Yassin,Lina Yassin,Sarah Yassin.",
+      "coupon": "",
+      "rec": "MONTHLY",
+      "reason": ""
+    },
+    {
+      "email": "fariezahamad@gmail.com",
+      "date": "2026-08-07",
+      "amount": 100,
+      "name": "Frieza Hamad",
+      "members": "Othman Aburas.",
+      "coupon": "",
+      "rec": "MONTHLY",
+      "reason": ""
+    },
+    {
+      "email": "mhamideh291290@gmail.com",
+      "date": "2026-08-05",
+      "amount": 100,
+      "name": "Mohammad Hamideh",
+      "members": "Raya Mohammad Hamideh.",
+      "coupon": "",
+      "rec": "MONTHLY",
+      "reason": ""
+    },
+    {
+      "email": "sarahshazeen013@gmail.com",
+      "date": "2026-08-03",
+      "amount": 100,
+      "name": "Sara Motiwala",
+      "members": "Khadijah Abid.",
+      "coupon": "",
+      "rec": "MONTHLY",
+      "reason": ""
+    },
+    {
+      "email": "helwaaburas@gmail.com",
+      "date": "2026-08-01",
+      "amount": 100,
+      "name": "Helwa Aburas",
+      "members": "Zeina Abuawad.",
+      "coupon": "",
+      "rec": "MONTHLY",
+      "reason": ""
+    },
+    {
+      "email": "kasseystanfill@gmail.com",
+      "date": "2026-08-01",
+      "amount": 385,
+      "name": "Kassey Stanfill Asad",
+      "members": "Annalise Stanfill,Addison Stanfill,Sophie Laine Stanfill,Alexander K James.",
+      "coupon": "",
+      "rec": "MONTHLY",
+      "reason": ""
+    },
+    {
+      "email": "shalabi.sara@yahoo.com",
+      "date": "2026-08-01",
+      "amount": 195,
+      "name": "Sara Shalabi",
+      "members": "Manwa Abuawad,Mila Abuawad.",
+      "coupon": "",
+      "rec": "MONTHLY",
+      "reason": ""
+    },
+    {
+      "email": "k_amna_77@yahoo.com",
+      "date": "2026-08-01",
+      "amount": 195,
+      "name": "Amna A Khan",
+      "members": "Muhammad Mujtaba Khan,Zahra Asif Khan.",
+      "coupon": "",
+      "rec": "MONTHLY",
+      "reason": ""
+    },
+    {
+      "email": "fatema.aldagry@gmail.com",
+      "date": "2026-08-01",
+      "amount": 195,
+      "name": "Fatima Aldaghiry",
+      "members": "Raneem Alkhateeb,Rafeef Alkhateeb.",
+      "coupon": "",
+      "rec": "MONTHLY",
+      "reason": ""
+    },
+    {
+      "email": "rga203@nyu.edu",
+      "date": "2026-08-01",
+      "amount": 100,
+      "name": "Rosemary Admiral",
+      "members": "Mohamed Amine Soulaimani.",
+      "coupon": "",
+      "rec": "MONTHLY",
+      "reason": ""
+    },
+    {
+      "email": "khadija_juma@yahoo.com",
+      "date": "2026-08-01",
+      "amount": 100,
+      "name": "Khadija Juma",
+      "members": "Ilyas Jones.",
+      "coupon": "",
+      "rec": "MONTHLY",
+      "reason": ""
+    },
+    {
+      "email": "haythem.mostafa@gmail.com",
+      "date": "2026-08-01",
+      "amount": 290,
+      "name": "Haitham Fetiha",
+      "members": "Laila Fetiha,Habiba Fetiha,Farida Fetiha.",
+      "coupon": "",
+      "rec": "MONTHLY",
+      "reason": ""
+    },
+    {
+      "email": "sanaamjoumaa@gmail.com",
+      "date": "2026-08-01",
+      "amount": 290,
+      "name": "Sanaa Jomaa",
+      "members": "Amar Amiri,Luna Amiri,Malek Amiri.",
+      "coupon": "",
+      "rec": "MONTHLY",
+      "reason": ""
+    }
+  ],
+  "camp_2026_main_count": 367,
+  "camp_2026_main_amount": 223572.5,
+  "camp_2026_zero": 24
+}

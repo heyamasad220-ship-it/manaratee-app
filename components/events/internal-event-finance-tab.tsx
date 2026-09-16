@@ -27,9 +27,11 @@ import {
   createEventExpense,
   deleteEventExpense,
   listEventExpenses,
-  type EventExpense,
 } from "@/lib/events/event-expense-actions"
-import { EVENT_EXPENSE_CATEGORIES } from "@/lib/events/event-expense-types"
+import {
+  EVENT_EXPENSE_CATEGORIES,
+  type EventExpense,
+} from "@/lib/events/event-expense-types"
 import { updateEventLinkedCampaign } from "@/lib/events/internal-event-actions"
 import type {
   EventCampaignOption,
@@ -61,6 +63,7 @@ export function InternalEventFinanceTab({
   initialExpenses?: EventExpense[]
   financeSummary?: {
     ticketRevenueCents: number
+    checkoutDonationCents?: number
     donationRevenueCents?: number
     expenseCents: number
     refundCents: number
@@ -292,6 +295,23 @@ export function InternalEventFinanceTab({
               </p>
             </CardContent>
           </Card>
+          {(financeSummary.checkoutDonationCents ?? 0) > 0 ? (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Ticket donations
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-semibold">
+                  {formatMoney(
+                    financeSummary.checkoutDonationCents ?? 0,
+                    financeSummary.currency
+                  )}
+                </p>
+              </CardContent>
+            </Card>
+          ) : null}
           {(financeSummary.donationRevenueCents ?? 0) > 0 ? (
             <Card>
               <CardHeader className="pb-2">

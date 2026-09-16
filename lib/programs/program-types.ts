@@ -16,6 +16,8 @@ export interface Program {
   program_kind: ProgramKind
 
   department_id: string | null
+  /** Directory person who is Program Lead for this year/season. */
+  lead_contact_id?: string | null
   flyer_url: string | null
   background_color: string | null
   title_color: string | null

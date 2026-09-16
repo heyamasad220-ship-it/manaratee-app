@@ -1,4 +1,6 @@
+import { getContactRecordTypeLabel } from "@/lib/contacts/contact-constants"
 import type { ContactDirectoryExportRow } from "@/lib/contacts/contact-report-types"
+import { formatPhoneDisplay } from "@/lib/ui/format-phone"
 
 function escapeCsvValue(value: unknown) {
   return `"${String(value ?? "").replaceAll('"', '""')}"`
@@ -18,10 +20,12 @@ function formatReportDate(value: string | null | undefined) {
 export function buildContactDirectoryCsvRows(contacts: ContactDirectoryExportRow[]) {
   return contacts.map((contact) => ({
     Name: contact.name,
+    Type: getContactRecordTypeLabel(contact.recordType),
     Email: contact.email,
-    Phone: contact.phone,
+    Phone: formatPhoneDisplay(contact.phone),
     Roles: contact.roles.join(", "),
     "Primary Contact": contact.primaryContactName,
+    Status: contact.status,
     Address: contact.address,
     City: contact.city,
     State: contact.state,
@@ -35,7 +39,8 @@ export function buildContactDirectoryCsvRows(contacts: ContactDirectoryExportRow
 export function downloadContactDirectoryCsv(
   contacts: ContactDirectoryExportRow[],
   generatedAt: string,
-  filterSummary: string
+  filterSummary: string,
+  fileStem = "contact-directory"
 ) {
   if (contacts.length === 0) return
 
@@ -57,7 +62,7 @@ export function downloadContactDirectoryCsv(
   const dateStamp = generatedAt.slice(0, 10)
 
   link.href = url
-  link.download = `contact-directory-${dateStamp}.csv`
+  link.download = `${fileStem}-${dateStamp}.csv`
   link.click()
 
   URL.revokeObjectURL(url)

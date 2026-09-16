@@ -18,6 +18,7 @@ export const ORGANIZATION_AUDIT_ACTIONS = {
   MEMBER_PROFILE_UPDATED: "member.profile_updated",
   MEMBER_PASSWORD_RESET_SENT: "member.password_reset_sent",
   MEMBER_REMOVED: "member.removed",
+  MEMBER_WORK_EMAIL_ASSIGNED: "member.work_email_assigned",
   ROLE_PERMISSION_CHANGED: "role.permission_changed",
 } as const
 

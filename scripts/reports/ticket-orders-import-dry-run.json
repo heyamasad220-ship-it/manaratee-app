@@ -1,0 +1,4931 @@
+{
+  "importTag": "TICKET_ORDERS_CSV_V1",
+  "mode": "dry-run",
+  "orgId": "e057e00a-e4e3-4adf-9af5-f465db1894be",
+  "csv": "C:/Users/danan/Downloads/TicketOrders.csv",
+  "summary": {
+    "csv_rows": 15764,
+    "events": 164,
+    "orders": 6440,
+    "tickets": 11967,
+    "unique_contacts": 2693,
+    "ticket_revenue_cents": 51549291,
+    "ticket_revenue": 515492.91,
+    "skipped": {
+      "transaction_charge": 81,
+      "donation_lines": 2099,
+      "vendor_bazaar": 610,
+      "program_qlh": 205,
+      "program_qil": 175,
+      "program_sunday_school": 605,
+      "program_summer_camp_2026": 0,
+      "missing_email": 0,
+      "unparsed_event_date": 22
+    },
+    "attach_existing_dinner": 1
+  },
+  "events": [
+    {
+      "name": "Ladies Painting Class",
+      "date": "2018-01-06",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Workshop",
+      "attachExistingDinner": false,
+      "ticketRows": 7,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 7,
+          "unitCents": 3000
+        }
+      ]
+    },
+    {
+      "name": "MAS Youth Fashion Show",
+      "date": "2018-01-20",
+      "status": "completed",
+      "department": "Youth",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 57,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 51,
+          "unitCents": 1000
+        },
+        {
+          "name": "Level 1 Gold Package",
+          "qty": 2,
+          "unitCents": 35000
+        },
+        {
+          "name": "Level 4 Platinum Package",
+          "qty": 2,
+          "unitCents": 15000
+        },
+        {
+          "name": "Level 3 Bronze Package",
+          "qty": 1,
+          "unitCents": 10000
+        },
+        {
+          "name": "Designer",
+          "qty": 1,
+          "unitCents": 25000
+        }
+      ]
+    },
+    {
+      "name": "Youth Got Talent Show",
+      "date": "2018-02-10",
+      "status": "completed",
+      "department": "Youth",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 74,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 17,
+          "unitCents": 1500
+        },
+        {
+          "name": "General Admission (inc. 5off)",
+          "qty": 57,
+          "unitCents": 990
+        }
+      ]
+    },
+    {
+      "name": "MAS Dallas Annual \"Muslims Got Talent\" Show",
+      "date": "2019-04-20",
+      "status": "completed",
+      "department": "Youth",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 63,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 7,
+          "unitCents": 1500
+        },
+        {
+          "name": "General Admission (per person 8 yrs old and up)",
+          "qty": 21,
+          "unitCents": 1500
+        },
+        {
+          "name": "Family Discount (per person 8 yrs old and up)",
+          "qty": 32,
+          "unitCents": 1200
+        },
+        {
+          "name": "Babysitting (per child 7 yrs old and under)",
+          "qty": 3,
+          "unitCents": 500
+        }
+      ]
+    },
+    {
+      "name": "Ramadan Kids' Club",
+      "date": "2019-05-11",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Religious Program",
+      "attachExistingDinner": false,
+      "ticketRows": 22,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 22,
+          "unitCents": 6000
+        }
+      ]
+    },
+    {
+      "name": "iPray Party",
+      "date": "2019-05-19",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 142,
+      "ticketTypes": [
+        {
+          "name": "Admission for Children Ages 3-13",
+          "qty": 142,
+          "unitCents": 800
+        }
+      ]
+    },
+    {
+      "name": "Jannah Infinity World and Mini-Taraweeh",
+      "date": "2019-05-24",
+      "status": "completed",
+      "department": "Recreational Camps",
+      "eventType": "Religious Program",
+      "attachExistingDinner": false,
+      "ticketRows": 10,
+      "ticketTypes": [
+        {
+          "name": "One Time Admission",
+          "qty": 9,
+          "unitCents": 500
+        },
+        {
+          "name": "All Sessions Admission",
+          "qty": 1,
+          "unitCents": 3500
+        }
+      ]
+    },
+    {
+      "name": "Youth All-Nighter",
+      "date": "2019-05-24",
+      "status": "completed",
+      "department": "Youth",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 48,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 48,
+          "unitCents": 700
+        }
+      ]
+    },
+    {
+      "name": "2019 Ramadan Qur'an Competition",
+      "date": "2019-05-25",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Religious Program",
+      "attachExistingDinner": false,
+      "ticketRows": 58,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 58,
+          "unitCents": 500
+        }
+      ]
+    },
+    {
+      "name": "MAS Members Iftar Registration",
+      "date": "2019-06-03",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Religious Program",
+      "attachExistingDinner": false,
+      "ticketRows": 22,
+      "ticketTypes": [
+        {
+          "name": "Registration for one Family",
+          "qty": 22,
+          "unitCents": 1000
+        }
+      ]
+    },
+    {
+      "name": "Youth Fun Day general admission",
+      "date": "2019-06-08",
+      "status": "completed",
+      "department": "Youth",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 21,
+      "ticketTypes": [
+        {
+          "name": "General Admission 3yrs- 20yrs parents admitted free",
+          "qty": 21,
+          "unitCents": 1000
+        }
+      ]
+    },
+    {
+      "name": "MAS Summer Camp 2019",
+      "date": "2019-06-10",
+      "status": "completed",
+      "department": "Recreational Camps",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 69,
+      "ticketTypes": [
+        {
+          "name": "First Child's Admission (inc. Early Bird Discount)",
+          "qty": 11,
+          "unitCents": 36500
+        },
+        {
+          "name": "Additional Children",
+          "qty": 19,
+          "unitCents": 0
+        },
+        {
+          "name": "First Child's Admission",
+          "qty": 19,
+          "unitCents": 37500
+        },
+        {
+          "name": "First Child's Admission (inc. 50% Discount)",
+          "qty": 5,
+          "unitCents": 18750
+        },
+        {
+          "name": "First Child's Admission (inc. 25% Discount)",
+          "qty": 6,
+          "unitCents": 28125
+        },
+        {
+          "name": "First Child's Admission (inc. 75% Percent Discount)",
+          "qty": 3,
+          "unitCents": 9375
+        },
+        {
+          "name": "Additional Children (inc. 50% Discount)",
+          "qty": 2,
+          "unitCents": 0
+        },
+        {
+          "name": "First Child's Admission (inc. 100% Discount)",
+          "qty": 1,
+          "unitCents": 0
+        },
+        {
+          "name": "Additional Children (inc. 75% Percent Discount)",
+          "qty": 2,
+          "unitCents": 0
+        },
+        {
+          "name": "Additional Children (inc. 25% Discount)",
+          "qty": 1,
+          "unitCents": 0
+        }
+      ]
+    },
+    {
+      "name": "MAS Summer Camp Lunch Orders",
+      "date": "2019-06-11",
+      "status": "completed",
+      "department": "Recreational Camps",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 446,
+      "ticketTypes": [
+        {
+          "name": "Tuesday Lunch for 1 child (Rice and Kofta)",
+          "qty": 78,
+          "unitCents": 300
+        },
+        {
+          "name": "Wednesday Lunch for 1 child (Shawerma)",
+          "qty": 96,
+          "unitCents": 300
+        },
+        {
+          "name": "Thursday Lunch for 1 child (Pizza)",
+          "qty": 120,
+          "unitCents": 300
+        },
+        {
+          "name": "Monday Lunch for 1 child (Spaghetti)",
+          "qty": 52,
+          "unitCents": 300
+        },
+        {
+          "name": "Tuesday Lunch for 1 child",
+          "qty": 28,
+          "unitCents": 300
+        },
+        {
+          "name": "Wednesday Lunch for 1 child",
+          "qty": 27,
+          "unitCents": 300
+        },
+        {
+          "name": "Thursday Lunch for 1 child",
+          "qty": 23,
+          "unitCents": 300
+        },
+        {
+          "name": "Monday Lunch for 1 child",
+          "qty": 22,
+          "unitCents": 300
+        }
+      ]
+    },
+    {
+      "name": "MAS Summer Camp 2",
+      "date": "2019-07-08",
+      "status": "completed",
+      "department": "Recreational Camps",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 35,
+      "ticketTypes": [
+        {
+          "name": "Qur'an for Little Hearts and Recreational Summer Camp Combo (ages 4-12)",
+          "qty": 15,
+          "unitCents": 37500
+        },
+        {
+          "name": "Qur'an for Little Hearts and Recreational Summer Camp Combo (ages 4-12) (inc. Membership Discount and Rec Portion)",
+          "qty": 2,
+          "unitCents": 13750
+        },
+        {
+          "name": "Qur'an for Little Hearts and Recreational Summer Camp Combo (ages 4-12) (inc. 75% Percent Discount)",
+          "qty": 1,
+          "unitCents": 9375
+        },
+        {
+          "name": "Recreational Camp (ages 4-12) ONLY",
+          "qty": 6,
+          "unitCents": 22500
+        },
+        {
+          "name": "Qur'an for Little Hearts and Recreational Summer Camp Combo (ages 4-12) (inc. 1 Additional Child Discount)",
+          "qty": 4,
+          "unitCents": 33500
+        },
+        {
+          "name": "Qur'an Bidaya Program (ages 13+) ONLY (inc. 1 Additional Child Discount)",
+          "qty": 1,
+          "unitCents": 19500
+        },
+        {
+          "name": "Qur'an for Little Hearts (ages 4-12) ONLY (inc. 50% Discount)",
+          "qty": 2,
+          "unitCents": 10000
+        },
+        {
+          "name": "Qur'an for Little Hearts and Recreational Summer Camp Combo (ages 4-12) (inc. 2 Additional Children Discount)",
+          "qty": 3,
+          "unitCents": 29500
+        },
+        {
+          "name": "Qur'an for Little Hearts (ages 4-12) ONLY",
+          "qty": 1,
+          "unitCents": 20000
+        }
+      ]
+    },
+    {
+      "name": "MAS Summer Camp (2) Lunch Orders (ages 9-12)",
+      "date": "2019-07-09",
+      "status": "completed",
+      "department": "Recreational Camps",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 135,
+      "ticketTypes": [
+        {
+          "name": "Tuesday Lunch for 1 child",
+          "qty": 36,
+          "unitCents": 300
+        },
+        {
+          "name": "Wednesday Lunch for 1 child",
+          "qty": 37,
+          "unitCents": 300
+        },
+        {
+          "name": "Thursday Lunch for 1 child",
+          "qty": 33,
+          "unitCents": 300
+        },
+        {
+          "name": "Monday Lunch for 1 child",
+          "qty": 29,
+          "unitCents": 300
+        }
+      ]
+    },
+    {
+      "name": "MAS Summer Camp (2) Lunch Orders (ages 4-8)",
+      "date": "2019-07-09",
+      "status": "completed",
+      "department": "Recreational Camps",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 512,
+      "ticketTypes": [
+        {
+          "name": "Tuesday Lunch & Juice for 1 child",
+          "qty": 116,
+          "unitCents": 100
+        },
+        {
+          "name": "Monday Lunch & Juice for 1 child",
+          "qty": 75,
+          "unitCents": 100
+        },
+        {
+          "name": "Wednesday Lunch & Juice for 1 child",
+          "qty": 173,
+          "unitCents": 100
+        },
+        {
+          "name": "Thursday Lunch & Juice for 1 child",
+          "qty": 148,
+          "unitCents": 100
+        }
+      ]
+    },
+    {
+      "name": "Recreational MasPASS",
+      "date": "2019-07-22",
+      "status": "completed",
+      "department": "Recreational Camps",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 4,
+      "ticketTypes": [
+        {
+          "name": "Recreational MASPass",
+          "qty": 3,
+          "unitCents": 7500
+        },
+        {
+          "name": "Hour Pass",
+          "qty": 1,
+          "unitCents": 0
+        }
+      ]
+    },
+    {
+      "name": "MAS Dallas ISNA Package",
+      "date": "2019-08-30",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 7,
+      "ticketTypes": [
+        {
+          "name": "MAS ISNA Registration",
+          "qty": 7,
+          "unitCents": 22200
+        }
+      ]
+    },
+    {
+      "name": "Pioneers Kids",
+      "date": "2019-09-06",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 13,
+      "ticketTypes": [
+        {
+          "name": "monthly payment",
+          "qty": 7,
+          "unitCents": 4000
+        },
+        {
+          "name": "Full year payment ( 25%)",
+          "qty": 4,
+          "unitCents": 22500
+        },
+        {
+          "name": "Semester payment (4 months 15%)",
+          "qty": 2,
+          "unitCents": 13600
+        }
+      ]
+    },
+    {
+      "name": "AYM Sponsored Trip",
+      "date": "2019-09-27",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 11,
+      "ticketTypes": [
+        {
+          "name": "Registration (1/2 off)",
+          "qty": 11,
+          "unitCents": 10000
+        }
+      ]
+    },
+    {
+      "name": "MAS Ladies Luncheon",
+      "date": "2019-10-16",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Fundraiser",
+      "attachExistingDinner": false,
+      "ticketRows": 93,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 93,
+          "unitCents": 4000
+        }
+      ]
+    },
+    {
+      "name": "Brothers Flag Football Tournament",
+      "date": "2019-11-02",
+      "status": "completed",
+      "department": "Youth",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 8,
+      "ticketTypes": [
+        {
+          "name": "Team Admission (8 people max)",
+          "qty": 8,
+          "unitCents": 20000
+        }
+      ]
+    },
+    {
+      "name": "Fall Camp (Prek-4th Grade)",
+      "date": "2019-11-25",
+      "status": "completed",
+      "department": "Recreational Camps",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 30,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 3,
+          "unitCents": 6000
+        },
+        {
+          "name": "First Child",
+          "qty": 20,
+          "unitCents": 6000
+        },
+        {
+          "name": "Additional Child (10% off)",
+          "qty": 7,
+          "unitCents": 0
+        }
+      ]
+    },
+    {
+      "name": "Gratitude Getaway Fall Middle School Camp",
+      "date": "2019-11-29",
+      "status": "completed",
+      "department": "Recreational Camps",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 12,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 12,
+          "unitCents": 7500
+        }
+      ]
+    },
+    {
+      "name": "Muslims Got Talent",
+      "date": "2019-12-21",
+      "status": "completed",
+      "department": "Youth",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 38,
+      "ticketTypes": [
+        {
+          "name": "EARLY BIRD (General Admission)",
+          "qty": 35,
+          "unitCents": 1000
+        },
+        {
+          "name": "Babysitting",
+          "qty": 3,
+          "unitCents": 0
+        }
+      ]
+    },
+    {
+      "name": "Brothers 5 v 5 Basketball Tournament",
+      "date": "2019-12-22",
+      "status": "completed",
+      "department": "Youth",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 8,
+      "ticketTypes": [
+        {
+          "name": "Team Admission (8 players max)",
+          "qty": 8,
+          "unitCents": 15000
+        }
+      ]
+    },
+    {
+      "name": "Winter Break Camp",
+      "date": "2019-12-23",
+      "status": "completed",
+      "department": "Recreational Camps",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 40,
+      "ticketTypes": [
+        {
+          "name": "First Child's Admission",
+          "qty": 23,
+          "unitCents": 13000
+        },
+        {
+          "name": "Additional Child's Admission (10% off)",
+          "qty": 17,
+          "unitCents": 11700
+        }
+      ]
+    },
+    {
+      "name": "MAS Fundraiser",
+      "date": "2020-01-25",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Fundraiser",
+      "attachExistingDinner": false,
+      "ticketRows": 38,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 29,
+          "unitCents": 5000
+        },
+        {
+          "name": "Childcare at Altitude Trampoline Park (Ages 6-14)",
+          "qty": 9,
+          "unitCents": 0
+        }
+      ]
+    },
+    {
+      "name": "MAS Ladies Luncheon",
+      "date": "2020-03-02",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Fundraiser",
+      "attachExistingDinner": false,
+      "ticketRows": 17,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 17,
+          "unitCents": 4000
+        }
+      ]
+    },
+    {
+      "name": "MAS Spring Break Camp (PreK - 4th Grade)",
+      "date": "2020-03-09",
+      "status": "completed",
+      "department": "Recreational Camps",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 20,
+      "ticketTypes": [
+        {
+          "name": "Spring Camp 1 March 9-12",
+          "qty": 13,
+          "unitCents": 8500
+        },
+        {
+          "name": "Spring Camp 2 March 16-19",
+          "qty": 3,
+          "unitCents": 8500
+        },
+        {
+          "name": "Spring Camp 1 March 9-12 (Additional Sibling)",
+          "qty": 4,
+          "unitCents": 0
+        }
+      ]
+    },
+    {
+      "name": "MAS Spring Break Camp (Middle School)",
+      "date": "2020-03-10",
+      "status": "completed",
+      "department": "Recreational Camps",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 6,
+      "ticketTypes": [
+        {
+          "name": "MAS Spring Break Camp (Middle School)",
+          "qty": 5,
+          "unitCents": 8500
+        },
+        {
+          "name": "MAS Spring Break Camp (Middle School) - Sibling",
+          "qty": 1,
+          "unitCents": 0
+        }
+      ]
+    },
+    {
+      "name": "Righteous Sinner - Movie Screening with Boona Mohammed",
+      "date": "2020-03-14",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 8,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 8,
+          "unitCents": 933
+        }
+      ]
+    },
+    {
+      "name": "Virtual Ramadan Competitions",
+      "date": "2020-04-24",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Religious Program",
+      "attachExistingDinner": false,
+      "ticketRows": 10,
+      "ticketTypes": [
+        {
+          "name": "Register for Competition",
+          "qty": 10,
+          "unitCents": 0
+        }
+      ]
+    },
+    {
+      "name": "Ramadan - Jannah Infintiy Camp - Grades PreK - 4th (Family Registration)",
+      "date": "2020-04-25",
+      "status": "completed",
+      "department": "Recreational Camps",
+      "eventType": "Religious Program",
+      "attachExistingDinner": false,
+      "ticketRows": 14,
+      "ticketTypes": [
+        {
+          "name": "Ramadan - Jannah Infintiy Camp - Grades PreK-4th (Family Registration)",
+          "qty": 14,
+          "unitCents": 5600
+        }
+      ]
+    },
+    {
+      "name": "Ramadan - Avengers Virtual Camp - Ages 10-13 (Family Registration)",
+      "date": "2020-04-25",
+      "status": "completed",
+      "department": "Recreational Camps",
+      "eventType": "Religious Program",
+      "attachExistingDinner": false,
+      "ticketRows": 10,
+      "ticketTypes": [
+        {
+          "name": "Avengers Camp - Family Registration",
+          "qty": 10,
+          "unitCents": 5600
+        }
+      ]
+    },
+    {
+      "name": "Ramadan Elevations - Dream BIG:Sura Yusuf - High School",
+      "date": "2020-04-26",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Religious Program",
+      "attachExistingDinner": false,
+      "ticketRows": 3,
+      "ticketTypes": [
+        {
+          "name": "Registration",
+          "qty": 3,
+          "unitCents": 0
+        }
+      ]
+    },
+    {
+      "name": "Ramadan Quraan Competition @ MAS (ALL AGES & LEVELS)",
+      "date": "2020-05-18",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Religious Program",
+      "attachExistingDinner": false,
+      "ticketRows": 60,
+      "ticketTypes": [
+        {
+          "name": "Registration Fee",
+          "qty": 60,
+          "unitCents": 1700
+        }
+      ]
+    },
+    {
+      "name": "Drive Through Eid Party",
+      "date": "2020-05-24",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Religious Program",
+      "attachExistingDinner": false,
+      "ticketRows": 6,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 6,
+          "unitCents": 167
+        }
+      ]
+    },
+    {
+      "name": "MAS Sunday School Summer Camp II",
+      "date": "2020-07-08",
+      "status": "completed",
+      "department": "Recreational Camps",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 119,
+      "ticketTypes": [
+        {
+          "name": "Ticket",
+          "qty": 82,
+          "unitCents": 11500
+        },
+        {
+          "name": "Ticket (inc. 1 Additional Child Discount without Books Fees)",
+          "qty": 4,
+          "unitCents": 8000
+        },
+        {
+          "name": "Sibling Ticket (inc. 1 Additional Child Discount without Books Fees)",
+          "qty": 1,
+          "unitCents": 0
+        },
+        {
+          "name": "Sibling Ticket",
+          "qty": 23,
+          "unitCents": 10350
+        },
+        {
+          "name": "Books Fees",
+          "qty": 9,
+          "unitCents": 2000
+        }
+      ]
+    },
+    {
+      "name": "Tafakkur",
+      "date": "2020-09-12",
+      "status": "completed",
+      "department": "Education",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 28,
+      "ticketTypes": [
+        {
+          "name": "Annual Fees per student",
+          "qty": 5,
+          "unitCents": 30500
+        },
+        {
+          "name": "Semester Fees per student",
+          "qty": 23,
+          "unitCents": 15000
+        }
+      ]
+    },
+    {
+      "name": "Virtual Fall Camps",
+      "date": "2020-11-23",
+      "status": "completed",
+      "department": "Recreational Camps",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 15,
+      "ticketTypes": [
+        {
+          "name": "(4-9 yrs) Child",
+          "qty": 13,
+          "unitCents": 3000
+        },
+        {
+          "name": "(10-13yrs) Child",
+          "qty": 2,
+          "unitCents": 4500
+        }
+      ]
+    },
+    {
+      "name": "MAS Virtual Winter Camps",
+      "date": "2020-12-21",
+      "status": "completed",
+      "department": "Recreational Camps",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 52,
+      "ticketTypes": [
+        {
+          "name": "Attendee (4-8yrs) Group",
+          "qty": 28,
+          "unitCents": 6000
+        },
+        {
+          "name": "Attendee (9-13yrs) Group",
+          "qty": 19,
+          "unitCents": 8000
+        },
+        {
+          "name": "Attendee (4-8yrs) Group (inc. DISCOUNT2)",
+          "qty": 1,
+          "unitCents": 5000
+        },
+        {
+          "name": "Attendee (4-8yrs) Group (inc. MAS Virtual Winter Camps Discount)",
+          "qty": 2,
+          "unitCents": 0
+        },
+        {
+          "name": "Attendee (9-13yrs) Group (inc. DISCOUNT)",
+          "qty": 1,
+          "unitCents": 4000
+        },
+        {
+          "name": "Attendee (4-8yrs) Group (inc. 50% Discount)",
+          "qty": 1,
+          "unitCents": 3000
+        }
+      ]
+    },
+    {
+      "name": "Virtual CODING",
+      "date": "2021-03-06",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Workshop",
+      "attachExistingDinner": false,
+      "ticketRows": 64,
+      "ticketTypes": [
+        {
+          "name": "Attendee (8-13yrs)",
+          "qty": 32,
+          "unitCents": 15000
+        },
+        {
+          "name": "Attendee (8-13yrs) (inc. MAS Members Discount)",
+          "qty": 10,
+          "unitCents": 13500
+        },
+        {
+          "name": "Attendee (8-13yrs) (inc. 50off)",
+          "qty": 1,
+          "unitCents": 10000
+        },
+        {
+          "name": "Attendee (7-9yrs)",
+          "qty": 10,
+          "unitCents": 15000
+        },
+        {
+          "name": "Attendee (10-13yrs)",
+          "qty": 9,
+          "unitCents": 15000
+        },
+        {
+          "name": "Attendee (7-9yrs) (inc. MAS Members Discount)",
+          "qty": 1,
+          "unitCents": 13500
+        },
+        {
+          "name": "Attendee (10-13yrs) (inc. MAS Members Discount)",
+          "qty": 1,
+          "unitCents": 13500
+        }
+      ]
+    },
+    {
+      "name": "One Day of Fun at MAS",
+      "date": "2021-03-19",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 41,
+      "ticketTypes": [
+        {
+          "name": "Attendee (9-13yrs)",
+          "qty": 41,
+          "unitCents": 1500
+        }
+      ]
+    },
+    {
+      "name": "MAS All Members Picnic",
+      "date": "2021-03-28",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 142,
+      "ticketTypes": [
+        {
+          "name": "Chicken Shawerma, Caesar Salad, chips and water",
+          "qty": 49,
+          "unitCents": 700
+        },
+        {
+          "name": "Beef Shawerma, Caesar Salad, chips and water",
+          "qty": 31,
+          "unitCents": 0
+        },
+        {
+          "name": "2 slices of pizza, chips and juice",
+          "qty": 43,
+          "unitCents": 500
+        },
+        {
+          "name": "Falafel Sandwiches, Chips, salad and water",
+          "qty": 19,
+          "unitCents": 0
+        }
+      ]
+    },
+    {
+      "name": "Dawah Outreach/ Fundraising",
+      "date": "2021-04-06",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Fundraiser",
+      "attachExistingDinner": false,
+      "ticketRows": 180,
+      "ticketTypes": [
+        {
+          "name": "Single cup",
+          "qty": 61,
+          "unitCents": 500
+        },
+        {
+          "name": "Two cups with a tray",
+          "qty": 119,
+          "unitCents": 1000
+        }
+      ]
+    },
+    {
+      "name": "Light it Up: Ramadan Prep Event",
+      "date": "2021-04-10",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Religious Program",
+      "attachExistingDinner": false,
+      "ticketRows": 19,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 19,
+          "unitCents": 1000
+        }
+      ]
+    },
+    {
+      "name": "Jannah Infinity Ramadan Camp- Virtual",
+      "date": "2021-04-16",
+      "status": "completed",
+      "department": "Recreational Camps",
+      "eventType": "Religious Program",
+      "attachExistingDinner": false,
+      "ticketRows": 23,
+      "ticketTypes": [
+        {
+          "name": "1st Child",
+          "qty": 12,
+          "unitCents": 4000
+        },
+        {
+          "name": "Another Child",
+          "qty": 6,
+          "unitCents": 0
+        },
+        {
+          "name": "Sponsor a child",
+          "qty": 1,
+          "unitCents": 0
+        },
+        {
+          "name": "Sponsor a Ramadan packet to be sent to a child",
+          "qty": 4,
+          "unitCents": 1000
+        }
+      ]
+    },
+    {
+      "name": "Quranic Heights- In Person",
+      "date": "2021-04-17",
+      "status": "completed",
+      "department": "Education",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 38,
+      "ticketTypes": [
+        {
+          "name": "Particpants",
+          "qty": 36,
+          "unitCents": 6000
+        },
+        {
+          "name": "Particpants (inc. MAS Members Discount)",
+          "qty": 2,
+          "unitCents": 5400
+        }
+      ]
+    },
+    {
+      "name": "Ramadan Quraan Competition @ MAS (ALL AGES & LEVELS)",
+      "date": "2021-04-27",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Religious Program",
+      "attachExistingDinner": false,
+      "ticketRows": 125,
+      "ticketTypes": [
+        {
+          "name": "Participant",
+          "qty": 125,
+          "unitCents": 2000
+        }
+      ]
+    },
+    {
+      "name": "Eid Mubarak Cards",
+      "date": "2021-05-23",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Religious Program",
+      "attachExistingDinner": false,
+      "ticketRows": 1,
+      "ticketTypes": [
+        {
+          "name": "Eid Mubarak - Night theme",
+          "qty": 1,
+          "unitCents": 1500
+        }
+      ]
+    },
+    {
+      "name": "MAS Members Get Together (previously Eid Party)",
+      "date": "2021-05-30",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Religious Program",
+      "attachExistingDinner": false,
+      "ticketRows": 166,
+      "ticketTypes": [
+        {
+          "name": "Entry Ticket:  Camp access, 1 meal,  mini golf , open sport fields & 1 Animal Show (for kids (3-6yrs) and for adults not participating in activities)",
+          "qty": 73,
+          "unitCents": 2000
+        },
+        {
+          "name": "Activities Ticket:  1 Meal, 1 Animal Show, camp access, mini golf, open sport fields. and Special Programing-Zip lining ,BB Gun & Archery- (must be a minimum of 7 years old to participate in special programming).",
+          "qty": 88,
+          "unitCents": 4000
+        },
+        {
+          "name": "Infant Ticket: Ages 2 and younger.",
+          "qty": 5,
+          "unitCents": 0
+        }
+      ]
+    },
+    {
+      "name": "Quran Summer Course- Ladies only",
+      "date": "2021-06-01",
+      "status": "completed",
+      "department": "Education",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 24,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 24,
+          "unitCents": 8000
+        }
+      ]
+    },
+    {
+      "name": "Taekwondo (Ladies only)",
+      "date": "2021-06-01",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Workshop",
+      "attachExistingDinner": false,
+      "ticketRows": 38,
+      "ticketTypes": [
+        {
+          "name": "Student (Sept -Nov)",
+          "qty": 29,
+          "unitCents": 12000
+        },
+        {
+          "name": "Student (June-Aug)",
+          "qty": 9,
+          "unitCents": 9000
+        }
+      ]
+    },
+    {
+      "name": "MAS Summer Camp 1",
+      "date": "2021-06-07",
+      "status": "completed",
+      "department": "Recreational Camps",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 120,
+      "ticketTypes": [
+        {
+          "name": "child age (4 & 5yrs) (inc. 5 % Discount)",
+          "qty": 7,
+          "unitCents": 0
+        },
+        {
+          "name": "child age (6 & 7yrs) (inc. 5 % Discount)",
+          "qty": 12,
+          "unitCents": 0
+        },
+        {
+          "name": "child age (4 & 5yrs)",
+          "qty": 9,
+          "unitCents": 45000
+        },
+        {
+          "name": "child age (6 & 7yrs)",
+          "qty": 15,
+          "unitCents": 45000
+        },
+        {
+          "name": "child age (10 & 11yrs)",
+          "qty": 13,
+          "unitCents": 45000
+        },
+        {
+          "name": "child age (10 & 11yrs) (inc. 5 % Discount)",
+          "qty": 7,
+          "unitCents": 0
+        },
+        {
+          "name": "child age (8 & 9yrs)",
+          "qty": 15,
+          "unitCents": 45000
+        },
+        {
+          "name": "child age (8 & 9yrs) (inc. 5 % Discount)",
+          "qty": 12,
+          "unitCents": 0
+        },
+        {
+          "name": "child age (4 & 5yrs) (inc. MAS Members Discount)",
+          "qty": 4,
+          "unitCents": 40500
+        },
+        {
+          "name": "child age (6 & 7yrs) (inc. MAS Members Discount)",
+          "qty": 3,
+          "unitCents": 0
+        },
+        {
+          "name": "child age (12 - 14yrs)",
+          "qty": 5,
+          "unitCents": 45000
+        },
+        {
+          "name": "child age (12 - 14yrs) (inc. 5 % Discount)",
+          "qty": 5,
+          "unitCents": 0
+        },
+        {
+          "name": "child age (8 & 9yrs) (inc. MAS Members Discount)",
+          "qty": 1,
+          "unitCents": 0
+        },
+        {
+          "name": "child age (10 & 11yrs) (inc. MAS Members Discount)",
+          "qty": 4,
+          "unitCents": 40500
+        },
+        {
+          "name": "child age (12 - 14yrs) (inc. MAS Members Discount)",
+          "qty": 3,
+          "unitCents": 40500
+        },
+        {
+          "name": "child age (4 & 5yrs) (inc. 35% Discount)",
+          "qty": 3,
+          "unitCents": 33750
+        },
+        {
+          "name": "child age (8 & 9yrs) (inc. 35% Discount)",
+          "qty": 2,
+          "unitCents": 0
+        }
+      ]
+    },
+    {
+      "name": "In-Person Summer Workshops at MAS Dallas- Ages (15+)",
+      "date": "2021-06-08",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Workshop",
+      "attachExistingDinner": false,
+      "ticketRows": 62,
+      "ticketTypes": [
+        {
+          "name": "Learn the Art of Sewing",
+          "qty": 19,
+          "unitCents": 8000
+        },
+        {
+          "name": "Aroma Therapy Yoga and Relaxation (Sisters Only)",
+          "qty": 11,
+          "unitCents": 8000
+        },
+        {
+          "name": "Learn to Speak Conversational Spanish",
+          "qty": 14,
+          "unitCents": 8000
+        },
+        {
+          "name": "Life Balance and Self-Care",
+          "qty": 9,
+          "unitCents": 8667
+        },
+        {
+          "name": "Learn to Speak Conversational Spanish (inc. DISCOUNT 1)",
+          "qty": 3,
+          "unitCents": 7200
+        },
+        {
+          "name": "Sewing - Advanced",
+          "qty": 5,
+          "unitCents": 10000
+        },
+        {
+          "name": "Sewing- Beginner",
+          "qty": 1,
+          "unitCents": 0
+        }
+      ]
+    },
+    {
+      "name": "Think Tank",
+      "date": "2021-06-11",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 46,
+      "ticketTypes": [
+        {
+          "name": "Attendee",
+          "qty": 46,
+          "unitCents": 2500
+        }
+      ]
+    },
+    {
+      "name": "Tuesday Night Live",
+      "date": "2021-06-15",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 28,
+      "ticketTypes": [
+        {
+          "name": "For the whole year (Sept-July) %50 Saving",
+          "qty": 6,
+          "unitCents": 10000
+        },
+        {
+          "name": "For This Month only",
+          "qty": 12,
+          "unitCents": 2000
+        },
+        {
+          "name": "Attendee",
+          "qty": 10,
+          "unitCents": 2500
+        }
+      ]
+    },
+    {
+      "name": "Sister's Swimming- every Sunday",
+      "date": "2021-06-27",
+      "status": "completed",
+      "department": "Swimming",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 32,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 32,
+          "unitCents": 1000
+        }
+      ]
+    },
+    {
+      "name": "MAS Summer Camp 2",
+      "date": "2021-07-05",
+      "status": "completed",
+      "department": "Recreational Camps",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 89,
+      "ticketTypes": [
+        {
+          "name": "child age (4 & 5yrs)",
+          "qty": 6,
+          "unitCents": 45000
+        },
+        {
+          "name": "child age (8 & 9yrs)",
+          "qty": 10,
+          "unitCents": 45000
+        },
+        {
+          "name": "child age (6 & 7yrs)",
+          "qty": 9,
+          "unitCents": 45000
+        },
+        {
+          "name": "child age (10 & 11yrs)",
+          "qty": 4,
+          "unitCents": 45500
+        },
+        {
+          "name": "child age (4 & 5yrs) (inc. MAS Members Discount)",
+          "qty": 3,
+          "unitCents": 40500
+        },
+        {
+          "name": "child age (6 & 7yrs) (inc. MAS Members Discount)",
+          "qty": 3,
+          "unitCents": 40500
+        },
+        {
+          "name": "child age (8 & 9yrs) (inc. MAS Members Discount)",
+          "qty": 3,
+          "unitCents": 40500
+        },
+        {
+          "name": "child age (8 & 9yrs) (inc. 5 % Discount)",
+          "qty": 9,
+          "unitCents": 0
+        },
+        {
+          "name": "child age (10 & 11yrs) (inc. 5 % Discount)",
+          "qty": 9,
+          "unitCents": 0
+        },
+        {
+          "name": "child age (12 - 14yrs)",
+          "qty": 5,
+          "unitCents": 45000
+        },
+        {
+          "name": "child age (4 & 5yrs) (inc. 5 % Discount)",
+          "qty": 4,
+          "unitCents": 0
+        },
+        {
+          "name": "child age (6 & 7yrs) (inc. 5 % Discount)",
+          "qty": 8,
+          "unitCents": 0
+        },
+        {
+          "name": "child age (12 - 14yrs) (inc. 5 % Discount)",
+          "qty": 4,
+          "unitCents": 0
+        },
+        {
+          "name": "child age (8 & 9yrs) (inc. 100% Discount)",
+          "qty": 1,
+          "unitCents": 0
+        },
+        {
+          "name": "child age (12 - 14yrs) (inc. 100% Discount)",
+          "qty": 1,
+          "unitCents": 0
+        },
+        {
+          "name": "child age (4 & 5yrs) (inc. 15% Discount)",
+          "qty": 1,
+          "unitCents": 0
+        },
+        {
+          "name": "child age (6 & 7yrs) (inc. 15% Discount)",
+          "qty": 1,
+          "unitCents": 0
+        },
+        {
+          "name": "child age (8 & 9yrs) (inc. 15% Discount)",
+          "qty": 1,
+          "unitCents": 0
+        },
+        {
+          "name": "child age (4 & 5yrs) (inc. 30% Discount)",
+          "qty": 1,
+          "unitCents": 0
+        },
+        {
+          "name": "child age (6 & 7yrs) (inc. 30% Discount)",
+          "qty": 1,
+          "unitCents": 0
+        },
+        {
+          "name": "child age (12 - 14yrs) (inc. 30% Discount)",
+          "qty": 1,
+          "unitCents": 0
+        },
+        {
+          "name": "child age (12 - 14yrs) (inc. 50% Discount)",
+          "qty": 1,
+          "unitCents": 22500
+        },
+        {
+          "name": "child age (6 & 7yrs) (inc. 25% Discount)",
+          "qty": 1,
+          "unitCents": 33750
+        },
+        {
+          "name": "child age (12 - 14yrs) (inc. 25% Discount)",
+          "qty": 1,
+          "unitCents": 35750
+        },
+        {
+          "name": "child age (10 & 11yrs) (inc. 100% Discount)",
+          "qty": 1,
+          "unitCents": 2000
+        }
+      ]
+    },
+    {
+      "name": "MAS Outdoors Summer Camp @ Ascend",
+      "date": "2021-07-11",
+      "status": "completed",
+      "department": "Recreational Camps",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 72,
+      "ticketTypes": [
+        {
+          "name": "Admission for First Camper",
+          "qty": 38,
+          "unitCents": 29900
+        },
+        {
+          "name": "Admission for Second Camper",
+          "qty": 14,
+          "unitCents": 27000
+        },
+        {
+          "name": "Admission for Third Camper",
+          "qty": 2,
+          "unitCents": 25650
+        },
+        {
+          "name": "Admission for First Camper (inc. 100% Discount)",
+          "qty": 6,
+          "unitCents": 0
+        },
+        {
+          "name": "Admission for First Camper (inc. $100 Discount)",
+          "qty": 1,
+          "unitCents": 19900
+        },
+        {
+          "name": "Admission for Second Camper (inc. 100% Discount)",
+          "qty": 1,
+          "unitCents": 0
+        },
+        {
+          "name": "Admission for First Camper (inc. 50% Discount)",
+          "qty": 4,
+          "unitCents": 14950
+        },
+        {
+          "name": "Admission for Second Camper (inc. 50% Discount)",
+          "qty": 2,
+          "unitCents": 0
+        },
+        {
+          "name": "Admission for Second Camper (inc. $100 Discount)",
+          "qty": 1,
+          "unitCents": 17000
+        },
+        {
+          "name": "Admission for First Camper (inc. MAS Members Discount)",
+          "qty": 1,
+          "unitCents": 26910
+        },
+        {
+          "name": "Admission for First Camper (inc. ASCEND Discount)",
+          "qty": 1,
+          "unitCents": 0
+        },
+        {
+          "name": "Admission for Second Camper (inc. ASCEND Discount)",
+          "qty": 1,
+          "unitCents": 0
+        }
+      ]
+    },
+    {
+      "name": "DHUL- HIJJAH Iftar",
+      "date": "2021-07-11",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Religious Program",
+      "attachExistingDinner": false,
+      "ticketRows": 115,
+      "ticketTypes": [
+        {
+          "name": "Kids under 4yrs",
+          "qty": 10,
+          "unitCents": 0
+        },
+        {
+          "name": "Kids ages (6-9yrs)",
+          "qty": 19,
+          "unitCents": 500
+        },
+        {
+          "name": "Participants 10yrs and Up",
+          "qty": 86,
+          "unitCents": 500
+        }
+      ]
+    },
+    {
+      "name": "The Quran Camp",
+      "date": "2021-07-25",
+      "status": "completed",
+      "department": "Recreational Camps",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 1,
+      "ticketTypes": [
+        {
+          "name": "Admission for First Camper",
+          "qty": 1,
+          "unitCents": 59900
+        }
+      ]
+    },
+    {
+      "name": "Sister's Swimming- every Sunday",
+      "date": "2021-08-08",
+      "status": "completed",
+      "department": "Swimming",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 6,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 6,
+          "unitCents": 1000
+        }
+      ]
+    },
+    {
+      "name": "Sister's Swimming- every Sunday",
+      "date": "2021-08-15",
+      "status": "completed",
+      "department": "Swimming",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 4,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 4,
+          "unitCents": 1000
+        }
+      ]
+    },
+    {
+      "name": "Sister's Swimming- every Sunday",
+      "date": "2021-08-22",
+      "status": "completed",
+      "department": "Swimming",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 4,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 4,
+          "unitCents": 1000
+        }
+      ]
+    },
+    {
+      "name": "Sister's Swimming- every Sunday",
+      "date": "2021-08-29",
+      "status": "completed",
+      "department": "Swimming",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 8,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 8,
+          "unitCents": 1000
+        }
+      ]
+    },
+    {
+      "name": "Sister's Swimming- every Sunday",
+      "date": "2021-09-05",
+      "status": "completed",
+      "department": "Swimming",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 2,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 2,
+          "unitCents": 1000
+        }
+      ]
+    },
+    {
+      "name": "Sister's Swimming- every Sunday",
+      "date": "2021-09-12",
+      "status": "completed",
+      "department": "Swimming",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 1,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 1,
+          "unitCents": 1000
+        }
+      ]
+    },
+    {
+      "name": "Sister's Swimming- every Sunday",
+      "date": "2021-09-19",
+      "status": "completed",
+      "department": "Swimming",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 8,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 8,
+          "unitCents": 1000
+        }
+      ]
+    },
+    {
+      "name": "Brothers' Revive- Private Event For Usar Members ONLY",
+      "date": "2021-09-24",
+      "status": "completed",
+      "department": "Youth",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 24,
+      "ticketTypes": [
+        {
+          "name": "Camper",
+          "qty": 23,
+          "unitCents": 12000
+        },
+        {
+          "name": "Camper (inc. $100 Discount)",
+          "qty": 1,
+          "unitCents": 0
+        }
+      ]
+    },
+    {
+      "name": "Ladies Luncheon",
+      "date": "2021-10-27",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Fundraiser",
+      "attachExistingDinner": false,
+      "ticketRows": 138,
+      "ticketTypes": [
+        {
+          "name": "Sponsor an orphan",
+          "qty": 138,
+          "unitCents": 5000
+        }
+      ]
+    },
+    {
+      "name": "Youth Usar SISTERS REVIVE",
+      "date": "2021-10-31",
+      "status": "completed",
+      "department": "Youth",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 39,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 39,
+          "unitCents": 1000
+        }
+      ]
+    },
+    {
+      "name": "Youth Usar BROTHERS REVIVE",
+      "date": "2021-11-14",
+      "status": "completed",
+      "department": "Youth",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 43,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 43,
+          "unitCents": 1000
+        }
+      ]
+    },
+    {
+      "name": "Fall Camp- Elementary",
+      "date": "2021-11-23",
+      "status": "completed",
+      "department": "Recreational Camps",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 27,
+      "ticketTypes": [
+        {
+          "name": "Camper",
+          "qty": 19,
+          "unitCents": 7000
+        },
+        {
+          "name": "Camper (inc. Member discount - camp)",
+          "qty": 4,
+          "unitCents": 5950
+        },
+        {
+          "name": "Camper (inc. 100% Discount)",
+          "qty": 1,
+          "unitCents": 0
+        },
+        {
+          "name": "Camper (inc. 30% Discount)",
+          "qty": 3,
+          "unitCents": 4900
+        }
+      ]
+    },
+    {
+      "name": "Fall Camp- Middle School",
+      "date": "2021-11-23",
+      "status": "completed",
+      "department": "Recreational Camps",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 21,
+      "ticketTypes": [
+        {
+          "name": "Camper (inc. Member discount - camp)",
+          "qty": 2,
+          "unitCents": 5950
+        },
+        {
+          "name": "Camper",
+          "qty": 14,
+          "unitCents": 7000
+        },
+        {
+          "name": "Camper (inc. 100% Discount)",
+          "qty": 1,
+          "unitCents": 0
+        },
+        {
+          "name": "Camper (inc. 30% Discount)",
+          "qty": 4,
+          "unitCents": 4900
+        }
+      ]
+    },
+    {
+      "name": "Girls All-Nighter",
+      "date": "2021-11-27",
+      "status": "completed",
+      "department": "Youth",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 37,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 37,
+          "unitCents": 1000
+        }
+      ]
+    },
+    {
+      "name": "Taekwondo (Ladies only)",
+      "date": "2021-12-06",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Workshop",
+      "attachExistingDinner": false,
+      "ticketRows": 21,
+      "ticketTypes": [
+        {
+          "name": "Dec- Jan Fees",
+          "qty": 21,
+          "unitCents": 12000
+        }
+      ]
+    },
+    {
+      "name": "Middle School Winter Camp",
+      "date": "2021-12-20",
+      "status": "completed",
+      "department": "Recreational Camps",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 25,
+      "ticketTypes": [
+        {
+          "name": "Camper 1",
+          "qty": 9,
+          "unitCents": 22500
+        },
+        {
+          "name": "Camper 2",
+          "qty": 8,
+          "unitCents": 22000
+        },
+        {
+          "name": "Camper 1 (inc. 50% Discount)",
+          "qty": 4,
+          "unitCents": 11250
+        },
+        {
+          "name": "Camper 1 (inc. 15% Discount)",
+          "qty": 1,
+          "unitCents": 19125
+        },
+        {
+          "name": "Camper 1 (inc. 25% Discount)",
+          "qty": 1,
+          "unitCents": 16875
+        },
+        {
+          "name": "Camper 2 (inc. 50% Discount)",
+          "qty": 2,
+          "unitCents": 10000
+        }
+      ]
+    },
+    {
+      "name": "Elementary Winter Camp",
+      "date": "2021-12-20",
+      "status": "completed",
+      "department": "Recreational Camps",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 27,
+      "ticketTypes": [
+        {
+          "name": "Camper 1 (inc. 50% Discount)",
+          "qty": 3,
+          "unitCents": 11750
+        },
+        {
+          "name": "Camper 1",
+          "qty": 10,
+          "unitCents": 22500
+        },
+        {
+          "name": "Camper 2",
+          "qty": 6,
+          "unitCents": 20000
+        },
+        {
+          "name": "Camper 1 (inc. 15% Discount)",
+          "qty": 1,
+          "unitCents": 19125
+        },
+        {
+          "name": "Camper 1 (inc. 25% Discount)",
+          "qty": 3,
+          "unitCents": 16875
+        },
+        {
+          "name": "Camper 2 (inc. 25% Discount)",
+          "qty": 2,
+          "unitCents": 0
+        },
+        {
+          "name": "Camper 2 (inc. 50% Discount)",
+          "qty": 2,
+          "unitCents": 12000
+        }
+      ]
+    },
+    {
+      "name": "MAS Dallas trip to MAS ICNA Chicago",
+      "date": "2021-12-25",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 68,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 43,
+          "unitCents": 39900
+        },
+        {
+          "name": "General Admission (inc. 100% Discount)",
+          "qty": 10,
+          "unitCents": 0
+        },
+        {
+          "name": "Bus Only",
+          "qty": 2,
+          "unitCents": 20000
+        },
+        {
+          "name": "Hotel Only",
+          "qty": 2,
+          "unitCents": 20000
+        },
+        {
+          "name": "Giordanos",
+          "qty": 11,
+          "unitCents": 1000
+        }
+      ]
+    },
+    {
+      "name": "MAS Tadabbur Class",
+      "date": "2022-01-08",
+      "status": "completed",
+      "department": "Education",
+      "eventType": "Workshop",
+      "attachExistingDinner": false,
+      "ticketRows": 10,
+      "ticketTypes": [
+        {
+          "name": "Tadabbur Student (Boys)",
+          "qty": 6,
+          "unitCents": 32000
+        },
+        {
+          "name": "Tadabbur Student (Girls)",
+          "qty": 3,
+          "unitCents": 30000
+        },
+        {
+          "name": "Tadabbur Student (Girls) (inc. Half Fees Off)",
+          "qty": 1,
+          "unitCents": 17000
+        }
+      ]
+    },
+    {
+      "name": "Connected: Rulings and Spirituality of Tahara & Salah",
+      "date": "2022-01-22",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 5,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 5,
+          "unitCents": 8000
+        }
+      ]
+    },
+    {
+      "name": "MAS Annual Dinner 2022",
+      "date": "2022-01-22",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Fundraiser",
+      "attachExistingDinner": false,
+      "ticketRows": 132,
+      "ticketTypes": [
+        {
+          "name": "Adult (inc. FR Guest)",
+          "qty": 22,
+          "unitCents": 0
+        },
+        {
+          "name": "Youth (6-13yrs) (inc. FR Guest)",
+          "qty": 8,
+          "unitCents": 0
+        },
+        {
+          "name": "Kids 5years and under (inc. FR Guest)",
+          "qty": 3,
+          "unitCents": 0
+        },
+        {
+          "name": "Adult",
+          "qty": 74,
+          "unitCents": 10000
+        },
+        {
+          "name": "Youth (6-13yrs)",
+          "qty": 20,
+          "unitCents": 2000
+        },
+        {
+          "name": "Kids 5years and under",
+          "qty": 5,
+          "unitCents": 0
+        }
+      ]
+    },
+    {
+      "name": "MAS Dallas X MIST",
+      "date": "2022-02-25",
+      "status": "completed",
+      "department": "Youth",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 12,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 1,
+          "unitCents": 2700
+        },
+        {
+          "name": "MIST Team Hijabs",
+          "qty": 11,
+          "unitCents": 1500
+        }
+      ]
+    },
+    {
+      "name": "Taekwondo-Ladies only",
+      "date": "2022-03-01",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Workshop",
+      "attachExistingDinner": false,
+      "ticketRows": 14,
+      "ticketTypes": [
+        {
+          "name": "March Fees",
+          "qty": 14,
+          "unitCents": 4000
+        }
+      ]
+    },
+    {
+      "name": "MAS Spring Camps",
+      "date": "2022-03-07",
+      "status": "completed",
+      "department": "Recreational Camps",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 88,
+      "ticketTypes": [
+        {
+          "name": "Middleschool Spring Camp 2 (March 16th-18th)",
+          "qty": 3,
+          "unitCents": 10000
+        },
+        {
+          "name": "Middleschool Spring Camp 1 (March 9th-11th)",
+          "qty": 5,
+          "unitCents": 10000
+        },
+        {
+          "name": "Elementary Spring Camp 1 (March 7th-10th)",
+          "qty": 9,
+          "unitCents": 8500
+        },
+        {
+          "name": "Elementary Spring Camp 2 (March 14th-17th) (inc. Members Discount)",
+          "qty": 2,
+          "unitCents": 7225
+        },
+        {
+          "name": "Elementary Spring Camp 1 (March 7th-10th) (inc. Members Discount)",
+          "qty": 5,
+          "unitCents": 7225
+        },
+        {
+          "name": "Elementary Spring Camp 2 (March 14th-17th)",
+          "qty": 5,
+          "unitCents": 8500
+        },
+        {
+          "name": "Middleschool Spring Camp 1 (March 9th-11th) (inc. Members Discount)",
+          "qty": 3,
+          "unitCents": 8500
+        },
+        {
+          "name": "Elementary Spring Camp 1 (March 7th-10th) (inc. 25% Discount)",
+          "qty": 1,
+          "unitCents": 6375
+        },
+        {
+          "name": "Middle & High School Spring Camp 1 Ages 10-15 (March 9th-11th) (inc. Members Discount)",
+          "qty": 3,
+          "unitCents": 8500
+        },
+        {
+          "name": "Elementary Spring Camp 1 Ages 4-9 (March 7th-10th)",
+          "qty": 4,
+          "unitCents": 8500
+        },
+        {
+          "name": "Middle & High School Spring Camp 1 Ages 10-15 (March 9th-11th)",
+          "qty": 1,
+          "unitCents": 10000
+        },
+        {
+          "name": "Elementary Spring Camp 2 Ages 4-9 (March 14th-17th)",
+          "qty": 10,
+          "unitCents": 8500
+        },
+        {
+          "name": "Middle & High School Camp 2 Ages 10-15 (March 16th-18th)",
+          "qty": 21,
+          "unitCents": 10000
+        },
+        {
+          "name": "Middle & High School Spring Camp 1 Ages 10-15 (March 9th-11th) (inc. $100 Discount)",
+          "qty": 7,
+          "unitCents": 0
+        },
+        {
+          "name": "Middle & High School Camp 2 Ages 10-15 (March 16th-18th) (inc. $100 Discount)",
+          "qty": 2,
+          "unitCents": 0
+        },
+        {
+          "name": "Elementary Spring Camp 2 Ages 4-9 (March 14th-17th) (inc. Campteachersfulldiscount)",
+          "qty": 5,
+          "unitCents": 0
+        },
+        {
+          "name": "Middle & High School Camp 2 Ages 10-15 (March 16th-18th) (inc. Campteachersfulldiscount)",
+          "qty": 1,
+          "unitCents": 0
+        },
+        {
+          "name": "Middle & High School Camp 2 Ages 10-15 (March 16th-18th) (inc. 100% off)",
+          "qty": 1,
+          "unitCents": 0
+        }
+      ]
+    },
+    {
+      "name": "TIC South Transportation",
+      "date": "2022-03-15",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 6,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 6,
+          "unitCents": 10000
+        }
+      ]
+    },
+    {
+      "name": "Ramadan Workshop",
+      "date": "2022-03-19",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Workshop",
+      "attachExistingDinner": false,
+      "ticketRows": 147,
+      "ticketTypes": [
+        {
+          "name": "Age (10-13yrs) Boys",
+          "qty": 15,
+          "unitCents": 1000
+        },
+        {
+          "name": "Age (6-9yrs) Girls",
+          "qty": 29,
+          "unitCents": 1000
+        },
+        {
+          "name": "Age (10-13yrs) Girls",
+          "qty": 30,
+          "unitCents": 1500
+        },
+        {
+          "name": "Age (2-5yrs)",
+          "qty": 30,
+          "unitCents": 1000
+        },
+        {
+          "name": "Age (6-9yrs) Boys",
+          "qty": 30,
+          "unitCents": 1000
+        },
+        {
+          "name": "Age (2-5yrs) (inc. 10% off Members Discount)",
+          "qty": 2,
+          "unitCents": 0
+        },
+        {
+          "name": "Age (6-9yrs) Girls (inc. 10% off Members Discount)",
+          "qty": 1,
+          "unitCents": 0
+        },
+        {
+          "name": "Age (10-13yrs) Girls (inc. 10% off Members Discount)",
+          "qty": 1,
+          "unitCents": 0
+        },
+        {
+          "name": "Age (2-5yrs) (inc. Teacherdiscount)",
+          "qty": 1,
+          "unitCents": 0
+        },
+        {
+          "name": "Age (6-9yrs) Girls (inc. Teacherdiscount)",
+          "qty": 3,
+          "unitCents": 0
+        },
+        {
+          "name": "Age (6-9yrs) Boys (inc. Teacherdiscount)",
+          "qty": 2,
+          "unitCents": 0
+        },
+        {
+          "name": "Age (10-13yrs) Boys (inc. Teacherdiscount)",
+          "qty": 2,
+          "unitCents": 0
+        },
+        {
+          "name": "Age (10-13yrs) Girls (inc. Teacherdiscount)",
+          "qty": 1,
+          "unitCents": 0
+        }
+      ]
+    },
+    {
+      "name": "Ramadan - Jannah Infinity program",
+      "date": "2022-04-01",
+      "status": "completed",
+      "department": "Recreational Camps",
+      "eventType": "Religious Program",
+      "attachExistingDinner": false,
+      "ticketRows": 123,
+      "ticketTypes": [
+        {
+          "name": "Preschoolers (2-5yrs)",
+          "qty": 6,
+          "unitCents": 3500
+        },
+        {
+          "name": "1st Grade",
+          "qty": 15,
+          "unitCents": 3500
+        },
+        {
+          "name": "3rd Grade",
+          "qty": 8,
+          "unitCents": 3500
+        },
+        {
+          "name": "2nd Grade",
+          "qty": 18,
+          "unitCents": 3500
+        },
+        {
+          "name": "Preschoolers (4 & 5 yrs)",
+          "qty": 9,
+          "unitCents": 0
+        },
+        {
+          "name": "4th Grade",
+          "qty": 5,
+          "unitCents": 3500
+        },
+        {
+          "name": "Pre-schoolers (2 & 3yrs)",
+          "qty": 8,
+          "unitCents": 3500
+        },
+        {
+          "name": "Pre-schoolers (2 & 3yrs) (inc. Teacherdiscount)",
+          "qty": 1,
+          "unitCents": 0
+        },
+        {
+          "name": "Kindergarten",
+          "qty": 7,
+          "unitCents": 3500
+        },
+        {
+          "name": "1st Grade- Group 2",
+          "qty": 9,
+          "unitCents": 3500
+        },
+        {
+          "name": "Pre-schoolers (4yrs)",
+          "qty": 7,
+          "unitCents": 3500
+        },
+        {
+          "name": "Drop off",
+          "qty": 30,
+          "unitCents": 1000
+        }
+      ]
+    },
+    {
+      "name": "Heartfelt Ramadan Iftars for Middle & High School",
+      "date": "2022-04-06",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Religious Program",
+      "attachExistingDinner": false,
+      "ticketRows": 191,
+      "ticketTypes": [
+        {
+          "name": "Middle School Iftar for the Month",
+          "qty": 14,
+          "unitCents": 2000
+        },
+        {
+          "name": "High School Iftar for 1 Week",
+          "qty": 50,
+          "unitCents": 500
+        },
+        {
+          "name": "Middle School Iftar for 1 Week",
+          "qty": 123,
+          "unitCents": 500
+        },
+        {
+          "name": "High School Iftar for the Month",
+          "qty": 4,
+          "unitCents": 2000
+        }
+      ]
+    },
+    {
+      "name": "High School Sisters All-Nighter",
+      "date": "2022-04-09",
+      "status": "completed",
+      "department": "Youth",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 28,
+      "ticketTypes": [
+        {
+          "name": "Admission (9th-12th Grade Only)",
+          "qty": 28,
+          "unitCents": 500
+        }
+      ]
+    },
+    {
+      "name": "Middle School Sisters All-Nighter",
+      "date": "2022-04-15",
+      "status": "completed",
+      "department": "Youth",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 47,
+      "ticketTypes": [
+        {
+          "name": "Admission (5th-8th Grade Only)",
+          "qty": 47,
+          "unitCents": 500
+        }
+      ]
+    },
+    {
+      "name": "Ramadan Quraan Competition @ MAS (ALL AGES & LEVELS)",
+      "date": "2022-04-23",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Religious Program",
+      "attachExistingDinner": false,
+      "ticketRows": 123,
+      "ticketTypes": [
+        {
+          "name": "7th and 8th: Surah Al-Najm",
+          "qty": 12,
+          "unitCents": 2000
+        },
+        {
+          "name": "3rd and 4th: Surah Al-Qiyamah",
+          "qty": 18,
+          "unitCents": 2000
+        },
+        {
+          "name": "Huffadh ( 25 & younger): Surah Al Imran",
+          "qty": 10,
+          "unitCents": 4000
+        },
+        {
+          "name": "1st and 2nd: Surah Al-Balad",
+          "qty": 22,
+          "unitCents": 2000
+        },
+        {
+          "name": "5th and 6th: Surah Al-Mursalat",
+          "qty": 16,
+          "unitCents": 2000
+        },
+        {
+          "name": "Pre-k and KG: Surah Al-Zalzala",
+          "qty": 10,
+          "unitCents": 4000
+        },
+        {
+          "name": "9th-12th: Surah Al-Waqiah",
+          "qty": 16,
+          "unitCents": 3000
+        },
+        {
+          "name": "College (Ages 19-25): Surah Qaf",
+          "qty": 6,
+          "unitCents": 2000
+        },
+        {
+          "name": "First 25 participants",
+          "qty": 13,
+          "unitCents": 0
+        }
+      ]
+    },
+    {
+      "name": "I - Pray Party 2022",
+      "date": "2022-05-06",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 166,
+      "ticketTypes": [
+        {
+          "name": "Currently 2nd Grader",
+          "qty": 40,
+          "unitCents": 2000
+        },
+        {
+          "name": "Other ages (2 years and up)",
+          "qty": 119,
+          "unitCents": 1500
+        },
+        {
+          "name": "Swimming for (5th-8th) Graders",
+          "qty": 3,
+          "unitCents": 0
+        },
+        {
+          "name": "Swimming for (5th-8th) Graders boys",
+          "qty": 4,
+          "unitCents": 1500
+        }
+      ]
+    },
+    {
+      "name": "Girls Night Pool Party",
+      "date": "2022-05-27",
+      "status": "completed",
+      "department": "Youth",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 20,
+      "ticketTypes": [
+        {
+          "name": "High School (Friday 7-9 PM)",
+          "qty": 5,
+          "unitCents": 1000
+        },
+        {
+          "name": "Middle School (Saturday 4-6)",
+          "qty": 15,
+          "unitCents": 1000
+        }
+      ]
+    },
+    {
+      "name": "On the Shoulders of Giants - Summer Camps",
+      "date": "2022-06-06",
+      "status": "completed",
+      "department": "Recreational Camps",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 8,
+      "ticketTypes": [
+        {
+          "name": "Camper 1",
+          "qty": 8,
+          "unitCents": 45000
+        }
+      ]
+    },
+    {
+      "name": "Girls Annual Ball",
+      "date": "2022-06-25",
+      "status": "completed",
+      "department": "Youth",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 12,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 7,
+          "unitCents": 5000
+        },
+        {
+          "name": "General Admission (inc. 50% Discount)",
+          "qty": 5,
+          "unitCents": 2500
+        }
+      ]
+    },
+    {
+      "name": "One Day Swim Pass",
+      "date": "2022-07-12",
+      "status": "completed",
+      "department": "Swimming",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 41,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 41,
+          "unitCents": 1000
+        }
+      ]
+    },
+    {
+      "name": "A Night to Honor Hijabis",
+      "date": "2022-09-02",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 135,
+      "ticketTypes": [
+        {
+          "name": "Early Bird Ticket",
+          "qty": 68,
+          "unitCents": 1000
+        },
+        {
+          "name": "General Admission",
+          "qty": 67,
+          "unitCents": 1500
+        }
+      ]
+    },
+    {
+      "name": "Brothers 5 v 5 Basketball Tournament",
+      "date": "2022-09-03",
+      "status": "completed",
+      "department": "Youth",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 10,
+      "ticketTypes": [
+        {
+          "name": "Team Admission (9 players max)",
+          "qty": 9,
+          "unitCents": 25500
+        },
+        {
+          "name": "Team Admission (9 players max) (inc. Marwan marouf)",
+          "qty": 1,
+          "unitCents": 0
+        }
+      ]
+    },
+    {
+      "name": "Private Sisters Usar Orientation Retreat",
+      "date": "2022-09-09",
+      "status": "completed",
+      "department": "Youth",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 25,
+      "ticketTypes": [
+        {
+          "name": "Retreat Registration Fee",
+          "qty": 25,
+          "unitCents": 10000
+        }
+      ]
+    },
+    {
+      "name": "Girls Swim Night",
+      "date": "2022-09-16",
+      "status": "completed",
+      "department": "Swimming",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 26,
+      "ticketTypes": [
+        {
+          "name": "Middle School Girls Swim Night (6-8 PM)",
+          "qty": 14,
+          "unitCents": 1000
+        },
+        {
+          "name": "High School Girls Swim Night (8-10 PM)",
+          "qty": 12,
+          "unitCents": 1000
+        }
+      ]
+    },
+    {
+      "name": "MAS Annual Fundraising Dinner",
+      "date": "2023-01-21",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Fundraiser",
+      "attachExistingDinner": false,
+      "ticketRows": 348,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 252,
+          "unitCents": 5000
+        },
+        {
+          "name": "Altitude Park Trip 6-14 yrs",
+          "qty": 4,
+          "unitCents": 0
+        },
+        {
+          "name": "Altitude Park Trip 6-12 yrs",
+          "qty": 73,
+          "unitCents": 2500
+        },
+        {
+          "name": "Babysitting",
+          "qty": 19,
+          "unitCents": 1000
+        }
+      ]
+    },
+    {
+      "name": "Female Fitness Club",
+      "date": "2023-02-14",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Workshop",
+      "attachExistingDinner": false,
+      "ticketRows": 15,
+      "ticketTypes": [
+        {
+          "name": "Thursdays 5:30 pm-6:30 pm",
+          "qty": 6,
+          "unitCents": 5000
+        },
+        {
+          "name": "Tuesdays 10 am- 11 am",
+          "qty": 5,
+          "unitCents": 4000
+        },
+        {
+          "name": "Tuesdays & Thursdays",
+          "qty": 4,
+          "unitCents": 7000
+        }
+      ]
+    },
+    {
+      "name": "Ladies Luncheon",
+      "date": "2023-02-28",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Fundraiser",
+      "attachExistingDinner": false,
+      "ticketRows": 101,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 101,
+          "unitCents": 5000
+        }
+      ]
+    },
+    {
+      "name": "March Madness - Brothers 5 v 5 Basketball Tournament",
+      "date": "2023-03-11",
+      "status": "completed",
+      "department": "Youth",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 10,
+      "ticketTypes": [
+        {
+          "name": "Team Admission (9 players max)",
+          "qty": 10,
+          "unitCents": 30500
+        }
+      ]
+    },
+    {
+      "name": "Ramadan 2023 - Iftars & All-Nights",
+      "date": "2023-03-23",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Religious Program",
+      "attachExistingDinner": false,
+      "ticketRows": 249,
+      "ticketTypes": [
+        {
+          "name": "Bundle & Save- Middle School All 4 Iftars + All Night",
+          "qty": 5,
+          "unitCents": 5000
+        },
+        {
+          "name": "Middle School (Boys) -  All Nighter",
+          "qty": 2,
+          "unitCents": 0
+        },
+        {
+          "name": "Middle School (Girls) -  All Nighter",
+          "qty": 1,
+          "unitCents": 0
+        },
+        {
+          "name": "Bundle & Save High School  2 Iftars + All Night",
+          "qty": 1,
+          "unitCents": 3000
+        },
+        {
+          "name": "Middle School Iftar - Week 1 (March 26)",
+          "qty": 15,
+          "unitCents": 1500
+        },
+        {
+          "name": "Bundle & Save- Middle School All 4 Iftars + All Nighter",
+          "qty": 23,
+          "unitCents": 5000
+        },
+        {
+          "name": "Bundle & Save High School  2 Iftars + All Nighter",
+          "qty": 5,
+          "unitCents": 3000
+        },
+        {
+          "name": "High School (Girls) -  All Nighter (April 8)",
+          "qty": 44,
+          "unitCents": 1500
+        },
+        {
+          "name": "High School Girls Iftar#2 - (April 12)",
+          "qty": 23,
+          "unitCents": 1000
+        },
+        {
+          "name": "Middle School (Girls) -  All Nighter (March 31)",
+          "qty": 35,
+          "unitCents": 1500
+        },
+        {
+          "name": "High School Girls Iftar#1 - (March 29)",
+          "qty": 2,
+          "unitCents": 1500
+        },
+        {
+          "name": "Bundle & Save High School  1 Iftars + All Nighter",
+          "qty": 2,
+          "unitCents": 3000
+        },
+        {
+          "name": "Middle School (Boys) -  All Nighter (April 7)",
+          "qty": 33,
+          "unitCents": 1500
+        },
+        {
+          "name": "High School (Boys) -  All Nighter (April 1)",
+          "qty": 10,
+          "unitCents": 1500
+        },
+        {
+          "name": "Middle School Iftar -  Week 2 (April 2)",
+          "qty": 11,
+          "unitCents": 1500
+        },
+        {
+          "name": "Middle School Iftar - Week 3 (April 9)",
+          "qty": 20,
+          "unitCents": 1500
+        },
+        {
+          "name": "High School Boys Iftar#1 - (April 5)",
+          "qty": 3,
+          "unitCents": 1000
+        },
+        {
+          "name": "High School Boys Iftar#2 - (April 19)",
+          "qty": 2,
+          "unitCents": 1000
+        },
+        {
+          "name": "Middle School Iftar - Week 4 (April 16)",
+          "qty": 12,
+          "unitCents": 1500
+        }
+      ]
+    },
+    {
+      "name": "Ramadan 2023 - Jannah Infinity program",
+      "date": "2023-03-24",
+      "status": "completed",
+      "department": "Recreational Camps",
+      "eventType": "Religious Program",
+      "attachExistingDinner": false,
+      "ticketRows": 64,
+      "ticketTypes": [
+        {
+          "name": "5th grade",
+          "qty": 5,
+          "unitCents": 4000
+        },
+        {
+          "name": "1st Grade",
+          "qty": 22,
+          "unitCents": 4500
+        },
+        {
+          "name": "4th Grade",
+          "qty": 7,
+          "unitCents": 4000
+        },
+        {
+          "name": "3rd Grade",
+          "qty": 10,
+          "unitCents": 4000
+        },
+        {
+          "name": "2nd Grade",
+          "qty": 13,
+          "unitCents": 4500
+        },
+        {
+          "name": "1st Grade (inc. 10% off Members Discount)",
+          "qty": 2,
+          "unitCents": 0
+        },
+        {
+          "name": "2nd Grade (inc. 10% off Members Discount)",
+          "qty": 1,
+          "unitCents": 0
+        },
+        {
+          "name": "4th Grade (inc. 10% off Members Discount)",
+          "qty": 1,
+          "unitCents": 0
+        },
+        {
+          "name": "Drop off",
+          "qty": 3,
+          "unitCents": 1500
+        }
+      ]
+    },
+    {
+      "name": "Itikaf at MAS - 2023",
+      "date": "2023-04-10",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Religious Program",
+      "attachExistingDinner": false,
+      "ticketRows": 15,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 15,
+          "unitCents": 2000
+        }
+      ]
+    },
+    {
+      "name": "Ramadan Quraan Competition @ MAS (ALL AGES & LEVELS)",
+      "date": "2023-04-15",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Religious Program",
+      "attachExistingDinner": false,
+      "ticketRows": 170,
+      "ticketTypes": [
+        {
+          "name": "3rd and 4th: Surah Abasah",
+          "qty": 28,
+          "unitCents": 2000
+        },
+        {
+          "name": "Pre-k and KG: Surah Al-Humazah",
+          "qty": 16,
+          "unitCents": 2000
+        },
+        {
+          "name": "7th and 8th: Surah Al-Mulk",
+          "qty": 30,
+          "unitCents": 2000
+        },
+        {
+          "name": "9th-12th: Surah Luqman",
+          "qty": 11,
+          "unitCents": 2000
+        },
+        {
+          "name": "Zero fee registration for those with financial difficulty",
+          "qty": 11,
+          "unitCents": 0
+        },
+        {
+          "name": "Huffadh ( 25 & younger): Surah Al Ma'idah",
+          "qty": 18,
+          "unitCents": 2000
+        },
+        {
+          "name": "1st and 2nd: Surah Al-Tariq",
+          "qty": 26,
+          "unitCents": 2000
+        },
+        {
+          "name": "5th and 6th: Surah Al-Insan",
+          "qty": 25,
+          "unitCents": 2000
+        },
+        {
+          "name": "College (Ages 19-25): Surah Muhammad",
+          "qty": 5,
+          "unitCents": 2000
+        }
+      ]
+    },
+    {
+      "name": "I pray Party 2023",
+      "date": "2023-05-06",
+      "status": "completed",
+      "department": "Youth",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 167,
+      "ticketTypes": [
+        {
+          "name": "kids 2 year & up",
+          "qty": 117,
+          "unitCents": 1500
+        },
+        {
+          "name": "2nd grader",
+          "qty": 50,
+          "unitCents": 2000
+        }
+      ]
+    },
+    {
+      "name": "Children's Story Time with NBA Player Tacko Fall: \"To New Heights\"",
+      "date": "2023-08-11",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 250,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 250,
+          "unitCents": 0
+        }
+      ]
+    },
+    {
+      "name": "Big Dash Summer Tournament @ EPIC",
+      "date": "2023-08-12",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 12,
+      "ticketTypes": [
+        {
+          "name": "Team Admission (9 players max)",
+          "qty": 12,
+          "unitCents": 30500
+        }
+      ]
+    },
+    {
+      "name": "OCT  15 Mas Welcome Picnic",
+      "date": "2023-10-15",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 72,
+      "ticketTypes": [
+        {
+          "name": "Adult 11 yrs and up",
+          "qty": 56,
+          "unitCents": 1000
+        },
+        {
+          "name": "kids 5 yrs-10 yrs",
+          "qty": 16,
+          "unitCents": 0
+        }
+      ]
+    },
+    {
+      "name": "MAS Ladies Luncheon",
+      "date": "2023-11-15",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Fundraiser",
+      "attachExistingDinner": false,
+      "ticketRows": 170,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 170,
+          "unitCents": 5000
+        }
+      ]
+    },
+    {
+      "name": "MAS Fundraising Dinner",
+      "date": "2023-12-01",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Fundraiser",
+      "attachExistingDinner": false,
+      "ticketRows": 287,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 208,
+          "unitCents": 3500
+        },
+        {
+          "name": "Youth Trip Kids 6- 13 Yrs",
+          "qty": 61,
+          "unitCents": 2500
+        },
+        {
+          "name": "Baby Sitting",
+          "qty": 18,
+          "unitCents": 1000
+        }
+      ]
+    },
+    {
+      "name": "Pre-Ramadan Art Workshop",
+      "date": "2024-01-20",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Workshop",
+      "attachExistingDinner": false,
+      "ticketRows": 25,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 25,
+          "unitCents": 6500
+        }
+      ]
+    },
+    {
+      "name": "Isra & Miraj",
+      "date": "2024-02-17",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Religious Program",
+      "attachExistingDinner": false,
+      "ticketRows": 191,
+      "ticketTypes": [
+        {
+          "name": "General Admission 2yrs & up",
+          "qty": 191,
+          "unitCents": 500
+        }
+      ]
+    },
+    {
+      "name": "Ramadan Ready Workshop",
+      "date": "2024-02-24",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Workshop",
+      "attachExistingDinner": false,
+      "ticketRows": 66,
+      "ticketTypes": [
+        {
+          "name": "Kindergarten/1st Grade",
+          "qty": 24,
+          "unitCents": 2000
+        },
+        {
+          "name": "2nd/3rd Grade",
+          "qty": 25,
+          "unitCents": 2000
+        },
+        {
+          "name": "4th/5th Grade",
+          "qty": 15,
+          "unitCents": 2000
+        },
+        {
+          "name": "Kindergarten/1st Grade (inc. 10% off Members Discount)",
+          "qty": 1,
+          "unitCents": 0
+        },
+        {
+          "name": "4th/5th Grade (inc. 10% off Members Discount)",
+          "qty": 1,
+          "unitCents": 0
+        }
+      ]
+    },
+    {
+      "name": "Middle School Girls Qiyam Night",
+      "date": "2024-03-13",
+      "status": "completed",
+      "department": "Youth",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 34,
+      "ticketTypes": [
+        {
+          "name": "Registration",
+          "qty": 32,
+          "unitCents": 700
+        },
+        {
+          "name": "Registration (inc. 10% off Members Discount)",
+          "qty": 2,
+          "unitCents": 630
+        }
+      ]
+    },
+    {
+      "name": "Ramadan 2024 - Jannah Infinity program",
+      "date": "2024-03-15",
+      "status": "completed",
+      "department": "Recreational Camps",
+      "eventType": "Religious Program",
+      "attachExistingDinner": false,
+      "ticketRows": 46,
+      "ticketTypes": [
+        {
+          "name": "KG & 1st Grade",
+          "qty": 10,
+          "unitCents": 8500
+        },
+        {
+          "name": "2nd & 3rd Grade",
+          "qty": 15,
+          "unitCents": 8500
+        },
+        {
+          "name": "4th & 5th Grade",
+          "qty": 6,
+          "unitCents": 8500
+        },
+        {
+          "name": "3 & 4 Years",
+          "qty": 3,
+          "unitCents": 8500
+        },
+        {
+          "name": "3 & 4 Years (inc. 10% off Members Discount)",
+          "qty": 1,
+          "unitCents": 0
+        },
+        {
+          "name": "KG & 1st Grade (inc. 10% off Members Discount)",
+          "qty": 1,
+          "unitCents": 0
+        },
+        {
+          "name": "4th & 5th Grade (inc. 10% off Members Discount)",
+          "qty": 1,
+          "unitCents": 0
+        },
+        {
+          "name": "One time payment",
+          "qty": 9,
+          "unitCents": 1000
+        }
+      ]
+    },
+    {
+      "name": "Middle School Boys- All Night Friday Night March 15, 2024",
+      "date": "2024-03-15",
+      "status": "completed",
+      "department": "Youth",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 29,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 29,
+          "unitCents": 1500
+        }
+      ]
+    },
+    {
+      "name": "MAS Iftar Crystal Banquet",
+      "date": "2024-03-18",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Religious Program",
+      "attachExistingDinner": false,
+      "ticketRows": 80,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 69,
+          "unitCents": 3000
+        },
+        {
+          "name": "Kids Program & Iftar",
+          "qty": 11,
+          "unitCents": 1500
+        }
+      ]
+    },
+    {
+      "name": "MAS Irving Family Iftar",
+      "date": "2024-03-21",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Religious Program",
+      "attachExistingDinner": false,
+      "ticketRows": 51,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 43,
+          "unitCents": 2600
+        },
+        {
+          "name": "8 years and under",
+          "qty": 8,
+          "unitCents": 2300
+        }
+      ]
+    },
+    {
+      "name": "Ramadan Quraan Competition @ MAS (ALL AGES & LEVELS)",
+      "date": "2024-03-30",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Religious Program",
+      "attachExistingDinner": false,
+      "ticketRows": 161,
+      "ticketTypes": [
+        {
+          "name": "1st and 2nd: Surah Al-Ghashiyah",
+          "qty": 25,
+          "unitCents": 2000
+        },
+        {
+          "name": "5th and 6th: Surah Al-Taghabun",
+          "qty": 22,
+          "unitCents": 2000
+        },
+        {
+          "name": "Huffadh ( 25 & younger): Surah Al-Tawbah",
+          "qty": 22,
+          "unitCents": 2000
+        },
+        {
+          "name": "Pre-k and KG: Surah Al-Fil",
+          "qty": 26,
+          "unitCents": 2000
+        },
+        {
+          "name": "3rd and 4th: Surah Al-Mursalat",
+          "qty": 21,
+          "unitCents": 2000
+        },
+        {
+          "name": "9th-12th: Surah Al-Fath",
+          "qty": 16,
+          "unitCents": 2000
+        },
+        {
+          "name": "Free tickets (sponsored by MAS supporters)",
+          "qty": 4,
+          "unitCents": 0
+        },
+        {
+          "name": "7th and 8th: Surah Al-Qamar",
+          "qty": 12,
+          "unitCents": 2000
+        },
+        {
+          "name": "College (Ages 19-25): Surah Al-Muminoon",
+          "qty": 13,
+          "unitCents": 2000
+        }
+      ]
+    },
+    {
+      "name": "I Pray Party 2024",
+      "date": "2024-05-04",
+      "status": "completed",
+      "department": "Youth",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 125,
+      "ticketTypes": [
+        {
+          "name": "2nd Grader (Currently )",
+          "qty": 29,
+          "unitCents": 2000
+        },
+        {
+          "name": "Kids 2 years & Up- Parents are free",
+          "qty": 96,
+          "unitCents": 1500
+        }
+      ]
+    },
+    {
+      "name": "MAS Dallas Intensive Summer Camp | Camper Registration Form",
+      "date": "2024-05-31",
+      "status": "completed",
+      "department": "Recreational Camps",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 46,
+      "ticketTypes": [
+        {
+          "name": "Camper's Ticket",
+          "qty": 29,
+          "unitCents": 60000
+        },
+        {
+          "name": "Camper's Ticket (inc. Staff Discount)",
+          "qty": 4,
+          "unitCents": 30000
+        },
+        {
+          "name": "Camper's Ticket (inc. 100 Percent Off)",
+          "qty": 7,
+          "unitCents": 0
+        },
+        {
+          "name": "Camper's Ticket (inc. 65 Percent OFF)",
+          "qty": 1,
+          "unitCents": 21000
+        },
+        {
+          "name": "Camper's Ticket (inc. 25% Discount)",
+          "qty": 1,
+          "unitCents": 45000
+        },
+        {
+          "name": "Camper's Ticket (inc. 75% Percent Discount)",
+          "qty": 3,
+          "unitCents": 7500
+        },
+        {
+          "name": "Camper's Ticket (inc. 50% Discount)",
+          "qty": 1,
+          "unitCents": 30000
+        }
+      ]
+    },
+    {
+      "name": "Hajj Workshop",
+      "date": "2024-06-08",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Workshop",
+      "attachExistingDinner": false,
+      "ticketRows": 128,
+      "ticketTypes": [
+        {
+          "name": "3rd-5th grade Girls",
+          "qty": 27,
+          "unitCents": 2000
+        },
+        {
+          "name": "PK- KG",
+          "qty": 45,
+          "unitCents": 2000
+        },
+        {
+          "name": "1st-2nd grade",
+          "qty": 40,
+          "unitCents": 2000
+        },
+        {
+          "name": "3rd-5th grade Boys",
+          "qty": 16,
+          "unitCents": 2000
+        }
+      ]
+    },
+    {
+      "name": "Eid Al Adha Celebration",
+      "date": "2024-06-16",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Religious Program",
+      "attachExistingDinner": false,
+      "ticketRows": 1,
+      "ticketTypes": [
+        {
+          "name": "Shawerma",
+          "qty": 1,
+          "unitCents": 32000
+        }
+      ]
+    },
+    {
+      "name": "Ladies Aerobic Fitness Classes",
+      "date": "2024-10-07",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Workshop",
+      "attachExistingDinner": false,
+      "ticketRows": 86,
+      "ticketTypes": [
+        {
+          "name": "Full 12 Sessions",
+          "qty": 18,
+          "unitCents": 9600
+        },
+        {
+          "name": "Single Session",
+          "qty": 18,
+          "unitCents": 1000
+        },
+        {
+          "name": "11 Sessions",
+          "qty": 3,
+          "unitCents": 8800
+        },
+        {
+          "name": "11 sessions Wednesday",
+          "qty": 1,
+          "unitCents": 8800
+        },
+        {
+          "name": "Wednesday 10:30 am 7 sessions",
+          "qty": 3,
+          "unitCents": 5600
+        },
+        {
+          "name": "Monday 7:00pm 7 sessions",
+          "qty": 6,
+          "unitCents": 5600
+        },
+        {
+          "name": "Single Session Monday 7pm - 8pm",
+          "qty": 20,
+          "unitCents": 1000
+        },
+        {
+          "name": "Single Session Wednesday 10:30-11:30 am",
+          "qty": 17,
+          "unitCents": 1000
+        }
+      ]
+    },
+    {
+      "name": "Mohammed: the orphan who adopted the World, I wanna be like him.",
+      "date": "2024-10-13",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 67,
+      "ticketTypes": [
+        {
+          "name": "3yrs & 4 years",
+          "qty": 15,
+          "unitCents": 3000
+        },
+        {
+          "name": "2nd & 3rd graders",
+          "qty": 25,
+          "unitCents": 2500
+        },
+        {
+          "name": "Kg & 1st graders.",
+          "qty": 15,
+          "unitCents": 2500
+        },
+        {
+          "name": "4th & 5th graders",
+          "qty": 12,
+          "unitCents": 3000
+        }
+      ]
+    },
+    {
+      "name": "MAS Fundraising Dinner 2024",
+      "date": "2024-10-27",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Fundraiser",
+      "attachExistingDinner": false,
+      "ticketRows": 322,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 178,
+          "unitCents": 3500
+        },
+        {
+          "name": "Youth Trip Kids 6- 13 Yrs",
+          "qty": 51,
+          "unitCents": 2500
+        },
+        {
+          "name": "Baby Sitting",
+          "qty": 14,
+          "unitCents": 0
+        },
+        {
+          "name": "General Admission (inc. Free)",
+          "qty": 72,
+          "unitCents": 0
+        },
+        {
+          "name": "Youth Trip Kids 6- 13 Yrs (inc. Free)",
+          "qty": 6,
+          "unitCents": 0
+        },
+        {
+          "name": "Baby Sitting (inc. Free)",
+          "qty": 1,
+          "unitCents": 0
+        }
+      ]
+    },
+    {
+      "name": "Hijab Party",
+      "date": "2025-02-07",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 93,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 76,
+          "unitCents": 1500
+        },
+        {
+          "name": "General Admission (inc. 40%OFF)",
+          "qty": 17,
+          "unitCents": 1500
+        }
+      ]
+    },
+    {
+      "name": "Israa’ & Mi’raj Kids Workshop",
+      "date": "2025-02-08",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Workshop",
+      "attachExistingDinner": false,
+      "ticketRows": 82,
+      "ticketTypes": [
+        {
+          "name": "3rd & 4th",
+          "qty": 20,
+          "unitCents": 3000
+        },
+        {
+          "name": "PreK & Kg",
+          "qty": 21,
+          "unitCents": 2500
+        },
+        {
+          "name": "1st & 2nd",
+          "qty": 25,
+          "unitCents": 2000
+        },
+        {
+          "name": "5th & 6th",
+          "qty": 14,
+          "unitCents": 2000
+        },
+        {
+          "name": "4th",
+          "qty": 2,
+          "unitCents": 2000
+        }
+      ]
+    },
+    {
+      "name": "Ramadan 2025 - Jannah Infinity program",
+      "date": "2025-02-28",
+      "status": "completed",
+      "department": "Recreational Camps",
+      "eventType": "Religious Program",
+      "attachExistingDinner": false,
+      "ticketRows": 44,
+      "ticketTypes": [
+        {
+          "name": "2nd & 3rd Grade",
+          "qty": 17,
+          "unitCents": 2500
+        },
+        {
+          "name": "4th, 5th & 6th  Grade Girls",
+          "qty": 4,
+          "unitCents": 0
+        },
+        {
+          "name": "Kg & 1st grade",
+          "qty": 15,
+          "unitCents": 6825
+        },
+        {
+          "name": "4th, 5th & 6th  Grade Boys",
+          "qty": 3,
+          "unitCents": 0
+        },
+        {
+          "name": "One time payment",
+          "qty": 5,
+          "unitCents": 1000
+        }
+      ]
+    },
+    {
+      "name": "MAS Iftar Crystal Banquet",
+      "date": "2025-03-05",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Religious Program",
+      "attachExistingDinner": false,
+      "ticketRows": 129,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 96,
+          "unitCents": 3725
+        },
+        {
+          "name": "Kids Program & Iftar",
+          "qty": 28,
+          "unitCents": 0
+        },
+        {
+          "name": "Babysitting",
+          "qty": 5,
+          "unitCents": 0
+        }
+      ]
+    },
+    {
+      "name": "Ramadan Tafseer Session at MAS Dallas",
+      "date": "2025-03-08",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Religious Program",
+      "attachExistingDinner": false,
+      "ticketRows": 45,
+      "ticketTypes": [
+        {
+          "name": "1st and 2nd: Surah Al-Burooj",
+          "qty": 10,
+          "unitCents": 0
+        },
+        {
+          "name": "5th and 6th: Surah Al-Muzzamil",
+          "qty": 12,
+          "unitCents": 0
+        },
+        {
+          "name": "Pre-k and KG: Surah Al-Duha",
+          "qty": 13,
+          "unitCents": 0
+        },
+        {
+          "name": "3rd and 4th: Surah Al-Nuh",
+          "qty": 10,
+          "unitCents": 0
+        }
+      ]
+    },
+    {
+      "name": "Middle School Girls All-Nighter",
+      "date": "2025-03-15",
+      "status": "completed",
+      "department": "Youth",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 47,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 47,
+          "unitCents": 500
+        }
+      ]
+    },
+    {
+      "name": "Ramadan Quraan Competition at MAS Dallas",
+      "date": "2025-03-22",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Religious Program",
+      "attachExistingDinner": false,
+      "ticketRows": 254,
+      "ticketTypes": [
+        {
+          "name": "7th and 8th: Surah Al-Hujaraat",
+          "qty": 23,
+          "unitCents": 2000
+        },
+        {
+          "name": "9th-12th: Surah Al-Hadid",
+          "qty": 21,
+          "unitCents": 2000
+        },
+        {
+          "name": "1st and 2nd: Surah Al-Burooj",
+          "qty": 41,
+          "unitCents": 2000
+        },
+        {
+          "name": "Pre-k and KG: Surah Al-Duha",
+          "qty": 32,
+          "unitCents": 2000
+        },
+        {
+          "name": "Huffadh ( 25 & younger): Surah Al-Baqarah",
+          "qty": 34,
+          "unitCents": 2000
+        },
+        {
+          "name": "5th and 6th: Surah Al-Muzzamil",
+          "qty": 35,
+          "unitCents": 2000
+        },
+        {
+          "name": "3rd and 4th: Surah Al-Nuh",
+          "qty": 35,
+          "unitCents": 2000
+        },
+        {
+          "name": "College (Ages 19-25): Surah Yasin",
+          "qty": 19,
+          "unitCents": 2000
+        },
+        {
+          "name": "Free tickets (sponsored by MAS supporters)",
+          "qty": 14,
+          "unitCents": 0
+        }
+      ]
+    },
+    {
+      "name": "Islam in America Fundraising Gala",
+      "date": "2025-04-19",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Fundraiser",
+      "attachExistingDinner": false,
+      "ticketRows": 12,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 12,
+          "unitCents": 10000
+        }
+      ]
+    },
+    {
+      "name": "Ladies Aerobic Fitness Classes",
+      "date": "2025-04-21",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Workshop",
+      "attachExistingDinner": false,
+      "ticketRows": 35,
+      "ticketTypes": [
+        {
+          "name": "4 sessions Wednesday",
+          "qty": 12,
+          "unitCents": 3500
+        },
+        {
+          "name": "8 sessions Monday & Wednesday",
+          "qty": 3,
+          "unitCents": 7000
+        },
+        {
+          "name": "4 sessions Monday",
+          "qty": 6,
+          "unitCents": 3500
+        },
+        {
+          "name": "Single Session",
+          "qty": 14,
+          "unitCents": 1000
+        }
+      ]
+    },
+    {
+      "name": "I Pray Party 2025",
+      "date": "2025-05-03",
+      "status": "completed",
+      "department": "Youth",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 114,
+      "ticketTypes": [
+        {
+          "name": "Kids 2 years & Up- Parents are free",
+          "qty": 70,
+          "unitCents": 1000
+        },
+        {
+          "name": "2nd Grader (Currently )",
+          "qty": 44,
+          "unitCents": 2000
+        }
+      ]
+    },
+    {
+      "name": "I Pray Party - Sponsors",
+      "date": "2025-05-03",
+      "status": "completed",
+      "department": "Youth",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 3,
+      "ticketTypes": [
+        {
+          "name": "Coffee",
+          "qty": 1,
+          "unitCents": 15000
+        },
+        {
+          "name": "Dessert",
+          "qty": 1,
+          "unitCents": 16000
+        },
+        {
+          "name": "Shawerma",
+          "qty": 1,
+          "unitCents": 15000
+        }
+      ]
+    },
+    {
+      "name": "Hajj Workshop",
+      "date": "2025-05-17",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Workshop",
+      "attachExistingDinner": false,
+      "ticketRows": 112,
+      "ticketTypes": [
+        {
+          "name": "1st grade",
+          "qty": 20,
+          "unitCents": 2000
+        },
+        {
+          "name": "2nd grade",
+          "qty": 20,
+          "unitCents": 2000
+        },
+        {
+          "name": "PK",
+          "qty": 20,
+          "unitCents": 2000
+        },
+        {
+          "name": "3rd-5th grade Girls",
+          "qty": 21,
+          "unitCents": 2000
+        },
+        {
+          "name": "KG",
+          "qty": 20,
+          "unitCents": 2000
+        },
+        {
+          "name": "3rd-5th grade Boys",
+          "qty": 11,
+          "unitCents": 2000
+        }
+      ]
+    },
+    {
+      "name": "MAS Annual Fundraising Dinner",
+      "date": "2025-09-13",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Fundraiser",
+      "attachExistingDinner": false,
+      "ticketRows": 328,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 234,
+          "unitCents": 5000
+        },
+        {
+          "name": "Altitude Park Trip 6-12 yrs",
+          "qty": 14,
+          "unitCents": 3000
+        },
+        {
+          "name": "Babysitting 1-5yrs",
+          "qty": 20,
+          "unitCents": 1000
+        },
+        {
+          "name": "Altitude Park Trip 6-14 yrs",
+          "qty": 56,
+          "unitCents": 2500
+        },
+        {
+          "name": "Reserved (VIP)",
+          "qty": 4,
+          "unitCents": 0
+        }
+      ]
+    },
+    {
+      "name": "Kids Workshop - Prophetic Tales For Young Hearts",
+      "date": "2025-11-08",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Workshop",
+      "attachExistingDinner": false,
+      "ticketRows": 97,
+      "ticketTypes": [
+        {
+          "name": "1st",
+          "qty": 17,
+          "unitCents": 2000
+        },
+        {
+          "name": "KG",
+          "qty": 20,
+          "unitCents": 2000
+        },
+        {
+          "name": "2nd",
+          "qty": 12,
+          "unitCents": 2000
+        },
+        {
+          "name": "3rd Grade - 5th Grade (Girls)",
+          "qty": 16,
+          "unitCents": 2000
+        },
+        {
+          "name": "Pk",
+          "qty": 16,
+          "unitCents": 2000
+        },
+        {
+          "name": "3rd Grade - 5th Grade (Boys)",
+          "qty": 14,
+          "unitCents": 2000
+        },
+        {
+          "name": "Pk (inc. Kids Workshop - Prophetic Tales For Young Hearts)",
+          "qty": 1,
+          "unitCents": 1500
+        },
+        {
+          "name": "3rd Grade - 5th Grade (Girls) (inc. Kids Workshop - Prophetic Tales For Young Hearts)",
+          "qty": 1,
+          "unitCents": 1000
+        }
+      ]
+    },
+    {
+      "name": "Hijab Party",
+      "date": "2026-02-06",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 83,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 67,
+          "unitCents": 2500
+        },
+        {
+          "name": "General Admission (inc. 20% OFF)",
+          "qty": 16,
+          "unitCents": 2000
+        }
+      ]
+    },
+    {
+      "name": "Youth Tarbiya Ramadan Prep",
+      "date": "2026-02-08",
+      "status": "completed",
+      "department": "Youth",
+      "eventType": "Religious Program",
+      "attachExistingDinner": false,
+      "ticketRows": 39,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 39,
+          "unitCents": 500
+        }
+      ]
+    },
+    {
+      "name": "Kids Workshop - Israa & Miraj",
+      "date": "2026-02-14",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Workshop",
+      "attachExistingDinner": false,
+      "ticketRows": 85,
+      "ticketTypes": [
+        {
+          "name": "Pk",
+          "qty": 13,
+          "unitCents": 2500
+        },
+        {
+          "name": "2nd",
+          "qty": 7,
+          "unitCents": 2500
+        },
+        {
+          "name": "3rd",
+          "qty": 13,
+          "unitCents": 2500
+        },
+        {
+          "name": "4th",
+          "qty": 8,
+          "unitCents": 2500
+        },
+        {
+          "name": "1st",
+          "qty": 12,
+          "unitCents": 2500
+        },
+        {
+          "name": "2nd (inc. Kids Workshop - Israa & Miraj 01242026)",
+          "qty": 3,
+          "unitCents": 0
+        },
+        {
+          "name": "3rd (inc. Kids Workshop - Israa & Miraj 01242026)",
+          "qty": 1,
+          "unitCents": 0
+        },
+        {
+          "name": "1st (inc. Kids Workshop - Israa & Miraj 01242026)",
+          "qty": 3,
+          "unitCents": 1250
+        },
+        {
+          "name": "KG (inc. Kids Workshop - Israa & Miraj 01242026)",
+          "qty": 1,
+          "unitCents": 1250
+        },
+        {
+          "name": "Pk (inc. Kids Workshop - Israa & Miraj 01242026)",
+          "qty": 2,
+          "unitCents": 0
+        },
+        {
+          "name": "KG",
+          "qty": 17,
+          "unitCents": 2500
+        },
+        {
+          "name": "4th (inc. Kids Workshop - Israa & Miraj 01242026)",
+          "qty": 1,
+          "unitCents": 0
+        },
+        {
+          "name": "5th",
+          "qty": 4,
+          "unitCents": 2500
+        }
+      ]
+    },
+    {
+      "name": "Bazaar Tickets",
+      "date": "2026-02-14",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 5,
+      "ticketTypes": [
+        {
+          "name": "Ramadan Booklet",
+          "qty": 1,
+          "unitCents": 0
+        },
+        {
+          "name": "Face Painting",
+          "qty": 1,
+          "unitCents": 0
+        },
+        {
+          "name": "Popcorn",
+          "qty": 1,
+          "unitCents": 0
+        },
+        {
+          "name": "Cotton Candy",
+          "qty": 2,
+          "unitCents": 200
+        }
+      ]
+    },
+    {
+      "name": "Ramadan 2026 - Jannah Infinity program",
+      "date": "2026-02-20",
+      "status": "completed",
+      "department": "Recreational Camps",
+      "eventType": "Religious Program",
+      "attachExistingDinner": false,
+      "ticketRows": 112,
+      "ticketTypes": [
+        {
+          "name": "Full Weekend Ramadan Package (Serene Day Included)",
+          "qty": 16,
+          "unitCents": 5325
+        },
+        {
+          "name": "Full Weekend Ramadan Package (Without Serene Day)",
+          "qty": 4,
+          "unitCents": 4775
+        },
+        {
+          "name": "One Day Drop-Off",
+          "qty": 92,
+          "unitCents": 1000
+        }
+      ]
+    },
+    {
+      "name": "MAS Ramadan Iftar - Serene Event Center",
+      "date": "2026-02-27",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Religious Program",
+      "attachExistingDinner": false,
+      "ticketRows": 216,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 49,
+          "unitCents": 5225
+        },
+        {
+          "name": "Babysitting",
+          "qty": 2,
+          "unitCents": 0
+        },
+        {
+          "name": "Kids Program & Iftar",
+          "qty": 3,
+          "unitCents": 0
+        },
+        {
+          "name": "General Admission (Ages 11+ yrs)",
+          "qty": 125,
+          "unitCents": 5225
+        },
+        {
+          "name": "Kids Program Ages 5-10 yrs (Meal included)",
+          "qty": 27,
+          "unitCents": 0
+        },
+        {
+          "name": "Babysitting Ages 1-4 yrs (Meal included)",
+          "qty": 8,
+          "unitCents": 0
+        },
+        {
+          "name": "General Admission (Ages 11+ yrs) (inc. VIP)",
+          "qty": 2,
+          "unitCents": 475
+        }
+      ]
+    },
+    {
+      "name": "MS Boys All-Nighter",
+      "date": "2026-02-27",
+      "status": "completed",
+      "department": "Youth",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 31,
+      "ticketTypes": [
+        {
+          "name": "MS Boys 6th - 8th Grade",
+          "qty": 31,
+          "unitCents": 1000
+        }
+      ]
+    },
+    {
+      "name": "Sisters Qiyam (Adults)",
+      "date": "2026-03-07",
+      "status": "completed",
+      "department": "Youth",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 98,
+      "ticketTypes": [
+        {
+          "name": "Don't let cost be a barrier",
+          "qty": 14,
+          "unitCents": 0
+        },
+        {
+          "name": "General Admission",
+          "qty": 76,
+          "unitCents": 1500
+        },
+        {
+          "name": "sponsor another sister's admission",
+          "qty": 8,
+          "unitCents": 0
+        }
+      ]
+    },
+    {
+      "name": "Ramadan Quraan Competition 2026",
+      "date": "2026-03-14",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Religious Program",
+      "attachExistingDinner": false,
+      "ticketRows": 284,
+      "ticketTypes": [
+        {
+          "name": "College (Ages 19-25): Surah Al-Kahf",
+          "qty": 18,
+          "unitCents": 2000
+        },
+        {
+          "name": "3rd and 4th: Surah Al-Ma'arij",
+          "qty": 34,
+          "unitCents": 2000
+        },
+        {
+          "name": "5th and 6th: Surah Al-Mulk",
+          "qty": 52,
+          "unitCents": 2000
+        },
+        {
+          "name": "Pre-k and KG: Surah Al-Adiyat",
+          "qty": 41,
+          "unitCents": 2000
+        },
+        {
+          "name": "Free tickets (sponsored by MAS supporters)",
+          "qty": 12,
+          "unitCents": 0
+        },
+        {
+          "name": "Huffadh ( 25 & younger): Surah Ali Imran",
+          "qty": 29,
+          "unitCents": 2000
+        },
+        {
+          "name": "1st and 2nd: Surah Abasa",
+          "qty": 47,
+          "unitCents": 2000
+        },
+        {
+          "name": "7th and 8th: Surah Luqman",
+          "qty": 28,
+          "unitCents": 2000
+        },
+        {
+          "name": "9th-12th: Surah Maryam",
+          "qty": 23,
+          "unitCents": 2000
+        }
+      ]
+    },
+    {
+      "name": "Eid Carnival",
+      "date": "2026-03-20",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Religious Program",
+      "attachExistingDinner": false,
+      "ticketRows": 3,
+      "ticketTypes": [
+        {
+          "name": "Henna",
+          "qty": 1,
+          "unitCents": 9500
+        },
+        {
+          "name": "Dessert",
+          "qty": 1,
+          "unitCents": 10000
+        },
+        {
+          "name": "FoodTruck",
+          "qty": 1,
+          "unitCents": 27500
+        }
+      ]
+    },
+    {
+      "name": "The Divine Bond",
+      "date": "2026-03-28",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 33,
+      "ticketTypes": [
+        {
+          "name": "Couple Admission (Before Discount) (inc. Early Bird Discount)",
+          "qty": 11,
+          "unitCents": 17000
+        },
+        {
+          "name": "Couple Admission (Before Discount)",
+          "qty": 1,
+          "unitCents": 42000
+        },
+        {
+          "name": "Childcare Fee  for kids 1-9 yrs(One ticket per child)",
+          "qty": 8,
+          "unitCents": 0
+        },
+        {
+          "name": "Couple Admission (Before Discount) (inc. Divine 1)",
+          "qty": 2,
+          "unitCents": 0
+        },
+        {
+          "name": "Couple Admission (Before Discount) (inc. DIVINE3)",
+          "qty": 2,
+          "unitCents": 32000
+        },
+        {
+          "name": "Couple Admission (Before Discount) (inc. EIDSPSHL)",
+          "qty": 4,
+          "unitCents": 25000
+        },
+        {
+          "name": "Couple Admission (Before Discount) (inc. GUEST)",
+          "qty": 5,
+          "unitCents": 2000
+        }
+      ]
+    },
+    {
+      "name": "I Pray Party 2026",
+      "date": "2026-04-25",
+      "status": "completed",
+      "department": "Youth",
+      "eventType": "Community Event",
+      "attachExistingDinner": false,
+      "ticketRows": 159,
+      "ticketTypes": [
+        {
+          "name": "Kids 2 years & Up- Parents are free",
+          "qty": 106,
+          "unitCents": 1000
+        },
+        {
+          "name": "2nd Grader (Currently )",
+          "qty": 32,
+          "unitCents": 1500
+        },
+        {
+          "name": "2nd Grader (Currently ) (inc. Waived)",
+          "qty": 9,
+          "unitCents": 0
+        },
+        {
+          "name": "Kids 2 years & Up- Parents are free (inc. Waived)",
+          "qty": 12,
+          "unitCents": 0
+        }
+      ]
+    },
+    {
+      "name": "Hajj Simulation & Summer Camp Meet & Greet",
+      "date": "2026-05-22",
+      "status": "completed",
+      "department": "Recreational Camps",
+      "eventType": "Religious Program",
+      "attachExistingDinner": false,
+      "ticketRows": 62,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 57,
+          "unitCents": 1000
+        },
+        {
+          "name": "General Admission (inc. Registered Camper)",
+          "qty": 5,
+          "unitCents": 0
+        }
+      ]
+    },
+    {
+      "name": "Day of Arafeh Iftar",
+      "date": "2026-05-26",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Religious Program",
+      "attachExistingDinner": false,
+      "ticketRows": 196,
+      "ticketTypes": [
+        {
+          "name": "General Admission 10 yrs+",
+          "qty": 165,
+          "unitCents": 1000
+        },
+        {
+          "name": "Kids Ticket (6-9yrs)",
+          "qty": 18,
+          "unitCents": 0
+        },
+        {
+          "name": "Babysitting (1-5yrs)",
+          "qty": 13,
+          "unitCents": 0
+        }
+      ]
+    },
+    {
+      "name": "Eid Prayer",
+      "date": "2026-05-27",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Religious Program",
+      "attachExistingDinner": false,
+      "ticketRows": 3,
+      "ticketTypes": [
+        {
+          "name": "Coffee Truck/ Cart",
+          "qty": 1,
+          "unitCents": 11000
+        },
+        {
+          "name": "Mocktail/ Smoothie (outside)",
+          "qty": 1,
+          "unitCents": 12000
+        },
+        {
+          "name": "Dessert",
+          "qty": 1,
+          "unitCents": 12000
+        }
+      ]
+    },
+    {
+      "name": "Back-to-School Kids Workshop",
+      "date": "2026-08-08",
+      "status": "completed",
+      "department": "Center",
+      "eventType": "Workshop",
+      "attachExistingDinner": false,
+      "ticketRows": 39,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 39,
+          "unitCents": 1000
+        }
+      ]
+    },
+    {
+      "name": "Annual Fundraising Dinner - Crystal Banquet",
+      "date": "2026-09-12",
+      "status": "approved",
+      "department": "Center",
+      "eventType": "Fundraiser",
+      "attachExistingDinner": true,
+      "ticketRows": 47,
+      "ticketTypes": [
+        {
+          "name": "General Admission",
+          "qty": 31,
+          "unitCents": 5000
+        },
+        {
+          "name": "Kids Program",
+          "qty": 12,
+          "unitCents": 0
+        },
+        {
+          "name": "Babysitting",
+          "qty": 4,
+          "unitCents": 0
+        }
+      ]
+    }
+  ],
+  "sample_orders": [
+    {
+      "email": "rajeh@att.net",
+      "name": "Amaal aref",
+      "eventKey": "MAS Youth Fashion Show||2018-01-20",
+      "date": "2018-01-01",
+      "paid": 20,
+      "tickets": 2,
+      "types": [
+        {
+          "name": "General Admission",
+          "qty": 2,
+          "unitCents": 1000
+        }
+      ],
+      "importKey": "a9f9d13782741b21859b"
+    },
+    {
+      "email": "hemnadin@gmail.com",
+      "name": "Hemna Din",
+      "eventKey": "MAS Youth Fashion Show||2018-01-20",
+      "date": "2018-01-02",
+      "paid": 350,
+      "tickets": 1,
+      "types": [
+        {
+          "name": "Level 1 Gold Package",
+          "qty": 1,
+          "unitCents": 35000
+        }
+      ],
+      "importKey": "83c08492ca80f7d11dd8"
+    },
+    {
+      "email": "basimas@hotmail.com",
+      "name": "Basima Shaheen",
+      "eventKey": "Ladies Painting Class||2018-01-06",
+      "date": "2018-01-02",
+      "paid": 30,
+      "tickets": 1,
+      "types": [
+        {
+          "name": "General Admission",
+          "qty": 1,
+          "unitCents": 3000
+        }
+      ],
+      "importKey": "1c0058917bcae5e9e14f"
+    },
+    {
+      "email": "miabufaris@gmail.com",
+      "name": "mervat abufaris",
+      "eventKey": "Ladies Painting Class||2018-01-06",
+      "date": "2018-01-02",
+      "paid": 30,
+      "tickets": 1,
+      "types": [
+        {
+          "name": "General Admission",
+          "qty": 1,
+          "unitCents": 3000
+        }
+      ],
+      "importKey": "3e68117c2a403c4bb759"
+    },
+    {
+      "email": "raniamusallam@yahoo.com",
+      "name": "Mariam and Aimee",
+      "eventKey": "Ladies Painting Class||2018-01-06",
+      "date": "2018-01-03",
+      "paid": 60,
+      "tickets": 2,
+      "types": [
+        {
+          "name": "General Admission",
+          "qty": 2,
+          "unitCents": 3000
+        }
+      ],
+      "importKey": "86eea5af16e79ea6683b"
+    },
+    {
+      "email": "nsafi49@yahoo.com",
+      "name": "Naila Safi",
+      "eventKey": "Ladies Painting Class||2018-01-06",
+      "date": "2018-01-04",
+      "paid": 30,
+      "tickets": 1,
+      "types": [
+        {
+          "name": "General Admission",
+          "qty": 1,
+          "unitCents": 3000
+        }
+      ],
+      "importKey": "ae722f8b88742940d479"
+    },
+    {
+      "email": "theeleganceofblack@yahoo.com",
+      "name": "Mohdiah Nasir",
+      "eventKey": "MAS Youth Fashion Show||2018-01-20",
+      "date": "2018-01-04",
+      "paid": 350,
+      "tickets": 1,
+      "types": [
+        {
+          "name": "Level 1 Gold Package",
+          "qty": 1,
+          "unitCents": 35000
+        }
+      ],
+      "importKey": "7e9b0412a8512996b59c"
+    },
+    {
+      "email": "rajeh@att.net",
+      "name": "Reem and Seham",
+      "eventKey": "MAS Youth Fashion Show||2018-01-20",
+      "date": "2018-01-04",
+      "paid": 150,
+      "tickets": 1,
+      "types": [
+        {
+          "name": "Level 4 Platinum Package",
+          "qty": 1,
+          "unitCents": 15000
+        }
+      ],
+      "importKey": "669a1a1cf4d6162c0070"
+    },
+    {
+      "email": "rajeh@att.net",
+      "name": "Mayada Mohamed",
+      "eventKey": "MAS Youth Fashion Show||2018-01-20",
+      "date": "2018-01-05",
+      "paid": 150,
+      "tickets": 1,
+      "types": [
+        {
+          "name": "Level 4 Platinum Package",
+          "qty": 1,
+          "unitCents": 15000
+        }
+      ],
+      "importKey": "a8449ca1feabc772f139"
+    },
+    {
+      "email": "sarah0078.sm@gmail.com",
+      "name": "Sarah Mostafa",
+      "eventKey": "Ladies Painting Class||2018-01-06",
+      "date": "2018-01-06",
+      "paid": 60,
+      "tickets": 2,
+      "types": [
+        {
+          "name": "General Admission",
+          "qty": 2,
+          "unitCents": 3000
+        }
+      ],
+      "importKey": "02931ad142ea73545952"
+    },
+    {
+      "email": "miabufaris@gmail.com",
+      "name": "Mervat Abufaris",
+      "eventKey": "MAS Youth Fashion Show||2018-01-20",
+      "date": "2018-01-09",
+      "paid": 10,
+      "tickets": 1,
+      "types": [
+        {
+          "name": "General Admission",
+          "qty": 1,
+          "unitCents": 1000
+        }
+      ],
+      "importKey": "d48688d2fbcc1e1029be"
+    },
+    {
+      "email": "neveen.nofal.rph@gmail.com",
+      "name": "Neveen Nofal/Booth for sr. Iman",
+      "eventKey": "MAS Youth Fashion Show||2018-01-20",
+      "date": "2018-01-11",
+      "paid": 100,
+      "tickets": 1,
+      "types": [
+        {
+          "name": "Level 3 Bronze Package",
+          "qty": 1,
+          "unitCents": 10000
+        }
+      ],
+      "importKey": "1102855c429d116d250c"
+    }
+  ],
+  "counters": {
+    "eventsCreated": 0,
+    "eventsExisting": 0,
+    "ticketTypesCreated": 0,
+    "ticketTypesExisting": 0,
+    "contactsMatched": 0,
+    "contactsCreated": 0,
+    "ordersCreated": 0,
+    "ordersExisting": 0,
+    "ticketsCreated": 0,
+    "affiliationsSynced": 0
+  },
+  "errors": [],
+  "parseErrors": []
+}

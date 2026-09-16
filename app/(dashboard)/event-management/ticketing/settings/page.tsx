@@ -1,5 +1,5 @@
-import { TicketingSettingsClient } from "@/components/tickets/ticketing-settings-client"
+import { redirect } from "next/navigation"
 
 export default function EventManagementTicketingSettingsPage() {
-  return <TicketingSettingsClient />
+  redirect("/event-management/settings/general")
 }

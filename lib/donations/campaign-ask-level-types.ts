@@ -37,7 +37,7 @@ export type CampaignAskLevelMetrics = {
   sortOrder: number
   /** Prospects linked to this ask level (0 until prospects exist). */
   prospects: number
-  /** Prospects at Asked stage or later (0 until prospects exist). */
+  /** Prospects in CAMPAIGN_PROSPECT_ASKED_STAGES (Asked or Pledged). */
   asked: number
   /** Count of secured pledges attributed to this ask level. */
   securedCount: number

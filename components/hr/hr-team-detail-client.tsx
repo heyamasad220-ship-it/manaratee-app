@@ -25,6 +25,7 @@ import {
 } from "@/lib/contacts/contact-constants"
 import { PageBreadcrumbs } from "@/components/navigation/page-breadcrumbs"
 import { Badge } from "@/components/ui/badge"
+import { PhoneText } from "@/components/ui/phone-text"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -338,7 +339,7 @@ export function HrTeamDetailClient({ teamId }: { teamId: string }) {
                       {formatRoles(member.contact_roles)}
                     </TableCell>
                     <TableCell>{member.contact_email || "-"}</TableCell>
-                    <TableCell>{member.contact_phone || "-"}</TableCell>
+                    <TableCell><PhoneText value={member.contact_phone} empty="-" /></TableCell>
                     <TableCell className="capitalize">{member.status}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">

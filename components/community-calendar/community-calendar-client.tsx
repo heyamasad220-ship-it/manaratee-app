@@ -62,7 +62,7 @@ export function CommunityCalendarClient({
         <Link href="/event-management" className="text-primary hover:underline">
           Event Management
         </Link>{" "}
-        → Overview → Community Calendar.
+        → Settings → General → Community Calendar.
       </>
     )
   })()

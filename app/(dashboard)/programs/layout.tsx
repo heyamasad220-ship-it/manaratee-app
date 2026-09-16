@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 
 import { getDepartmentHeadshipForCurrentUser } from "@/lib/departments/department-access"
+import { getProgramLeadsForCurrentUser } from "@/lib/programs/program-access"
 import { requireOrganizationModule } from "@/lib/modules/dashboard-module-access-server"
 import {
   hasAnyPermission,
@@ -19,8 +20,11 @@ export default async function ProgramsLayout({
     PERMISSIONS.PROGRAMS_MANAGE
   )
   if (!canViewPrograms) {
-    const headship = await getDepartmentHeadshipForCurrentUser()
-    if (!headship) {
+    const [headship, leads] = await Promise.all([
+      getDepartmentHeadshipForCurrentUser(),
+      getProgramLeadsForCurrentUser(),
+    ])
+    if (!headship && leads.length === 0) {
       redirect("/unauthorized")
     }
   }

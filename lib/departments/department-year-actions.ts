@@ -25,7 +25,9 @@ import {
   getCurrentUserPermissionContext,
   hasPermission,
 } from "@/lib/permissions/permissions"
+import { countRosterEnrollmentsOnVisibleOfferings, loadStaffVisibleOfferingsForPrograms } from "@/lib/programs/program-offering-queries"
 import { createProgram } from "@/lib/programs/program-actions"
+import { canAccessProgram } from "@/lib/programs/program-access"
 import { copyOfferingCapacityGroups } from "@/lib/programs/program-capacity-group-actions"
 import { createProgramOffering } from "@/lib/programs/program-offering-actions"
 import { normalizeProgramAudienceType } from "@/lib/programs/program-offering-attributes"
@@ -114,32 +116,23 @@ async function mapProgramsWithOfferingCounts(
   const supabase = await createClient()
   const ids = programs.map((p) => p.id)
 
-  const [{ data: offerings }, { data: enrollments }] = await Promise.all([
-    supabase
-      .from("program_offerings")
-      .select("program_id, capacity, capacity_mode")
-      .eq("organization_id", organizationId)
-      .in("program_id", ids)
-      .neq("status", "archived"),
-    supabase
-      .from("program_enrollments")
-      .select("program_id")
-      .eq("organization_id", organizationId)
-      .in("program_id", ids)
-      .in("status", [
-        "pending_payment",
-        "pending",
-        "enrolled",
-        "active",
-        "completed",
-      ]),
-  ])
+  const visibleOfferings = await loadStaffVisibleOfferingsForPrograms(
+    supabase,
+    organizationId,
+    ids
+  )
+  const enrolledByProgram = await countRosterEnrollmentsOnVisibleOfferings(
+    supabase,
+    organizationId,
+    ids,
+    visibleOfferings
+  )
 
   const offeringCounts = new Map<string, number>()
   const capacityByProgram = new Map<string, number>()
   const unlimitedPrograms = new Set<string>()
-  for (const row of offerings || []) {
-    const pid = row.program_id as string
+  for (const row of visibleOfferings) {
+    const pid = row.program_id
     offeringCounts.set(pid, (offeringCounts.get(pid) || 0) + 1)
     const mode = String(row.capacity_mode || "unlimited")
     if (mode === "limited") {
@@ -150,12 +143,6 @@ async function mapProgramsWithOfferingCounts(
     } else {
       unlimitedPrograms.add(pid)
     }
-  }
-
-  const enrolledByProgram = new Map<string, number>()
-  for (const row of enrollments || []) {
-    const pid = row.program_id as string
-    enrolledByProgram.set(pid, (enrolledByProgram.get(pid) || 0) + 1)
   }
 
   return programs.map((p) => {
@@ -270,9 +257,10 @@ export async function fetchDepartmentYearBasicsAction(
   | { success: false; error: string }
 > {
   try {
-    const canView = await canViewDepartment(departmentId)
+    const canView =
+      (await canViewDepartment(departmentId)) || (await canAccessProgram(programId))
     if (!canView) {
-      return { success: false, error: "You do not have permission to view this department." }
+      return { success: false, error: "You do not have permission to view this program." }
     }
 
     const organizationId = await getSelectedOrganizationId()

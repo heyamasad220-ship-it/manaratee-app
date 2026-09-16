@@ -6,6 +6,7 @@ import {
   isAddonChargeType,
   isCoreProgramFeeLineType,
   isSkippedAddonLineType,
+  isTransactionFeeAddon,
   resolveProgramAddonType,
   type AddonReportPaymentStatus,
   type AddonReportRow,
@@ -326,33 +327,38 @@ export async function getAddonReportRows(): Promise<
 
       if (addonLines.length > 0) {
         for (const line of addonLines) {
+          const addonInput = {
+            label: line.label,
+            lineType: line.line_type,
+            chargeType: charge.charge_type,
+            metadata: {
+              ...(charge.metadata || {}),
+              ...(line.metadata || {}),
+            },
+            quote: charge.quote_snapshot,
+          }
+          if (isTransactionFeeAddon(addonInput)) continue
           pending.push({
             id: `line:${line.id}`,
-            addonType: resolveProgramAddonType({
-              label: line.label,
-              lineType: line.line_type,
-              chargeType: charge.charge_type,
-              metadata: {
-                ...(charge.metadata || {}),
-                ...(line.metadata || {}),
-              },
-              quote: charge.quote_snapshot,
-            }),
+            addonType: resolveProgramAddonType(addonInput),
             quantity: Math.max(1, Number(line.quantity || 1)),
             amountDue: roundMoney(Number(line.amount || 0)),
           })
         }
       } else if (addonCharge && Number(charge.total || 0) > 0.009) {
-        pending.push({
-          id: `charge:${charge.id}`,
-          addonType: resolveProgramAddonType({
-            chargeType: charge.charge_type,
-            metadata: charge.metadata,
-            quote: charge.quote_snapshot,
-          }),
-          quantity: 1,
-          amountDue: roundMoney(Number(charge.total || 0)),
-        })
+        const addonInput = {
+          chargeType: charge.charge_type,
+          metadata: charge.metadata,
+          quote: charge.quote_snapshot,
+        }
+        if (!isTransactionFeeAddon(addonInput)) {
+          pending.push({
+            id: `charge:${charge.id}`,
+            addonType: resolveProgramAddonType(addonInput),
+            quantity: 1,
+            amountDue: roundMoney(Number(charge.total || 0)),
+          })
+        }
       }
 
       if (pending.length === 0) continue

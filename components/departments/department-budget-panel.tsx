@@ -47,6 +47,8 @@ export function DepartmentBudgetPanel({
   programId = null,
   readOnly = false,
   stickyStatsTop,
+  hideStats = false,
+  onDataChanged,
 }: {
   departmentId: string
   departmentName: string
@@ -54,6 +56,9 @@ export function DepartmentBudgetPanel({
   readOnly?: boolean
   /** CSS `top` so KPI cards stick below department workspace tab chrome. */
   stickyStatsTop?: string
+  /** Hide local KPIs when the parent Financial tab shows the combined row. */
+  hideStats?: boolean
+  onDataChanged?: () => void
 }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -91,7 +96,7 @@ export function DepartmentBudgetPanel({
 
   return (
     <div className="space-y-6">
-      {!loading && !error && summary ? (
+      {!hideStats && !loading && !error && summary ? (
         <div
           className={
             stickyStatsTop
@@ -239,6 +244,7 @@ export function DepartmentBudgetPanel({
                                     return
                                   }
                                   await load()
+                                  onDataChanged?.()
                                 })
                               }}
                             >
@@ -345,6 +351,7 @@ export function DepartmentBudgetPanel({
         onSaved={async () => {
           setCreateOpen(false)
           await load()
+          onDataChanged?.()
         }}
       />
     </div>

@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { PhoneText } from "@/components/ui/phone-text"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
   Table,
@@ -260,7 +261,7 @@ export default function CustomersPage() {
                           </span>
                           <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
                             <Phone className="h-3.5 w-3.5" />
-                            {ind.phone}
+                            <PhoneText value={ind.phone} empty="" />
                           </span>
                         </div>
                       </TableCell>

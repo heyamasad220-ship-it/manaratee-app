@@ -23,11 +23,8 @@ import {
   requireAnyPermission,
   type PermissionKey,
 } from "@/lib/permissions/permissions"
-import { getDepartments } from "@/lib/departments/department-queries"
-import { getEventTypes } from "@/lib/events/event-type-queries"
-import { getInternalEventFormDefaults } from "@/lib/events/internal-event-form-defaults"
-import { getActiveCalendarVenues } from "@/lib/bookings/venue-calendar-venues"
-import { getRoomSetupStyles } from "@/lib/setup-styles/setup-style-queries"
+import { loadInternalEventCreateFormOptions } from "@/lib/events/internal-event-form-options"
+import { getDepartmentHeadshipForCurrentUser } from "@/lib/departments/department-access"
 
 const VALID_SOURCE_TYPES = new Set<string>(
   Object.values(RESERVATION_SOURCE_TYPES)
@@ -75,25 +72,14 @@ function calendarTitleForSources(
 }
 
 async function loadEventFormOptions(
-  canPlanEvents: boolean
+  canPlanEvents: boolean,
+  lockDepartmentId?: string | null
 ): Promise<FacilityEventFormOptions | null> {
   if (!canPlanEvents) return null
 
-  const [departments, eventTypes, venues, setupStyles, defaults] = await Promise.all([
-    getDepartments(),
-    getEventTypes({ activeOnly: true }),
-    getActiveCalendarVenues(),
-    getRoomSetupStyles({ activeOnly: true }),
-    getInternalEventFormDefaults(),
-  ])
-
-  return {
-    departments: departments.map((d) => ({ id: d.id, name: d.name })),
-    eventTypes: eventTypes.map((t) => ({ id: t.id, name: t.name })),
-    venues: venues.map((v) => ({ id: v.id, name: v.name })),
-    setupStyles,
-    defaults,
-  }
+  return loadInternalEventCreateFormOptions({
+    lockDepartmentId,
+  })
 }
 
 async function AudienceCalendarPageContent({
@@ -111,7 +97,13 @@ async function AudienceCalendarPageContent({
   defaultSourceTypes?: ReservationSourceType[] | null
   sectionNav?: ReactNode
 }) {
-  await requireAnyPermission(...permissions)
+  const hasCalendarPermission = await hasAnyPermission(...permissions)
+  const headship = hasCalendarPermission
+    ? null
+    : await getDepartmentHeadshipForCurrentUser()
+  if (!hasCalendarPermission && !headship) {
+    await requireAnyPermission(...permissions)
+  }
 
   const resolved = await searchParams
   const dateParam = getSearchParam(resolved, "date")
@@ -124,7 +116,7 @@ async function AudienceCalendarPageContent({
     defaultSourceTypes ??
     null
 
-  const [data, canManageBlocks, canPlanEvents] = await Promise.all([
+  const [data, canManageBlocks, canPlanEventsOrg] = await Promise.all([
     getCalendarData(audience, anchorDate, view, { sourceTypes }),
     hasAnyPermission(
       PERMISSIONS.BOOKINGS_MANAGE,
@@ -139,9 +131,13 @@ async function AudienceCalendarPageContent({
     ),
   ])
 
+  const canPlanEvents = canPlanEventsOrg || Boolean(headship)
   const planEvents =
     canPlanEvents && (audience === "staff" || audience === "ops")
-  const eventFormOptions = await loadEventFormOptions(planEvents)
+  const eventFormOptions = await loadEventFormOptions(
+    planEvents,
+    canPlanEventsOrg ? null : headship?.departmentId
+  )
 
   const resolvedTitle =
     headerTitle ||

@@ -59,6 +59,17 @@ export function formatTimeDisplay(time24: string) {
 
 const HOUR_OPTIONS = Array.from({ length: 12 }, (_, index) => index + 1)
 
+export function buildTimeOptions(minuteStep: number) {
+  const step = Math.max(1, Math.min(30, minuteStep))
+  const options: string[] = []
+  for (let hours24 = 0; hours24 < 24; hours24 += 1) {
+    for (let minutes = 0; minutes < 60; minutes += step) {
+      options.push(toTime24(hours24, minutes))
+    }
+  }
+  return options
+}
+
 function buildMinuteOptions(minuteStep: number) {
   const step = Math.max(1, Math.min(30, minuteStep))
   const options: number[] = []

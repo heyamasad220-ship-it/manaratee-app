@@ -3,6 +3,8 @@
  * Client-safe (no server imports).
  */
 
+import { isTransactionFeeAddon } from "@/lib/programs/addon-display"
+
 const REGISTRATION_LINE_TYPES = new Set([
   "registration_fee",
   "tuition",
@@ -200,6 +202,15 @@ export function buildEnrollmentFeeBreakdown(
     }
 
     for (const line of otherLines) {
+      if (
+        isTransactionFeeAddon({
+          label: line.label,
+          lineType: line.line_type,
+          metadata: line.metadata,
+        })
+      ) {
+        continue
+      }
       additionalFees.push({
         label: titleCaseLabel(line.label || line.line_type || "Additional fee"),
         amount: Number(line.amount || 0),
@@ -224,6 +235,20 @@ export function buildEnrollmentFeeBreakdown(
         if (Number(line.amount) <= 0) continue
         const type = String(line.line_type).toLowerCase()
         if (SKIP_ADDITIONAL_LINE_TYPES.has(type)) continue
+        if (
+          isTransactionFeeAddon({
+            label: line.label,
+            lineType: line.line_type,
+            chargeType: charge.charge_type,
+            metadata: {
+              ...(charge.metadata || {}),
+              ...(line.metadata || {}),
+            },
+            quote: charge.quote_snapshot,
+          })
+        ) {
+          continue
+        }
         additionalFees.push({
           label: titleCaseLabel(
             line.label || chargeLabel(charge) || line.line_type
@@ -232,6 +257,15 @@ export function buildEnrollmentFeeBreakdown(
         })
       }
     } else if (Number(charge.total) > 0) {
+      if (
+        isTransactionFeeAddon({
+          chargeType: charge.charge_type,
+          metadata: charge.metadata,
+          quote: charge.quote_snapshot,
+        })
+      ) {
+        continue
+      }
       additionalFees.push({
         label: titleCaseLabel(chargeLabel(charge)),
         amount: Number(charge.total || 0),

@@ -49,6 +49,7 @@ import {
   CheckCircle2,
   Clock,
 } from "lucide-react"
+import { PhoneText } from "@/components/ui/phone-text"
 import { cn } from "@/lib/utils"
 
 type FoodTruck = {
@@ -224,7 +225,9 @@ export default function FoodTrucksPage() {
                         <TableCell>
                           <div className="flex flex-col">
                             <span className="text-sm">{truck.contact}</span>
-                            <span className="text-xs text-muted-foreground">{truck.phone}</span>
+                            <span className="text-xs text-muted-foreground">
+                              <PhoneText value={truck.phone} empty="" />
+                            </span>
                           </div>
                         </TableCell>
 

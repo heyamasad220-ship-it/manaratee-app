@@ -6,6 +6,7 @@ import { Plus, Search, Store, Users } from "lucide-react"
 import { AddEventVendorDialog } from "@/components/vendor-hub/events/add-event-vendor-dialog"
 import { EditEventVendorDialog } from "@/components/vendor-hub/events/edit-event-vendor-dialog"
 import { Badge } from "@/components/ui/badge"
+import { formatPhoneDisplay } from "@/lib/ui/format-phone"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -194,7 +195,7 @@ export function BazaarEventVendorsClient({
                           <div className="min-w-0">
                             <p className="text-sm">{row.contactName}</p>
                             <p className="truncate text-xs text-muted-foreground">
-                              {row.email || row.phone || "—"}
+                              {row.email || formatPhoneDisplay(row.phone) || "—"}
                             </p>
                           </div>
                         </TableCell>

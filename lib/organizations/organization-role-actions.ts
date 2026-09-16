@@ -155,7 +155,7 @@ export async function createOrganizationRoleAction(input: {
     await seedMissingRolePermissions(ctx.admin, ctx.organizationId)
 
     revalidatePath("/settings/roles-permissions")
-    return { success: true as const }
+    return { success: true as const, roleId: created.id as string }
   } catch (error) {
     return {
       success: false as const,

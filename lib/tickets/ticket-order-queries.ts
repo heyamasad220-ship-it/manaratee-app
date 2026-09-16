@@ -67,51 +67,70 @@ export async function getTicketOverviewStats(): Promise<TicketOverviewStats> {
     return { ordersCount: 0, ticketsIssued: 0, totalRevenueCents: 0, currency: "USD" }
   }
 
-  const [ordersResult, ticketsResult] = await Promise.all([
-    supabase
+  const pageSize = 1000
+  const orderRows: Array<{
+    total_cents?: number | null
+    refunded_amount_cents?: number | null
+    currency?: string | null
+    status?: string | null
+  }> = []
+
+  for (let from = 0; ; from += pageSize) {
+    const page = await supabase
       .from("ticket_orders")
       .select("total_cents, refunded_amount_cents, currency, status")
       .eq("organization_id", organizationId)
-      .in("status", ["completed", "partially_refunded"]),
-    supabase
-      .from("tickets")
-      .select("id", { count: "exact", head: true })
-      .eq("organization_id", organizationId)
-      .in("status", ["valid", "checked_in"]),
-  ])
+      .in("status", ["completed", "partially_refunded"])
+      .range(from, from + pageSize - 1)
 
-  const ordersQuery =
-    ordersResult.error?.code === "42703"
-      ? await supabase
-          .from("ticket_orders")
-          .select("total_cents, currency, status")
-          .eq("organization_id", organizationId)
-          .in("status", ["completed", "partially_refunded"])
-      : ordersResult
+    const query =
+      page.error?.code === "42703"
+        ? await supabase
+            .from("ticket_orders")
+            .select("total_cents, currency, status")
+            .eq("organization_id", organizationId)
+            .in("status", ["completed", "partially_refunded"])
+            .range(from, from + pageSize - 1)
+        : page
 
-  if (ordersQuery.error?.code === "42P01" || ticketsResult.error?.code === "42P01") {
+    if (query.error?.code === "42P01") {
+      return { ordersCount: 0, ticketsIssued: 0, totalRevenueCents: 0, currency: "USD" }
+    }
+    if (query.error) {
+      console.error(query.error)
+      throw new Error("Failed to load ticket overview stats")
+    }
+
+    orderRows.push(...(query.data || []))
+    if (!query.data || query.data.length < pageSize) break
+  }
+
+  const ticketsResult = await supabase
+    .from("tickets")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", organizationId)
+    .in("status", ["valid", "checked_in"])
+
+  if (ticketsResult.error?.code === "42P01") {
     return { ordersCount: 0, ticketsIssued: 0, totalRevenueCents: 0, currency: "USD" }
   }
 
-  const orders = ordersQuery.data || []
-  const totalRevenueCents = orders.reduce(
+  const totalRevenueCents = orderRows.reduce(
     (sum, row) =>
       sum +
       ticketOrderNetRevenueCents({
         status: row.status as string,
         totalCents: Number(row.total_cents || 0),
-        refundedAmountCents: Number(
-          (row as { refunded_amount_cents?: number }).refunded_amount_cents || 0
-        ),
+        refundedAmountCents: Number(row.refunded_amount_cents || 0),
       }),
     0
   )
 
   return {
-    ordersCount: orders.length,
+    ordersCount: orderRows.length,
     ticketsIssued: ticketsResult.count || 0,
     totalRevenueCents,
-    currency: orders[0]?.currency || "USD",
+    currency: orderRows[0]?.currency || "USD",
   }
 }
 
@@ -385,6 +404,11 @@ export type EventAttendeeListItem = {
   currency: string
   purchaserName: string | null
   purchaserEmail: string | null
+  purchaserPhone: string | null
+  contactId: string | null
+  paymentMethod: string | null
+  paymentReference: string | null
+  orderCreatedAt: string | null
 }
 
 function mapTicketStatus(status: string): EventAttendeeTicketStatus {
@@ -434,7 +458,14 @@ export async function getEventAttendees(
         refunded_amount_cents,
         currency,
         purchaser_name,
-        purchaser_email
+        purchaser_email,
+        contact_id,
+        payment_method,
+        payment_reference,
+        created_at,
+        contacts:contact_id (
+          phone
+        )
       )
     `
     )
@@ -465,7 +496,14 @@ export async function getEventAttendees(
           total_cents,
           currency,
           purchaser_name,
-          purchaser_email
+          purchaser_email,
+          contact_id,
+          payment_method,
+          payment_reference,
+          created_at,
+          contacts:contact_id (
+            phone
+          )
         )
       `
       )
@@ -495,12 +533,23 @@ function mapEventAttendeeRows(
     const order = Array.isArray(row.ticket_orders)
       ? row.ticket_orders[0]
       : row.ticket_orders
+    const contact = Array.isArray(order?.contacts)
+      ? order.contacts[0]
+      : order?.contacts
+    const purchaserEmail = (order?.purchaser_email as string | null) ?? null
+    const rawAttendeeEmail = (row.attendee_email as string | null) ?? null
+    const attendeeEmail =
+      rawAttendeeEmail &&
+      purchaserEmail &&
+      rawAttendeeEmail.trim().toLowerCase() === purchaserEmail.trim().toLowerCase()
+        ? null
+        : rawAttendeeEmail
 
     return {
       id: row.id as string,
       ticketCode: (row.ticket_code as string) || "",
       attendeeName: (row.attendee_name as string | null) ?? null,
-      attendeeEmail: (row.attendee_email as string | null) ?? null,
+      attendeeEmail,
       status: mapTicketStatus(row.status as string),
       checkedInAt: (row.checked_in_at as string | null) ?? null,
       createdAt: row.created_at as string,
@@ -513,7 +562,12 @@ function mapEventAttendeeRows(
       orderRefundedCents: Number(order?.refunded_amount_cents || 0),
       currency: (order?.currency as string) || "USD",
       purchaserName: (order?.purchaser_name as string | null) ?? null,
-      purchaserEmail: (order?.purchaser_email as string | null) ?? null,
+      purchaserEmail,
+      purchaserPhone: (contact?.phone as string | null) ?? null,
+      contactId: (order?.contact_id as string | null) ?? null,
+      paymentMethod: (order?.payment_method as string | null) ?? null,
+      paymentReference: (order?.payment_reference as string | null) ?? null,
+      orderCreatedAt: (order?.created_at as string | null) ?? null,
     }
   })
 }

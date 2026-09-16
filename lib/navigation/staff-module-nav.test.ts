@@ -23,10 +23,34 @@ describe("staff module nav", () => {
     assert.equal(isHiddenTopLevelStaffModule("finance", slugs), false)
   })
 
-  it("keeps Programs as a single rail item with no flyout children", () => {
-    assert.deepEqual(buildProgramsChildren("both"), [])
-    assert.deepEqual(buildProgramsChildren("academic"), [])
-    assert.deepEqual(buildProgramsChildren("seasonal"), [])
+  it("builds a Programs flyout with Overview through Settings", () => {
+    const labels = buildProgramsChildren("both").map((item) => item.label)
+    assert.deepEqual(labels, [
+      "Overview",
+      "All programs",
+      "Registrations",
+      "Finance",
+      "Financial Assistance",
+      "Reports",
+      "Settings",
+    ])
+    assert.deepEqual(
+      buildProgramsChildren("academic").map((item) => item.label),
+      labels
+    )
+    assert.deepEqual(
+      buildProgramsChildren("seasonal").map((item) => item.label),
+      labels
+    )
+    const overview = buildProgramsChildren("both").find(
+      (item) => item.label === "Overview"
+    )
+    const allPrograms = buildProgramsChildren("both").find(
+      (item) => item.label === "All programs"
+    )
+    assert.equal(overview?.href, "/programs")
+    assert.equal(overview?.exact, true)
+    assert.equal(allPrograms?.href, "/programs/list")
   })
 
   it("shows Volunteers when Programs or Event Management is on", () => {
@@ -54,18 +78,28 @@ describe("staff module nav", () => {
   })
 
   it("puts Reports on Event Management with Childcare under that prefix", () => {
-    const labels = buildEventManagementChildren().map((item) => item.label)
+    const children = buildEventManagementChildren()
+    const labels = children.map((item) => item.label)
     assert.deepEqual(labels, [
+      "Overview",
       "Events",
       "Master Calendar",
-      "Ticketing",
+      "Check-in",
       "Reports",
       "Settings",
     ])
-    const reports = buildEventManagementChildren().find(
-      (item) => item.label === "Reports"
-    )
+    const checkIn = children.find((item) => item.label === "Check-in")
+    assert.equal(checkIn?.href, "/event-management/check-in")
+    assert.equal(checkIn?.matchPrefix, "/event-management/check-in")
+    const reports = children.find((item) => item.label === "Reports")
     assert.equal(reports?.href, "/event-management/reports")
     assert.equal(reports?.matchPrefix, "/event-management/reports")
+
+    const overview = children.find((item) => item.label === "Overview")
+    const events = children.find((item) => item.label === "Events")
+    assert.equal(overview?.href, "/event-management")
+    assert.equal(overview?.exact, true)
+    assert.equal(events?.href, "/event-management/events")
+    assert.equal(events?.matchPrefix, "/event-management")
   })
 })

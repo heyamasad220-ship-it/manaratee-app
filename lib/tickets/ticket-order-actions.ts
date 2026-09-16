@@ -596,6 +596,9 @@ export async function bulkUpdateTicketOrderStatus(
 export async function refundEventTicketOrder(input: {
   orderId: string
   amountCents?: number
+  ticketIds?: string[]
+  note?: string | null
+  notifyCustomer?: boolean
 }): Promise<{ success: true } | { success: false; error: string }> {
   try {
     await assertTicketingManagePermission()
@@ -682,6 +685,35 @@ export async function refundEventTicketOrder(input: {
       refundedAmountCents: Number(orderRow.refunded_amount_cents || 0),
     })
 
+    const remainingCents = Math.max(totalCents - alreadyRefunded, 0)
+    const notifyCustomer = input.notifyCustomer !== false
+    const staffNote = input.note?.trim() || null
+
+    const { data: ticketRows } = await supabase
+      .from("tickets")
+      .select("id, status, event_ticket_types:ticket_type_id ( price_cents )")
+      .eq("organization_id", organizationId)
+      .eq("ticket_order_id", String(orderRow.id))
+
+    const activeTickets = (ticketRows || []).filter((row) => {
+      const status = String(row.status || "")
+      return status === "valid" || status === "checked_in" || status === "waitlisted"
+    })
+    const selectedIds = (input.ticketIds || []).filter((id) =>
+      activeTickets.some((ticket) => ticket.id === id)
+    )
+    const ticketsToVoid = selectedIds.length > 0 ? selectedIds : []
+    const selectedTickets =
+      ticketsToVoid.length > 0
+        ? activeTickets.filter((ticket) => ticketsToVoid.includes(ticket.id as string))
+        : []
+    const selectedPriceCents = selectedTickets.reduce((sum, ticket) => {
+      const typeEmbed = Array.isArray(ticket.event_ticket_types)
+        ? ticket.event_ticket_types[0]
+        : ticket.event_ticket_types
+      return sum + Math.max(Number((typeEmbed as { price_cents?: number } | null)?.price_cents || 0), 0)
+    }, 0)
+
     if (currentStatus !== "completed" && currentStatus !== "partially_refunded") {
       if (checkoutSessionId) {
         await expirePendingTicketCheckoutSession(supabase, {
@@ -696,6 +728,9 @@ export async function refundEventTicketOrder(input: {
         nextOrderStatus: "canceled",
         refundedAmountCents: alreadyRefunded,
         thisRefundCents: 0,
+        ticketIdsToVoid: ticketsToVoid.length > 0 ? ticketsToVoid : undefined,
+        notifyCustomer,
+        staffNote,
       })
 
       revalidateTicketingPaths()
@@ -706,11 +741,14 @@ export async function refundEventTicketOrder(input: {
       return { success: true }
     }
 
-    const remainingCents = Math.max(totalCents - alreadyRefunded, 0)
+    const suggestedCents =
+      ticketsToVoid.length > 0
+        ? Math.min(selectedPriceCents, remainingCents)
+        : remainingCents
     const thisRefundCents =
-      input.amountCents == null ? remainingCents : Math.round(input.amountCents)
-    if (thisRefundCents <= 0) {
-      return { success: false, error: "Nothing left to refund on this order." }
+      input.amountCents == null ? suggestedCents : Math.round(input.amountCents)
+    if (thisRefundCents < 0) {
+      return { success: false, error: "Enter a valid refund amount." }
     }
     if (thisRefundCents > remainingCents) {
       return {
@@ -718,26 +756,46 @@ export async function refundEventTicketOrder(input: {
         error: "Refund amount is greater than the remaining paid balance.",
       }
     }
+    if (thisRefundCents <= 0 && ticketsToVoid.length === 0) {
+      return { success: false, error: "Nothing left to refund on this order." }
+    }
 
-    const stripeResult = await createStripeTicketRefund(supabase, {
-      organizationId,
-      order: {
-        id: String(orderRow.id),
-        status: currentStatus,
-        total_cents: totalCents,
-        refunded_amount_cents: alreadyRefunded,
-        payment_method: stringOrNull(orderRow.payment_method),
-        stripe_checkout_session_id: checkoutSessionId,
-        stripe_payment_intent_id: stringOrNull(orderRow.stripe_payment_intent_id),
-        metadata,
-      },
-      amountCents: thisRefundCents,
-    })
-    const stripeRefundId = stripeResult.refundId || null
-    const nextRefunded = stripeResult.alreadyRefunded
-      ? totalCents
-      : alreadyRefunded + thisRefundCents
-    const nextOrderStatus = nextTicketOrderRefundStatus(totalCents, nextRefunded)
+    let stripeRefundId: string | null = null
+    let nextRefunded = alreadyRefunded
+    if (thisRefundCents > 0) {
+      const stripeResult = await createStripeTicketRefund(supabase, {
+        organizationId,
+        order: {
+          id: String(orderRow.id),
+          status: currentStatus,
+          total_cents: totalCents,
+          refunded_amount_cents: alreadyRefunded,
+          payment_method: stringOrNull(orderRow.payment_method),
+          stripe_checkout_session_id: checkoutSessionId,
+          stripe_payment_intent_id: stringOrNull(orderRow.stripe_payment_intent_id),
+          metadata,
+        },
+        amountCents: thisRefundCents,
+      })
+      stripeRefundId = stripeResult.refundId || null
+      nextRefunded = stripeResult.alreadyRefunded
+        ? totalCents
+        : alreadyRefunded + thisRefundCents
+    }
+
+    const voidingAllRemaining =
+      ticketsToVoid.length > 0 && ticketsToVoid.length === activeTickets.length
+    const nextOrderStatus =
+      nextRefunded >= totalCents && totalCents > 0
+        ? "refunded"
+        : nextRefunded > alreadyRefunded || (voidingAllRemaining && remainingCents === 0)
+          ? nextTicketOrderRefundStatus(totalCents, Math.max(nextRefunded, alreadyRefunded))
+          : nextRefunded > 0
+            ? nextTicketOrderRefundStatus(totalCents, nextRefunded)
+            : voidingAllRemaining
+              ? "canceled"
+              : "partially_refunded"
+
     if (nextOrderStatus === "completed") {
       return { success: false, error: "Nothing left to refund on this order." }
     }
@@ -747,10 +805,16 @@ export async function refundEventTicketOrder(input: {
       orderId: String(orderRow.id),
       nextOrderStatus,
       refundedAmountCents: nextRefunded,
-      thisRefundCents: stripeResult.alreadyRefunded
-        ? remainingCents
-        : thisRefundCents,
+      thisRefundCents,
       stripeRefundId,
+      ticketIdsToVoid:
+        nextOrderStatus === "refunded" || nextOrderStatus === "canceled"
+          ? undefined
+          : ticketsToVoid.length > 0
+            ? ticketsToVoid
+            : undefined,
+      notifyCustomer,
+      staffNote,
     })
 
     revalidateTicketingPaths()
@@ -892,7 +956,7 @@ export async function getOrderTickets(orderId: string) {
       attendee_name,
       attendee_email,
       status,
-      event_ticket_types:ticket_type_id ( name )
+      event_ticket_types:ticket_type_id ( name, price_cents )
     `)
     .eq("organization_id", organizationId)
     .eq("ticket_order_id", orderId)
@@ -903,14 +967,20 @@ export async function getOrderTickets(orderId: string) {
     return []
   }
 
-  return (data || []).map((row: any) => ({
-    id: row.id as string,
-    ticketCode: row.ticket_code as string,
-    attendeeName: row.attendee_name as string | null,
-    attendeeEmail: row.attendee_email as string | null,
-    status: row.status as string,
-    ticketTypeName: row.event_ticket_types?.name || "Ticket",
-  }))
+  return (data || []).map((row: any) => {
+    const typeEmbed = Array.isArray(row.event_ticket_types)
+      ? row.event_ticket_types[0]
+      : row.event_ticket_types
+    return {
+      id: row.id as string,
+      ticketCode: row.ticket_code as string,
+      attendeeName: row.attendee_name as string | null,
+      attendeeEmail: row.attendee_email as string | null,
+      status: row.status as string,
+      ticketTypeName: typeEmbed?.name || "Ticket",
+      priceCents: Math.max(Number(typeEmbed?.price_cents || 0), 0),
+    }
+  })
 }
 
 /** Check in or undo check-in for a single event ticket seat. */
@@ -1292,6 +1362,66 @@ export async function checkInEventTicketByCode(input: {
     success: true,
     attendeeName: (ticket.attendee_name as string) || "Attendee",
     alreadyCheckedIn: false,
+  }
+}
+
+/** Look up a ticket by code across all events in the organization and check in. */
+export async function checkInOrgTicketByCode(input: {
+  ticketCode: string
+  checkedIn?: boolean
+}): Promise<
+  | {
+      success: true
+      attendeeName: string
+      alreadyCheckedIn: boolean
+      eventId: string
+      eventName: string
+    }
+  | { success: false; error: string }
+> {
+  const code = input.ticketCode.trim().toUpperCase()
+  if (!code) {
+    return { success: false, error: "Enter a ticket code." }
+  }
+
+  const supabase = await createClient()
+  const organizationId = await getSelectedOrganizationId()
+  if (!organizationId) {
+    return { success: false, error: "No organization selected." }
+  }
+
+  const { data: tickets, error } = await supabase
+    .from("tickets")
+    .select("id, status, attendee_name, internal_event_id, internal_events:internal_event_id ( name )")
+    .eq("organization_id", organizationId)
+    .eq("ticket_code", code)
+    .limit(1)
+
+  const ticket = tickets?.[0]
+  if (error || !ticket) {
+    return { success: false, error: "Ticket not found." }
+  }
+
+  const eventEmbed = ticket.internal_events as { name?: string | null } | { name?: string | null }[] | null
+  const eventName = Array.isArray(eventEmbed)
+    ? eventEmbed[0]?.name
+    : eventEmbed?.name
+
+  const result = await checkInEventTicketByCode({
+    eventId: ticket.internal_event_id as string,
+    ticketCode: code,
+    checkedIn: input.checkedIn,
+  })
+  if (!result.success) {
+    return result
+  }
+
+  return {
+    success: true,
+    attendeeName: result.attendeeName,
+    alreadyCheckedIn: result.alreadyCheckedIn,
+    eventId: ticket.internal_event_id as string,
+    eventName: eventName || "Event",
   }
 }
 

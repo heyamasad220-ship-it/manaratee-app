@@ -12,6 +12,9 @@ export const VIEW_MASTER_CALENDAR_CTA_LABEL = "View Master Calendar"
 /** Outline CTA that opens Facilities calendar for room conflicts / availability. */
 export const CHECK_SPACE_AVAILABILITY_CTA_LABEL = "Check space availability"
 
+/** Link from in-place create: check rooms, then return to finish the form. */
+export const VIEW_FACILITY_CALENDAR_CTA_LABEL = "View facility calendar"
+
 export function buildFacilitiesBookSpaceHref(options?: {
   departmentId?: string | null
   returnTo?: string | null
@@ -20,6 +23,8 @@ export function buildFacilitiesBookSpaceHref(options?: {
   start?: string | null
   end?: string | null
   date?: string | null
+  /** When set, a newly created event is linked to this donations campaign. */
+  campaignId?: string | null
 }): string {
   const params = new URLSearchParams()
   if (options?.departmentId) params.set("department", options.departmentId)
@@ -29,6 +34,7 @@ export function buildFacilitiesBookSpaceHref(options?: {
   if (options?.start) params.set("start", options.start)
   if (options?.end) params.set("end", options.end)
   if (options?.date) params.set("date", options.date)
+  if (options?.campaignId) params.set("campaign", options.campaignId)
 
   const query = params.toString()
   return query ? `/facilities/calendar?${query}` : "/facilities/calendar"

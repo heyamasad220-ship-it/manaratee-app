@@ -2,11 +2,13 @@
 
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
+import { assertCanManageProgram } from "@/lib/programs/program-access"
 
 export async function createProgramDiscount(formData: FormData) {
   const supabase = await createClient()
 
   const programId = String(formData.get("program_id"))
+  await assertCanManageProgram(programId)
   const organizationId = String(formData.get("organization_id"))
   const discountTagId = String(formData.get("discount_tag_id"))
   const discountType =

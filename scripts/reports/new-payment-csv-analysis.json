@@ -1,0 +1,1811 @@
+{
+  "file": "C:/Users/danan/Downloads/New_PAYMENT_TRANSACTION_REPORT.csv",
+  "rowCount": 4475,
+  "headers": [
+    "Amount",
+    "Amount Type",
+    "Customer Name",
+    "Customer Email",
+    "Customer Phone",
+    "Refund ID",
+    "Transaction ID",
+    "Payment Mode",
+    "Payment / Donation Reason",
+    "Payment / Donation Secondary Reason",
+    "Payment Remarks",
+    "Recurring Type",
+    "Refunded By",
+    "Refund Reason",
+    "Schedule Transaction Date",
+    "Status",
+    "Transaction Date",
+    "Transaction Type",
+    "Reference ID"
+  ],
+  "totalAmount": 479548.52,
+  "minDate": "2022-05-16",
+  "maxDate": "2026-08-29",
+  "uniqueTxnIds": 3935,
+  "multiLineTxnCount": 466,
+  "exactDupeTxnCount": 4,
+  "statuses": {
+    "succeeded": {
+      "count": 4107,
+      "amount": 525848.43
+    },
+    "processing": {
+      "count": 3,
+      "amount": 93
+    },
+    "refunded": {
+      "count": 365,
+      "amount": -46392.91
+    }
+  },
+  "amountTypes": {
+    "SUBSCRIPTION_AMOUNT": {
+      "count": 3310,
+      "amount": 440060.05
+    },
+    "REGISTRATION_AMOUNT": {
+      "count": 228,
+      "amount": 25767.1
+    },
+    "ADDONS_AMOUNT": {
+      "count": 165,
+      "amount": 3696.5
+    },
+    "(blank)": {
+      "count": 365,
+      "amount": -46392.91
+    },
+    "DONATION_AMOUNT": {
+      "count": 388,
+      "amount": 53892.78
+    },
+    "TICKET_AMOUNT": {
+      "count": 19,
+      "amount": 2525
+    }
+  },
+  "txnTypes": {
+    "CREDIT": {
+      "count": 4110,
+      "amount": 525941.43
+    },
+    "DEBIT": {
+      "count": 365,
+      "amount": -46392.91
+    }
+  },
+  "paymentModes": {
+    "CARD": {
+      "count": 3288,
+      "amount": 393535.44
+    },
+    "BANK": {
+      "count": 17,
+      "amount": 3074
+    },
+    "APPLE_PAY": {
+      "count": 173,
+      "amount": 23077
+    },
+    "GOOGLE_PAY": {
+      "count": 35,
+      "amount": 4276.5
+    },
+    "LINK": {
+      "count": 602,
+      "amount": 83957.26
+    },
+    "(blank)": {
+      "count": 357,
+      "amount": -28731.68
+    },
+    "CASH": {
+      "count": 3,
+      "amount": 360
+    }
+  },
+  "families": {
+    "other": {
+      "count": 2520,
+      "amount": 260744.24
+    },
+    "qlh:2025-2026": {
+      "count": 602,
+      "amount": 68026.71
+    },
+    "qlh:2024-2025": {
+      "count": 343,
+      "amount": 40848.01
+    },
+    "qil:2025-2026": {
+      "count": 336,
+      "amount": 31650
+    },
+    "qil:unyearned": {
+      "count": 212,
+      "amount": 36430.74
+    },
+    "ss:2026-2027": {
+      "count": 194,
+      "amount": 19622.82
+    },
+    "qij": {
+      "count": 76,
+      "amount": 7201.5
+    },
+    "qil:2026-2027": {
+      "count": 67,
+      "amount": 8050
+    },
+    "qlh:2026-2027": {
+      "count": 61,
+      "amount": 5237.5
+    },
+    "blank": {
+      "count": 49,
+      "amount": 1090
+    },
+    "ss:2025-2026": {
+      "count": 15,
+      "amount": 647
+    }
+  },
+  "reasonCount": 81,
+  "topReasons": [
+    [
+      "Quran 4 Little Hearts 25-26",
+      {
+        "count": 602,
+        "amount": 68026.71
+      }
+    ],
+    [
+      "Quran 4 Lil Hearts (2023/2024)",
+      {
+        "count": 553,
+        "amount": 53320.6
+      }
+    ],
+    [
+      "Quran 4 Little Hearts (2024/2025)",
+      {
+        "count": 343,
+        "amount": 40848.01
+      }
+    ],
+    [
+      "Quran Institute for Ladies 2025-2026",
+      {
+        "count": 336,
+        "amount": 31650
+      }
+    ],
+    [
+      "MAS Quran Institute",
+      {
+        "count": 266,
+        "amount": 34911.8
+      }
+    ],
+    [
+      "Sunday School 26/27",
+      {
+        "count": 194,
+        "amount": 19622.82
+      }
+    ],
+    [
+      "MAS Quran Institute/ سورة النّساء",
+      {
+        "count": 160,
+        "amount": 10385
+      }
+    ],
+    [
+      "Quran Institute For Ladies",
+      {
+        "count": 157,
+        "amount": 25280.74
+      }
+    ],
+    [
+      "MAS Quran Institute/ Beginner/ مبتدئة",
+      {
+        "count": 128,
+        "amount": 7738.24
+      }
+    ],
+    [
+      "MAS Quran Institute/ Osool/ الأصول",
+      {
+        "count": 103,
+        "amount": 7085
+      }
+    ],
+    [
+      "MAS Quran Institute/ سورة البقرة",
+      {
+        "count": 86,
+        "amount": 4480
+      }
+    ],
+    [
+      "Self-Defense & Taekwondo with Samira",
+      {
+        "count": 68,
+        "amount": 8467.5
+      }
+    ],
+    [
+      "Winter Camp 2025 (Dec 22nd - Jan 1st)",
+      {
+        "count": 67,
+        "amount": 17528
+      }
+    ],
+    [
+      "Quran 4 Little Hearts 26-27",
+      {
+        "count": 61,
+        "amount": 5237.5
+      }
+    ],
+    [
+      "Quran Institute Junior (Part Time Hifth)",
+      {
+        "count": 61,
+        "amount": 6220
+      }
+    ],
+    [
+      "Winter Camp - Ready, Set, Pray",
+      {
+        "count": 60,
+        "amount": 13636
+      }
+    ],
+    [
+      "Ladies Taekwondo",
+      {
+        "count": 58,
+        "amount": 3637.5
+      }
+    ],
+    [
+      "Quran Institute for Ladies",
+      {
+        "count": 55,
+        "amount": 11150
+      }
+    ],
+    [
+      "MAS Quran Institute/ Qaeda Nouranea / قاعدة نورانيّة",
+      {
+        "count": 55,
+        "amount": 3705
+      }
+    ],
+    [
+      "The Companion Of The Quran",
+      {
+        "count": 54,
+        "amount": 3968
+      }
+    ],
+    [
+      "Self-Defense & Taekwondo with Samira: Nov 2025 - Feb 2026",
+      {
+        "count": 48,
+        "amount": 4420
+      }
+    ],
+    [
+      "MAS  Quran Institute/ Advance - متقدّمة",
+      {
+        "count": 47,
+        "amount": 3056.62
+      }
+    ],
+    [
+      "Quran Institute For Ladies 2026-2027",
+      {
+        "count": 46,
+        "amount": 5675
+      }
+    ],
+    [
+      "MAS Fall Camp November 2024",
+      {
+        "count": 41,
+        "amount": 4720.5
+      }
+    ],
+    [
+      "Fall Camp 2022",
+      {
+        "count": 41,
+        "amount": 3686.48
+      }
+    ],
+    [
+      "MAS Quran Institute/ Recitation Improvement / level 1/ تحسين تلاوة",
+      {
+        "count": 39,
+        "amount": 2600
+      }
+    ],
+    [
+      "Winter Camp 2022",
+      {
+        "count": 39,
+        "amount": 7555
+      }
+    ],
+    [
+      "Self-Defense & Taekwondo with Samira Intermediate Class",
+      {
+        "count": 37,
+        "amount": 6675
+      }
+    ],
+    [
+      "Istiqamah Institute",
+      {
+        "count": 35,
+        "amount": 3250
+      }
+    ],
+    [
+      "Self-Defense & Taekwondo with Samira Beginner’s Class",
+      {
+        "count": 32,
+        "amount": 4575
+      }
+    ],
+    [
+      "MAS Quran Institute/ Quran & Arabic Language Arts (Girls14+)",
+      {
+        "count": 30,
+        "amount": 745
+      }
+    ],
+    [
+      "Self-Defense & Taekwondo for Women (April - June) 2026",
+      {
+        "count": 29,
+        "amount": 2145
+      }
+    ],
+    [
+      "Fall Camp 2025 (November 24 - 27)",
+      {
+        "count": 29,
+        "amount": 3400
+      }
+    ],
+    [
+      "Fall Camp",
+      {
+        "count": 29,
+        "amount": 3514.5
+      }
+    ],
+    [
+      "MAS Quran Institute**",
+      {
+        "count": 27,
+        "amount": 7300
+      }
+    ],
+    [
+      "Taekwondo Ladies Class (Fall)",
+      {
+        "count": 25,
+        "amount": 3693
+      }
+    ],
+    [
+      "Self-Defense & Taekwondo with Samira - Beginner",
+      {
+        "count": 23,
+        "amount": 1365
+      }
+    ],
+    [
+      "Self-Defense & Taekwondo with Samira - Intermediate",
+      {
+        "count": 21,
+        "amount": 2250
+      }
+    ],
+    [
+      "MAS Fall Camp 2024",
+      {
+        "count": 21,
+        "amount": 1560
+      }
+    ],
+    [
+      "الأربعين النووية & متن الأجرومية",
+      {
+        "count": 18,
+        "amount": 0
+      }
+    ]
+  ],
+  "issues": {
+    "missingAmount": 0,
+    "zeroAmount": 65,
+    "negativeAmount": 365,
+    "missingEmail": 8,
+    "missingTxnId": 59,
+    "missingReason": 0,
+    "unparseableDate": 0,
+    "unknownStatus": {}
+  },
+  "parseErrors": 0,
+  "qil": {
+    "rowCount": 734,
+    "byYear": {
+      "2026-2027": {
+        "count": 67,
+        "amount": 8050,
+        "succeeded": 60,
+        "refunded": 6,
+        "processing": 1,
+        "offerings": {
+          "Memorization (Course 1 & Course 2)": 6,
+          "Tajweed & Recitation": 46,
+          "Memorization (Surat Al-Baqara & Surat Aal Imran)": 15
+        },
+        "reasons": {
+          "Quran Institute for Ladies 2026-2027": 6,
+          "Quran Institute For Ladies 2026-2027": 46,
+          "Quran Institure for Ladies 2026-2027": 15
+        },
+        "uniqueEmails": 54
+      },
+      "2025-2026": {
+        "count": 336,
+        "amount": 31650,
+        "succeeded": 325,
+        "refunded": 11,
+        "processing": 0,
+        "offerings": {
+          "(none)": 336
+        },
+        "reasons": {
+          "Quran Institute for Ladies 2025-2026": 336
+        },
+        "uniqueEmails": 97
+      },
+      "unyearned": {
+        "count": 331,
+        "amount": 50111.24,
+        "succeeded": 288,
+        "refunded": 43,
+        "processing": 0,
+        "offerings": {
+          "(none)": 247,
+          "All Programs / Monthly Payment / $100": 15,
+          "All Programs / Full Payment / $500": 29,
+          "Memorization / Half Payment / 250$": 12,
+          "All Programs / Half Payment / $250": 19,
+          "Recitation & Arabic Grammar / Full Payment/500$": 4,
+          "Memorization / Full Payment/500$": 5
+        },
+        "reasons": {
+          "Quran Institute For Ladies": 157,
+          "Quran Institute for Ladies": 55,
+          "Ladies Quran Recitation": 3,
+          "Ladies Taekwondo - Summer  (Intermediate & Advanced)": 9,
+          "Ladies Taekwondo - Summer  (Beginners)": 10,
+          "Ladies Taekwondo": 58,
+          "Taekwondo Ladies Class (Fall)": 25,
+          "Taekwondo Ladies Class": 14
+        },
+        "uniqueEmails": 122
+      }
+    },
+    "reasonVariants": {
+      "Quran Institute for Ladies 2026-2027": {
+        "count": 6,
+        "amount": 300
+      },
+      "Quran Institute For Ladies 2026-2027": {
+        "count": 46,
+        "amount": 5675
+      },
+      "Quran Institure for Ladies 2026-2027": {
+        "count": 15,
+        "amount": 2075
+      },
+      "Quran Institute for Ladies 2025-2026": {
+        "count": 336,
+        "amount": 31650
+      },
+      "Quran Institute For Ladies": {
+        "count": 157,
+        "amount": 25280.74
+      },
+      "Quran Institute for Ladies": {
+        "count": 55,
+        "amount": 11150
+      },
+      "Ladies Quran Recitation": {
+        "count": 3,
+        "amount": 600
+      },
+      "Ladies Taekwondo - Summer  (Intermediate & Advanced)": {
+        "count": 9,
+        "amount": 1800
+      },
+      "Ladies Taekwondo - Summer  (Beginners)": {
+        "count": 10,
+        "amount": 1950
+      },
+      "Ladies Taekwondo": {
+        "count": 58,
+        "amount": 3637.5
+      },
+      "Taekwondo Ladies Class (Fall)": {
+        "count": 25,
+        "amount": 3693
+      },
+      "Taekwondo Ladies Class": {
+        "count": 14,
+        "amount": 2000
+      }
+    },
+    "secondaries": {
+      "(none)": {
+        "count": 583,
+        "amount": 61611.24
+      },
+      "Tajweed & Recitation": {
+        "count": 46,
+        "amount": 5675
+      },
+      "All Programs / Full Payment / $500": {
+        "count": 29,
+        "amount": 9000
+      },
+      "All Programs / Half Payment / $250": {
+        "count": 19,
+        "amount": 4750
+      },
+      "Memorization (Surat Al-Baqara & Surat Aal Imran)": {
+        "count": 15,
+        "amount": 2075
+      },
+      "All Programs / Monthly Payment / $100": {
+        "count": 15,
+        "amount": 1500
+      },
+      "Memorization / Half Payment / 250$": {
+        "count": 12,
+        "amount": 1750
+      },
+      "Memorization (Course 1 & Course 2)": {
+        "count": 6,
+        "amount": 300
+      },
+      "Memorization / Full Payment/500$": {
+        "count": 5,
+        "amount": 1800
+      },
+      "Recitation & Arabic Grammar / Full Payment/500$": {
+        "count": 4,
+        "amount": 1350
+      }
+    },
+    "yearSecondary": {
+      "2025-2026 | (none)": {
+        "count": 336,
+        "amount": 31650
+      },
+      "2026-2027 | Memorization (Course 1 & Course 2)": {
+        "count": 6,
+        "amount": 300
+      },
+      "2026-2027 | Memorization (Surat Al-Baqara & Surat Aal Imran)": {
+        "count": 15,
+        "amount": 2075
+      },
+      "2026-2027 | Tajweed & Recitation": {
+        "count": 46,
+        "amount": 5675
+      },
+      "unyearned | (none)": {
+        "count": 247,
+        "amount": 29961.24
+      },
+      "unyearned | All Programs / Full Payment / $500": {
+        "count": 29,
+        "amount": 9000
+      },
+      "unyearned | All Programs / Half Payment / $250": {
+        "count": 19,
+        "amount": 4750
+      },
+      "unyearned | All Programs / Monthly Payment / $100": {
+        "count": 15,
+        "amount": 1500
+      },
+      "unyearned | Memorization / Full Payment/500$": {
+        "count": 5,
+        "amount": 1800
+      },
+      "unyearned | Memorization / Half Payment / 250$": {
+        "count": 12,
+        "amount": 1750
+      },
+      "unyearned | Recitation & Arabic Grammar / Full Payment/500$": {
+        "count": 4,
+        "amount": 1350
+      }
+    },
+    "unyearnedSample": [
+      {
+        "row": 1740,
+        "reason": "Quran Institute For Ladies",
+        "secondary": "",
+        "amount": 120,
+        "date": "2025-06-30",
+        "email": "lamiaa15@yahoo.com",
+        "status": "succeeded"
+      },
+      {
+        "row": 1741,
+        "reason": "Quran Institute For Ladies",
+        "secondary": "",
+        "amount": 120,
+        "date": "2025-06-30",
+        "email": "nurercoskun@gmail.com",
+        "status": "succeeded"
+      },
+      {
+        "row": 1744,
+        "reason": "Quran Institute For Ladies",
+        "secondary": "",
+        "amount": 100,
+        "date": "2025-06-24",
+        "email": "elmanawyheba78@gmail.com",
+        "status": "succeeded"
+      },
+      {
+        "row": 1765,
+        "reason": "Quran Institute For Ladies",
+        "secondary": "",
+        "amount": 120,
+        "date": "2025-05-30",
+        "email": "nurercoskun@gmail.com",
+        "status": "succeeded"
+      },
+      {
+        "row": 1767,
+        "reason": "Quran Institute For Ladies",
+        "secondary": "",
+        "amount": 100,
+        "date": "2025-05-28",
+        "email": "abeer.d3@gmail.com",
+        "status": "succeeded"
+      },
+      {
+        "row": 1768,
+        "reason": "Quran Institute For Ladies",
+        "secondary": "",
+        "amount": 120,
+        "date": "2025-05-28",
+        "email": "smm495@hotmail.com",
+        "status": "succeeded"
+      },
+      {
+        "row": 1769,
+        "reason": "Quran Institute For Ladies",
+        "secondary": "",
+        "amount": 120,
+        "date": "2025-05-26",
+        "email": "azizasalim@ymail.com",
+        "status": "succeeded"
+      },
+      {
+        "row": 1770,
+        "reason": "Quran Institute For Ladies",
+        "secondary": "",
+        "amount": 120,
+        "date": "2025-05-26",
+        "email": "nematsedeeg@gmail.cim",
+        "status": "succeeded"
+      },
+      {
+        "row": 1772,
+        "reason": "Quran Institute For Ladies",
+        "secondary": "",
+        "amount": 120,
+        "date": "2025-05-25",
+        "email": "buthainadaglas@yahoo.com",
+        "status": "succeeded"
+      },
+      {
+        "row": 1774,
+        "reason": "Quran Institute For Ladies",
+        "secondary": "",
+        "amount": 120,
+        "date": "2025-05-24",
+        "email": "lena0809@gmail.com",
+        "status": "succeeded"
+      },
+      {
+        "row": 1775,
+        "reason": "Quran Institute For Ladies",
+        "secondary": "",
+        "amount": 120,
+        "date": "2025-05-23",
+        "email": "ummadam56@gmail.com",
+        "status": "succeeded"
+      },
+      {
+        "row": 1779,
+        "reason": "Quran Institute For Ladies",
+        "secondary": "",
+        "amount": 120,
+        "date": "2025-05-22",
+        "email": "melkarmi@yahoo.com",
+        "status": "succeeded"
+      },
+      {
+        "row": 1780,
+        "reason": "Quran Institute For Ladies",
+        "secondary": "",
+        "amount": 100,
+        "date": "2025-05-22",
+        "email": "elmanawyheba78@gmail.com",
+        "status": "succeeded"
+      },
+      {
+        "row": 1782,
+        "reason": "Quran Institute For Ladies",
+        "secondary": "",
+        "amount": 500,
+        "date": "2025-05-19",
+        "email": "elarja@unlv.nevada.edu",
+        "status": "succeeded"
+      },
+      {
+        "row": 1789,
+        "reason": "Quran Institute For Ladies",
+        "secondary": "",
+        "amount": 250,
+        "date": "2025-05-13",
+        "email": "letifa.m.tahir@gamil.com",
+        "status": "succeeded"
+      },
+      {
+        "row": 1790,
+        "reason": "Quran Institute For Ladies",
+        "secondary": "",
+        "amount": -50,
+        "date": "2025-05-12",
+        "email": "farah.dabbura12@hotmail.com",
+        "status": "refunded"
+      },
+      {
+        "row": 1792,
+        "reason": "Quran Institute For Ladies",
+        "secondary": "",
+        "amount": 50,
+        "date": "2025-05-11",
+        "email": "farah.dabbura12@hotmail.com",
+        "status": "succeeded"
+      },
+      {
+        "row": 1793,
+        "reason": "Quran Institute For Ladies",
+        "secondary": "",
+        "amount": 25,
+        "date": "2025-05-08",
+        "email": "alaghao@gmail.com",
+        "status": "succeeded"
+      },
+      {
+        "row": 1802,
+        "reason": "Quran Institute For Ladies",
+        "secondary": "",
+        "amount": 60,
+        "date": "2025-05-07",
+        "email": "farah.dabbura12@hotmail.com",
+        "status": "succeeded"
+      },
+      {
+        "row": 1823,
+        "reason": "Quran Institute For Ladies",
+        "secondary": "",
+        "amount": 250,
+        "date": "2025-05-01",
+        "email": "moh.sheikh@gmail.com",
+        "status": "succeeded"
+      }
+    ],
+    "unyearnedCount": 331,
+    "afterAug24": [
+      {
+        "date": "2026-08-29",
+        "amount": 50,
+        "amountType": "SUBSCRIPTION_AMOUNT",
+        "email": "be_happy_0505@hotmail.com",
+        "name": "hassnae bellamine",
+        "secondary": "Memorization (Course 1 & Course 2)",
+        "status": "processing",
+        "txnId": "py_3U9pzxHFcF18bCZG0X1f9VFS"
+      },
+      {
+        "date": "2026-08-27",
+        "amount": 450,
+        "amountType": "SUBSCRIPTION_AMOUNT",
+        "email": "suzan@abudalu.com",
+        "name": "Suzan Qawouq",
+        "secondary": "Tajweed & Recitation",
+        "status": "succeeded",
+        "txnId": "ch_3U9BhyHFcF18bCZG1gS20G7X"
+      }
+    ],
+    "refunds": [
+      {
+        "date": "2026-08-28",
+        "amount": -50,
+        "email": "suzan@abudalu.com",
+        "secondary": "Tajweed & Recitation",
+        "year": "2026-2027",
+        "txnId": "ch_3U9BhyHFcF18bCZG1gS20G7X",
+        "refundReason": "REQUESTED_BY_CUSTOMER"
+      },
+      {
+        "date": "2026-08-26",
+        "amount": -100,
+        "email": "rowaidaramadan@gmail.com",
+        "secondary": "Tajweed & Recitation",
+        "year": "2026-2027",
+        "txnId": "ch_3U7IXmHFcF18bCZG0TUWcmVg",
+        "refundReason": "REQUESTED_BY_CUSTOMER"
+      },
+      {
+        "date": "2026-08-24",
+        "amount": -200,
+        "email": "elmanawyheba78@gmail.com",
+        "secondary": "Memorization (Surat Al-Baqara & Surat Aal Imran)",
+        "year": "2026-2027",
+        "txnId": "ch_3ToVa7HFcF18bCZG0q4DsX2U",
+        "refundReason": "REQUESTED_BY_CUSTOMER"
+      },
+      {
+        "date": "2026-08-24",
+        "amount": -50,
+        "email": "ymtse04@gmail.com",
+        "secondary": "Tajweed & Recitation",
+        "year": "2026-2027",
+        "txnId": "ch_3U71ExHFcF18bCZG1EfFu5Ud",
+        "refundReason": "REQUESTED_BY_CUSTOMER"
+      },
+      {
+        "date": "2026-08-13",
+        "amount": -175,
+        "email": "hanooninoona@gmail.com",
+        "secondary": "Tajweed & Recitation",
+        "year": "2026-2027",
+        "txnId": "ch_3U3SrVHFcF18bCZG1oshlxnp",
+        "refundReason": "REQUESTED_BY_CUSTOMER"
+      },
+      {
+        "date": "2026-06-12",
+        "amount": -400,
+        "email": "elmanawyheba78@gmail.com",
+        "secondary": "Tajweed & Recitation",
+        "year": "2026-2027",
+        "txnId": "ch_3ThbJrHFcF18bCZG1cFak1WF",
+        "refundReason": "REQUESTED_BY_CUSTOMER"
+      },
+      {
+        "date": "2026-04-03",
+        "amount": -100,
+        "email": "abeer_qandil@yahoo.com",
+        "secondary": "",
+        "year": "2025-2026",
+        "txnId": "ch_3THoOHHFcF18bCZG0zD9YhVv",
+        "refundReason": "REQUESTED_BY_CUSTOMER"
+      },
+      {
+        "date": "2026-03-09",
+        "amount": -100,
+        "email": "suhair.younes1970@gmail.com",
+        "secondary": "",
+        "year": "2025-2026",
+        "txnId": "ch_3SwlHfHFcF18bCZG0E3kL33R",
+        "refundReason": "REQUESTED_BY_CUSTOMER"
+      },
+      {
+        "date": "2026-03-09",
+        "amount": -100,
+        "email": "suhair.younes1970@gmail.com",
+        "secondary": "",
+        "year": "2025-2026",
+        "txnId": "ch_3T6naZHFcF18bCZG0BT2mpCB",
+        "refundReason": "REQUESTED_BY_CUSTOMER"
+      },
+      {
+        "date": "2026-02-04",
+        "amount": -50,
+        "email": "narmeenjmal@gmail.com",
+        "secondary": "",
+        "year": "2025-2026",
+        "txnId": "ch_3SwOm0HFcF18bCZG1Yeo7lIK",
+        "refundReason": "REQUESTED_BY_CUSTOMER"
+      },
+      {
+        "date": "2026-02-02",
+        "amount": -50,
+        "email": "yousif.sarah06@gmail.com",
+        "secondary": "",
+        "year": "2025-2026",
+        "txnId": "ch_3S82h6HFcF18bCZG1LIWFoXM",
+        "refundReason": "REQUESTED_BY_CUSTOMER"
+      },
+      {
+        "date": "2025-11-29",
+        "amount": -100,
+        "email": "bsoumia85@gmail.com",
+        "secondary": "",
+        "year": "2025-2026",
+        "txnId": "ch_3SYo2oHFcF18bCZG18PIR5hh",
+        "refundReason": "REQUESTED_BY_CUSTOMER"
+      },
+      {
+        "date": "2025-11-25",
+        "amount": -400,
+        "email": "bandarabdel@yahoo.com",
+        "secondary": "",
+        "year": "2025-2026",
+        "txnId": "ch_3SQrVpHFcF18bCZG1kPqoIBF",
+        "refundReason": "REQUESTED_BY_CUSTOMER"
+      },
+      {
+        "date": "2025-11-10",
+        "amount": -50,
+        "email": "kokierek84@gmail.com",
+        "secondary": "",
+        "year": "2025-2026",
+        "txnId": "ch_3SP2vaHFcF18bCZG1ran6H54",
+        "refundReason": "REQUESTED_BY_CUSTOMER"
+      },
+      {
+        "date": "2025-11-07",
+        "amount": -50,
+        "email": "sab2008reen@live.com",
+        "secondary": "",
+        "year": "2025-2026",
+        "txnId": "ch_3SP2vYHFcF18bCZG0u8Fjcxw",
+        "refundReason": "REQUESTED_BY_CUSTOMER"
+      },
+      {
+        "date": "2025-11-04",
+        "amount": -400,
+        "email": "saralifecoach20@gmail.com",
+        "secondary": "",
+        "year": "2025-2026",
+        "txnId": "ch_3SIVMgHFcF18bCZG1ZcQ2MAJ",
+        "refundReason": "REQUESTED_BY_CUSTOMER"
+      },
+      {
+        "date": "2025-09-16",
+        "amount": -50,
+        "email": "arooj.b@gmail.com",
+        "secondary": "",
+        "year": "2025-2026",
+        "txnId": "ch_3S81rLHFcF18bCZG0ZuJMpyx",
+        "refundReason": "REQUESTED_BY_CUSTOMER"
+      },
+      {
+        "date": "2025-05-12",
+        "amount": -50,
+        "email": "farah.dabbura12@hotmail.com",
+        "secondary": "",
+        "year": null,
+        "txnId": "ch_3RNbQnHFcF18bCZG12RxfjOf",
+        "refundReason": "DUPLICATE"
+      },
+      {
+        "date": "2025-02-26",
+        "amount": -450,
+        "email": "noor.elaine@gmail.com",
+        "secondary": "",
+        "year": null,
+        "txnId": "ch_3Qw9wSHFcF18bCZG09xkDlug",
+        "refundReason": "REQUESTED_BY_CUSTOMER"
+      },
+      {
+        "date": "2025-02-26",
+        "amount": -250,
+        "email": "bdweik@dcccd.edu",
+        "secondary": "",
+        "year": null,
+        "txnId": "ch_3QeHD9HFcF18bCZG0tP9HHFj",
+        "refundReason": "REQUESTED_BY_CUSTOMER"
+      },
+      {
+        "date": "2025-02-13",
+        "amount": -250,
+        "email": "hebah-a@live.com",
+        "secondary": "",
+        "year": null,
+        "txnId": "ch_3QpCNzHFcF18bCZG0cnrY5Nt",
+        "refundReason": "REQUESTED_BY_CUSTOMER"
+      },
+      {
+        "date": "2025-02-10",
+        "amount": -60,
+        "email": "rajaaaljaber@gmail.com",
+        "secondary": "",
+        "year": null,
+        "txnId": "ch_3QgpGxHFcF18bCZG15U77EpD",
+        "refundReason": "REQUESTED_BY_CUSTOMER"
+      },
+      {
+        "date": "2025-02-10",
+        "amount": -60,
+        "email": "rajaaaljaber@gmail.com",
+        "secondary": "",
+        "year": null,
+        "txnId": "ch_3QhBkTHFcF18bCZG1AwkgGHU",
+        "refundReason": "REQUESTED_BY_CUSTOMER"
+      },
+      {
+        "date": "2025-01-15",
+        "amount": -250,
+        "email": "abeer_qandil@yahoo.com",
+        "secondary": "",
+        "year": null,
+        "txnId": "ch_3QeH7kHFcF18bCZG0Zq1mKWy",
+        "refundReason": "REQUESTED_BY_CUSTOMER"
+      },
+      {
+        "date": "2024-12-16",
+        "amount": -71.84,
+        "email": "tonazzinazaman@yahoo.com",
+        "secondary": "",
+        "year": null,
+        "txnId": "ch_3QWJZsHFcF18bCZG1VSTzrNq",
+        "refundReason": "REQUESTED_BY_CUSTOMER"
+      },
+      {
+        "date": "2024-12-16",
+        "amount": -51.4,
+        "email": "rhumayra@gmail.com",
+        "secondary": "",
+        "year": null,
+        "txnId": "ch_3QWJZvHFcF18bCZG1fYvFa6u",
+        "refundReason": "REQUESTED_BY_CUSTOMER"
+      },
+      {
+        "date": "2024-11-15",
+        "amount": -10.2,
+        "email": "salgahafi@risingstarsacad.com",
+        "secondary": "",
+        "year": null,
+        "txnId": "ch_3QLUqxHFcF18bCZG1JRRDO30",
+        "refundReason": "REQUESTED_BY_CUSTOMER"
+      },
+      {
+        "date": "2024-11-15",
+        "amount": -61.3,
+        "email": "esraa.althamary21@gmail.com",
+        "secondary": "",
+        "year": null,
+        "txnId": "ch_3QHBJXHFcF18bCZG155kQWTI",
+        "refundReason": "REQUESTED_BY_CUSTOMER"
+      },
+      {
+        "date": "2024-11-15",
+        "amount": -61.3,
+        "email": "ayatalthamary@gmail.com",
+        "secondary": "",
+        "year": null,
+        "txnId": "ch_3QHC1eHFcF18bCZG1vwMYfJS",
+        "refundReason": "REQUESTED_BY_CUSTOMER"
+      },
+      {
+        "date": "2024-11-04",
+        "amount": -250,
+        "email": "hmfl99@hotmail.com",
+        "secondary": "Memorization / Half Payment / 250$",
+        "year": null,
+        "txnId": "ch_3QH5TtHFcF18bCZG1fnzv4DG",
+        "refundReason": "REQUESTED_BY_CUSTOMER"
+      },
+      {
+        "date": "2024-10-04",
+        "amount": -250,
+        "email": "yousif.sarah06@gmail.com",
+        "secondary": "Memorization / Half Payment / 250$",
+        "year": null,
+        "txnId": "ch_3Q5qhjHFcF18bCZG0YARl1VS",
+        "refundReason": "REQUESTED_BY_CUSTOMER"
+      },
+      {
+        "date": "2024-09-20",
+        "amount": -450,
+        "email": "wedadghanim@gmail.com",
+        "secondary": "All Programs / Full Payment / $500",
+        "year": null,
+        "txnId": "ch_3PsrFJHFcF18bCZG02qC8Pr0",
+        "refundReason": "REQUESTED_BY_CUSTOMER"
+      },
+      {
+        "date": "2024-09-09",
+        "amount": -50,
+        "email": "nurercoskun@gmail.com",
+        "secondary": "All Programs / Full Payment / $500",
+        "year": null,
+        "txnId": "ch_3Px9v7HFcF18bCZG1G2mSo7C",
+        "refundReason": "REQUESTED_BY_CUSTOMER"
+      },
+      {
+        "date": "2024-09-09",
+        "amount": -50,
+        "email": "bsami36242@gmail.com",
+        "secondary": "All Programs / Full Payment / $500",
+        "year": null,
+        "txnId": "ch_3Px9cyHFcF18bCZG02UIcEzn",
+        "refundReason": "REQUESTED_BY_CUSTOMER"
+      },
+      {
+        "date": "2024-09-09",
+        "amount": -50,
+        "email": "noha.el.hendy85@gmail.com",
+        "secondary": "Memorization / Full Payment/500$",
+        "year": null,
+        "txnId": "ch_3Px8VAHFcF18bCZG0bYLgTZC",
+        "refundReason": "REQUESTED_BY_CUSTOMER"
+      },
+      {
+        "date": "2024-09-09",
+        "amount": -50,
+        "email": "gfturk88@gmail.com",
+        "secondary": "Recitation & Arabic Grammar / Full Payment/500$",
+        "year": null,
+        "txnId": "ch_3PwVnjHFcF18bCZG1WiTHw3E",
+        "refundReason": "REQUESTED_BY_CUSTOMER"
+      },
+      {
+        "date": "2024-09-09",
+        "amount": -50,
+        "email": "mona1137@yahoo.com",
+        "secondary": "All Programs / Full Payment / $500",
+        "year": null,
+        "txnId": "ch_3Pw910HFcF18bCZG1q5h9Tc9",
+        "refundReason": "REQUESTED_BY_CUSTOMER"
+      },
+      {
+        "date": "2024-09-09",
+        "amount": -50,
+        "email": "eelsaegh@gmail.com",
+        "secondary": "All Programs / Full Payment / $500",
+        "year": null,
+        "txnId": "ch_3PvmQUHFcF18bCZG0jRqxjCg",
+        "refundReason": "REQUESTED_BY_CUSTOMER"
+      },
+      {
+        "date": "2024-09-09",
+        "amount": -50,
+        "email": "yasmin8333@yahoo.com",
+        "secondary": "All Programs / Full Payment / $500",
+        "year": null,
+        "txnId": "ch_3PviylHFcF18bCZG1fJ40LKK",
+        "refundReason": "REQUESTED_BY_CUSTOMER"
+      },
+      {
+        "date": "2024-09-09",
+        "amount": -50,
+        "email": "smm495@hotmail.com",
+        "secondary": "All Programs / Full Payment / $500",
+        "year": null,
+        "txnId": "ch_3PvL29HFcF18bCZG03Kd1YJU",
+        "refundReason": "REQUESTED_BY_CUSTOMER"
+      },
+      {
+        "date": "2024-08-07",
+        "amount": -40,
+        "email": "lakiyou13@gmail.com",
+        "secondary": "All Programs / Full Payment / $500",
+        "year": null,
+        "txnId": "ch_3PkpSIHFcF18bCZG0MBWPE0m",
+        "refundReason": "REQUESTED_BY_CUSTOMER"
+      },
+      {
+        "date": "2023-03-10",
+        "amount": -125,
+        "email": "hk.hasaballah@gmail.com",
+        "secondary": "",
+        "year": null,
+        "txnId": "ch_3MjtLaHFcF18bCZG11NJxYz2",
+        "refundReason": "DUPLICATE"
+      },
+      {
+        "date": "2023-02-23",
+        "amount": -125,
+        "email": "hk.hasaballah@gmail.com",
+        "secondary": "",
+        "year": null,
+        "txnId": "ch_3MZfBtHFcF18bCZG1DeZ57ar",
+        "refundReason": "DUPLICATE"
+      },
+      {
+        "date": "2023-02-12",
+        "amount": -237.5,
+        "email": "omsaphiya@icloud.com",
+        "secondary": "",
+        "year": null,
+        "txnId": "ch_3MZfBoHFcF18bCZG19x2T6UZ",
+        "refundReason": "DUPLICATE"
+      },
+      {
+        "date": "2023-02-12",
+        "amount": -125,
+        "email": "felmazouni@hotmail.com",
+        "secondary": "",
+        "year": null,
+        "txnId": "ch_3MZfBvHFcF18bCZG0zpwut5P",
+        "refundReason": "DUPLICATE"
+      },
+      {
+        "date": "2023-02-12",
+        "amount": -125,
+        "email": "bruin_mopier0b@icloud.com",
+        "secondary": "",
+        "year": null,
+        "txnId": "ch_3MZfC2HFcF18bCZG0tq2Q0zM",
+        "refundReason": "DUPLICATE"
+      },
+      {
+        "date": "2023-02-12",
+        "amount": -125,
+        "email": "syeda_farah@yahoo.com",
+        "secondary": "",
+        "year": null,
+        "txnId": "ch_3MZfC4HFcF18bCZG0kBUD4HI",
+        "refundReason": "DUPLICATE"
+      },
+      {
+        "date": "2023-02-12",
+        "amount": -237.5,
+        "email": "afrozahai@gmail.com",
+        "secondary": "",
+        "year": null,
+        "txnId": "ch_3MZfCEHFcF18bCZG1nrSZ7om",
+        "refundReason": "DUPLICATE"
+      },
+      {
+        "date": "2023-02-12",
+        "amount": -337.5,
+        "email": "mubina5976@yahoo.com",
+        "secondary": "",
+        "year": null,
+        "txnId": "ch_3MZfCSHFcF18bCZG0gsoMnY0",
+        "refundReason": "DUPLICATE"
+      },
+      {
+        "date": "2023-02-12",
+        "amount": -125,
+        "email": "aamerbh@gmail.com",
+        "secondary": "",
+        "year": null,
+        "txnId": "ch_3MZfCUHFcF18bCZG0FxiOxYx",
+        "refundReason": "DUPLICATE"
+      },
+      {
+        "date": "2023-02-12",
+        "amount": -125,
+        "email": "usa_sherif@yahoo.com",
+        "secondary": "",
+        "year": null,
+        "txnId": "ch_3MZfCZHFcF18bCZG0OVfBmfc",
+        "refundReason": "DUPLICATE"
+      },
+      {
+        "date": "2023-02-12",
+        "amount": -125,
+        "email": "abc.xyz.zc@gmail.com",
+        "secondary": "",
+        "year": null,
+        "txnId": "ch_3MZfCcHFcF18bCZG1RLVEIhh",
+        "refundReason": "DUPLICATE"
+      },
+      {
+        "date": "2023-02-12",
+        "amount": -125,
+        "email": "okiekazi@hotmail.com",
+        "secondary": "",
+        "year": null,
+        "txnId": "ch_3MZfCgHFcF18bCZG11RKfL4F",
+        "refundReason": "DUPLICATE"
+      },
+      {
+        "date": "2023-02-10",
+        "amount": -237.5,
+        "email": "atasnim501@gmail.com",
+        "secondary": "",
+        "year": null,
+        "txnId": "ch_3MZfCjHFcF18bCZG0sZ7wX7T",
+        "refundReason": "DUPLICATE"
+      },
+      {
+        "date": "2023-02-10",
+        "amount": -125,
+        "email": "lljallad8517@gmail.com",
+        "secondary": "",
+        "year": null,
+        "txnId": "ch_3MZfCoHFcF18bCZG1upB8DZH",
+        "refundReason": "DUPLICATE"
+      },
+      {
+        "date": "2023-02-10",
+        "amount": -237.5,
+        "email": "sftaufique@gmail.com",
+        "secondary": "",
+        "year": null,
+        "txnId": "ch_3MZfCQHFcF18bCZG1zfir9pD",
+        "refundReason": "DUPLICATE"
+      },
+      {
+        "date": "2023-02-10",
+        "amount": -237.5,
+        "email": "shamilakhan@gmail.com",
+        "secondary": "",
+        "year": null,
+        "txnId": "ch_3MZfBxHFcF18bCZG1cruglni",
+        "refundReason": "DUPLICATE"
+      },
+      {
+        "date": "2023-02-10",
+        "amount": -125,
+        "email": "arshad.daniyah@gmail.com",
+        "secondary": "",
+        "year": null,
+        "txnId": "ch_3MZfCAHFcF18bCZG0nvjToO4",
+        "refundReason": "DUPLICATE"
+      },
+      {
+        "date": "2023-02-10",
+        "amount": -125,
+        "email": "jessicaahassan@gmail.com",
+        "secondary": "",
+        "year": null,
+        "txnId": "ch_3MZfBrHFcF18bCZG1pRV3i6y",
+        "refundReason": "DUPLICATE"
+      },
+      {
+        "date": "2022-10-05",
+        "amount": -351,
+        "email": "adnanraza37@hotmail.com",
+        "secondary": "",
+        "year": null,
+        "txnId": "ch_3LbsgEHFcF18bCZG1LTepVkI",
+        "refundReason": "REQUESTED_BY_CUSTOMER"
+      }
+    ],
+    "processing": [
+      {
+        "row": 7,
+        "amount": 50,
+        "amountType": "SUBSCRIPTION_AMOUNT",
+        "status": "processing",
+        "email": "be_happy_0505@hotmail.com",
+        "name": "hassnae bellamine",
+        "reason": "Quran Institute for Ladies 2026-2027",
+        "secondary": "Memorization (Course 1 & Course 2)",
+        "year": "2026-2027",
+        "offeringFamily": "memoriz_course",
+        "txnId": "py_3U9pzxHFcF18bCZG0X1f9VFS",
+        "date": "2026-08-29",
+        "rec": "MONTHLY",
+        "refundReason": ""
+      }
+    ]
+  },
+  "refundSample": [
+    {
+      "row": 12,
+      "amount": -200,
+      "email": "obadaselwadi99@gmail.com",
+      "reason": "Istiqamah Institute",
+      "secondary": "",
+      "status": "refunded",
+      "txnId": "ch_3U4kLiHFcF18bCZG1DiOU4v3",
+      "date": "2026-08-28",
+      "refundReason": "REQUESTED_BY_CUSTOMER"
+    },
+    {
+      "row": 13,
+      "amount": -50,
+      "email": "suzan@abudalu.com",
+      "reason": "Quran Institute For Ladies 2026-2027",
+      "secondary": "Tajweed & Recitation",
+      "status": "refunded",
+      "txnId": "ch_3U9BhyHFcF18bCZG1gS20G7X",
+      "date": "2026-08-28",
+      "refundReason": "REQUESTED_BY_CUSTOMER"
+    },
+    {
+      "row": 30,
+      "amount": -100,
+      "email": "rowaidaramadan@gmail.com",
+      "reason": "Quran Institute For Ladies 2026-2027",
+      "secondary": "Tajweed & Recitation",
+      "status": "refunded",
+      "txnId": "ch_3U7IXmHFcF18bCZG0TUWcmVg",
+      "date": "2026-08-26",
+      "refundReason": "REQUESTED_BY_CUSTOMER"
+    },
+    {
+      "row": 35,
+      "amount": -200,
+      "email": "elmanawyheba78@gmail.com",
+      "reason": "Quran Institure for Ladies 2026-2027",
+      "secondary": "Memorization (Surat Al-Baqara & Surat Aal Imran)",
+      "status": "refunded",
+      "txnId": "ch_3ToVa7HFcF18bCZG0q4DsX2U",
+      "date": "2026-08-24",
+      "refundReason": "REQUESTED_BY_CUSTOMER"
+    },
+    {
+      "row": 36,
+      "amount": -50,
+      "email": "ymtse04@gmail.com",
+      "reason": "Quran Institute For Ladies 2026-2027",
+      "secondary": "Tajweed & Recitation",
+      "status": "refunded",
+      "txnId": "ch_3U71ExHFcF18bCZG1EfFu5Ud",
+      "date": "2026-08-24",
+      "refundReason": "REQUESTED_BY_CUSTOMER"
+    },
+    {
+      "row": 118,
+      "amount": -175,
+      "email": "hanooninoona@gmail.com",
+      "reason": "Quran Institute For Ladies 2026-2027",
+      "secondary": "Tajweed & Recitation",
+      "status": "refunded",
+      "txnId": "ch_3U3SrVHFcF18bCZG1oshlxnp",
+      "date": "2026-08-13",
+      "refundReason": "REQUESTED_BY_CUSTOMER"
+    },
+    {
+      "row": 125,
+      "amount": -25,
+      "email": "manalhakeem@yahoo.com",
+      "reason": "Saturday Arabic Kids Conversation 26-27",
+      "secondary": "",
+      "status": "refunded",
+      "txnId": "ch_3TuFU4HFcF18bCZG0DphcnTX",
+      "date": "2026-08-12",
+      "refundReason": "REQUESTED_BY_CUSTOMER"
+    },
+    {
+      "row": 155,
+      "amount": -120,
+      "email": "haythem.mostafa@gmail.com",
+      "reason": "Quran 4 Little Hearts 26-27",
+      "secondary": "",
+      "status": "refunded",
+      "txnId": "ch_3TqFKmHFcF18bCZG1QwiqDd3",
+      "date": "2026-08-06",
+      "refundReason": "REQUESTED_BY_CUSTOMER"
+    },
+    {
+      "row": 156,
+      "amount": -3,
+      "email": "haythem.mostafa@gmail.com",
+      "reason": "Quran 4 Little Hearts 26-27",
+      "secondary": "",
+      "status": "refunded",
+      "txnId": "ch_3TqFKmHFcF18bCZG1QwiqDd3",
+      "date": "2026-08-06",
+      "refundReason": "REQUESTED_BY_CUSTOMER"
+    },
+    {
+      "row": 157,
+      "amount": -290,
+      "email": "haythem.mostafa@gmail.com",
+      "reason": "Quran 4 Little Hearts 26-27",
+      "secondary": "",
+      "status": "refunded",
+      "txnId": "ch_3TzfqyHFcF18bCZG1Ifcr0dc",
+      "date": "2026-08-06",
+      "refundReason": "REQUESTED_BY_CUSTOMER"
+    },
+    {
+      "row": 162,
+      "amount": -5,
+      "email": "rga203@nyu.edu",
+      "reason": "Sunday School 26/27",
+      "secondary": "",
+      "status": "refunded",
+      "txnId": "ch_3TO2gMHFcF18bCZG0A3Ltzdh",
+      "date": "2026-08-05",
+      "refundReason": "REQUESTED_BY_CUSTOMER"
+    },
+    {
+      "row": 163,
+      "amount": -120,
+      "email": "rga203@nyu.edu",
+      "reason": "Sunday School 26/27",
+      "secondary": "",
+      "status": "refunded",
+      "txnId": "ch_3TO2gMHFcF18bCZG0A3Ltzdh",
+      "date": "2026-08-05",
+      "refundReason": "REQUESTED_BY_CUSTOMER"
+    },
+    {
+      "row": 198,
+      "amount": -10,
+      "email": "hatamlehwalaa1@gmail.com",
+      "reason": "Sunday School 26/27",
+      "secondary": "",
+      "status": "refunded",
+      "txnId": "ch_3TNzOuHFcF18bCZG1196k7k4",
+      "date": "2026-07-16",
+      "refundReason": "REQUESTED_BY_CUSTOMER"
+    },
+    {
+      "row": 199,
+      "amount": -240,
+      "email": "hatamlehwalaa1@gmail.com",
+      "reason": "Sunday School 26/27",
+      "secondary": "",
+      "status": "refunded",
+      "txnId": "ch_3TNzOuHFcF18bCZG1196k7k4",
+      "date": "2026-07-16",
+      "refundReason": "REQUESTED_BY_CUSTOMER"
+    },
+    {
+      "row": 215,
+      "amount": -50,
+      "email": "buthainadaglas@yahoo.com",
+      "reason": "QI - Recitation Improvement (July)",
+      "secondary": "",
+      "status": "refunded",
+      "txnId": "ch_3Tmm6yHFcF18bCZG16RfylSM",
+      "date": "2026-07-06",
+      "refundReason": "REQUESTED_BY_CUSTOMER"
+    }
+  ],
+  "refundCount": 365,
+  "processingCount": 3,
+  "processingSample": [
+    {
+      "row": 7,
+      "amount": 50,
+      "email": "be_happy_0505@hotmail.com",
+      "reason": "Quran Institute for Ladies 2026-2027",
+      "secondary": "Memorization (Course 1 & Course 2)",
+      "txnId": "py_3U9pzxHFcF18bCZG0X1f9VFS",
+      "date": "2026-08-29"
+    },
+    {
+      "row": 329,
+      "amount": 40,
+      "email": "rachelcolegrove260@gmail.com",
+      "reason": "Quran 4 Little Hearts 26-27",
+      "secondary": "",
+      "txnId": "",
+      "date": "2026-05-20"
+    },
+    {
+      "row": 330,
+      "amount": 3,
+      "email": "rachelcolegrove260@gmail.com",
+      "reason": "Quran 4 Little Hearts 26-27",
+      "secondary": "",
+      "txnId": "",
+      "date": "2026-05-20"
+    }
+  ],
+  "failedRows": [],
+  "multiLineSample": [
+    {
+      "id": "ch_3U9q1sHFcF18bCZG00oqkJ6g",
+      "n": 2,
+      "rows": [
+        {
+          "row": 5,
+          "amount": 120,
+          "amountType": "REGISTRATION_AMOUNT",
+          "status": "succeeded",
+          "reason": "Quran Institute Junior 26-27",
+          "email": "dijmaiga@gmail.com",
+          "date": "2026-08-29"
+        },
+        {
+          "row": 6,
+          "amount": 6,
+          "amountType": "ADDONS_AMOUNT",
+          "status": "succeeded",
+          "reason": "Quran Institute Junior 26-27",
+          "email": "dijmaiga@gmail.com",
+          "date": "2026-08-29"
+        }
+      ]
+    },
+    {
+      "id": "ch_3U9Z0GHFcF18bCZG1KhZkWv4",
+      "n": 2,
+      "rows": [
+        {
+          "row": 9,
+          "amount": 25,
+          "amountType": "REGISTRATION_AMOUNT",
+          "status": "succeeded",
+          "reason": "Saturday Arabic Kids Conversation 26-27",
+          "email": "b.almalla7@gmail.com",
+          "date": "2026-08-28"
+        },
+        {
+          "row": 10,
+          "amount": 2,
+          "amountType": "ADDONS_AMOUNT",
+          "status": "succeeded",
+          "reason": "Saturday Arabic Kids Conversation 26-27",
+          "email": "b.almalla7@gmail.com",
+          "date": "2026-08-28"
+        }
+      ]
+    },
+    {
+      "id": "ch_3U4kLiHFcF18bCZG1DiOU4v3",
+      "n": 2,
+      "rows": [
+        {
+          "row": 12,
+          "amount": -200,
+          "amountType": "(blank)",
+          "status": "refunded",
+          "reason": "Istiqamah Institute",
+          "email": "obadaselwadi99@gmail.com",
+          "date": "2026-08-28"
+        },
+        {
+          "row": 102,
+          "amount": 200,
+          "amountType": "SUBSCRIPTION_AMOUNT",
+          "status": "succeeded",
+          "reason": "Istiqamah Institute",
+          "email": "obadaselwadi99@gmail.com",
+          "date": "2026-08-15"
+        }
+      ]
+    },
+    {
+      "id": "ch_3U9BhyHFcF18bCZG1gS20G7X",
+      "n": 2,
+      "rows": [
+        {
+          "row": 13,
+          "amount": -50,
+          "amountType": "(blank)",
+          "status": "refunded",
+          "reason": "Quran Institute For Ladies 2026-2027",
+          "email": "suzan@abudalu.com",
+          "date": "2026-08-28"
+        },
+        {
+          "row": 17,
+          "amount": 450,
+          "amountType": "SUBSCRIPTION_AMOUNT",
+          "status": "succeeded",
+          "reason": "Quran Institute For Ladies 2026-2027",
+          "email": "suzan@abudalu.com",
+          "date": "2026-08-27"
+        }
+      ]
+    },
+    {
+      "id": "ch_3U9Do1HFcF18bCZG0tmhBMWw",
+      "n": 2,
+      "rows": [
+        {
+          "row": 15,
+          "amount": 20,
+          "amountType": "REGISTRATION_AMOUNT",
+          "status": "succeeded",
+          "reason": "Quran 4 Little Hearts 26-27",
+          "email": "esraa.shatory@gmail.com",
+          "date": "2026-08-28"
+        },
+        {
+          "row": 16,
+          "amount": 4.5,
+          "amountType": "ADDONS_AMOUNT",
+          "status": "succeeded",
+          "reason": "Quran 4 Little Hearts 26-27",
+          "email": "esraa.shatory@gmail.com",
+          "date": "2026-08-28"
+        }
+      ]
+    },
+    {
+      "id": "ch_3U97tPHFcF18bCZG0auI3rXM",
+      "n": 2,
+      "rows": [
+        {
+          "row": 22,
+          "amount": 40,
+          "amountType": "REGISTRATION_AMOUNT",
+          "status": "succeeded",
+          "reason": "Quran Institute Junior 26-27",
+          "email": "manalhakeem@yahoo.com",
+          "date": "2026-08-27"
+        },
+        {
+          "row": 23,
+          "amount": 2,
+          "amountType": "ADDONS_AMOUNT",
+          "status": "succeeded",
+          "reason": "Quran Institute Junior 26-27",
+          "email": "manalhakeem@yahoo.com",
+          "date": "2026-08-27"
+        }
+      ]
+    },
+    {
+      "id": "ch_3U8miDHFcF18bCZG06jgS86t",
+      "n": 2,
+      "rows": [
+        {
+          "row": 28,
+          "amount": 40,
+          "amountType": "REGISTRATION_AMOUNT",
+          "status": "succeeded",
+          "reason": "Quran Institute Junior 26-27",
+          "email": "afsaam1234@hotmail.com",
+          "date": "2026-08-26"
+        },
+        {
+          "row": 29,
+          "amount": 2,
+          "amountType": "ADDONS_AMOUNT",
+          "status": "succeeded",
+          "reason": "Quran Institute Junior 26-27",
+          "email": "afsaam1234@hotmail.com",
+          "date": "2026-08-26"
+        }
+      ]
+    },
+    {
+      "id": "ch_3U7IXmHFcF18bCZG0TUWcmVg",
+      "n": 2,
+      "rows": [
+        {
+          "row": 30,
+          "amount": -100,
+          "amountType": "(blank)",
+          "status": "refunded",
+          "reason": "Quran Institute For Ladies 2026-2027",
+          "email": "rowaidaramadan@gmail.com",
+          "date": "2026-08-26"
+        },
+        {
+          "row": 38,
+          "amount": 900,
+          "amountType": "SUBSCRIPTION_AMOUNT",
+          "status": "succeeded",
+          "reason": "Quran Institute For Ladies 2026-2027",
+          "email": "rowaidaramadan@gmail.com",
+          "date": "2026-08-22"
+        }
+      ]
+    }
+  ]
+}

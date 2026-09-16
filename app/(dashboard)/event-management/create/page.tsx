@@ -1,14 +1,14 @@
 import { redirect } from "next/navigation"
 
-import { buildFacilitiesBookSpaceHref } from "@/lib/events/facility-event-request-href"
 import { isSafeReturnToPath } from "@/lib/navigation/return-to"
+import { getDepartmentHeadshipForCurrentUser } from "@/lib/departments/department-access"
 import {
+  hasAnyPermission,
   PERMISSIONS,
-  requireAnyPermission,
 } from "@/lib/permissions/permissions"
 
 /**
- * Legacy create route — event creation now opens from Facilities calendar.
+ * Legacy create route — event creation stays on Event Management (or returnTo).
  */
 export default async function CreateInternalEventRedirectPage({
   searchParams,
@@ -21,19 +21,20 @@ export default async function CreateInternalEventRedirectPage({
     end?: string
   }>
 }) {
-  await requireAnyPermission(PERMISSIONS.EVENTS_MANAGE, PERMISSIONS.PROGRAMS_MANAGE)
+  const canCreate =
+    (await hasAnyPermission(
+      PERMISSIONS.EVENTS_MANAGE,
+      PERMISSIONS.PROGRAMS_MANAGE
+    )) || Boolean(await getDepartmentHeadshipForCurrentUser())
+  if (!canCreate) {
+    redirect("/unauthorized")
+  }
 
   const params = await searchParams
   const returnTo = isSafeReturnToPath(params?.returnTo) ? params?.returnTo : null
+  if (returnTo) {
+    redirect(returnTo)
+  }
 
-  redirect(
-    buildFacilitiesBookSpaceHref({
-      departmentId: params?.department || null,
-      returnTo,
-      openNew: true,
-      venueId: params?.venueId || null,
-      start: params?.start || null,
-      end: params?.end || null,
-    })
-  )
+  redirect("/event-management/events?create=1")
 }

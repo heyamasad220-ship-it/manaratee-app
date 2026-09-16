@@ -19,6 +19,7 @@ type CustomerStaffEventRequestClientProps = {
     startAt?: string
     endAt?: string
   }
+  approvalRequired?: boolean
 }
 
 export function CustomerStaffEventRequestClient({
@@ -28,6 +29,7 @@ export function CustomerStaffEventRequestClient({
   setupStyles,
   defaults,
   initialSlot,
+  approvalRequired = false,
 }: CustomerStaffEventRequestClientProps) {
   const router = useRouter()
   const [open, setOpen] = useState(true)
@@ -37,8 +39,9 @@ export function CustomerStaffEventRequestClient({
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Request an event</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Center events need facility approval. Online and External Venue events are confirmed when
-          you submit. Your name is recorded as the requester.
+          Center events use Facilities only to check space. Online and External
+          Venue events skip Facilities and never wait for approval. Your name is
+          recorded as the requester.
         </p>
       </div>
       {!open ? (
@@ -57,6 +60,8 @@ export function CustomerStaffEventRequestClient({
         lockDepartment={Boolean(defaults.departmentId)}
         initialSlot={initialSlot}
         requestOrigin="member-staff"
+        spaceMode="calendar-link"
+        approvalRequired={approvalRequired}
         onSubmitted={() => {
           router.push("/customer/staff/events")
           router.refresh()

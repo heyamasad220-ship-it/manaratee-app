@@ -1,10 +1,11 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import Link from "next/link"
 import { Plus, Trash2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -26,6 +27,7 @@ import {
   type CampaignAskLevelRow,
 } from "@/lib/donations/campaign-ask-level-types"
 import { formatDonationCurrency } from "@/lib/donations/campaign-analytics"
+import { donationCampaignWorkspaceHref } from "@/lib/donations/campaign-workspace-paths"
 
 type CampaignStrategyTabProps = {
   campaignId: string
@@ -59,19 +61,6 @@ export function CampaignStrategyTab({
     const gap = askLevelMetrics.reduce((sum, row) => sum + row.gap, 0)
     return { targetGifts, targetValue, amountSecured, gap }
   }, [askLevelMetrics])
-
-  const draftTotals = useMemo(() => {
-    return drafts.reduce(
-      (acc, draft) => {
-        const askAmount = Number(draft.askAmount) || 0
-        const targetCount = Math.max(0, Math.floor(Number(draft.targetCount) || 0))
-        acc.targetGifts += targetCount
-        acc.targetValue += askLevelTargetValue(askAmount, targetCount)
-        return acc
-      },
-      { targetGifts: 0, targetValue: 0 }
-    )
-  }, [drafts])
 
   function updateDraft(clientKey: string, patch: Partial<CampaignAskLevelDraft>) {
     setDrafts((prev) =>
@@ -118,16 +107,9 @@ export function CampaignStrategyTab({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-base font-semibold text-foreground">Gift / Ask Level Chart</h2>
-          <p className="text-sm text-muted-foreground">
-            Plan how many gifts you need at each ask amount. Prospects can exceed the target
-            count.
-          </p>
-        </div>
-        {canManage ? (
-          editing ? (
+      {canManage ? (
+        <div className="flex justify-end">
+          {editing ? (
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" onClick={handleCancel} disabled={saving}>
                 Cancel
@@ -138,52 +120,9 @@ export function CampaignStrategyTab({
             </div>
           ) : (
             <Button onClick={() => setEditing(true)}>Edit Strategy</Button>
-          )
-        ) : null}
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="border border-border shadow-sm">
-          <CardHeader className="pb-1 pt-4">
-            <CardTitle className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Targeted Gifts
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pb-4 text-xl font-semibold tabular-nums">
-            {editing ? draftTotals.targetGifts : totals.targetGifts}
-          </CardContent>
-        </Card>
-        <Card className="border border-border shadow-sm">
-          <CardHeader className="pb-1 pt-4">
-            <CardTitle className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Target Value
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pb-4 text-xl font-semibold tabular-nums">
-            {formatDonationCurrency(editing ? draftTotals.targetValue : totals.targetValue)}
-          </CardContent>
-        </Card>
-        <Card className="border border-border shadow-sm">
-          <CardHeader className="pb-1 pt-4">
-            <CardTitle className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Amount Secured
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pb-4 text-xl font-semibold tabular-nums">
-            {formatDonationCurrency(totals.amountSecured)}
-          </CardContent>
-        </Card>
-        <Card className="border border-border shadow-sm">
-          <CardHeader className="pb-1 pt-4">
-            <CardTitle className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Gap
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pb-4 text-xl font-semibold tabular-nums">
-            {formatDonationCurrency(totals.gap)}
-          </CardContent>
-        </Card>
-      </div>
+          )}
+        </div>
+      ) : null}
 
       {editing ? (
         <Card className="border border-border shadow-sm">
@@ -300,8 +239,41 @@ export function CampaignStrategyTab({
                       <TableCell className="text-right tabular-nums">
                         {formatDonationCurrency(row.targetValue)}
                       </TableCell>
-                      <TableCell className="text-right tabular-nums">{row.prospects}</TableCell>
-                      <TableCell className="text-right tabular-nums">{row.asked}</TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {row.prospects > 0 ? (
+                          <Link
+                            href={donationCampaignWorkspaceHref(campaignId, {
+                              tab: "plan",
+                              section: "prospects",
+                              askType: "donation",
+                              askLevelId: row.askLevelId,
+                            })}
+                            className="font-medium text-primary underline-offset-4 hover:underline"
+                          >
+                            {row.prospects}
+                          </Link>
+                        ) : (
+                          row.prospects
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {row.asked > 0 ? (
+                          <Link
+                            href={donationCampaignWorkspaceHref(campaignId, {
+                              tab: "plan",
+                              section: "prospects",
+                              askType: "donation",
+                              askLevelId: row.askLevelId,
+                              asked: true,
+                            })}
+                            className="font-medium text-primary underline-offset-4 hover:underline"
+                          >
+                            {row.asked}
+                          </Link>
+                        ) : (
+                          row.asked
+                        )}
+                      </TableCell>
                       <TableCell className="text-right tabular-nums">
                         {row.securedCount}/{row.targetCount}
                       </TableCell>
@@ -344,12 +316,6 @@ export function CampaignStrategyTab({
           </CardContent>
         </Card>
       )}
-
-      <p className="text-xs text-muted-foreground">
-        Prospects and Asked update when you add prospects on the Prospects tab. Secured uses
-        pledges linked to an ask level (or matching ask amount until then). Prospects may exceed
-        the target number of gifts.
-      </p>
     </div>
   )
 }

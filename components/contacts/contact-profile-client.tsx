@@ -786,6 +786,7 @@ export function ContactProfileClient({
                   staffId={staffRecordId}
                   organizationId={organizationId}
                   contactRoles={roles}
+                  contactId={contact.id}
                 />
               ) : modules.workforce && hasRole("employee") ? (
                 <Card>

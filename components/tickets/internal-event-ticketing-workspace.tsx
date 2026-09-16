@@ -110,7 +110,7 @@ export function InternalEventTicketingWorkspace({
           </div>
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" size="sm" asChild>
-              <Link href={`/event-management/ticketing/orders?event=${eventId}`}>
+              <Link href={`/event-management/reports/orders?event=${eventId}`}>
                 View orders
               </Link>
             </Button>

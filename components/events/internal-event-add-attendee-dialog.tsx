@@ -105,12 +105,12 @@ export function InternalEventAddAttendeeDialog({
 
           {activeTypes.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              Add registration offerings on the Registration tab first.
+              Add ticket types in Settings → Tickets first.
             </p>
           ) : (
             <>
               <div className="space-y-2">
-                <Label>Registration type</Label>
+                <Label>Ticket type</Label>
                 <Select
                   value={ticketTypeId || activeTypes[0]?.id}
                   onValueChange={setTicketTypeId}

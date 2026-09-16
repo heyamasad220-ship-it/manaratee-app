@@ -15,8 +15,6 @@ export type ProgramWorkspaceTab =
 
 export type ProgramSettingsSection =
   | "general"
-  | "defaults"
-  | "registration"
   | "notifications"
   | "promo-codes"
 
@@ -25,7 +23,11 @@ export type ProgramFinanceSection =
   | "payment-summary"
   | "addons"
 
-export type ProgramReportsSection = "enrollments" | "attendance" | "trends"
+export type ProgramReportsSection =
+  | "enrollments"
+  | "attendance"
+  | "trends"
+  | "year-comparison"
 
 export function parseProgramWorkspaceTab(
   value: string | null | undefined
@@ -56,14 +58,10 @@ export function isLegacyProgramApplicationsQuery(
 export function parseProgramSettingsSection(
   section: string | null | undefined
 ): ProgramSettingsSection {
-  if (section === "defaults" || section === "year-defaults") return "defaults"
-  if (
-    section === "registration" ||
-    section === "notifications" ||
-    section === "promo-codes"
-  ) {
+  if (section === "notifications" || section === "promo-codes") {
     return section
   }
+  // Leftover General / Program defaults / Registration bookmarks all open General.
   return "general"
 }
 
@@ -118,6 +116,9 @@ export function parseProgramReportsSection(
 ): ProgramReportsSection {
   if (section === "attendance") return "attendance"
   if (section === "trends") return "trends"
+  if (section === "year-comparison" || section === "growth") {
+    return "year-comparison"
+  }
   return "enrollments"
 }
 

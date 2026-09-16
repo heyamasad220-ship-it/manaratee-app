@@ -13,7 +13,7 @@
 |---|----------|
 | 1 | **Explicit inherit toggles** per group (not null-means-inherit) |
 | 2 | Customize groups: **dates**, **eligibility**, **enrollment types + waitlist**. Schedule, staff, fees, capacity/groups, delivery stay offering-only |
-| 3 | Program defaults edited on **Program detail → Settings** (Enrollment defaults) |
+| 3 | Program defaults edited on **Program detail → Settings → General** |
 | 4 | **Existing offerings = overridden** (`inherit_* = false`) so current values stay; no surprise re-inheritance |
 | 11 | After F1 helpers: build **program defaults + slim offering create** (F2/F3) before teacher page / reports |
 | 12 | **Program kinds:** `academic` (year + offerings) vs `seasonal` (camp/season as one product). Same Programs menu; different create + settings chrome. SQL **`193`**. |
@@ -221,7 +221,7 @@ Columns **QI / Edu / Camp** = how often that layer is the *primary* place staff 
 | Phase | Work | Outcome |
 |-------|------|---------|
 | **F1** | Define inherit/override flags + effective-value helpers (read path) | **Done** — run `180`; helpers in `program-offering-inherit.ts` |
-| **F2** | Program defaults settings UI + seed new offerings from defaults | **Done** — Program detail → **Settings**; `saveProgramEnrollmentDefaults` + `syncInheritingOfferingsFromProgram` |
+| **F2** | Program defaults settings UI + seed new offerings from defaults | **Done** — Program detail → **Settings → General**; `saveProgramEnrollmentDefaults` + `syncInheritingOfferingsFromProgram` |
 | **F3** | Slim offering create/edit + Customize toggles | **Done** — Add offering inherit switches; Enrollment tab Customize (use program …) |
 | **F4** | Feature-pack visibility (capacity groups, care, attendance) | **Done** — Overview packs: `attendance_tracked`, `care_enabled`; care panel gated; youth capacity groups unchanged (auto) |
 | **F5** | Teacher class page (roster → attendance) | **Done** — `/my-classes/[offeringId]` roster + attendance when tracked (`program_attendance`, SQL `181`); assigned-staff enrollment SELECT via **`183`** |

@@ -61,6 +61,7 @@ type ProgramScheduleRow = {
   venue_id?: string | null
   offering_start_date?: string | null
   offering_end_date?: string | null
+  delivery_format?: string | null
   programs?: { name: string } | null
 }
 
@@ -129,6 +130,10 @@ function expandProgramScheduleRows(
     const cursorDateKey = toDateParam(cursor)
 
     for (const row of rows) {
+      if (row.delivery_format === "online") {
+        continue
+      }
+
       const dayIndex = dayNameToIndex(row.day_of_week)
       if (dayIndex === null || cursor.getDay() !== dayIndex) {
         continue
@@ -334,7 +339,7 @@ async function getProgramFacilityReservations(
       location,
       venue_id,
       programs:program_id ( name ),
-      program_offerings:offering_id ( start_date, end_date )
+      program_offerings:offering_id ( start_date, end_date, delivery_format )
     `
 
   let { data, error } = await supabase
@@ -357,7 +362,7 @@ async function getProgramFacilityReservations(
       end_time,
       location,
       programs:program_id ( name ),
-      program_offerings:offering_id ( start_date, end_date )
+      program_offerings:offering_id ( start_date, end_date, delivery_format )
     `
       )
       .eq("organization_id", organizationId)
@@ -399,6 +404,7 @@ async function getProgramFacilityReservations(
       venue_id: row.venue_id ?? null,
       offering_start_date: offering?.start_date ?? null,
       offering_end_date: offering?.end_date ?? null,
+      delivery_format: offering?.delivery_format ?? null,
       programs: row.programs,
     }
   })

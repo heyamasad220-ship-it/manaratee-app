@@ -248,10 +248,10 @@ export async function updateProgramBasics(
 
 export type ProgramEnrollmentDefaultsInput = {
   programId: string
-  start_date: string | null
-  end_date: string | null
-  enrollment_open_date: string | null
-  enrollment_close_date: string | null
+  start_date?: string | null
+  end_date?: string | null
+  enrollment_open_date?: string | null
+  enrollment_close_date?: string | null
   program_type: "adult" | "youth"
   min_age: number | null
   max_age: number | null
@@ -308,6 +308,10 @@ export async function saveProgramEnrollmentDefaults(
     department_id?: string | null
     flyer_url?: string | null
     background_color?: string | null
+    start_date?: string | null
+    end_date?: string | null
+    enrollment_open_date?: string | null
+    enrollment_close_date?: string | null
     status?: string | null
     visibility?: "public" | "private" | "members_only"
     min_grade?: string | null
@@ -334,10 +338,22 @@ export async function saveProgramEnrollmentDefaults(
       department_id: program.department_id ?? null,
       flyer_url: program.flyer_url ?? null,
       background_color: program.background_color ?? null,
-      start_date: emptyToNull(input.start_date),
-      end_date: emptyToNull(input.end_date),
-      enrollment_open_date: emptyToNull(input.enrollment_open_date),
-      enrollment_close_date: emptyToNull(input.enrollment_close_date),
+      start_date:
+        input.start_date !== undefined
+          ? emptyToNull(input.start_date)
+          : emptyToNull(program.start_date),
+      end_date:
+        input.end_date !== undefined
+          ? emptyToNull(input.end_date)
+          : emptyToNull(program.end_date),
+      enrollment_open_date:
+        input.enrollment_open_date !== undefined
+          ? emptyToNull(input.enrollment_open_date)
+          : emptyToNull(program.enrollment_open_date),
+      enrollment_close_date:
+        input.enrollment_close_date !== undefined
+          ? emptyToNull(input.enrollment_close_date)
+          : emptyToNull(program.enrollment_close_date),
       age_groups: getAgeGroupLabelsFromMinMax(input.min_age, input.max_age),
       grade_levels: gradeLevels,
       gender: emptyToNull(input.gender) || "All",

@@ -1,0 +1,302 @@
+{
+  "mode": "execute",
+  "xlsxPath": "C:/Users/danan/Downloads/Camp_Enrollment_Growth.xlsx",
+  "generatedAt": "2026-09-02T17:22:27.465Z",
+  "excelRows": 3524,
+  "createdPrograms": 111,
+  "createdOfferings": 111,
+  "createdContacts": 257,
+  "reusedContacts": 2273,
+  "createdPeople": 1030,
+  "reusedPeople": 1495,
+  "createdEnrollments": 2363,
+  "skippedExisting": 107,
+  "skippedDuplicate": 201,
+  "skippedExistingYear": 667,
+  "skippedUnmapped": 0,
+  "skippedNoMember": 0,
+  "skippedNoParent": 0,
+  "uniqueParents": 802,
+  "byProgram": {
+    "Summer Camp 1 2024": {
+      "rows": 323,
+      "enrolled": 142,
+      "skipped": 142
+    },
+    "Summer Camp 2 2024": {
+      "rows": 324,
+      "enrolled": 254,
+      "skipped": 31
+    },
+    "Spring Camp 2024": {
+      "rows": 38,
+      "enrolled": 35,
+      "skipped": 2
+    },
+    "Summer Camp 1 2025": {
+      "rows": 323,
+      "enrolled": 249,
+      "skipped": 28
+    },
+    "Summer Camp 2 2025": {
+      "rows": 308,
+      "enrolled": 249,
+      "skipped": 28
+    },
+    "Youth Intensive 2025": {
+      "rows": 47,
+      "enrolled": 36,
+      "skipped": 11
+    },
+    "Youth Intensive 2026": {
+      "rows": 35,
+      "enrolled": 35,
+      "skipped": 0
+    },
+    "Fall Camp 2023": {
+      "rows": 49,
+      "enrolled": 49,
+      "skipped": 0
+    },
+    "Fall Camp 2022": {
+      "rows": 69,
+      "enrolled": 63,
+      "skipped": 6
+    },
+    "Fall Camp 2025": {
+      "rows": 39,
+      "enrolled": 37,
+      "skipped": 2
+    },
+    "Fall Camp October 2024": {
+      "rows": 17,
+      "enrolled": 16,
+      "skipped": 1
+    },
+    "Fall Camp November 2024": {
+      "rows": 63,
+      "enrolled": 63,
+      "skipped": 0
+    },
+    "Summer Camp 1 2023": {
+      "rows": 230,
+      "enrolled": 211,
+      "skipped": 19
+    },
+    "Summer Camp 2 2023": {
+      "rows": 213,
+      "enrolled": 198,
+      "skipped": 15
+    },
+    "RIJAAL Overnight Camp 2024": {
+      "rows": 5,
+      "enrolled": 3,
+      "skipped": 2
+    },
+    "Special Needs Summer Camp 2026": {
+      "rows": 3,
+      "enrolled": 3,
+      "skipped": 0
+    },
+    "Spring Camp 2025": {
+      "rows": 16,
+      "enrolled": 16,
+      "skipped": 0
+    },
+    "Spring Camp Week 2 2023": {
+      "rows": 50,
+      "enrolled": 49,
+      "skipped": 1
+    },
+    "Spring Camp Week 1 2023": {
+      "rows": 30,
+      "enrolled": 28,
+      "skipped": 2
+    },
+    "Summer Camp 1 2022": {
+      "rows": 167,
+      "enrolled": 155,
+      "skipped": 12
+    },
+    "Summer Camp 2 2022": {
+      "rows": 133,
+      "enrolled": 125,
+      "skipped": 8
+    },
+    "Winter Break Camp 2024": {
+      "rows": 92,
+      "enrolled": 84,
+      "skipped": 8
+    },
+    "Winter Camp Ready Set Pray 2024": {
+      "rows": 98,
+      "enrolled": 87,
+      "skipped": 11
+    },
+    "Winter Camp 2022": {
+      "rows": 68,
+      "enrolled": 61,
+      "skipped": 7
+    },
+    "Winter Camp 2025": {
+      "rows": 117,
+      "enrolled": 115,
+      "skipped": 2
+    }
+  },
+  "unmapped": [],
+  "errors": [
+    {
+      "member": "Lana Owidat",
+      "program": "Summer Camp 1 2024",
+      "error": "find_or_create_contact: canceling statement due to statement timeout"
+    },
+    {
+      "member": "USMAN JABBAR",
+      "program": "Summer Camp 1 2024",
+      "error": "enrollment batch: canceling statement due to statement timeout"
+    },
+    {
+      "member": "Jannah Iqbal",
+      "program": "Summer Camp 2 2024",
+      "error": "offering Summer Camp 2 2024: duplicate key value violates unique constraint \"program_offerings_default_unique\""
+    },
+    {
+      "member": "Awad Muhareb",
+      "program": "Summer Camp 2 2024",
+      "error": "enrollment batch: canceling statement due to statement timeout"
+    },
+    {
+      "member": "Zaina Masri",
+      "program": "Summer Camp 2 2024",
+      "error": "find_or_create_contact: canceling statement due to statement timeout"
+    },
+    {
+      "member": "Saleh Sweiki",
+      "program": "Spring Camp 2024",
+      "error": "offering Spring Camp 2024: duplicate key value violates unique constraint \"program_offerings_default_unique\""
+    },
+    {
+      "member": "Raania Farhan",
+      "program": "Spring Camp 2024",
+      "error": "offering Spring Camp 2024: duplicate key value violates unique constraint \"program_offerings_default_unique\""
+    },
+    {
+      "member": "Ismaeel Hindman",
+      "program": "Summer Camp 1 2025",
+      "error": "find_or_create_contact: canceling statement due to statement timeout"
+    },
+    {
+      "member": "Kenan Jaber",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment batch: canceling statement due to statement timeout"
+    },
+    {
+      "member": "Shah Aazin Amaya",
+      "program": "Summer Camp 2 2025",
+      "error": "offering Summer Camp 2 2025: duplicate key value violates unique constraint \"program_offerings_default_unique\""
+    },
+    {
+      "member": "Amal Alagha",
+      "program": "Summer Camp 2 2025",
+      "error": "enrollment batch: canceling statement due to statement timeout"
+    },
+    {
+      "member": "Yamin Galal",
+      "program": "Summer Camp 2 2025",
+      "error": "child person: canceling statement due to statement timeout"
+    },
+    {
+      "member": "khalid elanid",
+      "program": "Summer Camp 2 2025",
+      "error": "find_or_create_contact: canceling statement due to statement timeout"
+    },
+    {
+      "member": "Yusuf Osman",
+      "program": "Summer Camp 2 2025",
+      "error": "link parent person: canceling statement due to statement timeout"
+    },
+    {
+      "member": "Tameem Bairuti",
+      "program": "Summer Camp 2 2025",
+      "error": "child person: canceling statement due to statement timeout"
+    },
+    {
+      "member": "Layla Osman",
+      "program": "Summer Camp 2 2025",
+      "error": "link parent person: canceling statement due to statement timeout"
+    },
+    {
+      "member": "Zara Ashraf",
+      "program": "Summer Camp 2 2025",
+      "error": "find_or_create_contact: canceling statement due to statement timeout"
+    },
+    {
+      "member": "Zoya Ashraf",
+      "program": "Summer Camp 2 2025",
+      "error": "link parent person: canceling statement due to statement timeout"
+    },
+    {
+      "member": "Taiba Omar Alabduljader",
+      "program": "Fall Camp October 2024",
+      "error": "offering Fall Camp October 2024: duplicate key value violates unique constraint \"program_offerings_default_unique\""
+    },
+    {
+      "member": "Mohammed Lulu",
+      "program": "RIJAAL Overnight Camp 2024",
+      "error": "offering RIJAAL Overnight Camp 2024: duplicate key value violates unique constraint \"program_offerings_default_unique\""
+    },
+    {
+      "member": "Mustafa Anas",
+      "program": "RIJAAL Overnight Camp 2024",
+      "error": "offering RIJAAL Overnight Camp 2024: duplicate key value violates unique constraint \"program_offerings_default_unique\""
+    },
+    {
+      "member": "Soumaya Nsiri",
+      "program": "Spring Camp Week 2 2023",
+      "error": "offering Spring Camp Week 2 2023: duplicate key value violates unique constraint \"program_offerings_default_unique\""
+    },
+    {
+      "member": "Ayah Alhindi",
+      "program": "Spring Camp Week 1 2023",
+      "error": "offering Spring Camp Week 1 2023: duplicate key value violates unique constraint \"program_offerings_default_unique\""
+    },
+    {
+      "member": "Hamza Nadim Kanan",
+      "program": "Winter Break Camp 2024",
+      "error": "offering Winter Break Camp 2024: duplicate key value violates unique constraint \"program_offerings_default_unique\""
+    },
+    {
+      "member": "Ayah Anbar",
+      "program": "Winter Break Camp 2024",
+      "error": "offering Winter Break Camp 2024: duplicate key value violates unique constraint \"program_offerings_default_unique\""
+    },
+    {
+      "member": "Maazin Zuberi",
+      "program": "Winter Break Camp 2024",
+      "error": "offering Winter Break Camp 2024: duplicate key value violates unique constraint \"program_offerings_default_unique\""
+    },
+    {
+      "member": "Muath Alobaidi",
+      "program": "Winter Break Camp 2024",
+      "error": "offering Winter Break Camp 2024: duplicate key value violates unique constraint \"program_offerings_default_unique\""
+    },
+    {
+      "member": "Ahmed Aburahma",
+      "program": "Winter Camp Ready Set Pray 2024",
+      "error": "offering Winter Camp Ready Set Pray 2024: duplicate key value violates unique constraint \"program_offerings_default_unique\""
+    },
+    {
+      "member": "Camellia Ali",
+      "program": "Winter Camp Ready Set Pray 2024",
+      "error": "offering Winter Camp Ready Set Pray 2024: duplicate key value violates unique constraint \"program_offerings_default_unique\""
+    },
+    {
+      "member": "Julia Abdelhady",
+      "program": "Winter Camp Ready Set Pray 2024",
+      "error": "offering Winter Camp Ready Set Pray 2024: duplicate key value violates unique constraint \"program_offerings_default_unique\""
+    }
+  ],
+  "samples": [],
+  "programCount": 25
+}

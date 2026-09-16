@@ -26,6 +26,7 @@ import {
 } from "@/lib/memberships/membership-constants"
 import { fetchHrTeams } from "@/lib/hr/hr-team-actions"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { formatPhoneDisplay } from "@/lib/ui/format-phone"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -328,7 +329,7 @@ export function MembersList() {
                         <div>
                           <p className="font-medium">{row.contactName}</p>
                           <p className="text-xs text-muted-foreground">
-                            {row.email || row.phone || "—"}
+                            {row.email || formatPhoneDisplay(row.phone) || "—"}
                           </p>
                         </div>
                       </div>

@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { isBillingSchemaMissingError } from "@/lib/programs/program-billing-schema"
+import { canManageEnrollment, canManageProgram } from "@/lib/programs/program-access"
+import type { BillingOverrideType } from "@/lib/programs/program-billing-types"
 
 async function requireOrganizationId() {
   const organizationId = await getSelectedOrganizationId()
@@ -14,6 +16,23 @@ async function requireOrganizationId() {
   }
 
   return organizationId
+}
+
+async function denyUnlessCanManageBilling(input: {
+  programId?: string | null
+  enrollmentId?: string | null
+}) {
+  const programId = String(input.programId || "").trim()
+  const enrollmentId = String(input.enrollmentId || "").trim()
+  if (programId && (await canManageProgram(programId))) return null
+  if (enrollmentId && (await canManageEnrollment(enrollmentId))) return null
+  if (!programId && !enrollmentId) {
+    return { ok: false as const, error: "Missing program." }
+  }
+  return {
+    ok: false as const,
+    error: "You do not have permission to manage billing for this program.",
+  }
 }
 
 function revalidateBilling(programId: string) {
@@ -33,6 +52,8 @@ export async function waiveChargeScheduleAction(formData: FormData) {
   if (!scheduleId) {
     return { ok: false, error: "Missing schedule item" }
   }
+  const denied = await denyUnlessCanManageBilling({ programId })
+  if (denied) return denied
 
   const supabase = await createClient()
   const { error } = await supabase.rpc("waive_charge_schedule_item", {
@@ -67,6 +88,8 @@ export async function adjustChargeScheduleAction(formData: FormData) {
   if (!scheduleId) {
     return { ok: false, error: "Missing schedule item" }
   }
+  const denied = await denyUnlessCanManageBilling({ programId })
+  if (denied) return denied
 
   const supabase = await createClient()
   const { error } = await supabase.rpc("adjust_charge_schedule_item", {
@@ -104,6 +127,8 @@ export async function addEnrollmentFeeAction(formData: FormData) {
   if (!enrollmentId || !label) {
     return { ok: false, error: "Enrollment and label are required" }
   }
+  const denied = await denyUnlessCanManageBilling({ programId, enrollmentId })
+  if (denied) return denied
 
   const supabase = await createClient()
   const { error } = await supabase.rpc("add_enrollment_schedule_fee", {
@@ -149,6 +174,8 @@ export async function createBillingOverrideAction(formData: FormData) {
   if (!offeringId || !overrideType || !label) {
     return { ok: false, error: "Missing required override fields" }
   }
+  const denied = await denyUnlessCanManageBilling({ programId, enrollmentId })
+  if (denied) return denied
 
   const supabase = await createClient()
   const { error } = await supabase.rpc("create_offering_billing_override", {
@@ -190,6 +217,8 @@ export async function setOfferingBillingPeriodStatusesAction(input: {
   if (!input.offeringId || periodIds.length === 0) {
     return { ok: false as const, error: "Missing offering or periods" }
   }
+  const denied = await denyUnlessCanManageBilling({ programId: input.programId })
+  if (denied) return denied
 
   if (input.periodStatus !== "active" && input.periodStatus !== "skipped") {
     return { ok: false as const, error: "Invalid period status" }
@@ -251,6 +280,8 @@ export async function syncBillingPeriodsAction(formData: FormData) {
   if (!offeringId) {
     return { ok: false, error: "Missing offering" }
   }
+  const denied = await denyUnlessCanManageBilling({ programId })
+  if (denied) return denied
 
   const supabase = await createClient()
   const { error } = await supabase.rpc("sync_offering_billing_periods", {

@@ -1,8 +1,10 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import Link from "next/link"
 
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
   DialogContent,
@@ -25,11 +27,14 @@ import {
   convertCampaignProspectToSponsorshipAction,
   getCampaignSponsorshipAction,
   listCampaignLinkedEventsAction,
-  listSponsorshipPackagesForEventAction,
   updateCampaignSponsorshipAction,
+  updateCampaignSponsorshipBenefitAction,
 } from "@/lib/donations/campaign-sponsorship-actions"
+import { listSponsorshipPackagesForCampaignAction } from "@/lib/donations/campaign-sponsorship-package-actions"
 import {
   CUSTOM_SPONSORSHIP_PACKAGE_VALUE,
+  SPONSORSHIP_BENEFIT_STATUS_LABELS,
+  SPONSORSHIP_BENEFIT_STATUSES,
   SPONSORSHIP_PAYMENT_STATUS_LABELS,
   SPONSORSHIP_PAYMENT_STATUSES,
   SPONSORSHIP_STATUS_LABELS,
@@ -37,13 +42,17 @@ import {
   SPONSORSHIP_TYPE_LABELS,
   SPONSORSHIP_TYPES,
   formatCampaignEventOptionLabel,
+  formatSponsorshipBenefitLabel,
   formatSponsorshipPackageOptionLabel,
   type CampaignLinkedEventOption,
+  type CampaignSponsorshipBenefitRow,
+  type SponsorshipBenefitStatus,
   type SponsorshipPackageRow,
   type SponsorshipPaymentStatus,
   type SponsorshipStatus,
   type SponsorshipType,
 } from "@/lib/donations/campaign-sponsorship-types"
+import { donationCampaignWorkspaceHref } from "@/lib/donations/campaign-workspace-paths"
 
 type Prefill = {
   contactId: string
@@ -88,6 +97,8 @@ export function CampaignSponsorshipDialog({
   const [notes, setNotes] = useState("")
   const [events, setEvents] = useState<CampaignLinkedEventOption[]>([])
   const [packages, setPackages] = useState<SponsorshipPackageRow[]>([])
+  const [benefits, setBenefits] = useState<CampaignSponsorshipBenefitRow[]>([])
+  const [linkedProspectId, setLinkedProspectId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(false)
 
@@ -102,14 +113,12 @@ export function CampaignSponsorshipDialog({
 
   useEffect(() => {
     if (!open) return
-    if (!eventId) {
-      setPackages([])
-      return
-    }
-    void listSponsorshipPackagesForEventAction(eventId).then((result) => {
-      if (result.success) setPackages(result.packages)
-    })
-  }, [open, eventId])
+    void listSponsorshipPackagesForCampaignAction(campaignId, { activeOnly: false }).then(
+      (result) => {
+        if (result.success) setPackages(result.packages)
+      }
+    )
+  }, [open, campaignId])
 
   useEffect(() => {
     if (!open) return
@@ -134,6 +143,8 @@ export function CampaignSponsorshipDialog({
         setPaymentStatus(row.payment_status)
         setCommittedDate(row.committed_date || "")
         setNotes(row.notes || "")
+        setLinkedProspectId(row.prospectId || row.prospect_id)
+        setBenefits(result.benefits || [])
       })
       return
     }
@@ -149,12 +160,27 @@ export function CampaignSponsorshipDialog({
     setPaymentStatus("unpaid")
     setCommittedDate(new Date().toISOString().slice(0, 10))
     setNotes(prefill?.notes || "")
-  }, [open, sponsorshipId, prefill])
+    setLinkedProspectId(prospectId)
+    setBenefits([])
+  }, [open, sponsorshipId, prefill, prospectId])
 
   const selectedPackage = useMemo(
     () => packages.find((row) => row.id === packageId) || null,
     [packages, packageId]
   )
+
+  const completedBenefits = benefits.filter((benefit) => benefit.status === "completed").length
+
+  async function handleBenefitStatus(benefitId: string, status: SponsorshipBenefitStatus) {
+    const result = await updateCampaignSponsorshipBenefitAction(benefitId, { status })
+    if (!result.success) {
+      alert(result.error)
+      return
+    }
+    setBenefits((current) =>
+      current.map((benefit) => (benefit.id === benefitId ? result.benefit : benefit))
+    )
+  }
 
   async function handleSave() {
     const amount = Number(committedAmount)
@@ -227,6 +253,19 @@ export function CampaignSponsorshipDialog({
             <div className="flex flex-col gap-1">
               <Label>Sponsor</Label>
               <p className="text-sm font-medium">{contactName || "—"}</p>
+              {isEditing && linkedProspectId ? (
+                <Button variant="link" className="h-auto justify-start px-0" asChild>
+                  <Link
+                    href={donationCampaignWorkspaceHref(campaignId, {
+                      tab: "plan",
+                      section: "prospects",
+                      askType: "sponsorship",
+                    })}
+                  >
+                    View Original Prospect
+                  </Link>
+                </Button>
+              ) : null}
             </div>
 
             <div className="flex flex-col gap-2">
@@ -260,6 +299,7 @@ export function CampaignSponsorshipDialog({
                   if (pkg) {
                     setCommittedAmount(String(pkg.amount))
                     if (sponsorshipType !== "in_kind") setCashAmount(String(pkg.amount))
+                    if (pkg.event_id) setEventId(pkg.event_id)
                   }
                 }}
                 disabled={!canManage}
@@ -271,11 +311,19 @@ export function CampaignSponsorshipDialog({
                   <SelectItem value={CUSTOM_SPONSORSHIP_PACKAGE_VALUE}>
                     Custom / Undecided
                   </SelectItem>
-                  {packages.map((pkg) => (
-                    <SelectItem key={pkg.id} value={pkg.id}>
-                      {formatSponsorshipPackageOptionLabel(pkg)}
-                    </SelectItem>
-                  ))}
+                  {packages
+                    .filter((pkg) => pkg.active || pkg.id === packageId)
+                    .map((pkg) => {
+                    const eventName = pkg.event_id
+                      ? events.find((event) => event.id === pkg.event_id)?.name
+                      : null
+                    return (
+                      <SelectItem key={pkg.id} value={pkg.id}>
+                        {formatSponsorshipPackageOptionLabel(pkg)}
+                        {eventName ? ` · ${eventName}` : ""}
+                      </SelectItem>
+                    )
+                  })}
                 </SelectContent>
               </Select>
               {selectedPackage?.description ? (
@@ -420,6 +468,58 @@ export function CampaignSponsorshipDialog({
                 onChange={(event) => setNotes(event.target.value)}
               />
             </div>
+
+            {isEditing && benefits.length > 0 ? (
+              <div className="flex flex-col gap-3">
+                <div>
+                  <Label>Benefit Fulfillment</Label>
+                  <p className="text-xs text-muted-foreground">
+                    {completedBenefits} / {benefits.length} completed
+                  </p>
+                </div>
+                <div className="flex flex-col gap-2">
+                  {benefits.map((benefit) => (
+                    <div
+                      key={benefit.id}
+                      className="flex flex-wrap items-center gap-2 rounded-md border border-border px-3 py-2"
+                    >
+                      <Checkbox
+                        checked={benefit.status === "completed"}
+                        disabled={!canManage}
+                        onCheckedChange={(checked) =>
+                          void handleBenefitStatus(
+                            benefit.id,
+                            checked === true ? "completed" : "pending"
+                          )
+                        }
+                        aria-label={`Mark ${benefit.name} complete`}
+                      />
+                      <p className="min-w-0 flex-1 text-sm">
+                        {formatSponsorshipBenefitLabel(benefit)}
+                      </p>
+                      <Select
+                        value={benefit.status}
+                        onValueChange={(value: SponsorshipBenefitStatus) =>
+                          void handleBenefitStatus(benefit.id, value)
+                        }
+                        disabled={!canManage}
+                      >
+                        <SelectTrigger className="h-8 w-[8.5rem]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {SPONSORSHIP_BENEFIT_STATUSES.map((status) => (
+                            <SelectItem key={status} value={status}>
+                              {SPONSORSHIP_BENEFIT_STATUS_LABELS[status]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </div>
         )}
 

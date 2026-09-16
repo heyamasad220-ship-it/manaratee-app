@@ -1,5 +1,6 @@
 import { getCustomerPortalSupabase } from "@/lib/auth/customer-portal-session"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
+import { resolveStaffIdentityForUser } from "@/lib/organizations/work-email-lookups"
 import { primaryInstructorNameByOffering } from "@/lib/programs/primary-instructor"
 import type {
   ProgramStaffAssignment,
@@ -120,18 +121,17 @@ export async function getStaffAssignmentsForCurrentContact(
 ): Promise<ProgramStaffAssignmentWithDetails[]> {
   const { supabase } = await getCustomerPortalSupabase()
 
-  const { data: contact, error: contactError } = await supabase
-    .from("contacts")
-    .select("id")
-    .eq("organization_id", organizationId)
-    .eq("auth_user_id", authUserId)
-    .maybeSingle()
-
-  if (contactError || !contact?.id) {
+  const identity = await resolveStaffIdentityForUser(
+    supabase,
+    organizationId,
+    authUserId
+  )
+  const contactId = identity.staffContactId || identity.personalContactId
+  if (!contactId) {
     return []
   }
 
-  return getStaffAssignmentsForContact(contact.id as string, organizationId)
+  return getStaffAssignmentsForContact(contactId, organizationId)
 }
 
 export type StaffEligibleContact = {

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import { Loader2, Search } from "lucide-react"
 
 import { Input } from "@/components/ui/input"
@@ -17,6 +17,9 @@ type PledgeContactPickerProps = {
   disabled?: boolean
   label?: string
   inputId?: string
+  onQueryChange?: (query: string) => void
+  onCreateClick?: () => void
+  createLabel?: string
 }
 
 export function PledgeContactPicker({
@@ -27,6 +30,9 @@ export function PledgeContactPicker({
   disabled = false,
   label = "Assigned to",
   inputId = "pledge-contact-picker",
+  onQueryChange,
+  onCreateClick,
+  createLabel = "Person or organization not found? Create one",
 }: PledgeContactPickerProps) {
   const [search, setSearch] = useState(contactLabel || "")
   const [searching, setSearching] = useState(false)
@@ -40,23 +46,27 @@ export function PledgeContactPicker({
       primary_contact_name?: string | null
     }>
   >([])
-  const [showResults, setShowResults] = useState(false)
-  const suppressBlurCloseRef = useRef(false)
+
+  const queryIsSelectedLabel =
+    Boolean(contactId) && search.trim() === (contactLabel || "").trim()
+  const showList = search.trim().length >= 2 && !queryIsSelectedLabel
 
   useEffect(() => {
     if (contactLabel) {
       setSearch(contactLabel)
+      onQueryChange?.(contactLabel)
     }
-  }, [contactLabel])
+  }, [contactLabel, onQueryChange])
 
   useEffect(() => {
-    if (!showResults || search.trim().length < 2) {
+    if (!showList) {
       setResults([])
+      setSearching(false)
       return
     }
 
+    setSearching(true)
     const timer = window.setTimeout(async () => {
-      setSearching(true)
       const result = await searchContactsForDonationPickerAction(search.trim(), 30)
       setSearching(false)
 
@@ -69,16 +79,12 @@ export function PledgeContactPicker({
     }, 300)
 
     return () => window.clearTimeout(timer)
-  }, [search, showResults])
+  }, [search, showList])
 
-  function closeResultsUnlessInteracting() {
-    window.setTimeout(() => {
-      if (suppressBlurCloseRef.current) {
-        suppressBlurCloseRef.current = false
-        return
-      }
-      setShowResults(false)
-    }, 0)
+  function selectContact(nextContactId: string, nextLabel: string) {
+    onChange(nextContactId, nextLabel)
+    setSearch(nextLabel)
+    setResults([])
   }
 
   return (
@@ -90,31 +96,24 @@ export function PledgeContactPicker({
           id={inputId}
           value={search}
           disabled={disabled}
-          placeholder="Search person, organization, or group"
+          placeholder="Search people or organizations"
           className="pl-9"
-          onFocus={() => setShowResults(true)}
+          autoComplete="off"
           onChange={(event) => {
-            setSearch(event.target.value)
-            setShowResults(true)
+            const next = event.target.value
+            setSearch(next)
+            onQueryChange?.(next)
           }}
-          onBlur={closeResultsUnlessInteracting}
         />
       </div>
-      {showResults && searching ? (
+      {showList && searching ? (
         <p className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
-          Searching...
+          Searching people and organizations...
         </p>
       ) : null}
-      {showResults && results.length > 0 ? (
-        <div
-          className="max-h-44 space-y-1 overflow-y-auto rounded-lg border p-1"
-          // Keep the input focused while scrolling/clicking results (incl. scrollbar).
-          onMouseDown={(event) => {
-            suppressBlurCloseRef.current = true
-            event.preventDefault()
-          }}
-        >
+      {showList && !searching && results.length > 0 ? (
+        <div className="max-h-44 space-y-1 overflow-y-auto rounded-lg border p-1">
           {results.map((contact) => (
             <button
               key={contact.contactId}
@@ -123,15 +122,10 @@ export function PledgeContactPicker({
                 "w-full rounded-md px-3 py-2 text-left text-sm hover:bg-muted",
                 contactId === contact.contactId && "bg-muted ring-1 ring-primary/30"
               )}
-              onMouseDown={(event) => {
-                suppressBlurCloseRef.current = true
-                event.preventDefault()
-              }}
               onClick={() => {
-                const label = contact.full_name || contact.email || contact.phone || "Unnamed contact"
-                onChange(contact.contactId, label)
-                setSearch(label)
-                setShowResults(false)
+                const nextLabel =
+                  contact.full_name || contact.email || contact.phone || "Unnamed contact"
+                selectContact(contact.contactId, nextLabel)
               }}
             >
               <p className="font-medium">{contact.full_name || "Unnamed contact"}</p>
@@ -144,8 +138,17 @@ export function PledgeContactPicker({
             </button>
           ))}
         </div>
-      ) : showResults && search.trim().length >= 2 && !searching ? (
-        <p className="text-sm text-muted-foreground">No contacts found.</p>
+      ) : showList && !searching ? (
+        <p className="text-sm text-muted-foreground">No person or organization found.</p>
+      ) : null}
+      {onCreateClick && showList && !searching && results.length === 0 ? (
+        <button
+          type="button"
+          className="h-auto justify-start px-0 text-sm font-medium text-primary hover:underline"
+          onClick={onCreateClick}
+        >
+          {createLabel}
+        </button>
       ) : null}
       {!organizationId ? (
         <p className="text-xs text-muted-foreground">Organization context is loading.</p>

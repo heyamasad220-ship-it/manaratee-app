@@ -5,6 +5,7 @@ import Link from "next/link"
 import {
   CAMPAIGN_WORKSPACE_TABS,
   donationCampaignWorkspaceHref,
+  isFundraisingPlanTab,
   type CampaignWorkspaceTab,
 } from "@/lib/donations/campaign-workspace-paths"
 import { cn } from "@/lib/utils"
@@ -18,10 +19,11 @@ export function CampaignWorkspaceNav({ campaignId, activeTab }: CampaignWorkspac
   return (
     <nav
       aria-label="Campaign workspace"
-      className="flex flex-wrap gap-1 border-b border-border pb-px"
+      className="flex min-w-0 flex-wrap gap-1 border-b border-border pb-px"
     >
       {CAMPAIGN_WORKSPACE_TABS.map((tab) => {
-        const isActive = tab.id === activeTab
+        const isActive =
+          tab.id === "plan" ? isFundraisingPlanTab(activeTab) : tab.id === activeTab
         return (
           <Link
             key={tab.id}

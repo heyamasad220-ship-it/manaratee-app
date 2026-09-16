@@ -7,11 +7,10 @@ export default async function VendorHubReportsLayout({
   children: React.ReactNode
 }) {
   await requirePermission(PERMISSIONS.REPORTS_VIEW)
-
   return (
     <VendorHubSectionShell
       title="Reports"
-      description="Live booth fees, payments, and utilization from Vendor Hub events."
+      description="Vendor sales, booth utilization, and participation history across bazaars."
       showEventSelector={false}
     >
       {children}

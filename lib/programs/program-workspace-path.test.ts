@@ -49,7 +49,7 @@ describe("program workspace paths", () => {
         tab: "settings",
         section: "year-defaults",
       }),
-      "/programs/abc?tab=settings&section=defaults"
+      "/programs/abc?tab=settings"
     )
     assert.equal(
       programWorkspaceHrefFromDepartmentYearQuery({
@@ -79,9 +79,17 @@ describe("program workspace paths", () => {
       programWorkspaceHrefFromDepartmentYearQuery({
         yearProgramId: "abc",
         tab: "settings",
+        section: "defaults",
+      }),
+      "/programs/abc?tab=settings"
+    )
+    assert.equal(
+      programWorkspaceHrefFromDepartmentYearQuery({
+        yearProgramId: "abc",
+        tab: "settings",
         section: "registration",
       }),
-      "/programs/abc?tab=settings&section=registration"
+      "/programs/abc?tab=settings"
     )
   })
 
@@ -167,6 +175,13 @@ describe("program workspace paths", () => {
         reportsSection: "trends",
       }),
       "/programs/abc?tab=reports&section=trends"
+    )
+    assert.equal(
+      programWorkspaceHref("abc", {
+        tab: "reports",
+        reportsSection: "year-comparison",
+      }),
+      "/programs/abc?tab=reports&section=year-comparison"
     )
   })
 

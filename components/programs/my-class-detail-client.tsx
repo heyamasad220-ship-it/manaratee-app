@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { Loader2 } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
+import { PhoneText } from "@/components/ui/phone-text"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -238,7 +239,7 @@ export function MyClassDetailClient({
                         ) : null}
                         {enrollment.parent_phone ? (
                           <div className="text-xs text-muted-foreground">
-                            {enrollment.parent_phone}
+                            <PhoneText value={enrollment.parent_phone} empty="" />
                           </div>
                         ) : null}
                       </TableCell>

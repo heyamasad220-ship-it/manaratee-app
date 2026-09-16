@@ -12,7 +12,7 @@
 | Reports: **Registrations** rename + **Payment transactions** tab | Done |
 | `program_applications` table + waitlist offering/offer columns | Done (SQL `182`) |
 | Customer apply (`/customer/programs/[id]/apply`) + application form | Done (full name, returning/new, new-student background, course, babysitter, payment preference → `application_answers`) |
-| Enrollment process setting (direct vs application/approval) + seat activation | Done (SQL **`280`**; Settings → Program defaults) |
+| Enrollment process setting (direct vs application/approval) + seat activation | Done (SQL **`280`**; Settings → General) |
 | Open enrollment (`application_required` synced from program process) | Done (SQL **`194`** / **`280`**) |
 | Program workspace **Registrations**: Applications + Enrollments (no Approved tab) | Done |
 | Waitlist on full + offer deadline | Not yet (status model ready) |

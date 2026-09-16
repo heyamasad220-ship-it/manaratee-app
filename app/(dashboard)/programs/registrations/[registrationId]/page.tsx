@@ -36,6 +36,7 @@ import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-orga
 import {
   getHierarchyLabels,
 } from "@/lib/programs/program-display-labels"
+import { requireEnrollmentAccess } from "@/lib/programs/program-access"
 import {
   contactLabel,
   canEditEnrollmentCharges,
@@ -155,6 +156,7 @@ export default async function RegistrationDetailPage({
   params: Promise<PageParams>
 }) {
   const { registrationId } = await params
+  await requireEnrollmentAccess(registrationId)
   const organizationId = await getSelectedOrganizationId()
 
   if (!organizationId) {

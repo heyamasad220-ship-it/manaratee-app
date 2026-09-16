@@ -1,0 +1,107 @@
+{
+  "importTag": "FUNDRAISER_DINNER_SEP2026_V1",
+  "mode": "dry-run",
+  "orgId": "e057e00a-e4e3-4adf-9af5-f465db1894be",
+  "eventId": "412ba533-c63c-4c9f-8516-021897083501",
+  "csv": "C:/Users/danan/Downloads/September122026Fundraiser.csv",
+  "summary": {
+    "csv_rows": 280,
+    "orders": 114,
+    "tickets": 246,
+    "unique_contacts": 109,
+    "ticket_revenue": 10795,
+    "ticket_donations": 970,
+    "checked_in": 190,
+    "skipped": {
+      "unknown_type": 0,
+      "missing_email": 0,
+      "unparsed_order_date": 0
+    }
+  },
+  "sample_orders": [
+    {
+      "email": "ed@masdfw.org",
+      "name": "Dr. Raed Omar Sbeit",
+      "date": "2026-08-14T01:16",
+      "tickets": 6,
+      "ticketCents": 23500,
+      "donationCents": 0,
+      "importKey": "c860d07d348ea69a10a6"
+    },
+    {
+      "email": "ataha002@gmail.com",
+      "name": "Ahmed Taha",
+      "date": "2026-08-17T16:07",
+      "tickets": 2,
+      "ticketCents": 10000,
+      "donationCents": 0,
+      "importKey": "b9d1190e2b07371f05da"
+    },
+    {
+      "email": "hwadi40@gmail.com",
+      "name": "Haneen Wadi",
+      "date": "2026-08-17T16:18",
+      "tickets": 4,
+      "ticketCents": 13500,
+      "donationCents": 0,
+      "importKey": "e6a1ee3e382dec16f0fd"
+    },
+    {
+      "email": "rahmatullah.akbar@gmail.com",
+      "name": "Rahmatullah Akbar",
+      "date": "2026-08-17T18:44",
+      "tickets": 4,
+      "ticketCents": 13500,
+      "donationCents": 0,
+      "importKey": "bbcca255c86627f16e92"
+    },
+    {
+      "email": "arefeducationalsolutions@gmail.com",
+      "name": "Amaal Aref",
+      "date": "2026-08-21T11:51",
+      "tickets": 1,
+      "ticketCents": 5000,
+      "donationCents": 0,
+      "importKey": "78dbc1b2961c3a8aeee2"
+    },
+    {
+      "email": "ashraf.aboulnaga@gmail.com",
+      "name": "Ashraf Aboulnaga",
+      "date": "2026-08-21T12:51",
+      "tickets": 4,
+      "ticketCents": 17500,
+      "donationCents": 0,
+      "importKey": "5a5b689071da0a254024"
+    },
+    {
+      "email": "sahartork94@yahoo.com",
+      "name": "Sahar El-Turk",
+      "date": "2026-08-21T22:46",
+      "tickets": 4,
+      "ticketCents": 20000,
+      "donationCents": 2000,
+      "importKey": "7dbb90d7504a63e50999"
+    },
+    {
+      "email": "musara87@gmail.com",
+      "name": "Musa Abdelaziz",
+      "date": "2026-08-22T19:57",
+      "tickets": 2,
+      "ticketCents": 10000,
+      "donationCents": 0,
+      "importKey": "f19ddee6646418323386"
+    }
+  ],
+  "counters": {
+    "contactsMatched": 0,
+    "contactsCreated": 0,
+    "ordersCreated": 0,
+    "ordersUpdated": 0,
+    "ordersExisting": 0,
+    "ticketsCreated": 0,
+    "ticketsUpdated": 0,
+    "affiliationsSynced": 0
+  },
+  "errors": [],
+  "parseErrors": []
+}

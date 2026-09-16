@@ -339,7 +339,9 @@ export async function fetchCampaignProspectsPageAction(input: CampaignProspectsP
     if (input.askType && input.askType !== "all") {
       query = query.eq("ask_type", input.askType)
     }
-    if (input.stage && input.stage !== "all") {
+    if (input.asked) {
+      query = query.in("stage", CAMPAIGN_PROSPECT_ASKED_STAGES)
+    } else if (input.stage && input.stage !== "all") {
       query = query.in("stage", campaignProspectStageFilterValues(input.stage))
     }
     if (input.priority && input.priority !== "all") {

@@ -1,0 +1,205 @@
+{
+  "mode": "dry-run",
+  "xlsxPath": "C:/Users/danan/Downloads/EducationPrograms.xlsx",
+  "csvPath": "C:/Users/danan/Downloads/EduPrograms2.csv",
+  "generatedAt": "2026-08-31T17:39:22.269Z",
+  "excelRows": 1253,
+  "csvRows": 813,
+  "createdDepartments": 1,
+  "createdPrograms": 17,
+  "createdOfferings": 17,
+  "createdContacts": 123,
+  "reusedContacts": 781,
+  "createdPeople": 904,
+  "reusedPeople": 0,
+  "createdEnrollments": 904,
+  "skippedExisting": 0,
+  "skippedCancelled": 12,
+  "skippedExistingYear": 337,
+  "skippedNoParent": 0,
+  "skippedDuplicate": 0,
+  "skippedNoMember": 0,
+  "uniqueParents": 381,
+  "byProgram": {
+    "QLH 2022-2023": {
+      "rows": 61,
+      "enrolled": 61,
+      "skipped": 0
+    },
+    "Sunday School 2022-2023": {
+      "rows": 143,
+      "enrolled": 143,
+      "skipped": 0
+    },
+    "QLH 2023-2024": {
+      "rows": 53,
+      "enrolled": 53,
+      "skipped": 0
+    },
+    "Sunday School 2023-2024": {
+      "rows": 162,
+      "enrolled": 162,
+      "skipped": 0
+    },
+    "Saturday Quranic Arabic 2024-2025": {
+      "rows": 47,
+      "enrolled": 47,
+      "skipped": 0
+    },
+    "Sunday School 2024-2025": {
+      "rows": 148,
+      "enrolled": 148,
+      "skipped": 0
+    },
+    "Kids Saturday Quranic Arabic 2025-2026": {
+      "rows": 22,
+      "enrolled": 22,
+      "skipped": 0
+    },
+    "Quran Institute Junior 2025-2026": {
+      "rows": 8,
+      "enrolled": 8,
+      "skipped": 0
+    },
+    "Saturday Quranic Arabic 2025-2026": {
+      "rows": 21,
+      "enrolled": 21,
+      "skipped": 0
+    },
+    "Sunday School 2025-2026": {
+      "rows": 141,
+      "enrolled": 141,
+      "skipped": 0
+    },
+    "The Companion of the Quran 2025-2026": {
+      "rows": 11,
+      "enrolled": 11,
+      "skipped": 0
+    },
+    "Istiqamah Institute 2026-2027": {
+      "rows": 20,
+      "enrolled": 20,
+      "skipped": 0
+    },
+    "QLH 2026-2027": {
+      "rows": 44,
+      "enrolled": 44,
+      "skipped": 0
+    },
+    "Quran Institute Junior 2026-2027": {
+      "rows": 8,
+      "enrolled": 8,
+      "skipped": 0
+    },
+    "Kids Saturday Quranic Arabic 2026-2027": {
+      "rows": 6,
+      "enrolled": 6,
+      "skipped": 0
+    },
+    "Saturday Quranic Arabic 2026-2027": {
+      "rows": 6,
+      "enrolled": 6,
+      "skipped": 0
+    },
+    "The Companion of the Quran 2026-2027": {
+      "rows": 3,
+      "enrolled": 3,
+      "skipped": 0
+    }
+  },
+  "errors": [],
+  "samples": [
+    {
+      "program": "QLH 2022-2023",
+      "member": "Abdullah Kabbani",
+      "parent": "WAREEF KABBANI",
+      "parentEmail": "wareef@kabbani.org"
+    },
+    {
+      "program": "QLH 2022-2023",
+      "member": "Adam Shmaitelly",
+      "parent": "Nadinjrab",
+      "parentEmail": "nadinjrab@yahoo.com"
+    },
+    {
+      "program": "QLH 2022-2023",
+      "member": "Ahmad Abdelhaq",
+      "parent": "Hanan Abdelhaq",
+      "parentEmail": "h.abdelhaq93@gmail.com"
+    },
+    {
+      "program": "QLH 2022-2023",
+      "member": "Ahmad Adawi",
+      "parent": "Rachel Rider",
+      "parentEmail": "rachel@rriderlaw.com"
+    },
+    {
+      "program": "QLH 2022-2023",
+      "member": "Ahmad Ismail",
+      "parent": "Luma Khalil",
+      "parentEmail": "lamabro44@gmail.com"
+    },
+    {
+      "program": "QLH 2022-2023",
+      "member": "Amar Amiri",
+      "parent": "Sanaa Jomaa",
+      "parentEmail": "sanaamjoumaa@gmail.com"
+    },
+    {
+      "program": "QLH 2022-2023",
+      "member": "Ameera Khatib",
+      "parent": "Aisha Furrha",
+      "parentEmail": "afurrha@gmail.com"
+    },
+    {
+      "program": "QLH 2022-2023",
+      "member": "Amin Hamideh",
+      "parent": "Mohammad Hamideh",
+      "parentEmail": "mhamideh291290@gmail.com"
+    },
+    {
+      "program": "QLH 2022-2023",
+      "member": "Amina Ibrahim",
+      "parent": "Hanan Dawoud",
+      "parentEmail": "hanandwd@hotmail.com"
+    },
+    {
+      "program": "QLH 2022-2023",
+      "member": "Amr Abdulrahman",
+      "parent": "Milda Koueder",
+      "parentEmail": "milda3000@yahoo.com"
+    },
+    {
+      "program": "QLH 2022-2023",
+      "member": "Aroub Awad",
+      "parent": "Duhaa Awad",
+      "parentEmail": "duhaaawad@icloud.com"
+    },
+    {
+      "program": "QLH 2022-2023",
+      "member": "Aseel Abdalla",
+      "parent": "Asma Elashi",
+      "parentEmail": "a.elashi@gmail.com"
+    }
+  ],
+  "programsCreated": [
+    "QLH 2022-2023",
+    "Sunday School 2022-2023",
+    "QLH 2023-2024",
+    "Sunday School 2023-2024",
+    "Saturday Quranic Arabic 2024-2025",
+    "Sunday School 2024-2025",
+    "Kids Saturday Quranic Arabic 2025-2026",
+    "Quran Institute Junior 2025-2026",
+    "Saturday Quranic Arabic 2025-2026",
+    "Sunday School 2025-2026",
+    "The Companion of the Quran 2025-2026",
+    "Istiqamah Institute 2026-2027",
+    "QLH 2026-2027",
+    "Quran Institute Junior 2026-2027",
+    "Kids Saturday Quranic Arabic 2026-2027",
+    "Saturday Quranic Arabic 2026-2027",
+    "The Companion of the Quran 2026-2027"
+  ],
+  "programCount": 17
+}

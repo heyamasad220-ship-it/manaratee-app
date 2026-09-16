@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 
 import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
+import { canManageEnrollment, canManageProgram } from "@/lib/programs/program-access"
 
 function resolvePaymentStatus(total: number, paid: number) {
   if (paid <= 0.009) return "pending"
@@ -66,6 +67,15 @@ export async function refundProgramSchedulePaymentAction(input: {
 
   if (chargeError || !charge) {
     return { success: false, error: chargeError?.message || "Charge not found" }
+  }
+
+  const canRefund = charge.program_id
+    ? await canManageProgram(charge.program_id as string)
+    : charge.enrollment_id
+      ? await canManageEnrollment(charge.enrollment_id as string)
+      : false
+  if (!canRefund) {
+    return { success: false, error: "You do not have permission to refund this payment." }
   }
 
   const isFullRefund = refundAmount + 0.009 >= originalAmount

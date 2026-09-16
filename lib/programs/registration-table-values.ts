@@ -5,6 +5,7 @@ import {
   REGISTRATION_COLUMN_DEFINITIONS,
   type RegistrationColumnId,
 } from "@/lib/programs/registration-table-columns"
+import { formatPhoneDisplay } from "@/lib/ui/format-phone"
 
 /** Fields the registration table/CSV need — kept client-safe (no server imports). */
 export type RegistrationTableValueRow = {
@@ -102,7 +103,7 @@ export function getRegistrationCsvValue(
     case "email":
       return csvText(registrationContactEmail(row))
     case "phone":
-      return csvText(registrationContactPhone(row))
+      return formatPhoneDisplay(registrationContactPhone(row))
     case "guardian":
       return row.showsGuardian ? csvText(row.parentName) : ""
     case "dob":
@@ -140,7 +141,7 @@ export function getRegistrationDisplayValue(
     case "email":
       return displayCell(registrationContactEmail(row))
     case "phone":
-      return displayCell(registrationContactPhone(row))
+      return formatPhoneDisplay(registrationContactPhone(row)) || EMPTY_CELL
     case "guardian":
       return row.showsGuardian ? displayCell(row.parentName) : EMPTY_CELL
     case "dob":

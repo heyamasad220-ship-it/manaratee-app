@@ -3,10 +3,6 @@
 import { canViewDepartment } from "@/lib/departments/department-access"
 import { roundMoney } from "@/lib/departments/department-period-helpers"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
-import {
-  getOfferingRegistrationState,
-  type OfferingRegistrationState,
-} from "@/lib/programs/program-offering-display"
 import { createClient } from "@/lib/supabase/server"
 
 import {
@@ -47,15 +43,6 @@ export type ProgramOverviewAttentionItem = {
   detail: string
   tone: "amber" | "rose" | "slate"
   hrefSection?: ProgramOverviewAttentionHref
-}
-
-export type ProgramOverviewOfferingRow = {
-  id: string
-  name: string
-  instructorName: string | null
-  enrolled: number
-  capacity: number | null
-  registrationState: OfferingRegistrationState
 }
 
 export type ProgramOverviewActivityKind =
@@ -101,7 +88,6 @@ export type ProgramOverviewMetrics = {
   fullPayDiscounts: number
   coupons: ProgramOverviewCouponRow[]
   outstandingRows: ProgramOverviewOutstandingRow[]
-  offeringRows: ProgramOverviewOfferingRow[]
   activity: ProgramOverviewActivityItem[]
   attention: ProgramOverviewAttentionItem[]
 }
@@ -137,7 +123,6 @@ function emptyMetrics(programId: string, programName: string): ProgramOverviewMe
     fullPayDiscounts: 0,
     coupons: [],
     outstandingRows: [],
-    offeringRows: [],
     activity: [],
     attention: [],
   }
@@ -150,12 +135,6 @@ function isFaCode(code: string) {
 function isDiscountCode(code: string) {
   if (!code || isFaCode(code)) return false
   return /^(STAFF|MEMBER|CREDIT)/i.test(code) || code.length > 0
-}
-
-function contactFullName(contact: unknown): string {
-  const row = Array.isArray(contact) ? contact[0] : contact
-  if (!row || typeof row !== "object") return ""
-  return String((row as { full_name?: string | null }).full_name || "").trim()
 }
 
 function isVoidedChargeStatus(status: string) {
@@ -199,7 +178,7 @@ export async function fetchProgramOverviewMetricsAction(
     const supabase = await createClient()
     const { data: program, error: programError } = await supabase
       .from("programs")
-      .select("id, name, department_id, enrollment_open_date, enrollment_close_date")
+      .select("id, name, department_id")
       .eq("id", programId)
       .eq("organization_id", organizationId)
       .maybeSingle()
@@ -210,7 +189,7 @@ export async function fetchProgramOverviewMetricsAction(
 
     const programName = (program.name as string) || "Program"
 
-    const [applications, enrollments, offerings, feePlans, assignments, scheduleItems] =
+    const [applications, enrollments, offerings, feePlans] =
       await Promise.all([
       fetchAll((from, to) =>
         supabase
@@ -233,9 +212,7 @@ export async function fetchProgramOverviewMetricsAction(
       fetchAll((from, to) =>
         supabase
           .from("program_offerings")
-          .select(
-            "id, name, capacity, status, enrollment_open_date, enrollment_close_date"
-          )
+          .select("id, name, capacity, status")
           .eq("organization_id", organizationId)
           .eq("program_id", programId)
           .range(from, to)
@@ -244,26 +221,6 @@ export async function fetchProgramOverviewMetricsAction(
         supabase
           .from("program_offering_fee_plans")
           .select("offering_id, plan_type, is_default, is_active, metadata")
-          .eq("organization_id", organizationId)
-          .eq("program_id", programId)
-          .range(from, to)
-      ),
-      fetchAll((from, to) =>
-        supabase
-          .from("program_staff_assignments")
-          .select(
-            "offering_id, assignment_role, is_active, contact:contact_id ( full_name )"
-          )
-          .eq("organization_id", organizationId)
-          .eq("program_id", programId)
-          .eq("is_active", true)
-          .in("assignment_role", ["primary_instructor", "instructor"])
-          .range(from, to)
-      ),
-      fetchAll((from, to) =>
-        supabase
-          .from("program_schedule_items")
-          .select("offering_id, instructor_name")
           .eq("organization_id", organizationId)
           .eq("program_id", programId)
           .range(from, to)
@@ -333,31 +290,6 @@ export async function fetchProgramOverviewMetricsAction(
     const offeringNameById = new Map(
       offerings.map((row) => [row.id as string, (row.name as string) || "Offering"])
     )
-    const instructorByOffering = new Map<string, string>()
-    for (const row of scheduleItems) {
-      const offeringId = row.offering_id as string | null
-      const name = String(row.instructor_name || "").trim()
-      if (!offeringId || !name || instructorByOffering.has(offeringId)) continue
-      instructorByOffering.set(offeringId, name)
-    }
-    for (const row of assignments) {
-      const offeringId = row.offering_id as string | null
-      const name = contactFullName(row.contact)
-      if (!offeringId || !name) continue
-      if (!instructorByOffering.has(offeringId)) {
-        instructorByOffering.set(offeringId, name)
-      }
-    }
-    for (const row of assignments) {
-      if (String(row.assignment_role || "") !== "primary_instructor") continue
-      const offeringId = row.offering_id as string | null
-      const name = contactFullName(row.contact)
-      if (offeringId && name) instructorByOffering.set(offeringId, name)
-    }
-    const programEnrollmentFallback = {
-      enrollment_open_date: (program.enrollment_open_date as string | null) || null,
-      enrollment_close_date: (program.enrollment_close_date as string | null) || null,
-    }
     const defaultPlanByOffering = new Map<string, { plan_type: string; tuition: number }>()
     for (const row of feePlans) {
       if (row.is_active === false) continue
@@ -540,7 +472,7 @@ export async function fetchProgramOverviewMetricsAction(
     let offeringsFree = 0
     const nearCapacityNames: string[] = []
     const atCapacityNames: string[] = []
-    const offeringRows: ProgramOverviewOfferingRow[] = visibleOfferings.map((row) => {
+    for (const row of visibleOfferings) {
       const offeringId = row.id as string
       const enrolled = enrolledByOffering.get(offeringId) || 0
       const capacityRaw = Number(row.capacity || 0)
@@ -552,27 +484,7 @@ export async function fetchProgramOverviewMetricsAction(
       } else if (capacity && enrolled / capacity >= 0.8) {
         nearCapacityNames.push((row.name as string) || "Offering")
       }
-      return {
-        id: offeringId,
-        name: (row.name as string) || "Offering",
-        instructorName: instructorByOffering.get(offeringId) || null,
-        enrolled,
-        capacity,
-        registrationState: getOfferingRegistrationState(
-          {
-            enrollment_open_date:
-              (row.enrollment_open_date as string | null) || null,
-            enrollment_close_date:
-              (row.enrollment_close_date as string | null) || null,
-          },
-          programEnrollmentFallback
-        ),
-      }
-    })
-    offeringRows.sort((a, b) => {
-      if (b.enrolled !== a.enrolled) return b.enrolled - a.enrolled
-      return a.name.localeCompare(b.name)
-    })
+    }
 
     const money = (value: number) => {
       const rounded = roundMoney(value)
@@ -732,7 +644,6 @@ export async function fetchProgramOverviewMetricsAction(
         fullPayDiscounts,
         coupons,
         outstandingRows: outstandingRows.slice(0, 12),
-        offeringRows: offeringRows.slice(0, 8),
         activity: diversified,
         attention,
       },

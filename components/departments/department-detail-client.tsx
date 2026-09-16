@@ -22,6 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { PhoneText } from "@/components/ui/phone-text"
 
 type DepartmentDetailClientProps = {
   departmentId: string
@@ -159,7 +160,7 @@ export function DepartmentDetailClient({
                         {member.email || "—"}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
-                        {member.phone || "—"}
+                        <PhoneText value={member.phone} />
                       </TableCell>
                       <TableCell className="capitalize text-muted-foreground">
                         {member.employmentStatus || "—"}

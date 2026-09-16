@@ -1,0 +1,381 @@
+{
+  "importTag": "QIL_HISTORICAL_PAYMENTS_V1",
+  "mode": "execute",
+  "generatedAt": "2026-08-29T20:33:26.017Z",
+  "skipped": {
+    "not_qil": 2604,
+    "junior": 76,
+    "processing": 1,
+    "donation_or_ticket": 407,
+    "already_in_2026_27": 62,
+    "zero_or_other_status": 15,
+    "already_imported_2025_26": 162
+  },
+  "byYear": {
+    "2026-2027": {
+      "txns": 1,
+      "gross": 450,
+      "refunded": 50,
+      "net": 400,
+      "offerings": {
+        "Recitation Improvement": 1
+      }
+    },
+    "2024-2025": {
+      "txns": 83,
+      "gross": 21540,
+      "refunded": 3016.04,
+      "net": 18523.96,
+      "offerings": {
+        "QIL Registration": 67,
+        "Memorization": 13,
+        "Recitation & Arabic Grammar": 3
+      }
+    },
+    "2023-2024": {
+      "txns": 315,
+      "gross": 45762.8,
+      "refunded": 1395,
+      "net": 44367.8,
+      "offerings": {
+        "Recitation / Nouraniyyeh": 10,
+        "Recitation / Ijaza": 88,
+        "Tajweed / Nouraniyyeh": 91,
+        "Nouraniyyeh / Recitation Improvement": 26,
+        "Tajweed": 4,
+        "Hifz": 48,
+        "Hifz Review & Arabic Grammar": 40,
+        "Ijaza & Sanad": 5,
+        "Hifz and Arabic Grammar": 2,
+        "Hifz Review (Az-Zahrawayn)": 1
+      }
+    },
+    "2022-2023": {
+      "txns": 675,
+      "gross": 48210.5,
+      "refunded": 3010.14,
+      "net": 45200.36,
+      "offerings": {
+        "Tajweed (Beginner) Summer": 2,
+        "Tajweed (Advanced) Summer": 6,
+        "Surat Al-Baqara": 81,
+        "Surat An-Nisa": 141,
+        "Tajweed (Advanced)": 43,
+        "Tajweed (Beginner)": 123,
+        "Hifz": 9,
+        "Tajweed (Osool)": 102,
+        "Arabic Grammar": 7,
+        "Arabic Grammar (Nahw)": 15,
+        "Recitation Improvement (Level 1)": 36,
+        "Al Nouraniyyeh": 55,
+        "Recitation Improvement (Level 2)": 16,
+        "Preparing for Ijaza": 1,
+        "Hifz Review (Az-Zahrawayn)": 9,
+        "Quran & Arabic Language Arts (Girls 14+)": 25,
+        "Shu'uba Narration": 4
+      }
+    }
+  },
+  "totals": {
+    "enrollments": 329,
+    "cancelled": 15,
+    "net": 110118.16,
+    "gross": 115963.3,
+    "refunded": 7471.18
+  },
+  "unmatched2026": [],
+  "unknownCourseCount": 0,
+  "unknownCourses": [],
+  "created": {
+    "programs": [
+      "QIL 2022-2023",
+      "QIL 2023-2024",
+      "QIL 2024-2025"
+    ],
+    "offerings": [
+      "QIL Registration",
+      "Memorization",
+      "Recitation & Arabic Grammar",
+      "Recitation / Nouraniyyeh",
+      "Recitation / Ijaza",
+      "Tajweed / Nouraniyyeh",
+      "Nouraniyyeh / Recitation Improvement",
+      "Tajweed",
+      "Hifz",
+      "Hifz Review & Arabic Grammar",
+      "Ijaza & Sanad",
+      "Hifz and Arabic Grammar",
+      "Hifz Review (Az-Zahrawayn)",
+      "Tajweed (Beginner) Summer",
+      "Tajweed (Advanced) Summer",
+      "Surat Al-Baqara",
+      "Surat An-Nisa",
+      "Tajweed (Advanced)",
+      "Tajweed (Beginner)",
+      "Hifz",
+      "Tajweed (Osool)",
+      "Arabic Grammar",
+      "Arabic Grammar (Nahw)",
+      "Recitation Improvement (Level 1)",
+      "Al Nouraniyyeh",
+      "Recitation Improvement (Level 2)",
+      "Preparing for Ijaza",
+      "Hifz Review (Az-Zahrawayn)",
+      "Quran & Arabic Language Arts (Girls 14+)",
+      "Shu'uba Narration"
+    ],
+    "enrollments": 329
+  },
+  "sample": [
+    {
+      "year": "2026-2027",
+      "offering": "Recitation Improvement",
+      "student": "Suzan Qawouq",
+      "payer": "Suzan Qawouq",
+      "email": "suzan@abudalu.com",
+      "net": 400,
+      "refunded": 50,
+      "cancelled": false
+    },
+    {
+      "year": "2024-2025",
+      "offering": "QIL Registration",
+      "student": "Farah Dabbura",
+      "payer": "Farah Dabbura",
+      "email": "farah.dabbura12@hotmail.com",
+      "net": 0,
+      "refunded": 50,
+      "cancelled": true
+    },
+    {
+      "year": "2024-2025",
+      "offering": "QIL Registration",
+      "student": "NoorElaine Abushaaban",
+      "payer": "NoorElaine Abushaaban",
+      "email": "noor.elaine@gmail.com",
+      "net": 450,
+      "refunded": 450,
+      "cancelled": false
+    },
+    {
+      "year": "2024-2025",
+      "offering": "QIL Registration",
+      "student": "Bushra Dweik",
+      "payer": "Bushra Dweik",
+      "email": "bdweik@dcccd.edu",
+      "net": 250,
+      "refunded": 250,
+      "cancelled": false
+    },
+    {
+      "year": "2024-2025",
+      "offering": "QIL Registration",
+      "student": "Hebah Qunies",
+      "payer": "Hebah Qunies",
+      "email": "hebah-a@live.com",
+      "net": 250,
+      "refunded": 250,
+      "cancelled": false
+    },
+    {
+      "year": "2024-2025",
+      "offering": "QIL Registration",
+      "student": "Rajaa aljaber",
+      "payer": "Rajaa aljaber",
+      "email": "rajaaaljaber@gmail.com",
+      "net": 0,
+      "refunded": 120,
+      "cancelled": true
+    },
+    {
+      "year": "2024-2025",
+      "offering": "QIL Registration",
+      "student": "Elham Asmar",
+      "payer": "Elham Asmar",
+      "email": "alluma79@yahoo.com",
+      "net": 500,
+      "refunded": 0,
+      "cancelled": false
+    },
+    {
+      "year": "2024-2025",
+      "offering": "QIL Registration",
+      "student": "Abeer Qandil",
+      "payer": "Abeer Qandil",
+      "email": "abeer_qandil@yahoo.com",
+      "net": 250,
+      "refunded": 250,
+      "cancelled": false
+    },
+    {
+      "year": "2024-2025",
+      "offering": "QIL Registration",
+      "student": "Naima Houglaouene",
+      "payer": "Naima Houglaouene",
+      "email": "sam.bou2720@gmail.com",
+      "net": 300,
+      "refunded": 0,
+      "cancelled": false
+    },
+    {
+      "year": "2024-2025",
+      "offering": "QIL Registration",
+      "student": "Hanan Kuzat",
+      "payer": "Hanan Kuzat",
+      "email": "hanankuzat@yahoo.com",
+      "net": 400,
+      "refunded": 0,
+      "cancelled": false
+    },
+    {
+      "year": "2024-2025",
+      "offering": "QIL Registration",
+      "student": "Tonazzina Zaman",
+      "payer": "Tonazzina Zaman",
+      "email": "tonazzinazaman@yahoo.com",
+      "net": 0,
+      "refunded": 71.84,
+      "cancelled": true
+    },
+    {
+      "year": "2024-2025",
+      "offering": "QIL Registration",
+      "student": "Rifat Humayra",
+      "payer": "Rifat Humayra",
+      "email": "rhumayra@gmail.com",
+      "net": 0,
+      "refunded": 51.4,
+      "cancelled": true
+    },
+    {
+      "year": "2024-2025",
+      "offering": "QIL Registration",
+      "student": "ALTHAMARY NASSIR",
+      "payer": "ALTHAMARY NASSIR",
+      "email": "salgahafi@risingstarsacad.com",
+      "net": 0,
+      "refunded": 10.2,
+      "cancelled": true
+    },
+    {
+      "year": "2024-2025",
+      "offering": "QIL Registration",
+      "student": "Esraa Nassir Althamary",
+      "payer": "Esraa Nassir Althamary",
+      "email": "esraa.althamary21@gmail.com",
+      "net": 0,
+      "refunded": 61.3,
+      "cancelled": true
+    },
+    {
+      "year": "2024-2025",
+      "offering": "QIL Registration",
+      "student": "Ayat Nassir Althamary",
+      "payer": "Ayat Nassir Althamary",
+      "email": "ayatalthamary@gmail.com",
+      "net": 0,
+      "refunded": 61.3,
+      "cancelled": true
+    },
+    {
+      "year": "2024-2025",
+      "offering": "QIL Registration",
+      "student": "Manal El karmi",
+      "payer": "Manal El karmi",
+      "email": "melkarmi@yahoo.com",
+      "net": 450,
+      "refunded": 0,
+      "cancelled": false
+    },
+    {
+      "year": "2024-2025",
+      "offering": "QIL Registration",
+      "student": "Nada Mousa Abudaabes",
+      "payer": "Nada Mousa Abudaabes",
+      "email": "nadaabudaabes2@gmail.com",
+      "net": 450,
+      "refunded": 0,
+      "cancelled": false
+    },
+    {
+      "year": "2024-2025",
+      "offering": "QIL Registration",
+      "student": "Heyam Asad",
+      "payer": "Heyam Asad",
+      "email": "heyamasad220@gmail.com",
+      "net": 300,
+      "refunded": 0,
+      "cancelled": false
+    },
+    {
+      "year": "2024-2025",
+      "offering": "Memorization",
+      "student": "Haneen Esmat Musa",
+      "payer": "Haneen Esmat Musa",
+      "email": "esmathaneen11@gmail.com",
+      "net": 500,
+      "refunded": 0,
+      "cancelled": false
+    },
+    {
+      "year": "2024-2025",
+      "offering": "Memorization",
+      "student": "hadeel khuffash",
+      "payer": "hadeel khuffash",
+      "email": "hmfl99@hotmail.com",
+      "net": 500,
+      "refunded": 250,
+      "cancelled": false
+    },
+    {
+      "year": "2024-2025",
+      "offering": "QIL Registration",
+      "student": "Rawand Shiblaq",
+      "payer": "Rawand Shiblaq",
+      "email": "rshiblaq90@gmail.com",
+      "net": 250,
+      "refunded": 0,
+      "cancelled": false
+    },
+    {
+      "year": "2024-2025",
+      "offering": "QIL Registration",
+      "student": "Duaa Qawwas",
+      "payer": "Duaa Qawwas",
+      "email": "duaa_qawas@yahoo.com",
+      "net": 250,
+      "refunded": 0,
+      "cancelled": false
+    },
+    {
+      "year": "2024-2025",
+      "offering": "QIL Registration",
+      "student": "Sara Kenana",
+      "payer": "Sara Kenana",
+      "email": "saralifecoach20@gmail.com",
+      "net": 450,
+      "refunded": 0,
+      "cancelled": false
+    },
+    {
+      "year": "2024-2025",
+      "offering": "QIL Registration",
+      "student": "Lena Alkhateeb",
+      "payer": "Lena Alkhateeb",
+      "email": "lena0809@gmail.com",
+      "net": 250,
+      "refunded": 0,
+      "cancelled": false
+    },
+    {
+      "year": "2024-2025",
+      "offering": "QIL Registration",
+      "student": "Faouzia Jouhari",
+      "payer": "Faouzia Jouhari",
+      "email": "fjouhari@hotmail.com",
+      "net": 450,
+      "refunded": 0,
+      "cancelled": false
+    }
+  ]
+}

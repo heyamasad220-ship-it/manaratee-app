@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 
 import { requireDonationStaffAccess } from "@/lib/donations/donation-action-auth"
 import { DONATIONS_PAGE_SIZE } from "@/lib/donations/donation-pagination"
+import { createServiceRoleClient } from "@/lib/supabase/service-role"
 import { formatFinancialActivityPaymentStatus } from "@/lib/donations/donation-status"
 import { formatPaymentSourceLabel } from "@/lib/donations/payment-source-channel"
 import { countsTowardGivingTotals, paymentNetAmount } from "@/lib/donations/payment-net-amount"
@@ -12,6 +13,35 @@ import { attachPaymentMethodDisplayLabels } from "@/lib/donations/payment-method
 
 function escapeIlike(value: string) {
   return value.replace(/[%_\\,]/g, "\\$&")
+}
+
+function contactPickerOrFilter(search: string) {
+  const term = `%${escapeIlike(search.trim())}%`
+  const quoted = `"${term.replace(/"/g, "")}"`
+  return [
+    `full_name.ilike.${quoted}`,
+    `email.ilike.${quoted}`,
+    `phone.ilike.${quoted}`,
+    `primary_contact_name.ilike.${quoted}`,
+  ].join(",")
+}
+
+function rankDonationPickerContacts(contacts: DonationPickerContact[], search: string) {
+  const q = search.trim().toLowerCase()
+  if (!q) return contacts
+
+  return [...contacts].sort((a, b) => {
+    const aName = (a.full_name || "").toLowerCase()
+    const bName = (b.full_name || "").toLowerCase()
+    const score = (name: string) => {
+      if (name === q) return 0
+      if (name.startsWith(q)) return 1
+      return 2
+    }
+    const diff = score(aName) - score(bName)
+    if (diff !== 0) return diff
+    return aName.localeCompare(bName)
+  })
 }
 
 export type PaymentStatusDisplayFilter =
@@ -1306,35 +1336,67 @@ export type DonationPickerContact = {
   primary_contact_name?: string | null
 }
 
-/** Search org contacts for donation pledge/payment pickers (not limited to existing donors). */
+/** Search org contacts for donation pledge/payment pickers (people, organizations, and groups). */
 export async function searchContactsForDonationPickerAction(search: string, limit = 50) {
   const access = await requireDonationStaffAccess("view")
   if (!access.ok) return { success: false as const, error: access.error }
 
-  let query = access.supabase
+  const writeClient = createServiceRoleClient()
+  let query = writeClient
     .from("contacts")
     .select("id, full_name, email, phone, contact_type, primary_contact_name")
     .eq("organization_id", access.orgId)
+    .in("contact_type", ["individual", "organization", "group"])
     .order("full_name", { ascending: true })
     .limit(Math.min(limit, 100))
 
-  if (search.trim()) {
-    const term = `%${escapeIlike(search.trim())}%`
-    query = query.or(`full_name.ilike.${term},email.ilike.${term},phone.ilike.${term}`)
+  const trimmed = search.trim()
+  if (trimmed) {
+    query = query.or(contactPickerOrFilter(trimmed))
   }
 
   const { data, error } = await query
 
+  if (error && trimmed) {
+    const fallback = await writeClient
+      .from("contacts")
+      .select("id, full_name, email, phone, contact_type, primary_contact_name")
+      .eq("organization_id", access.orgId)
+      .in("contact_type", ["individual", "organization", "group"])
+      .ilike("full_name", `%${escapeIlike(trimmed)}%`)
+      .order("full_name", { ascending: true })
+      .limit(Math.min(limit, 100))
+
+    if (fallback.error) return { success: false as const, error: fallback.error.message }
+
+    const contacts: DonationPickerContact[] = rankDonationPickerContacts(
+      (fallback.data || []).map((row) => ({
+        contactId: row.id as string,
+        full_name: row.full_name as string | null,
+        email: row.email as string | null,
+        phone: row.phone as string | null,
+        contact_type: row.contact_type as string | null,
+        primary_contact_name: row.primary_contact_name as string | null,
+      })),
+      trimmed
+    )
+
+    return { success: true as const, contacts }
+  }
+
   if (error) return { success: false as const, error: error.message }
 
-  const contacts: DonationPickerContact[] = (data || []).map((row) => ({
-    contactId: row.id as string,
-    full_name: row.full_name as string | null,
-    email: row.email as string | null,
-    phone: row.phone as string | null,
-    contact_type: row.contact_type as string | null,
-    primary_contact_name: row.primary_contact_name as string | null,
-  }))
+  const contacts: DonationPickerContact[] = rankDonationPickerContacts(
+    (data || []).map((row) => ({
+      contactId: row.id as string,
+      full_name: row.full_name as string | null,
+      email: row.email as string | null,
+      phone: row.phone as string | null,
+      contact_type: row.contact_type as string | null,
+      primary_contact_name: row.primary_contact_name as string | null,
+    })),
+    trimmed
+  )
 
   return { success: true as const, contacts }
 }

@@ -4,6 +4,7 @@ import { NextResponse } from "next/server"
 import { loadOrganizationSidebarModules } from "@/lib/organizations/load-organization-sidebar-modules"
 import { buildSidebarPermissionContext } from "@/lib/organizations/sidebar-nav-context"
 import { resolveDepartmentHeadship } from "@/lib/departments/department-headship"
+import { resolveProgramLeads } from "@/lib/programs/program-leadship"
 import { isCurrentUserPlatformAdmin } from "@/lib/platform/is-platform-admin-user"
 import { getPlatformAdminOrgAccessOrganizationId } from "@/lib/platform/platform-org-access"
 import { getServiceRoleClient } from "@/lib/platform/require-platform-admin"
@@ -45,6 +46,7 @@ export async function GET() {
       modules: [],
       platformSupportMode: false,
       myDepartment: null,
+      myPrograms: [],
       permissionContext: {
         isOwner: false,
         isSuperAdmin: false,
@@ -75,7 +77,7 @@ export async function GET() {
 
   try {
     const admin = getServiceRoleClient()
-    const [modules, permissionContext, headship] = await Promise.all([
+    const [modules, permissionContext, headship, programLeads] = await Promise.all([
       loadOrganizationSidebarModules(admin, organizationId),
       buildSidebarPermissionContext({
         supabase,
@@ -86,6 +88,7 @@ export async function GET() {
         platformSupportMode,
       }),
       resolveDepartmentHeadship(supabase, organizationId, user.id),
+      resolveProgramLeads(supabase, organizationId, user.id),
     ])
 
     const myDepartment = headship
@@ -94,6 +97,11 @@ export async function GET() {
           name: headship.departmentName,
         }
       : null
+
+    const myPrograms = programLeads.map((lead) => ({
+      id: lead.programId,
+      name: lead.programName,
+    }))
 
     let directoryRoleCounts = {}
     try {
@@ -132,6 +140,7 @@ export async function GET() {
       modules,
       platformSupportMode,
       myDepartment,
+      myPrograms,
       permissionContext,
       directoryRoleCounts,
       programKinds,

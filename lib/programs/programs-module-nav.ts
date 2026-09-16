@@ -7,6 +7,7 @@ export const PROGRAMS_FINANCE_PAYROLL_PATH = "/finance/payroll"
 export const PROGRAMS_FINANCIAL_ASSISTANCE_PATH =
   "/finance/financial-assistance"
 export const PROGRAMS_REPORTS_PATH = "/programs/reports/enrollments"
+export const PROGRAMS_SETTINGS_PATH = "/programs/settings"
 
 export type ProgramsModuleTabId =
   | "overview"
@@ -16,6 +17,7 @@ export type ProgramsModuleTabId =
   | "finance"
   | "financial-assistance"
   | "reports"
+  | "settings"
 
 export type ProgramsModuleTab = {
   id: ProgramsModuleTabId
@@ -25,8 +27,7 @@ export type ProgramsModuleTab = {
 
 export const PROGRAMS_MODULE_TABS: ProgramsModuleTab[] = [
   { id: "overview", label: "Overview", href: PROGRAMS_OVERVIEW_PATH },
-  { id: "programs", label: "Programs", href: PROGRAMS_LIST_PATH },
-  { id: "offerings", label: "Offerings", href: PROGRAMS_OFFERINGS_PATH },
+  { id: "programs", label: "All programs", href: PROGRAMS_LIST_PATH },
   {
     id: "registrations",
     label: "Registrations",
@@ -39,6 +40,7 @@ export const PROGRAMS_MODULE_TABS: ProgramsModuleTab[] = [
     href: PROGRAMS_FINANCIAL_ASSISTANCE_PATH,
   },
   { id: "reports", label: "Reports", href: PROGRAMS_REPORTS_PATH },
+  { id: "settings", label: "Settings", href: PROGRAMS_SETTINGS_PATH },
 ]
 
 function pathStarts(pathname: string, prefix: string) {
@@ -69,6 +71,9 @@ export function resolveProgramsModuleTab(
   }
   if (pathStarts(path, PROGRAMS_OFFERINGS_PATH)) {
     return "offerings"
+  }
+  if (pathStarts(path, PROGRAMS_SETTINGS_PATH)) {
+    return "settings"
   }
   if (pathStarts(path, PROGRAMS_LIST_PATH)) {
     return "programs"

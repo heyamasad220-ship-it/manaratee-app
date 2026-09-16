@@ -9,18 +9,23 @@ import {
   normalizeProspectAskType,
 } from "@/lib/donations/campaign-prospect-types"
 import {
+  CAMPAIGN_SPONSORSHIP_BENEFIT_SELECT,
   CAMPAIGN_SPONSORSHIP_SELECT,
   CUSTOM_SPONSORSHIP_PACKAGE_VALUE,
+  SPONSORSHIP_PACKAGE_BENEFIT_SELECT,
   SPONSORSHIP_PACKAGE_SELECT,
+  mapSponsorshipPackageRow,
+  normalizeSponsorshipBenefitStatus,
   normalizeSponsorshipPaymentStatus,
   normalizeSponsorshipStatus,
   normalizeSponsorshipType,
   type CampaignLinkedEventOption,
+  type CampaignSponsorshipBenefitRow,
   type CampaignSponsorshipListItem,
   type CampaignSponsorshipRow,
   type CampaignSponsorshipWriteInput,
+  type SponsorshipBenefitStatus,
   type SponsorshipPackageRow,
-  type SponsorshipPackageWriteInput,
 } from "@/lib/donations/campaign-sponsorship-types"
 import { createServiceRoleClient } from "@/lib/supabase/service-role"
 
@@ -36,21 +41,23 @@ function missingSponsorshipSchemaError(message: string) {
     message.includes("42P01") ||
     message.includes("42703")
   ) {
-    return "Sponsorships are not available yet. Run scripts/284_campaign_sponsorship_prospects.sql in Supabase."
+    return "Sponsorships are not available yet. Run scripts/284_campaign_sponsorship_prospects.sql and scripts/285_campaign_sponsorship_packages.sql in Supabase."
   }
   return null
 }
 
-function mapPackageRow(row: Record<string, unknown>): SponsorshipPackageRow {
+function mapSponsorshipBenefitRow(row: Record<string, unknown>): CampaignSponsorshipBenefitRow {
   return {
     id: row.id as string,
     organization_id: row.organization_id as string,
-    event_id: row.event_id as string,
-    name: (row.name as string) || "Package",
-    amount: Number(row.amount || 0),
-    description: (row.description as string | null) ?? null,
+    sponsorship_id: row.sponsorship_id as string,
+    package_benefit_id: (row.package_benefit_id as string | null) ?? null,
+    name: (row.name as string) || "Benefit",
+    value: (row.value as string | null) ?? null,
+    status: normalizeSponsorshipBenefitStatus(row.status as string),
+    completed_at: (row.completed_at as string | null) ?? null,
+    notes: (row.notes as string | null) ?? null,
     display_order: Number(row.display_order || 0),
-    active: row.active !== false,
   }
 }
 
@@ -145,22 +152,76 @@ async function enrichSponsorships(
   const packageIds = [
     ...new Set(rows.map((row) => row.sponsorship_package_id).filter(Boolean) as string[]),
   ]
+  const prospectIds = [...new Set(rows.map((row) => row.prospect_id).filter(Boolean) as string[])]
+  const sponsorshipIds = rows.map((row) => row.id)
 
-  const [contacts, events, packages] = await Promise.all([
+  const [contacts, events, packages, prospects, benefitRows] = await Promise.all([
     loadContactNames(orgId, contactIds),
     loadEventNames(orgId, eventIds),
     loadPackageNames(orgId, packageIds),
+    (async () => {
+      const map = new Map<string, { assignedToName: string | null }>()
+      if (prospectIds.length === 0) return map
+      const writeClient = createServiceRoleClient()
+      const { data } = await writeClient
+        .from("campaign_prospects")
+        .select("id, assigned_to_contact_id")
+        .eq("organization_id", orgId)
+        .in("id", prospectIds)
+      const assigneeIds = [
+        ...new Set(
+          (data || [])
+            .map((row) => row.assigned_to_contact_id as string | null)
+            .filter(Boolean) as string[]
+        ),
+      ]
+      const assignees = await loadContactNames(orgId, assigneeIds)
+      for (const row of data || []) {
+        const assigneeId = row.assigned_to_contact_id as string | null
+        map.set(row.id as string, {
+          assignedToName: assigneeId ? assignees.get(assigneeId)?.name ?? null : null,
+        })
+      }
+      return map
+    })(),
+    (async () => {
+      const map = new Map<string, { completed: number; total: number }>()
+      if (sponsorshipIds.length === 0) return map
+      const writeClient = createServiceRoleClient()
+      const { data } = await writeClient
+        .from("campaign_sponsorship_benefits")
+        .select("sponsorship_id, status")
+        .eq("organization_id", orgId)
+        .in("sponsorship_id", sponsorshipIds)
+      for (const row of data || []) {
+        const id = row.sponsorship_id as string
+        const current = map.get(id) || { completed: 0, total: 0 }
+        current.total += 1
+        if (String(row.status || "").toLowerCase() === "completed") current.completed += 1
+        map.set(id, current)
+      }
+      return map
+    })(),
   ])
 
-  return rows.map((row) => ({
-    ...row,
-    contactName: contacts.get(row.contact_id)?.name || "Unknown contact",
-    contactEmail: contacts.get(row.contact_id)?.email ?? null,
-    eventName: row.event_id ? events.get(row.event_id) ?? null : null,
-    packageName: row.sponsorship_package_id
-      ? packages.get(row.sponsorship_package_id) ?? null
-      : null,
-  }))
+  return rows.map((row) => {
+    const benefits = benefitRows.get(row.id)
+    return {
+      ...row,
+      contactName: contacts.get(row.contact_id)?.name || "Unknown contact",
+      contactEmail: contacts.get(row.contact_id)?.email ?? null,
+      eventName: row.event_id ? events.get(row.event_id) ?? null : null,
+      packageName: row.sponsorship_package_id
+        ? packages.get(row.sponsorship_package_id) ?? null
+        : null,
+      assignedToName: row.prospect_id
+        ? prospects.get(row.prospect_id)?.assignedToName ?? null
+        : null,
+      prospectId: row.prospect_id,
+      benefitsCompleted: benefits?.completed || 0,
+      benefitsTotal: benefits?.total || 0,
+    }
+  })
 }
 
 export async function listCampaignLinkedEventsAction(campaignId: string) {
@@ -232,75 +293,8 @@ export async function listSponsorshipPackagesForEventAction(eventId: string) {
 
     return {
       success: true as const,
-      packages: ((data || []) as Record<string, unknown>[]).map(mapPackageRow),
+      packages: ((data || []) as Record<string, unknown>[]).map(mapSponsorshipPackageRow),
     }
-  } catch (error) {
-    return { success: false as const, error: (error as Error).message }
-  }
-}
-
-export async function createSponsorshipPackageAction(input: SponsorshipPackageWriteInput) {
-  const access = await requireDonationStaffAccess("prospects")
-  if (!access.ok) return { success: false as const, error: access.error }
-
-  const eventId = input.event_id?.trim()
-  const name = input.name?.trim()
-  if (!eventId) return { success: false as const, error: "Select an event first" }
-  if (!name) return { success: false as const, error: "Package name is required" }
-  const amount = Number(input.amount)
-  if (!(amount >= 0)) return { success: false as const, error: "Enter a valid package amount" }
-
-  try {
-    const writeClient = createServiceRoleClient()
-    const { data: event, error: eventError } = await writeClient
-      .from("internal_events")
-      .select("id")
-      .eq("organization_id", access.orgId)
-      .eq("id", eventId)
-      .maybeSingle()
-
-    if (eventError) return { success: false as const, error: eventError.message }
-    if (!event) return { success: false as const, error: "Event not found" }
-
-    const { data: existing } = await writeClient
-      .from("sponsorship_packages")
-      .select("display_order")
-      .eq("organization_id", access.orgId)
-      .eq("event_id", eventId)
-      .order("display_order", { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    const displayOrder =
-      input.display_order != null
-        ? input.display_order
-        : Number(existing?.display_order || 0) + 1
-
-    const { data, error } = await writeClient
-      .from("sponsorship_packages")
-      .insert({
-        organization_id: access.orgId,
-        event_id: eventId,
-        name,
-        amount,
-        description: input.description?.trim() || null,
-        display_order: displayOrder,
-        active: input.active !== false,
-      })
-      .select(SPONSORSHIP_PACKAGE_SELECT)
-      .single()
-
-    if (error || !data) {
-      return {
-        success: false as const,
-        error:
-          missingSponsorshipSchemaError(error?.message || "") ||
-          error?.message ||
-          "Failed to create package",
-      }
-    }
-
-    return { success: true as const, package: mapPackageRow(data as Record<string, unknown>) }
   } catch (error) {
     return { success: false as const, error: (error as Error).message }
   }
@@ -367,7 +361,93 @@ export async function getCampaignSponsorshipAction(sponsorshipId: string) {
     const [enriched] = await enrichSponsorships(access.orgId, [
       mapSponsorshipRow(data as Record<string, unknown>),
     ])
-    return { success: true as const, sponsorship: enriched }
+    const benefits = await listSponsorshipBenefits(access.orgId, sponsorshipId)
+    return { success: true as const, sponsorship: enriched, benefits }
+  } catch (error) {
+    return { success: false as const, error: (error as Error).message }
+  }
+}
+
+async function listSponsorshipBenefits(orgId: string, sponsorshipId: string) {
+  const writeClient = createServiceRoleClient()
+  const { data, error } = await writeClient
+    .from("campaign_sponsorship_benefits")
+    .select(CAMPAIGN_SPONSORSHIP_BENEFIT_SELECT)
+    .eq("organization_id", orgId)
+    .eq("sponsorship_id", sponsorshipId)
+    .order("display_order", { ascending: true })
+
+  if (error || !data) return [] as CampaignSponsorshipBenefitRow[]
+  return (data as Record<string, unknown>[]).map(mapSponsorshipBenefitRow)
+}
+
+export async function listCampaignSponsorshipBenefitsAction(sponsorshipId: string) {
+  const access = await requireDonationStaffAccess("view")
+  if (!access.ok) return { success: false as const, error: access.error }
+  if (!sponsorshipId.trim()) return { success: false as const, error: "Sponsorship is required" }
+
+  try {
+    const benefits = await listSponsorshipBenefits(access.orgId, sponsorshipId)
+    return { success: true as const, benefits }
+  } catch (error) {
+    return { success: false as const, error: (error as Error).message }
+  }
+}
+
+export async function updateCampaignSponsorshipBenefitAction(
+  benefitId: string,
+  input: { status?: SponsorshipBenefitStatus; notes?: string | null }
+) {
+  const access = await requireDonationStaffAccess("prospects")
+  if (!access.ok) return { success: false as const, error: access.error }
+  if (!benefitId.trim()) return { success: false as const, error: "Benefit is required" }
+
+  try {
+    const writeClient = createServiceRoleClient()
+    const { data: existing, error: existingError } = await writeClient
+      .from("campaign_sponsorship_benefits")
+      .select("id, sponsorship_id, status")
+      .eq("organization_id", access.orgId)
+      .eq("id", benefitId)
+      .maybeSingle()
+
+    if (existingError) return { success: false as const, error: existingError.message }
+    if (!existing) return { success: false as const, error: "Benefit not found" }
+
+    const patch: Record<string, unknown> = {}
+    if (input.status !== undefined) {
+      patch.status = normalizeSponsorshipBenefitStatus(input.status)
+      patch.completed_at =
+        input.status === "completed" ? new Date().toISOString() : null
+    }
+    if (input.notes !== undefined) patch.notes = input.notes?.trim() || null
+
+    const { data, error } = await writeClient
+      .from("campaign_sponsorship_benefits")
+      .update(patch)
+      .eq("organization_id", access.orgId)
+      .eq("id", benefitId)
+      .select(CAMPAIGN_SPONSORSHIP_BENEFIT_SELECT)
+      .maybeSingle()
+
+    if (error || !data) {
+      return { success: false as const, error: error?.message || "Failed to update benefit" }
+    }
+
+    const { data: sponsorship } = await writeClient
+      .from("campaign_sponsorships")
+      .select("campaign_id")
+      .eq("organization_id", access.orgId)
+      .eq("id", existing.sponsorship_id)
+      .maybeSingle()
+    if (sponsorship?.campaign_id) {
+      revalidateSponsorshipPaths(sponsorship.campaign_id as string)
+    }
+
+    return {
+      success: true as const,
+      benefit: mapSponsorshipBenefitRow(data as Record<string, unknown>),
+    }
   } catch (error) {
     return { success: false as const, error: (error as Error).message }
   }
@@ -376,6 +456,43 @@ export async function getCampaignSponsorshipAction(sponsorshipId: string) {
 function resolvedPackageId(value: string | null | undefined) {
   if (!value || value === CUSTOM_SPONSORSHIP_PACKAGE_VALUE) return null
   return value
+}
+
+async function snapshotPackageBenefitsForSponsorship(
+  writeClient: ReturnType<typeof createServiceRoleClient>,
+  orgId: string,
+  sponsorshipId: string,
+  packageId: string
+) {
+  const { data: existing } = await writeClient
+    .from("campaign_sponsorship_benefits")
+    .select("id")
+    .eq("organization_id", orgId)
+    .eq("sponsorship_id", sponsorshipId)
+    .limit(1)
+
+  if ((existing || []).length > 0) return
+
+  const { data: benefits, error } = await writeClient
+    .from("sponsorship_package_benefits")
+    .select(SPONSORSHIP_PACKAGE_BENEFIT_SELECT)
+    .eq("organization_id", orgId)
+    .eq("package_id", packageId)
+    .order("display_order", { ascending: true })
+
+  if (error || !benefits || benefits.length === 0) return
+
+  await writeClient.from("campaign_sponsorship_benefits").insert(
+    benefits.map((benefit, index) => ({
+      organization_id: orgId,
+      sponsorship_id: sponsorshipId,
+      package_benefit_id: benefit.id,
+      name: benefit.name,
+      value: (benefit.value as string | null) ?? null,
+      status: "pending",
+      display_order: Number(benefit.display_order ?? index),
+    }))
+  )
 }
 
 export async function createCampaignSponsorshipAction(
@@ -463,10 +580,19 @@ export async function createCampaignSponsorshipAction(
       }
     }
 
+    const createdRow = mapSponsorshipRow(data as Record<string, unknown>)
+    const packageId = resolvedPackageId(input.sponsorship_package_id)
+    if (packageId) {
+      await snapshotPackageBenefitsForSponsorship(
+        writeClient,
+        access.orgId,
+        createdRow.id,
+        packageId
+      )
+    }
+
     revalidateSponsorshipPaths(campaignId)
-    const [enriched] = await enrichSponsorships(access.orgId, [
-      mapSponsorshipRow(data as Record<string, unknown>),
-    ])
+    const [enriched] = await enrichSponsorships(access.orgId, [createdRow])
     return { success: true as const, sponsorship: enriched }
   } catch (error) {
     return { success: false as const, error: (error as Error).message }
@@ -531,10 +657,19 @@ export async function updateCampaignSponsorshipAction(
       }
     }
 
+    const updatedRow = mapSponsorshipRow(data as Record<string, unknown>)
+    const packageId = resolvedPackageId(updatedRow.sponsorship_package_id)
+    if (packageId) {
+      await snapshotPackageBenefitsForSponsorship(
+        writeClient,
+        access.orgId,
+        updatedRow.id,
+        packageId
+      )
+    }
+
     revalidateSponsorshipPaths(existing.campaign_id as string)
-    const [enriched] = await enrichSponsorships(access.orgId, [
-      mapSponsorshipRow(data as Record<string, unknown>),
-    ])
+    const [enriched] = await enrichSponsorships(access.orgId, [updatedRow])
     return { success: true as const, sponsorship: enriched }
   } catch (error) {
     return { success: false as const, error: (error as Error).message }
@@ -657,13 +792,27 @@ export async function convertCampaignProspectToSponsorshipAction(input: {
 export async function sumActiveCampaignSponsorships(
   organizationId: string,
   campaignId: string
-): Promise<{ committed: number; cash: number; inKind: number }> {
-  const empty = { committed: 0, cash: 0, inKind: 0 }
+): Promise<{
+  sponsorCount: number
+  committed: number
+  cash: number
+  collected: number
+  outstanding: number
+  inKind: number
+}> {
+  const empty = {
+    sponsorCount: 0,
+    committed: 0,
+    cash: 0,
+    collected: 0,
+    outstanding: 0,
+    inKind: 0,
+  }
   try {
     const writeClient = createServiceRoleClient()
     const { data, error } = await writeClient
       .from("campaign_sponsorships")
-      .select("committed_amount, cash_amount, in_kind_value, status")
+      .select("committed_amount, cash_amount, in_kind_value, status, payment_status")
       .eq("organization_id", organizationId)
       .eq("campaign_id", campaignId)
 
@@ -672,9 +821,16 @@ export async function sumActiveCampaignSponsorships(
     return data.reduce((sum, row) => {
       const status = String(row.status || "").toLowerCase()
       if (status === "cancelled") return sum
+      const cash = Number(row.cash_amount || 0)
+      const payment = String(row.payment_status || "").toLowerCase()
+      const collected = payment === "paid" ? cash : 0
+      const outstanding = payment === "paid" || payment === "waived" ? 0 : cash
       return {
+        sponsorCount: sum.sponsorCount + 1,
         committed: sum.committed + Number(row.committed_amount || 0),
-        cash: sum.cash + Number(row.cash_amount || 0),
+        cash: sum.cash + cash,
+        collected: sum.collected + collected,
+        outstanding: sum.outstanding + outstanding,
         inKind: sum.inKind + Number(row.in_kind_value || 0),
       }
     }, empty)

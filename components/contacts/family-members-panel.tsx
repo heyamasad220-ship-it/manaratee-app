@@ -19,6 +19,7 @@ import {
 import { removeHouseholdMemberAction } from "@/lib/contacts/family-management-actions"
 import type { FamilyMemberGivingRow } from "@/lib/contacts/family-types"
 import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
+import { PhoneText } from "@/components/ui/phone-text"
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("en-US", {
@@ -163,7 +164,7 @@ export function FamilyMembersPanel({
                     </TableCell>
                     <TableCell>{formatRole(member.role)}</TableCell>
                     <TableCell className="text-muted-foreground">
-                      {member.isMinor ? "—" : member.phone || "—"}
+                      {member.isMinor ? "—" : <PhoneText value={member.phone} />}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {member.isMinor ? "—" : member.email || "—"}

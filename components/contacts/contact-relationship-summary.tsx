@@ -204,7 +204,7 @@ export function ContactRelationshipSummaryCard({
       value: summary.ticketsCount,
       icon: Ticket,
       records: activity.ticketing,
-      href: "/event-management/ticketing",
+      href: "/event-management/reports/orders",
       viewLabel: "View purchases",
       accent: "cyan",
     })
@@ -240,7 +240,7 @@ export function ContactRelationshipSummaryCard({
       value: summary.vendorActivityCount,
       icon: Store,
       records: activity.vendorHub,
-      href: `/vendor-hub/network/history?contact=${contactId}`,
+      href: `/vendor-hub/reports?tab=history&contact=${contactId}`,
       viewLabel: "View vendor activity",
       accent: "violet",
     })

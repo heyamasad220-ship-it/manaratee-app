@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useMemo, useState, useTransition } from "react"
-import Link from "next/link"
 import { Copy, Loader2, Settings } from "lucide-react"
 import { useRouter } from "next/navigation"
 
@@ -173,14 +172,8 @@ export function InternalEventSettingsWorkspace({
                 Use organization default checkout
               </Label>
               <p className="mt-1 text-sm text-muted-foreground">
-                Inherit the default form from{" "}
-                <Link
-                  href="/event-management/ticketing/settings"
-                  className="text-primary underline-offset-4 hover:underline"
-                >
-                  Ticketing settings
-                </Link>
-                .
+                Inherit the organization default checkout form when this event
+                does not use a custom form.
               </p>
             </div>
             <div className="flex items-center gap-2">

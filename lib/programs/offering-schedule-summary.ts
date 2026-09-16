@@ -126,6 +126,23 @@ export function getOfferingScheduleSummaryLines(
   }
 }
 
+export function offeringHasFacilitySpace(
+  items: ProgramScheduleItem[]
+): boolean {
+  return items.some(
+    (item) => Boolean(item.venue_id) || Boolean(item.location?.trim())
+  )
+}
+
+export function getOfferingFacilityLabels(
+  items: ProgramScheduleItem[],
+  venues?: Array<{ id: string; name: string }>
+): string[] {
+  return getOfferingScheduleSummaryLines(items, venues)?.location
+    ?.split(", ")
+    .filter(Boolean) ?? []
+}
+
 /**
  * Single-line schedule summary (lists, tooltips).
  */

@@ -1,0 +1,4071 @@
+{
+  "file": "C:/Users/danan/Downloads/Program_PAYMENT_TRANSACTION_REPORT.csv",
+  "rowCount": 5000,
+  "headers": [
+    "Amount",
+    "Customer Name",
+    "Customer Email",
+    "Customer Phone",
+    "Payment / Donation Secondary Reason",
+    "Payment Remarks",
+    "Program",
+    "Recurring Type",
+    "Schedule Transaction Date",
+    "Transaction Date"
+  ],
+  "extraColumns": [],
+  "hasStatus": false,
+  "hasTransactionId": false,
+  "hasRefundReason": false,
+  "hasPaymentMode": false,
+  "uniqueEmails": 952,
+  "uniquePhones": 914,
+  "totalAmount": 981951.39,
+  "absAmount": 981951.39,
+  "minDate": "2024-09-24",
+  "maxDate": "2026-08-29",
+  "parseErrors": 0,
+  "parseErrorSample": [],
+  "recurringTypes": {
+    "MONTHLY": {
+      "count": 3634,
+      "amount": 443635.14
+    },
+    "ONE_TIME": {
+      "count": 1365,
+      "amount": 536273.43
+    },
+    "YEARLY": {
+      "count": 1,
+      "amount": 2042.82
+    }
+  },
+  "programCount": 72,
+  "familyYear": [
+    {
+      "family": "other",
+      "year": null,
+      "count": 1713,
+      "amount": 177082.61,
+      "programs": [
+        "Istiqamah Institute",
+        "Quran Institute for Ladies 2026-2027",
+        "Quran Institute For Ladies 2026-2027",
+        "Game Night",
+        "Self-Defense & Taekwondo for All Levels",
+        "Quran Institute for Brothers",
+        "The Companion of The Quran 26-27",
+        "Rijaal Age 14+ (Group 1)",
+        "QI - Recitation Improvement (July)",
+        "Self-Defense & Taekwondo for Women (April - June) 2026",
+        "Ages 9-99 Qur’anic Arabic Summer Intensive on Zoom",
+        "QI - Recitation Improvement (June)",
+        "Kids Arabic Reading & Writing Summer Program",
+        "Summer Hifth Review Program (Ages 8–16)",
+        "Rijaal Age 10-13 (Group 1 - 2nd Year)",
+        "Rijaal Age 10-13 (Group 2 - 1st Year)",
+        "Rijaal Age 7-9 (Group 1)",
+        "MUHSEN",
+        "Arabic Language Club",
+        "The Companion Of The Quran",
+        "Kids Saturday Quranic Arabic Program",
+        "Quranic Arabic Program 2025-2026",
+        "Quran Institute for Ladies 2025-2026",
+        "Self-Defense & Taekwondo with Samira: Nov 2025 - Feb 2026",
+        "Winter Camp 2025 (Dec 22nd - Jan 1st)",
+        "Zoom Quranic Arabic Intensive December",
+        "Fall Camp 2025 (November 24 - 27)",
+        "Self-Defense & Taekwondo with Samira",
+        "Zoom Arabic Intensive 1C",
+        "Middle School Girls Soccor",
+        "Swimming Course 2 - August",
+        "Zoom Arabic Intensive 1B, and 1C",
+        "Zoom Arabic Intensive Book 1A",
+        "Zoom Arabic Intensive 1B",
+        "Swimming Course 1 - Boys all ages",
+        "Quranic Arabic - Intensive 3 Day Program",
+        "Self-Defense & Taekwondo with Samira - Intermediate",
+        "Self-Defense & Taekwondo with Samira - Beginner",
+        "Field Trip 4-5 Yrs",
+        "Field Trip 9-14 Girls",
+        "Field Trip 6-9 Boys & 6-8 Girls",
+        "Quranic Arabic Program",
+        "Boys Juniors Leadership 7-9",
+        "Boys Youth Leadership 10-13",
+        "Spring Camp",
+        "Quran Institute for Ladies",
+        "Self-Defense & Taekwondo with Samira - Beginners",
+        "Winter Camp - Ready, Set, Pray",
+        "MAS Fall Camp November 2024",
+        "MAS Fall Camp 2024",
+        "Quran Institute For Ladies",
+        "Self-Defense & Taekwondo with Samira Intermediate Class",
+        "Self-Defense & Taekwondo with Samira Beginner’s Class"
+      ]
+    },
+    {
+      "family": "qij",
+      "year": "2026-2027",
+      "count": 5,
+      "amount": 687.5,
+      "programs": [
+        "Quran Institute Junior 26-27"
+      ]
+    },
+    {
+      "family": "qlh",
+      "year": "2026-2027",
+      "count": 25,
+      "amount": 3939,
+      "programs": [
+        "Quran 4 Little Hearts 26-27"
+      ]
+    },
+    {
+      "family": "qil",
+      "year": "2026-2027",
+      "count": 14,
+      "amount": 2275,
+      "programs": [
+        "Quran Institure for Ladies 2026-2027"
+      ]
+    },
+    {
+      "family": "summer_camp",
+      "year": "2026",
+      "count": 398,
+      "amount": 238722.5,
+      "programs": [
+        "2026 MAS Summer Camp Two (6/29 - 7/23)",
+        "3rd Annual Youth Intensive Summer Camp 2026",
+        "2026 MAS Summer Camp One (June)"
+      ]
+    },
+    {
+      "family": "qlh",
+      "year": "2025-2026",
+      "count": 427,
+      "amount": 68031.84,
+      "programs": [
+        "Quran 4 Little Hearts 25-26"
+      ]
+    },
+    {
+      "family": "summer_camp",
+      "year": null,
+      "count": 3,
+      "amount": 630,
+      "programs": [
+        "Special Needs Summer Camp"
+      ]
+    },
+    {
+      "family": "sunday_school",
+      "year": "2025-2026",
+      "count": 654,
+      "amount": 111998.82,
+      "programs": [
+        "25-26 Sunday School"
+      ]
+    },
+    {
+      "family": "sunday_school",
+      "year": null,
+      "count": 432,
+      "amount": 12300,
+      "programs": [
+        "Sunday School Lunch Ticket",
+        "Muhsen Sunday School"
+      ]
+    },
+    {
+      "family": "qij",
+      "year": null,
+      "count": 48,
+      "amount": 6670,
+      "programs": [
+        "Quran Institute Junior (Part Time Hifth)"
+      ]
+    },
+    {
+      "family": "sunday_school",
+      "year": "2026-2027",
+      "count": 16,
+      "amount": 4742.82,
+      "programs": [
+        "Sunday School 26/27"
+      ]
+    },
+    {
+      "family": "blank",
+      "year": null,
+      "count": 18,
+      "amount": 0,
+      "programs": [
+        "الأربعين النووية & متن الأجرومية"
+      ]
+    },
+    {
+      "family": "summer_camp",
+      "year": "2025",
+      "count": 397,
+      "amount": 211167.5,
+      "programs": [
+        "2025 MAS Summer - Camp 2 (July)",
+        "2025 MAS Summer - Camp 1 (June)",
+        "2nd Annual Youth Intensive Summer Camp 2025"
+      ]
+    },
+    {
+      "family": "sunday_school",
+      "year": "2024-2025",
+      "count": 640,
+      "amount": 112772.8,
+      "programs": [
+        "2024/2025 Sunday School (Boys & Girls)"
+      ]
+    },
+    {
+      "family": "qlh",
+      "year": "2020-2024",
+      "count": 210,
+      "amount": 30931,
+      "programs": [
+        "Quran 4 Little Hearts (2024/2025)"
+      ]
+    }
+  ],
+  "focusPrograms": [
+    {
+      "name": "25-26 Sunday School",
+      "family": "sunday_school",
+      "year": "2025-2026",
+      "count": 654,
+      "amount": 111998.82,
+      "absAmount": 111998.82,
+      "minDate": "2025-05-18",
+      "maxDate": "2026-05-13",
+      "missingEmail": 0,
+      "missingPhone": 9,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 3,
+      "fullPaymentNo": 615,
+      "rawVariants": [
+        "25-26 Sunday School"
+      ],
+      "couponCount": 3,
+      "topCoupons": [
+        [
+          "STAFF-SS2526-50",
+          {
+            "count": 78,
+            "amount": 7188
+          }
+        ],
+        [
+          "%50OFF",
+          {
+            "count": 18,
+            "amount": 2106
+          }
+        ],
+        [
+          "OFF",
+          {
+            "count": 2,
+            "amount": 0
+          }
+        ]
+      ],
+      "recurring": {
+        "MONTHLY": {
+          "count": 651,
+          "amount": 109956
+        },
+        "ONE_TIME": {
+          "count": 3,
+          "amount": 2042.82
+        }
+      }
+    },
+    {
+      "name": "2024/2025 Sunday School (Boys & Girls)",
+      "family": "sunday_school",
+      "year": "2024-2025",
+      "count": 640,
+      "amount": 112772.8,
+      "absAmount": 112772.8,
+      "minDate": "2024-09-27",
+      "maxDate": "2025-06-01",
+      "missingEmail": 0,
+      "missingPhone": 17,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 0,
+      "fullPaymentNo": 590,
+      "rawVariants": [
+        "2024/2025 Sunday School (Boys & Girls)"
+      ],
+      "couponCount": 5,
+      "topCoupons": [
+        [
+          "TEACHER",
+          {
+            "count": 46,
+            "amount": 5628
+          }
+        ],
+        [
+          "%50OFF",
+          {
+            "count": 11,
+            "amount": 822
+          }
+        ],
+        [
+          "DISCOUNT",
+          {
+            "count": 8,
+            "amount": 401.28
+          }
+        ],
+        [
+          "FINCODE",
+          {
+            "count": 8,
+            "amount": 585.52
+          }
+        ],
+        [
+          "10PERCENT",
+          {
+            "count": 6,
+            "amount": 588
+          }
+        ]
+      ],
+      "recurring": {
+        "MONTHLY": {
+          "count": 640,
+          "amount": 112772.8
+        }
+      }
+    },
+    {
+      "name": "Quran 4 Little Hearts 25-26",
+      "family": "qlh",
+      "year": "2025-2026",
+      "count": 427,
+      "amount": 68031.84,
+      "absAmount": 68031.84,
+      "minDate": "2025-08-01",
+      "maxDate": "2026-06-29",
+      "missingEmail": 0,
+      "missingPhone": 0,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 0,
+      "fullPaymentNo": 403,
+      "rawVariants": [
+        "Quran 4 Little Hearts 25-26"
+      ],
+      "couponCount": 4,
+      "topCoupons": [
+        [
+          "STAFF-QLH2526-50",
+          {
+            "count": 42,
+            "amount": 4095
+          }
+        ],
+        [
+          "OFFQLH",
+          {
+            "count": 8,
+            "amount": 117.84
+          }
+        ],
+        [
+          "QLH50",
+          {
+            "count": 8,
+            "amount": 1350
+          }
+        ],
+        [
+          "QLH30",
+          {
+            "count": 6,
+            "amount": 819
+          }
+        ]
+      ],
+      "recurring": {
+        "MONTHLY": {
+          "count": 427,
+          "amount": 68031.84
+        }
+      }
+    },
+    {
+      "name": "Sunday School Lunch Ticket",
+      "family": "sunday_school",
+      "year": null,
+      "count": 386,
+      "amount": 5860,
+      "absAmount": 5860,
+      "minDate": "2025-08-31",
+      "maxDate": "2026-05-02",
+      "missingEmail": 0,
+      "missingPhone": 9,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 2,
+      "fullPaymentNo": 375,
+      "rawVariants": [
+        "Sunday School Lunch Ticket"
+      ],
+      "couponCount": 0,
+      "topCoupons": [],
+      "recurring": {
+        "MONTHLY": {
+          "count": 384,
+          "amount": 5680
+        },
+        "ONE_TIME": {
+          "count": 2,
+          "amount": 180
+        }
+      }
+    },
+    {
+      "name": "2026 MAS Summer Camp One (June)",
+      "family": "summer_camp",
+      "year": "2026",
+      "count": 226,
+      "amount": 140155,
+      "absAmount": 140155,
+      "minDate": "2026-04-01",
+      "maxDate": "2026-06-22",
+      "missingEmail": 0,
+      "missingPhone": 4,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 226,
+      "fullPaymentNo": 0,
+      "rawVariants": [
+        "2026 MAS Summer Camp One (June)"
+      ],
+      "couponCount": 14,
+      "topCoupons": [
+        [
+          "CAMP1-TWOWEEKS",
+          {
+            "count": 11,
+            "amount": 4410
+          }
+        ],
+        [
+          "FA-CAMP1-100",
+          {
+            "count": 7,
+            "amount": 0
+          }
+        ],
+        [
+          "CAMP1-ONEWEEK",
+          {
+            "count": 5,
+            "amount": 675
+          }
+        ],
+        [
+          "MEMBER-SC1-10",
+          {
+            "count": 4,
+            "amount": 2700
+          }
+        ],
+        [
+          "FA-CAMP1-50",
+          {
+            "count": 2,
+            "amount": 450
+          }
+        ],
+        [
+          "STAFF-CAMP1-CREDIT",
+          {
+            "count": 2,
+            "amount": 0
+          }
+        ],
+        [
+          "STAFF-CAMP1-50",
+          {
+            "count": 2,
+            "amount": 850
+          }
+        ],
+        [
+          "FA-CAMP1-50%",
+          {
+            "count": 2,
+            "amount": 850
+          }
+        ]
+      ],
+      "recurring": {
+        "ONE_TIME": {
+          "count": 226,
+          "amount": 140155
+        }
+      }
+    },
+    {
+      "name": "Quran 4 Little Hearts (2024/2025)",
+      "family": "qlh",
+      "year": "2020-2024",
+      "count": 210,
+      "amount": 30931,
+      "absAmount": 30931,
+      "minDate": "2024-09-26",
+      "maxDate": "2025-05-26",
+      "missingEmail": 0,
+      "missingPhone": 0,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 0,
+      "fullPaymentNo": 179,
+      "rawVariants": [
+        "Quran 4 Little Hearts (2024/2025)"
+      ],
+      "couponCount": 4,
+      "topCoupons": [
+        [
+          "TEACHER",
+          {
+            "count": 14,
+            "amount": 1015
+          }
+        ],
+        [
+          "%50OFF",
+          {
+            "count": 6,
+            "amount": 570
+          }
+        ],
+        [
+          "DISCOUNT",
+          {
+            "count": 4,
+            "amount": 400
+          }
+        ],
+        [
+          "MASMEM",
+          {
+            "count": 1,
+            "amount": 306
+          }
+        ]
+      ],
+      "recurring": {
+        "MONTHLY": {
+          "count": 210,
+          "amount": 30931
+        }
+      }
+    },
+    {
+      "name": "2025 MAS Summer - Camp 1 (June)",
+      "family": "summer_camp",
+      "year": "2025",
+      "count": 190,
+      "amount": 101437.5,
+      "absAmount": 101437.5,
+      "minDate": "2025-04-11",
+      "maxDate": "2025-06-25",
+      "missingEmail": 0,
+      "missingPhone": 5,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 190,
+      "fullPaymentNo": 0,
+      "rawVariants": [
+        "2025 MAS Summer - Camp 1 (June)"
+      ],
+      "couponCount": 9,
+      "topCoupons": [
+        [
+          "TWOWEEKSOFF",
+          {
+            "count": 9,
+            "amount": 3900
+          }
+        ],
+        [
+          "WAIVED",
+          {
+            "count": 9,
+            "amount": 0
+          }
+        ],
+        [
+          "TEACHER",
+          {
+            "count": 9,
+            "amount": 0
+          }
+        ],
+        [
+          "THREEWEEKSOFF",
+          {
+            "count": 8,
+            "amount": 1300
+          }
+        ],
+        [
+          "ONEWEEKOFF",
+          {
+            "count": 8,
+            "amount": 4375
+          }
+        ],
+        [
+          "%50OFF",
+          {
+            "count": 7,
+            "amount": 2375
+          }
+        ],
+        [
+          "MASSTAFF",
+          {
+            "count": 5,
+            "amount": 1925
+          }
+        ],
+        [
+          "CASH",
+          {
+            "count": 1,
+            "amount": 0
+          }
+        ]
+      ],
+      "recurring": {
+        "ONE_TIME": {
+          "count": 190,
+          "amount": 101437.5
+        }
+      }
+    },
+    {
+      "name": "2025 MAS Summer - Camp 2 (July)",
+      "family": "summer_camp",
+      "year": "2025",
+      "count": 174,
+      "amount": 90060,
+      "absAmount": 90060,
+      "minDate": "2025-04-13",
+      "maxDate": "2025-07-23",
+      "missingEmail": 0,
+      "missingPhone": 6,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 174,
+      "fullPaymentNo": 0,
+      "rawVariants": [
+        "2025 MAS Summer - Camp 2 (July)"
+      ],
+      "couponCount": 19,
+      "topCoupons": [
+        [
+          "PR-CAMP2-TWOWEEKS",
+          {
+            "count": 13,
+            "amount": 5670
+          }
+        ],
+        [
+          "PR-CAMP2-ONEWEEK",
+          {
+            "count": 11,
+            "amount": 2565
+          }
+        ],
+        [
+          "PR-CAMP2-THREEWEEKS",
+          {
+            "count": 7,
+            "amount": 3160
+          }
+        ],
+        [
+          "WAIVED",
+          {
+            "count": 6,
+            "amount": 0
+          }
+        ],
+        [
+          "FA-CAMP2-100",
+          {
+            "count": 5,
+            "amount": 0
+          }
+        ],
+        [
+          "STAFF-CAMP2-CREDIT",
+          {
+            "count": 5,
+            "amount": 0
+          }
+        ],
+        [
+          "TWOWEEKSOFF",
+          {
+            "count": 4,
+            "amount": 1700
+          }
+        ],
+        [
+          "CASH-CAMP2-100",
+          {
+            "count": 3,
+            "amount": 0
+          }
+        ]
+      ],
+      "recurring": {
+        "ONE_TIME": {
+          "count": 174,
+          "amount": 90060
+        }
+      }
+    },
+    {
+      "name": "2026 MAS Summer Camp Two (6/29 - 7/23)",
+      "family": "summer_camp",
+      "year": "2026",
+      "count": 141,
+      "amount": 83417.5,
+      "absAmount": 83417.5,
+      "minDate": "2026-04-21",
+      "maxDate": "2026-07-21",
+      "missingEmail": 0,
+      "missingPhone": 4,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 141,
+      "fullPaymentNo": 0,
+      "rawVariants": [
+        "2026 MAS Summer Camp Two (6/29 - 7/23)"
+      ],
+      "couponCount": 14,
+      "topCoupons": [
+        [
+          "CAMP2-TWOWEEKS",
+          {
+            "count": 8,
+            "amount": 3360
+          }
+        ],
+        [
+          "FA-CAMP2-100",
+          {
+            "count": 8,
+            "amount": 0
+          }
+        ],
+        [
+          "CAMP2-THREEWEEKS",
+          {
+            "count": 6,
+            "amount": 4080
+          }
+        ],
+        [
+          "STAFF-CAMP1-CREDIT",
+          {
+            "count": 4,
+            "amount": 0
+          }
+        ],
+        [
+          "CAMP2-ONEWEEK",
+          {
+            "count": 4,
+            "amount": 1020
+          }
+        ],
+        [
+          "STAFF-CAMP2-50",
+          {
+            "count": 4,
+            "amount": 1700
+          }
+        ],
+        [
+          "MEMBER-SC2-10",
+          {
+            "count": 3,
+            "amount": 1935
+          }
+        ],
+        [
+          "CREDITS-CAMP2-100",
+          {
+            "count": 1,
+            "amount": 0
+          }
+        ]
+      ],
+      "recurring": {
+        "ONE_TIME": {
+          "count": 141,
+          "amount": 83417.5
+        }
+      }
+    },
+    {
+      "name": "Muhsen Sunday School",
+      "family": "sunday_school",
+      "year": null,
+      "count": 46,
+      "amount": 6440,
+      "absAmount": 6440,
+      "minDate": "2024-10-08",
+      "maxDate": "2025-06-03",
+      "missingEmail": 0,
+      "missingPhone": 8,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 0,
+      "fullPaymentNo": 46,
+      "rawVariants": [
+        "Muhsen Sunday School"
+      ],
+      "couponCount": 0,
+      "topCoupons": [],
+      "recurring": {
+        "MONTHLY": {
+          "count": 46,
+          "amount": 6440
+        }
+      }
+    },
+    {
+      "name": "2nd Annual Youth Intensive Summer Camp 2025",
+      "family": "summer_camp",
+      "year": "2025",
+      "count": 33,
+      "amount": 19670,
+      "absAmount": 19670,
+      "minDate": "2025-05-23",
+      "maxDate": "2025-06-22",
+      "missingEmail": 0,
+      "missingPhone": 2,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 33,
+      "fullPaymentNo": 0,
+      "rawVariants": [
+        "2nd Annual Youth Intensive Summer Camp 2025"
+      ],
+      "couponCount": 10,
+      "topCoupons": [
+        [
+          "EARLYBIRD",
+          {
+            "count": 5,
+            "amount": 3950
+          }
+        ],
+        [
+          "CAMPTEACHER",
+          {
+            "count": 4,
+            "amount": 1750
+          }
+        ],
+        [
+          "250",
+          {
+            "count": 1,
+            "amount": 450
+          }
+        ],
+        [
+          "PAYMENT_PLAN",
+          {
+            "count": 1,
+            "amount": 0
+          }
+        ],
+        [
+          "MASMEM",
+          {
+            "count": 1,
+            "amount": 630
+          }
+        ],
+        [
+          "%50OFF",
+          {
+            "count": 1,
+            "amount": 350
+          }
+        ],
+        [
+          "EARLYSTAFF",
+          {
+            "count": 1,
+            "amount": 325
+          }
+        ],
+        [
+          "SIBLING",
+          {
+            "count": 1,
+            "amount": 665
+          }
+        ]
+      ],
+      "recurring": {
+        "ONE_TIME": {
+          "count": 33,
+          "amount": 19670
+        }
+      }
+    },
+    {
+      "name": "3rd Annual Youth Intensive Summer Camp 2026",
+      "family": "summer_camp",
+      "year": "2026",
+      "count": 31,
+      "amount": 15150,
+      "absAmount": 15150,
+      "minDate": "2026-04-30",
+      "maxDate": "2026-06-23",
+      "missingEmail": 0,
+      "missingPhone": 1,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 31,
+      "fullPaymentNo": 0,
+      "rawVariants": [
+        "3rd Annual Youth Intensive Summer Camp 2026"
+      ],
+      "couponCount": 4,
+      "topCoupons": [
+        [
+          "PP-3AYISC26-200",
+          {
+            "count": 3,
+            "amount": 600
+          }
+        ],
+        [
+          "ISC-MASSTAFF-50",
+          {
+            "count": 2,
+            "amount": 750
+          }
+        ],
+        [
+          "FA-3AISC26-300",
+          {
+            "count": 1,
+            "amount": 300
+          }
+        ],
+        [
+          "FA-3AYISC26-100",
+          {
+            "count": 1,
+            "amount": 0
+          }
+        ]
+      ],
+      "recurring": {
+        "ONE_TIME": {
+          "count": 31,
+          "amount": 15150
+        }
+      }
+    },
+    {
+      "name": "Quran 4 Little Hearts 26-27",
+      "family": "qlh",
+      "year": "2026-2027",
+      "count": 25,
+      "amount": 3939,
+      "absAmount": 3939,
+      "minDate": "2026-08-01",
+      "maxDate": "2026-08-28",
+      "missingEmail": 0,
+      "missingPhone": 1,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 0,
+      "fullPaymentNo": 25,
+      "rawVariants": [
+        "Quran 4 Little Hearts 26-27"
+      ],
+      "couponCount": 2,
+      "topCoupons": [
+        [
+          "STAFF-QLH2627-50",
+          {
+            "count": 4,
+            "amount": 295
+          }
+        ],
+        [
+          "FA-QLH2627-SD",
+          {
+            "count": 1,
+            "amount": 29
+          }
+        ]
+      ],
+      "recurring": {
+        "MONTHLY": {
+          "count": 25,
+          "amount": 3939
+        }
+      }
+    },
+    {
+      "name": "Sunday School 26/27",
+      "family": "sunday_school",
+      "year": "2026-2027",
+      "count": 16,
+      "amount": 4742.82,
+      "absAmount": 4742.82,
+      "minDate": "2026-04-12",
+      "maxDate": "2026-04-14",
+      "missingEmail": 0,
+      "missingPhone": 0,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 1,
+      "fullPaymentNo": 14,
+      "rawVariants": [
+        "Sunday School 26/27"
+      ],
+      "couponCount": 2,
+      "topCoupons": [
+        [
+          "50STAFF",
+          {
+            "count": 2,
+            "amount": 234
+          }
+        ],
+        [
+          "TESTING",
+          {
+            "count": 1,
+            "amount": 0
+          }
+        ]
+      ],
+      "recurring": {
+        "ONE_TIME": {
+          "count": 1,
+          "amount": 0
+        },
+        "MONTHLY": {
+          "count": 14,
+          "amount": 2700
+        },
+        "YEARLY": {
+          "count": 1,
+          "amount": 2042.82
+        }
+      }
+    },
+    {
+      "name": "Quran Institure for Ladies 2026-2027",
+      "family": "qil",
+      "year": "2026-2027",
+      "count": 14,
+      "amount": 2275,
+      "absAmount": 2275,
+      "minDate": "2026-06-11",
+      "maxDate": "2026-08-24",
+      "missingEmail": 0,
+      "missingPhone": 4,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 11,
+      "fullPaymentNo": 3,
+      "rawVariants": [
+        "Quran Institure for Ladies 2026-2027"
+      ],
+      "couponCount": 0,
+      "topCoupons": [],
+      "recurring": {
+        "MONTHLY": {
+          "count": 3,
+          "amount": 75
+        },
+        "ONE_TIME": {
+          "count": 11,
+          "amount": 2200
+        }
+      }
+    },
+    {
+      "name": "Special Needs Summer Camp",
+      "family": "summer_camp",
+      "year": null,
+      "count": 3,
+      "amount": 630,
+      "absAmount": 630,
+      "minDate": "2026-05-30",
+      "maxDate": "2026-06-09",
+      "missingEmail": 0,
+      "missingPhone": 0,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 3,
+      "fullPaymentNo": 0,
+      "rawVariants": [
+        "Special Needs Summer Camp"
+      ],
+      "couponCount": 1,
+      "topCoupons": [
+        [
+          "SN-SC1-80",
+          {
+            "count": 1,
+            "amount": 180
+          }
+        ]
+      ],
+      "recurring": {
+        "ONE_TIME": {
+          "count": 3,
+          "amount": 630
+        }
+      }
+    }
+  ],
+  "otherPrograms": [
+    {
+      "name": "Quran Institute for Ladies 2025-2026",
+      "family": "other",
+      "year": null,
+      "count": 151,
+      "amount": 12240,
+      "absAmount": 12240,
+      "minDate": "2025-08-25",
+      "maxDate": "2026-04-06",
+      "missingEmail": 0,
+      "missingPhone": 0,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 26,
+      "fullPaymentNo": 125,
+      "rawVariants": [
+        "Quran Institute for Ladies 2025-2026"
+      ],
+      "couponCount": 4,
+      "topCoupons": [
+        [
+          "RF-QI4L2526-75",
+          {
+            "count": 12,
+            "amount": 850
+          }
+        ],
+        [
+          "FA-QI4L2526-40",
+          {
+            "count": 8,
+            "amount": 240
+          }
+        ],
+        [
+          "HP-QI4L2526-50",
+          {
+            "count": 3,
+            "amount": 600
+          }
+        ],
+        [
+          "FA-QI4L2526-100",
+          {
+            "count": 2,
+            "amount": 0
+          }
+        ]
+      ],
+      "recurring": {
+        "MONTHLY": {
+          "count": 125,
+          "amount": 5940
+        },
+        "ONE_TIME": {
+          "count": 26,
+          "amount": 6300
+        }
+      }
+    },
+    {
+      "name": "Arabic Language Club",
+      "family": "other",
+      "year": null,
+      "count": 127,
+      "amount": 3910,
+      "absAmount": 3910,
+      "minDate": "2024-11-09",
+      "maxDate": "2026-05-06",
+      "missingEmail": 0,
+      "missingPhone": 0,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 2,
+      "fullPaymentNo": 125,
+      "rawVariants": [
+        "Arabic Language Club"
+      ],
+      "couponCount": 0,
+      "topCoupons": [],
+      "recurring": {
+        "MONTHLY": {
+          "count": 125,
+          "amount": 3520
+        },
+        "ONE_TIME": {
+          "count": 2,
+          "amount": 390
+        }
+      }
+    },
+    {
+      "name": "Quranic Arabic Program",
+      "family": "other",
+      "year": null,
+      "count": 105,
+      "amount": 10640,
+      "absAmount": 10640,
+      "minDate": "2024-10-26",
+      "maxDate": "2025-05-22",
+      "missingEmail": 0,
+      "missingPhone": 3,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 1,
+      "fullPaymentNo": 80,
+      "rawVariants": [
+        "Quranic Arabic Program"
+      ],
+      "couponCount": 1,
+      "topCoupons": [
+        [
+          "TEACHER50",
+          {
+            "count": 11,
+            "amount": 330
+          }
+        ]
+      ],
+      "recurring": {
+        "MONTHLY": {
+          "count": 104,
+          "amount": 10184
+        },
+        "ONE_TIME": {
+          "count": 1,
+          "amount": 456
+        }
+      }
+    },
+    {
+      "name": "Quran Institute for Brothers",
+      "family": "other",
+      "year": null,
+      "count": 88,
+      "amount": 8900,
+      "absAmount": 8900,
+      "minDate": "2024-10-20",
+      "maxDate": "2026-08-22",
+      "missingEmail": 0,
+      "missingPhone": 0,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 1,
+      "fullPaymentNo": 87,
+      "rawVariants": [
+        "Quran Institute for Brothers"
+      ],
+      "couponCount": 0,
+      "topCoupons": [],
+      "recurring": {
+        "MONTHLY": {
+          "count": 87,
+          "amount": 8900
+        },
+        "ONE_TIME": {
+          "count": 1,
+          "amount": 0
+        }
+      }
+    },
+    {
+      "name": "Kids Saturday Quranic Arabic Program",
+      "family": "other",
+      "year": null,
+      "count": 86,
+      "amount": 8104,
+      "absAmount": 8104,
+      "minDate": "2025-09-01",
+      "maxDate": "2026-05-02",
+      "missingEmail": 0,
+      "missingPhone": 0,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 1,
+      "fullPaymentNo": 83,
+      "rawVariants": [
+        "Kids Saturday Quranic Arabic Program"
+      ],
+      "couponCount": 1,
+      "topCoupons": [
+        [
+          "SQA-KIDS-40",
+          {
+            "count": 1,
+            "amount": 952
+          }
+        ]
+      ],
+      "recurring": {
+        "MONTHLY": {
+          "count": 85,
+          "amount": 7152
+        },
+        "ONE_TIME": {
+          "count": 1,
+          "amount": 952
+        }
+      }
+    },
+    {
+      "name": "Quranic Arabic Program 2025-2026",
+      "family": "other",
+      "year": null,
+      "count": 79,
+      "amount": 7516,
+      "absAmount": 7516,
+      "minDate": "2025-09-01",
+      "maxDate": "2026-05-01",
+      "missingEmail": 0,
+      "missingPhone": 0,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 1,
+      "fullPaymentNo": 76,
+      "rawVariants": [
+        "Quranic Arabic Program 2025-2026"
+      ],
+      "couponCount": 1,
+      "topCoupons": [
+        [
+          "SQA40",
+          {
+            "count": 1,
+            "amount": 952
+          }
+        ]
+      ],
+      "recurring": {
+        "MONTHLY": {
+          "count": 78,
+          "amount": 6564
+        },
+        "ONE_TIME": {
+          "count": 1,
+          "amount": 952
+        }
+      }
+    },
+    {
+      "name": "Rijaal Age 10-13 (Group 1 - 2nd Year)",
+      "family": "other",
+      "year": null,
+      "count": 70,
+      "amount": 6400,
+      "absAmount": 6400,
+      "minDate": "2025-09-17",
+      "maxDate": "2026-05-18",
+      "missingEmail": 0,
+      "missingPhone": 0,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 1,
+      "fullPaymentNo": 41,
+      "rawVariants": [
+        "Rijaal Age 10-13 (Group 1 - 2nd Year)"
+      ],
+      "couponCount": 0,
+      "topCoupons": [],
+      "recurring": {
+        "MONTHLY": {
+          "count": 69,
+          "amount": 6400
+        },
+        "ONE_TIME": {
+          "count": 1,
+          "amount": 0
+        }
+      }
+    },
+    {
+      "name": "Winter Camp 2025 (Dec 22nd - Jan 1st)",
+      "family": "other",
+      "year": null,
+      "count": 66,
+      "amount": 17908,
+      "absAmount": 17908,
+      "minDate": "2025-12-09",
+      "maxDate": "2025-12-30",
+      "missingEmail": 0,
+      "missingPhone": 3,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 66,
+      "fullPaymentNo": 0,
+      "rawVariants": [
+        "Winter Camp 2025 (Dec 22nd - Jan 1st)"
+      ],
+      "couponCount": 6,
+      "topCoupons": [
+        [
+          "WC1225-ONEWEEK-40",
+          {
+            "count": 5,
+            "amount": 924
+          }
+        ],
+        [
+          "WC1225-CASH-100",
+          {
+            "count": 4,
+            "amount": 0
+          }
+        ],
+        [
+          "WC1225-FA-100",
+          {
+            "count": 3,
+            "amount": 0
+          }
+        ],
+        [
+          "WC1225-2NDWEEK-50",
+          {
+            "count": 2,
+            "amount": 380
+          }
+        ],
+        [
+          "WC1225-MEMBER-10",
+          {
+            "count": 2,
+            "amount": 684
+          }
+        ],
+        [
+          "WC1225-STAFF-100",
+          {
+            "count": 1,
+            "amount": 0
+          }
+        ]
+      ],
+      "recurring": {
+        "ONE_TIME": {
+          "count": 66,
+          "amount": 17908
+        }
+      }
+    },
+    {
+      "name": "Field Trip 6-9 Boys & 6-8 Girls",
+      "family": "other",
+      "year": null,
+      "count": 63,
+      "amount": 1750,
+      "absAmount": 1750,
+      "minDate": "2025-06-21",
+      "maxDate": "2025-06-23",
+      "missingEmail": 0,
+      "missingPhone": 1,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 63,
+      "fullPaymentNo": 0,
+      "rawVariants": [
+        "Field Trip 6-9 Boys & 6-8 Girls"
+      ],
+      "couponCount": 0,
+      "topCoupons": [],
+      "recurring": {
+        "ONE_TIME": {
+          "count": 63,
+          "amount": 1750
+        }
+      }
+    },
+    {
+      "name": "Winter Camp - Ready, Set, Pray",
+      "family": "other",
+      "year": null,
+      "count": 57,
+      "amount": 14856,
+      "absAmount": 14856,
+      "minDate": "2024-12-13",
+      "maxDate": "2024-12-31",
+      "missingEmail": 0,
+      "missingPhone": 1,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 57,
+      "fullPaymentNo": 0,
+      "rawVariants": [
+        "Winter Camp - Ready, Set, Pray"
+      ],
+      "couponCount": 5,
+      "topCoupons": [
+        [
+          "FREE",
+          {
+            "count": 5,
+            "amount": 0
+          }
+        ],
+        [
+          "HALFOFF",
+          {
+            "count": 5,
+            "amount": 595
+          }
+        ],
+        [
+          "%50OFF",
+          {
+            "count": 3,
+            "amount": 395
+          }
+        ],
+        [
+          "%25OFF",
+          {
+            "count": 2,
+            "amount": 585
+          }
+        ],
+        [
+          "MEMBER",
+          {
+            "count": 2,
+            "amount": 531
+          }
+        ]
+      ],
+      "recurring": {
+        "ONE_TIME": {
+          "count": 57,
+          "amount": 14856
+        }
+      }
+    },
+    {
+      "name": "Rijaal Age 10-13 (Group 2 - 1st Year)",
+      "family": "other",
+      "year": null,
+      "count": 55,
+      "amount": 4800,
+      "absAmount": 4800,
+      "minDate": "2025-09-16",
+      "maxDate": "2026-05-15",
+      "missingEmail": 0,
+      "missingPhone": 0,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 0,
+      "fullPaymentNo": 49,
+      "rawVariants": [
+        "Rijaal Age 10-13 (Group 2 - 1st Year)"
+      ],
+      "couponCount": 0,
+      "topCoupons": [],
+      "recurring": {
+        "MONTHLY": {
+          "count": 55,
+          "amount": 4800
+        }
+      }
+    },
+    {
+      "name": "Field Trip 9-14 Girls",
+      "family": "other",
+      "year": null,
+      "count": 55,
+      "amount": 1525,
+      "absAmount": 1525,
+      "minDate": "2025-06-21",
+      "maxDate": "2025-06-24",
+      "missingEmail": 0,
+      "missingPhone": 0,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 55,
+      "fullPaymentNo": 0,
+      "rawVariants": [
+        "Field Trip 9-14 Girls"
+      ],
+      "couponCount": 1,
+      "topCoupons": [
+        [
+          "FA-CAMP1-FT",
+          {
+            "count": 1,
+            "amount": 0
+          }
+        ]
+      ],
+      "recurring": {
+        "ONE_TIME": {
+          "count": 55,
+          "amount": 1525
+        }
+      }
+    },
+    {
+      "name": "Boys Juniors Leadership 7-9",
+      "family": "other",
+      "year": null,
+      "count": 50,
+      "amount": 4400,
+      "absAmount": 4400,
+      "minDate": "2025-01-15",
+      "maxDate": "2025-05-15",
+      "missingEmail": 0,
+      "missingPhone": 0,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 2,
+      "fullPaymentNo": 48,
+      "rawVariants": [
+        "Boys Juniors Leadership 7-9"
+      ],
+      "couponCount": 0,
+      "topCoupons": [],
+      "recurring": {
+        "MONTHLY": {
+          "count": 48,
+          "amount": 4160
+        },
+        "ONE_TIME": {
+          "count": 2,
+          "amount": 240
+        }
+      }
+    },
+    {
+      "name": "Quran Institute Junior (Part Time Hifth)",
+      "family": "qij",
+      "year": null,
+      "count": 48,
+      "amount": 6670,
+      "absAmount": 6670,
+      "minDate": "2025-08-11",
+      "maxDate": "2026-05-01",
+      "missingEmail": 0,
+      "missingPhone": 0,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 0,
+      "fullPaymentNo": 26,
+      "rawVariants": [
+        "Quran Institute Junior (Part Time Hifth)"
+      ],
+      "couponCount": 0,
+      "topCoupons": [],
+      "recurring": {
+        "MONTHLY": {
+          "count": 48,
+          "amount": 6670
+        }
+      }
+    },
+    {
+      "name": "Self-Defense & Taekwondo with Samira: Nov 2025 - Feb 2026",
+      "family": "other",
+      "year": null,
+      "count": 46,
+      "amount": 4550,
+      "absAmount": 4550,
+      "minDate": "2025-10-28",
+      "maxDate": "2026-02-03",
+      "missingEmail": 0,
+      "missingPhone": 4,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 4,
+      "fullPaymentNo": 42,
+      "rawVariants": [
+        "Self-Defense & Taekwondo with Samira: Nov 2025 - Feb 2026"
+      ],
+      "couponCount": 0,
+      "topCoupons": [],
+      "recurring": {
+        "MONTHLY": {
+          "count": 42,
+          "amount": 3900
+        },
+        "ONE_TIME": {
+          "count": 4,
+          "amount": 650
+        }
+      }
+    },
+    {
+      "name": "Quran Institute For Ladies 2026-2027",
+      "family": "other",
+      "year": null,
+      "count": 41,
+      "amount": 6450,
+      "absAmount": 6450,
+      "minDate": "2026-06-11",
+      "maxDate": "2026-08-27",
+      "missingEmail": 0,
+      "missingPhone": 3,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 14,
+      "fullPaymentNo": 27,
+      "rawVariants": [
+        "Quran Institute For Ladies 2026-2027"
+      ],
+      "couponCount": 2,
+      "topCoupons": [
+        [
+          "STAFF-QIL2627-50",
+          {
+            "count": 2,
+            "amount": 200
+          }
+        ],
+        [
+          "FA-QIL2627-100",
+          {
+            "count": 2,
+            "amount": 0
+          }
+        ]
+      ],
+      "recurring": {
+        "ONE_TIME": {
+          "count": 14,
+          "amount": 5125
+        },
+        "MONTHLY": {
+          "count": 27,
+          "amount": 1325
+        }
+      }
+    },
+    {
+      "name": "The Companion Of The Quran",
+      "family": "other",
+      "year": null,
+      "count": 41,
+      "amount": 4572,
+      "absAmount": 4572,
+      "minDate": "2025-11-03",
+      "maxDate": "2026-05-03",
+      "missingEmail": 0,
+      "missingPhone": 0,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 0,
+      "fullPaymentNo": 39,
+      "rawVariants": [
+        "The Companion Of The Quran"
+      ],
+      "couponCount": 1,
+      "topCoupons": [
+        [
+          "FA-TCOTQ",
+          {
+            "count": 7,
+            "amount": 182
+          }
+        ]
+      ],
+      "recurring": {
+        "MONTHLY": {
+          "count": 41,
+          "amount": 4572
+        }
+      }
+    },
+    {
+      "name": "MAS Fall Camp November 2024",
+      "family": "other",
+      "year": null,
+      "count": 41,
+      "amount": 4720.5,
+      "absAmount": 4720.5,
+      "minDate": "2024-11-17",
+      "maxDate": "2024-11-27",
+      "missingEmail": 0,
+      "missingPhone": 1,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 41,
+      "fullPaymentNo": 0,
+      "rawVariants": [
+        "MAS Fall Camp November 2024"
+      ],
+      "couponCount": 3,
+      "topCoupons": [
+        [
+          "ONEDAY",
+          {
+            "count": 3,
+            "amount": 148.5
+          }
+        ],
+        [
+          "NOV50",
+          {
+            "count": 3,
+            "amount": 216
+          }
+        ],
+        [
+          "TEACHER",
+          {
+            "count": 1,
+            "amount": 0
+          }
+        ]
+      ],
+      "recurring": {
+        "ONE_TIME": {
+          "count": 41,
+          "amount": 4720.5
+        }
+      }
+    },
+    {
+      "name": "Self-Defense & Taekwondo with Samira",
+      "family": "other",
+      "year": null,
+      "count": 39,
+      "amount": 3900,
+      "absAmount": 3900,
+      "minDate": "2025-08-01",
+      "maxDate": "2025-11-04",
+      "missingEmail": 0,
+      "missingPhone": 2,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 2,
+      "fullPaymentNo": 37,
+      "rawVariants": [
+        "Self-Defense & Taekwondo with Samira"
+      ],
+      "couponCount": 0,
+      "topCoupons": [],
+      "recurring": {
+        "MONTHLY": {
+          "count": 37,
+          "amount": 3510
+        },
+        "ONE_TIME": {
+          "count": 2,
+          "amount": 390
+        }
+      }
+    },
+    {
+      "name": "MUHSEN",
+      "family": "other",
+      "year": null,
+      "count": 36,
+      "amount": 5040,
+      "absAmount": 5040,
+      "minDate": "2025-09-07",
+      "maxDate": "2026-05-07",
+      "missingEmail": 0,
+      "missingPhone": 9,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 0,
+      "fullPaymentNo": 36,
+      "rawVariants": [
+        "MUHSEN"
+      ],
+      "couponCount": 0,
+      "topCoupons": [],
+      "recurring": {
+        "MONTHLY": {
+          "count": 36,
+          "amount": 5040
+        }
+      }
+    },
+    {
+      "name": "Boys Youth Leadership 10-13",
+      "family": "other",
+      "year": null,
+      "count": 35,
+      "amount": 3200,
+      "absAmount": 3200,
+      "minDate": "2025-01-15",
+      "maxDate": "2025-05-15",
+      "missingEmail": 0,
+      "missingPhone": 2,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 1,
+      "fullPaymentNo": 34,
+      "rawVariants": [
+        "Boys Youth Leadership 10-13"
+      ],
+      "couponCount": 0,
+      "topCoupons": [],
+      "recurring": {
+        "MONTHLY": {
+          "count": 34,
+          "amount": 3040
+        },
+        "ONE_TIME": {
+          "count": 1,
+          "amount": 160
+        }
+      }
+    },
+    {
+      "name": "Quran Institute for Ladies",
+      "family": "other",
+      "year": null,
+      "count": 31,
+      "amount": 5500,
+      "absAmount": 5500,
+      "minDate": "2024-09-24",
+      "maxDate": "2025-02-05",
+      "missingEmail": 0,
+      "missingPhone": 3,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 11,
+      "fullPaymentNo": 18,
+      "rawVariants": [
+        "Quran Institute for Ladies"
+      ],
+      "couponCount": 0,
+      "topCoupons": [],
+      "recurring": {
+        "MONTHLY": {
+          "count": 20,
+          "amount": 2750
+        },
+        "ONE_TIME": {
+          "count": 11,
+          "amount": 2750
+        }
+      }
+    },
+    {
+      "name": "Rijaal Age 14+ (Group 1)",
+      "family": "other",
+      "year": null,
+      "count": 29,
+      "amount": 2960,
+      "absAmount": 2960,
+      "minDate": "2025-09-20",
+      "maxDate": "2026-07-15",
+      "missingEmail": 0,
+      "missingPhone": 0,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 1,
+      "fullPaymentNo": 25,
+      "rawVariants": [
+        "Rijaal Age 14+ (Group 1)"
+      ],
+      "couponCount": 0,
+      "topCoupons": [],
+      "recurring": {
+        "MONTHLY": {
+          "count": 28,
+          "amount": 2960
+        },
+        "ONE_TIME": {
+          "count": 1,
+          "amount": 0
+        }
+      }
+    },
+    {
+      "name": "Fall Camp 2025 (November 24 - 27)",
+      "family": "other",
+      "year": null,
+      "count": 28,
+      "amount": 3500,
+      "absAmount": 3500,
+      "minDate": "2025-11-12",
+      "maxDate": "2025-11-26",
+      "missingEmail": 0,
+      "missingPhone": 1,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 27,
+      "fullPaymentNo": 1,
+      "rawVariants": [
+        "Fall Camp 2025 (November 24 - 27)"
+      ],
+      "couponCount": 4,
+      "topCoupons": [
+        [
+          "FC1125-PT1D-70",
+          {
+            "count": 3,
+            "amount": 90
+          }
+        ],
+        [
+          "FC1125-PT2D-40",
+          {
+            "count": 1,
+            "amount": 60
+          }
+        ],
+        [
+          "FC1125-STAFF-50",
+          {
+            "count": 1,
+            "amount": 50
+          }
+        ],
+        [
+          "FC-PT2D-40",
+          {
+            "count": 1,
+            "amount": 60
+          }
+        ]
+      ],
+      "recurring": {
+        "ONE_TIME": {
+          "count": 27,
+          "amount": 3400
+        },
+        "MONTHLY": {
+          "count": 1,
+          "amount": 100
+        }
+      }
+    },
+    {
+      "name": "Field Trip 4-5 Yrs",
+      "family": "other",
+      "year": null,
+      "count": 28,
+      "amount": 750,
+      "absAmount": 750,
+      "minDate": "2025-06-21",
+      "maxDate": "2025-06-26",
+      "missingEmail": 0,
+      "missingPhone": 0,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 28,
+      "fullPaymentNo": 0,
+      "rawVariants": [
+        "Field Trip 4-5 Yrs"
+      ],
+      "couponCount": 0,
+      "topCoupons": [],
+      "recurring": {
+        "ONE_TIME": {
+          "count": 28,
+          "amount": 750
+        }
+      }
+    },
+    {
+      "name": "Self-Defense & Taekwondo for Women (April - June) 2026",
+      "family": "other",
+      "year": null,
+      "count": 27,
+      "amount": 2470,
+      "absAmount": 2470,
+      "minDate": "2026-04-06",
+      "maxDate": "2026-06-29",
+      "missingEmail": 0,
+      "missingPhone": 1,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 3,
+      "fullPaymentNo": 24,
+      "rawVariants": [
+        "Self-Defense & Taekwondo for Women (April - June) 2026"
+      ],
+      "couponCount": 0,
+      "topCoupons": [],
+      "recurring": {
+        "MONTHLY": {
+          "count": 24,
+          "amount": 1950
+        },
+        "ONE_TIME": {
+          "count": 3,
+          "amount": 520
+        }
+      }
+    },
+    {
+      "name": "Swimming Course 2 - August",
+      "family": "other",
+      "year": null,
+      "count": 26,
+      "amount": 2584,
+      "absAmount": 2584,
+      "minDate": "2025-08-01",
+      "maxDate": "2025-08-14",
+      "missingEmail": 0,
+      "missingPhone": 0,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 26,
+      "fullPaymentNo": 0,
+      "rawVariants": [
+        "Swimming Course 2 - August"
+      ],
+      "couponCount": 1,
+      "topCoupons": [
+        [
+          "RC-SWC2-20",
+          {
+            "count": 10,
+            "amount": 1064
+          }
+        ]
+      ],
+      "recurring": {
+        "ONE_TIME": {
+          "count": 26,
+          "amount": 2584
+        }
+      }
+    },
+    {
+      "name": "Game Night",
+      "family": "other",
+      "year": null,
+      "count": 24,
+      "amount": 240,
+      "absAmount": 240,
+      "minDate": "2024-09-27",
+      "maxDate": "2026-08-27",
+      "missingEmail": 0,
+      "missingPhone": 0,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 0,
+      "fullPaymentNo": 24,
+      "rawVariants": [
+        "Game Night  "
+      ],
+      "couponCount": 0,
+      "topCoupons": [],
+      "recurring": {
+        "MONTHLY": {
+          "count": 24,
+          "amount": 240
+        }
+      }
+    },
+    {
+      "name": "Swimming Course 1 - Boys all ages",
+      "family": "other",
+      "year": null,
+      "count": 20,
+      "amount": 2470,
+      "absAmount": 2470,
+      "minDate": "2025-06-22",
+      "maxDate": "2025-07-29",
+      "missingEmail": 0,
+      "missingPhone": 0,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 20,
+      "fullPaymentNo": 0,
+      "rawVariants": [
+        "Swimming Course 1 - Boys all ages"
+      ],
+      "couponCount": 1,
+      "topCoupons": [
+        [
+          "FA-SWC-100",
+          {
+            "count": 1,
+            "amount": 0
+          }
+        ]
+      ],
+      "recurring": {
+        "ONE_TIME": {
+          "count": 20,
+          "amount": 2470
+        }
+      }
+    },
+    {
+      "name": "Self-Defense & Taekwondo with Samira - Intermediate",
+      "family": "other",
+      "year": null,
+      "count": 20,
+      "amount": 2315,
+      "absAmount": 2315,
+      "minDate": "2024-12-30",
+      "maxDate": "2025-07-07",
+      "missingEmail": 0,
+      "missingPhone": 0,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 7,
+      "fullPaymentNo": 13,
+      "rawVariants": [
+        "Self-Defense & Taekwondo with Samira - Intermediate"
+      ],
+      "couponCount": 1,
+      "topCoupons": [
+        [
+          "50%OFF",
+          {
+            "count": 1,
+            "amount": 75
+          }
+        ]
+      ],
+      "recurring": {
+        "MONTHLY": {
+          "count": 13,
+          "amount": 1040
+        },
+        "ONE_TIME": {
+          "count": 7,
+          "amount": 1275
+        }
+      }
+    },
+    {
+      "name": "Self-Defense & Taekwondo with Samira - Beginner",
+      "family": "other",
+      "year": null,
+      "count": 20,
+      "amount": 1820,
+      "absAmount": 1820,
+      "minDate": "2025-04-07",
+      "maxDate": "2025-07-07",
+      "missingEmail": 0,
+      "missingPhone": 4,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 2,
+      "fullPaymentNo": 18,
+      "rawVariants": [
+        "Self-Defense & Taekwondo with Samira - Beginner"
+      ],
+      "couponCount": 0,
+      "topCoupons": [],
+      "recurring": {
+        "MONTHLY": {
+          "count": 18,
+          "amount": 1560
+        },
+        "ONE_TIME": {
+          "count": 2,
+          "amount": 260
+        }
+      }
+    },
+    {
+      "name": "Rijaal Age 7-9 (Group 1)",
+      "family": "other",
+      "year": null,
+      "count": 18,
+      "amount": 1440,
+      "absAmount": 1440,
+      "minDate": "2025-09-17",
+      "maxDate": "2026-05-15",
+      "missingEmail": 0,
+      "missingPhone": 0,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 0,
+      "fullPaymentNo": 18,
+      "rawVariants": [
+        "Rijaal Age 7-9 (Group 1)"
+      ],
+      "couponCount": 0,
+      "topCoupons": [],
+      "recurring": {
+        "MONTHLY": {
+          "count": 18,
+          "amount": 1440
+        }
+      }
+    },
+    {
+      "name": "الأربعين النووية & متن الأجرومية",
+      "family": "blank",
+      "year": null,
+      "count": 18,
+      "amount": 0,
+      "absAmount": 0,
+      "minDate": "2025-08-27",
+      "maxDate": "2025-09-04",
+      "missingEmail": 0,
+      "missingPhone": 1,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 18,
+      "fullPaymentNo": 0,
+      "rawVariants": [
+        "الأربعين النووية & متن الأجرومية"
+      ],
+      "couponCount": 1,
+      "topCoupons": [
+        [
+          "QI2025-FREE",
+          {
+            "count": 18,
+            "amount": 0
+          }
+        ]
+      ],
+      "recurring": {
+        "ONE_TIME": {
+          "count": 18,
+          "amount": 0
+        }
+      }
+    },
+    {
+      "name": "MAS Fall Camp 2024",
+      "family": "other",
+      "year": null,
+      "count": 17,
+      "amount": 2120,
+      "absAmount": 2120,
+      "minDate": "2024-10-09",
+      "maxDate": "2024-11-14",
+      "missingEmail": 0,
+      "missingPhone": 1,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 10,
+      "fullPaymentNo": 7,
+      "rawVariants": [
+        "MAS Fall Camp 2024"
+      ],
+      "couponCount": 1,
+      "topCoupons": [
+        [
+          "FALL50",
+          {
+            "count": 3,
+            "amount": 200
+          }
+        ]
+      ],
+      "recurring": {
+        "MONTHLY": {
+          "count": 7,
+          "amount": 1040
+        },
+        "ONE_TIME": {
+          "count": 10,
+          "amount": 1080
+        }
+      }
+    },
+    {
+      "name": "Istiqamah Institute",
+      "family": "other",
+      "year": null,
+      "count": 16,
+      "amount": 2200,
+      "absAmount": 2200,
+      "minDate": "2026-08-15",
+      "maxDate": "2026-08-29",
+      "missingEmail": 0,
+      "missingPhone": 0,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 0,
+      "fullPaymentNo": 15,
+      "rawVariants": [
+        "Istiqamah Institute"
+      ],
+      "couponCount": 0,
+      "topCoupons": [],
+      "recurring": {
+        "MONTHLY": {
+          "count": 16,
+          "amount": 2200
+        }
+      }
+    },
+    {
+      "name": "Quranic Arabic - Intensive 3 Day Program",
+      "family": "other",
+      "year": null,
+      "count": 15,
+      "amount": 1213.11,
+      "absAmount": 1213.11,
+      "minDate": "2025-05-14",
+      "maxDate": "2025-07-11",
+      "missingEmail": 0,
+      "missingPhone": 1,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 15,
+      "fullPaymentNo": 0,
+      "rawVariants": [
+        "Quranic Arabic - Intensive 3 Day Program"
+      ],
+      "couponCount": 1,
+      "topCoupons": [
+        [
+          "QA20",
+          {
+            "count": 1,
+            "amount": 13.11
+          }
+        ]
+      ],
+      "recurring": {
+        "ONE_TIME": {
+          "count": 15,
+          "amount": 1213.11
+        }
+      }
+    },
+    {
+      "name": "Self-Defense & Taekwondo for All Levels",
+      "family": "other",
+      "year": null,
+      "count": 8,
+      "amount": 650,
+      "absAmount": 650,
+      "minDate": "2026-08-10",
+      "maxDate": "2026-08-27",
+      "missingEmail": 0,
+      "missingPhone": 0,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 0,
+      "fullPaymentNo": 8,
+      "rawVariants": [
+        "Self-Defense & Taekwondo for All Levels"
+      ],
+      "couponCount": 0,
+      "topCoupons": [],
+      "recurring": {
+        "MONTHLY": {
+          "count": 8,
+          "amount": 650
+        }
+      }
+    },
+    {
+      "name": "Spring Camp",
+      "family": "other",
+      "year": null,
+      "count": 8,
+      "amount": 1225,
+      "absAmount": 1225,
+      "minDate": "2025-03-05",
+      "maxDate": "2025-03-16",
+      "missingEmail": 0,
+      "missingPhone": 0,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 8,
+      "fullPaymentNo": 0,
+      "rawVariants": [
+        "Spring Camp"
+      ],
+      "couponCount": 1,
+      "topCoupons": [
+        [
+          "FREE",
+          {
+            "count": 1,
+            "amount": 0
+          }
+        ]
+      ],
+      "recurring": {
+        "ONE_TIME": {
+          "count": 8,
+          "amount": 1225
+        }
+      }
+    },
+    {
+      "name": "Quran Institute for Ladies 2026-2027",
+      "family": "other",
+      "year": null,
+      "count": 6,
+      "amount": 300,
+      "absAmount": 300,
+      "minDate": "2026-08-17",
+      "maxDate": "2026-08-29",
+      "missingEmail": 0,
+      "missingPhone": 0,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 0,
+      "fullPaymentNo": 6,
+      "rawVariants": [
+        "Quran Institute for Ladies 2026-2027"
+      ],
+      "couponCount": 0,
+      "topCoupons": [],
+      "recurring": {
+        "MONTHLY": {
+          "count": 6,
+          "amount": 300
+        }
+      }
+    },
+    {
+      "name": "QI - Recitation Improvement (June)",
+      "family": "other",
+      "year": null,
+      "count": 6,
+      "amount": 900,
+      "absAmount": 900,
+      "minDate": "2026-05-30",
+      "maxDate": "2026-05-31",
+      "missingEmail": 0,
+      "missingPhone": 0,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 6,
+      "fullPaymentNo": 0,
+      "rawVariants": [
+        "QI - Recitation Improvement (June)"
+      ],
+      "couponCount": 0,
+      "topCoupons": [],
+      "recurring": {
+        "ONE_TIME": {
+          "count": 6,
+          "amount": 900
+        }
+      }
+    },
+    {
+      "name": "Self-Defense & Taekwondo with Samira - Beginners",
+      "family": "other",
+      "year": null,
+      "count": 6,
+      "amount": 1200,
+      "absAmount": 1200,
+      "minDate": "2024-12-18",
+      "maxDate": "2025-01-22",
+      "missingEmail": 0,
+      "missingPhone": 1,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 6,
+      "fullPaymentNo": 0,
+      "rawVariants": [
+        "Self-Defense & Taekwondo with Samira - Beginners"
+      ],
+      "couponCount": 0,
+      "topCoupons": [],
+      "recurring": {
+        "ONE_TIME": {
+          "count": 6,
+          "amount": 1200
+        }
+      }
+    },
+    {
+      "name": "Quran Institute For Ladies",
+      "family": "other",
+      "year": null,
+      "count": 6,
+      "amount": 2700,
+      "absAmount": 2700,
+      "minDate": "2024-10-06",
+      "maxDate": "2024-11-13",
+      "missingEmail": 0,
+      "missingPhone": 0,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 6,
+      "fullPaymentNo": 0,
+      "rawVariants": [
+        "Quran Institute For Ladies"
+      ],
+      "couponCount": 0,
+      "topCoupons": [],
+      "recurring": {
+        "ONE_TIME": {
+          "count": 6,
+          "amount": 2700
+        }
+      }
+    },
+    {
+      "name": "Quran Institute Junior 26-27",
+      "family": "qij",
+      "year": "2026-2027",
+      "count": 5,
+      "amount": 687.5,
+      "absAmount": 687.5,
+      "minDate": "2026-08-14",
+      "maxDate": "2026-08-29",
+      "missingEmail": 0,
+      "missingPhone": 0,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 0,
+      "fullPaymentNo": 5,
+      "rawVariants": [
+        "Quran Institute Junior 26-27"
+      ],
+      "couponCount": 1,
+      "topCoupons": [
+        [
+          "STAFF-QLH2627-50",
+          {
+            "count": 1,
+            "amount": 97.5
+          }
+        ]
+      ],
+      "recurring": {
+        "MONTHLY": {
+          "count": 5,
+          "amount": 687.5
+        }
+      }
+    },
+    {
+      "name": "QI - Recitation Improvement (July)",
+      "family": "other",
+      "year": null,
+      "count": 4,
+      "amount": 600,
+      "absAmount": 600,
+      "minDate": "2026-06-22",
+      "maxDate": "2026-06-30",
+      "missingEmail": 0,
+      "missingPhone": 1,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 4,
+      "fullPaymentNo": 0,
+      "rawVariants": [
+        "QI - Recitation Improvement (July)"
+      ],
+      "couponCount": 0,
+      "topCoupons": [],
+      "recurring": {
+        "ONE_TIME": {
+          "count": 4,
+          "amount": 600
+        }
+      }
+    },
+    {
+      "name": "The Companion of The Quran 26-27",
+      "family": "other",
+      "year": null,
+      "count": 3,
+      "amount": 250,
+      "absAmount": 250,
+      "minDate": "2026-08-01",
+      "maxDate": "2026-08-16",
+      "missingEmail": 0,
+      "missingPhone": 1,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 0,
+      "fullPaymentNo": 3,
+      "rawVariants": [
+        "The Companion of The Quran 26-27"
+      ],
+      "couponCount": 1,
+      "topCoupons": [
+        [
+          "STAFF-TCQ2627-50",
+          {
+            "count": 1,
+            "amount": 50
+          }
+        ]
+      ],
+      "recurring": {
+        "MONTHLY": {
+          "count": 3,
+          "amount": 250
+        }
+      }
+    },
+    {
+      "name": "Zoom Arabic Intensive 1B, and 1C",
+      "family": "other",
+      "year": null,
+      "count": 3,
+      "amount": 529,
+      "absAmount": 529,
+      "minDate": "2025-08-07",
+      "maxDate": "2025-08-12",
+      "missingEmail": 0,
+      "missingPhone": 0,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 3,
+      "fullPaymentNo": 0,
+      "rawVariants": [
+        "Zoom Arabic Intensive 1B, and 1C"
+      ],
+      "couponCount": 0,
+      "topCoupons": [],
+      "recurring": {
+        "ONE_TIME": {
+          "count": 3,
+          "amount": 529
+        }
+      }
+    },
+    {
+      "name": "Zoom Quranic Arabic Intensive December",
+      "family": "other",
+      "year": null,
+      "count": 2,
+      "amount": 240,
+      "absAmount": 240,
+      "minDate": "2025-12-13",
+      "maxDate": "2025-12-13",
+      "missingEmail": 0,
+      "missingPhone": 0,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 2,
+      "fullPaymentNo": 0,
+      "rawVariants": [
+        "Zoom Quranic Arabic Intensive December"
+      ],
+      "couponCount": 0,
+      "topCoupons": [],
+      "recurring": {
+        "ONE_TIME": {
+          "count": 2,
+          "amount": 240
+        }
+      }
+    },
+    {
+      "name": "Zoom Arabic Intensive 1C",
+      "family": "other",
+      "year": null,
+      "count": 2,
+      "amount": 120,
+      "absAmount": 120,
+      "minDate": "2025-08-08",
+      "maxDate": "2025-08-30",
+      "missingEmail": 0,
+      "missingPhone": 0,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 2,
+      "fullPaymentNo": 0,
+      "rawVariants": [
+        "Zoom Arabic Intensive 1C"
+      ],
+      "couponCount": 0,
+      "topCoupons": [],
+      "recurring": {
+        "ONE_TIME": {
+          "count": 2,
+          "amount": 120
+        }
+      }
+    },
+    {
+      "name": "Self-Defense & Taekwondo with Samira Intermediate Class",
+      "family": "other",
+      "year": null,
+      "count": 2,
+      "amount": 450,
+      "absAmount": 450,
+      "minDate": "2024-10-28",
+      "maxDate": "2024-10-29",
+      "missingEmail": 0,
+      "missingPhone": 0,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 2,
+      "fullPaymentNo": 0,
+      "rawVariants": [
+        "Self-Defense & Taekwondo with Samira Intermediate Class"
+      ],
+      "couponCount": 0,
+      "topCoupons": [],
+      "recurring": {
+        "ONE_TIME": {
+          "count": 2,
+          "amount": 450
+        }
+      }
+    },
+    {
+      "name": "Ages 9-99 Qur’anic Arabic Summer Intensive on Zoom",
+      "family": "other",
+      "year": null,
+      "count": 1,
+      "amount": 165,
+      "absAmount": 165,
+      "minDate": "2026-06-06",
+      "maxDate": "2026-06-06",
+      "missingEmail": 0,
+      "missingPhone": 0,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 0,
+      "fullPaymentNo": 1,
+      "rawVariants": [
+        "Ages 9-99 Qur’anic Arabic Summer Intensive on Zoom"
+      ],
+      "couponCount": 0,
+      "topCoupons": [],
+      "recurring": {
+        "MONTHLY": {
+          "count": 1,
+          "amount": 165
+        }
+      }
+    },
+    {
+      "name": "Kids Arabic Reading & Writing Summer Program",
+      "family": "other",
+      "year": null,
+      "count": 1,
+      "amount": 200,
+      "absAmount": 200,
+      "minDate": "2026-05-30",
+      "maxDate": "2026-05-30",
+      "missingEmail": 0,
+      "missingPhone": 0,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 1,
+      "fullPaymentNo": 0,
+      "rawVariants": [
+        "Kids Arabic Reading & Writing Summer Program"
+      ],
+      "couponCount": 0,
+      "topCoupons": [],
+      "recurring": {
+        "ONE_TIME": {
+          "count": 1,
+          "amount": 200
+        }
+      }
+    },
+    {
+      "name": "Summer Hifth Review Program (Ages 8–16)",
+      "family": "other",
+      "year": null,
+      "count": 1,
+      "amount": 100,
+      "absAmount": 100,
+      "minDate": "2026-05-30",
+      "maxDate": "2026-05-30",
+      "missingEmail": 0,
+      "missingPhone": 0,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 1,
+      "fullPaymentNo": 0,
+      "rawVariants": [
+        "Summer Hifth Review Program (Ages 8–16)"
+      ],
+      "couponCount": 0,
+      "topCoupons": [],
+      "recurring": {
+        "ONE_TIME": {
+          "count": 1,
+          "amount": 100
+        }
+      }
+    },
+    {
+      "name": "Middle School Girls Soccor",
+      "family": "other",
+      "year": null,
+      "count": 1,
+      "amount": 100,
+      "absAmount": 100,
+      "minDate": "2025-08-15",
+      "maxDate": "2025-08-15",
+      "missingEmail": 0,
+      "missingPhone": 0,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 0,
+      "fullPaymentNo": 1,
+      "rawVariants": [
+        "Middle School Girls Soccor"
+      ],
+      "couponCount": 0,
+      "topCoupons": [],
+      "recurring": {
+        "MONTHLY": {
+          "count": 1,
+          "amount": 100
+        }
+      }
+    },
+    {
+      "name": "Zoom Arabic Intensive Book 1A",
+      "family": "other",
+      "year": null,
+      "count": 1,
+      "amount": 120,
+      "absAmount": 120,
+      "minDate": "2025-08-09",
+      "maxDate": "2025-08-09",
+      "missingEmail": 0,
+      "missingPhone": 0,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 1,
+      "fullPaymentNo": 0,
+      "rawVariants": [
+        "Zoom Arabic Intensive Book 1A"
+      ],
+      "couponCount": 0,
+      "topCoupons": [],
+      "recurring": {
+        "ONE_TIME": {
+          "count": 1,
+          "amount": 120
+        }
+      }
+    },
+    {
+      "name": "Zoom Arabic Intensive 1B",
+      "family": "other",
+      "year": null,
+      "count": 1,
+      "amount": 120,
+      "absAmount": 120,
+      "minDate": "2025-08-08",
+      "maxDate": "2025-08-08",
+      "missingEmail": 0,
+      "missingPhone": 0,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 1,
+      "fullPaymentNo": 0,
+      "rawVariants": [
+        "Zoom Arabic Intensive 1B"
+      ],
+      "couponCount": 0,
+      "topCoupons": [],
+      "recurring": {
+        "ONE_TIME": {
+          "count": 1,
+          "amount": 120
+        }
+      }
+    },
+    {
+      "name": "Self-Defense & Taekwondo with Samira Beginner’s Class",
+      "family": "other",
+      "year": null,
+      "count": 1,
+      "amount": 150,
+      "absAmount": 150,
+      "minDate": "2024-09-25",
+      "maxDate": "2024-09-25",
+      "missingEmail": 0,
+      "missingPhone": 0,
+      "missingRemarks": 0,
+      "noMembers": 0,
+      "fullPaymentYes": 1,
+      "fullPaymentNo": 0,
+      "rawVariants": [
+        "Self-Defense & Taekwondo with Samira Beginner’s Class"
+      ],
+      "couponCount": 0,
+      "topCoupons": [],
+      "recurring": {
+        "ONE_TIME": {
+          "count": 1,
+          "amount": 150
+        }
+      }
+    }
+  ],
+  "issueCounts": {
+    "missingAmount": 0,
+    "zeroAmount": 112,
+    "negativeAmount": 0,
+    "missingName": 0,
+    "missingEmail": 0,
+    "missingPhone": 114,
+    "missingProgram": 0,
+    "missingTxnDate": 0,
+    "unparseableTxnDate": 0,
+    "missingRemarks": 0,
+    "remarksNoMembers": 0,
+    "amountVsFeesMismatch": 400,
+    "trailingSpacesProgram": 24,
+    "likelyTypos": 14
+  },
+  "internalExactDupes": 12,
+  "internalExactDupeRows": 24,
+  "internalDupeSample": [
+    {
+      "key": "noha.el.hendy85@gmail.com|50|2026-08-17|quran institute for ladies 2026 2027|noha abdellatif",
+      "rows": [
+        {
+          "rowNumber": 41,
+          "name": "Noha Abdellatif",
+          "email": "noha.el.hendy85@gmail.com",
+          "amount": 50,
+          "date": "2026-08-17",
+          "program": "Quran Institute for Ladies 2026-2027"
+        },
+        {
+          "rowNumber": 44,
+          "name": "Noha Abdellatif",
+          "email": "noha.el.hendy85@gmail.com",
+          "amount": 50,
+          "date": "2026-08-17",
+          "program": "Quran Institute For Ladies 2026-2027"
+        }
+      ]
+    },
+    {
+      "key": "sarahammad4651410@gmail.com|100|2026-06-29|quran 4 little hearts 25 26|sultan mostafa al araj",
+      "rows": [
+        {
+          "rowNumber": 155,
+          "name": "Mustafa Akram Al araj",
+          "email": "sarahammad4651410@gmail.com",
+          "amount": 100,
+          "date": "2026-06-29",
+          "program": "Quran 4 Little Hearts 25-26"
+        },
+        {
+          "rowNumber": 156,
+          "name": "Mustafa Akram Al araj",
+          "email": "sarahammad4651410@gmail.com",
+          "amount": 100,
+          "date": "2026-06-29",
+          "program": "Quran 4 Little Hearts 25-26"
+        }
+      ]
+    },
+    {
+      "key": "rabeeyay99@gmail.com|80|2026-04-01|rijaal age 10 13 group 1 2nd year|maahib hussain",
+      "rows": [
+        {
+          "rowNumber": 825,
+          "name": "Rabeeya Hussain",
+          "email": "rabeeyay99@gmail.com",
+          "amount": 80,
+          "date": "2026-04-01",
+          "program": "Rijaal Age 10-13 (Group 1 - 2nd Year)"
+        },
+        {
+          "rowNumber": 826,
+          "name": "Rabeeya Hussain",
+          "email": "rabeeyay99@gmail.com",
+          "amount": 80,
+          "date": "2026-04-01",
+          "program": "Rijaal Age 10-13 (Group 1 - 2nd Year)"
+        }
+      ]
+    },
+    {
+      "key": "batoolawwad87@gmail.com|10|2025-10-17|sunday school lunch ticket|omar khalil",
+      "rows": [
+        {
+          "rowNumber": 2367,
+          "name": "Batool Abu darwish",
+          "email": "batoolawwad87@gmail.com",
+          "amount": 10,
+          "date": "2025-10-17",
+          "program": "Sunday School Lunch Ticket"
+        },
+        {
+          "rowNumber": 2369,
+          "name": "Batool Abu darwish",
+          "email": "batoolawwad87@gmail.com",
+          "amount": 10,
+          "date": "2025-10-17",
+          "program": "Sunday School Lunch Ticket"
+        }
+      ]
+    },
+    {
+      "key": "eng.hesham.hussien@gmail.com|20|2025-10-17|sunday school lunch ticket|maryam mohamed yassin hesham mohammed",
+      "rows": [
+        {
+          "rowNumber": 2368,
+          "name": "Esraa Adel Hassan",
+          "email": "eng.hesham.hussien@gmail.com",
+          "amount": 20,
+          "date": "2025-10-17",
+          "program": "Sunday School Lunch Ticket"
+        },
+        {
+          "rowNumber": 2370,
+          "name": "Esraa Adel Hassan",
+          "email": "eng.hesham.hussien@gmail.com",
+          "amount": 20,
+          "date": "2025-10-17",
+          "program": "Sunday School Lunch Ticket"
+        }
+      ]
+    },
+    {
+      "key": "hudagadid@gmail.com|114|2025-10-03|kids saturday quranic arabic program|ameera abdallah hidaya abdallah",
+      "rows": [
+        {
+          "rowNumber": 2422,
+          "name": "Huda Gadid",
+          "email": "hudagadid@gmail.com",
+          "amount": 114,
+          "date": "2025-10-03",
+          "program": "Kids Saturday Quranic Arabic Program"
+        },
+        {
+          "rowNumber": 2423,
+          "name": "Huda Gadid",
+          "email": "hudagadid@gmail.com",
+          "amount": 114,
+          "date": "2025-10-03",
+          "program": "Kids Saturday Quranic Arabic Program"
+        }
+      ]
+    },
+    {
+      "key": "arooj.b@gmail.com|50|2025-09-16|quran institute for ladies 2025 2026|arooj butt",
+      "rows": [
+        {
+          "rowNumber": 2688,
+          "name": "Arooj Butt",
+          "email": "arooj.b@gmail.com",
+          "amount": 50,
+          "date": "2025-09-16",
+          "program": "Quran Institute for Ladies 2025-2026"
+        },
+        {
+          "rowNumber": 2689,
+          "name": "Arooj Butt",
+          "email": "arooj.b@gmail.com",
+          "amount": 50,
+          "date": "2025-09-16",
+          "program": "Quran Institute for Ladies 2025-2026"
+        }
+      ]
+    },
+    {
+      "key": "awadalla.fatima@yahoo.com|400|2025-06-30|2025 mas summer camp 2 july|nadeen hassan",
+      "rows": [
+        {
+          "rowNumber": 3096,
+          "name": "Fatima Awadalla",
+          "email": "awadalla.fatima@yahoo.com",
+          "amount": 400,
+          "date": "2025-06-30",
+          "program": "2025 MAS Summer - Camp 2 (July)"
+        },
+        {
+          "rowNumber": 3097,
+          "name": "Fatima Awadalla",
+          "email": "awadalla.fatima@yahoo.com",
+          "amount": 400,
+          "date": "2025-06-30",
+          "program": "2025 MAS Summer - Camp 2 (July)"
+        }
+      ]
+    },
+    {
+      "key": "alaasoccer@yahoo.com|20|2025-04-25|arabic language club|eleen abukhait",
+      "rows": [
+        {
+          "rowNumber": 3774,
+          "name": "Alaa Hafez",
+          "email": "alaasoccer@yahoo.com",
+          "amount": 20,
+          "date": "2025-04-25",
+          "program": "Arabic Language Club"
+        },
+        {
+          "rowNumber": 3775,
+          "name": "Alaa Hafez",
+          "email": "alaasoccer@yahoo.com",
+          "amount": 20,
+          "date": "2025-04-25",
+          "program": "Arabic Language Club"
+        }
+      ]
+    },
+    {
+      "key": "zeinabafifi2015@gmail.com|80|2025-03-17|boys juniors leadership 7 9|mohammad sammy afifi",
+      "rows": [
+        {
+          "rowNumber": 3970,
+          "name": "Reham El Sayed Ahmed Ismail Afifi",
+          "email": "zeinabafifi2015@gmail.com",
+          "amount": 80,
+          "date": "2025-03-17",
+          "program": "Boys Juniors Leadership 7-9"
+        },
+        {
+          "rowNumber": 3971,
+          "name": "Reham El Sayed Ahmed Ismail Afifi",
+          "email": "zeinabafifi2015@gmail.com",
+          "amount": 80,
+          "date": "2025-03-17",
+          "program": "Boys Juniors Leadership 7-9"
+        }
+      ]
+    },
+    {
+      "key": "batoolawwad87@gmail.com|120|2025-03-17|2024 2025 sunday school boys girls|omar khalil",
+      "rows": [
+        {
+          "rowNumber": 3972,
+          "name": "Batool Abu darwish",
+          "email": "batoolawwad87@gmail.com",
+          "amount": 120,
+          "date": "2025-03-17",
+          "program": "2024/2025 Sunday School (Boys & Girls)"
+        },
+        {
+          "rowNumber": 3973,
+          "name": "Batool Abu darwish",
+          "email": "batoolawwad87@gmail.com",
+          "amount": 120,
+          "date": "2025-03-17",
+          "program": "2024/2025 Sunday School (Boys & Girls)"
+        }
+      ]
+    },
+    {
+      "key": "rabeeakc@gmail.com|204|2025-02-26|quranic arabic program|rabeea khalid choudhary mustafa maqbool daanya maqbool rania maqbool maryam mustafa",
+      "rows": [
+        {
+          "rowNumber": 4095,
+          "name": "Rabeea Khalid Choudhary",
+          "email": "rabeeakc@gmail.com",
+          "amount": 204,
+          "date": "2025-02-26",
+          "program": "Quranic Arabic Program"
+        },
+        {
+          "rowNumber": 4096,
+          "name": "Rabeea Khalid Choudhary",
+          "email": "rabeeakc@gmail.com",
+          "amount": 204,
+          "date": "2025-02-26",
+          "program": "Quranic Arabic Program"
+        }
+      ]
+    }
+  ],
+  "sampleTypos": [
+    {
+      "rowNumber": 16,
+      "program": "Quran Institure for Ladies 2026-2027",
+      "name": "Abeer Zoubi",
+      "email": "smm495@hotmail.com"
+    },
+    {
+      "rowNumber": 47,
+      "program": "Quran Institure for Ladies 2026-2027",
+      "name": "Nada Saleh",
+      "email": "nada12ali@gmail.com"
+    },
+    {
+      "rowNumber": 53,
+      "program": "Quran Institure for Ladies 2026-2027",
+      "name": "Fatema Odeh",
+      "email": "newfastlink@yahoo.com"
+    },
+    {
+      "rowNumber": 60,
+      "program": "Quran Institure for Ladies 2026-2027",
+      "name": "wafa yerrou",
+      "email": "wafayerrou@gmail.com"
+    },
+    {
+      "rowNumber": 82,
+      "program": "Quran Institure for Ladies 2026-2027",
+      "name": "Mona Alnaeemi",
+      "email": "mona1137@yahoo.com"
+    },
+    {
+      "rowNumber": 90,
+      "program": "Quran Institure for Ladies 2026-2027",
+      "name": "Zainab Irshaid",
+      "email": "zainab.irshaid@gmail.com"
+    },
+    {
+      "rowNumber": 94,
+      "program": "Quran Institure for Ladies 2026-2027",
+      "name": "Nagham Issa",
+      "email": "nagham.t.issa@gmail.com"
+    },
+    {
+      "rowNumber": 95,
+      "program": "Quran Institure for Ladies 2026-2027",
+      "name": "Heba Hassan",
+      "email": "heba1987hassan@gmail.com"
+    },
+    {
+      "rowNumber": 99,
+      "program": "Quran Institure for Ladies 2026-2027",
+      "name": "Enas Elsaegh",
+      "email": "eelsaegh@gmail.com"
+    },
+    {
+      "rowNumber": 143,
+      "program": "Quran Institure for Ladies 2026-2027",
+      "name": "Heba El Manawy",
+      "email": "elmanawyheba78@gmail.com"
+    },
+    {
+      "rowNumber": 216,
+      "program": "Quran Institure for Ladies 2026-2027",
+      "name": "Imene Latreche",
+      "email": "imene_17@hotmail.com"
+    },
+    {
+      "rowNumber": 233,
+      "program": "Quran Institure for Ladies 2026-2027",
+      "name": "Iman Ettabaq",
+      "email": "emybaq81@hotmail.fr"
+    },
+    {
+      "rowNumber": 235,
+      "program": "Quran Institure for Ladies 2026-2027",
+      "name": "Soumia B Bouhlal",
+      "email": "bsoumia@hotmail.com"
+    },
+    {
+      "rowNumber": 246,
+      "program": "Quran Institure for Ladies 2026-2027",
+      "name": "Sara Kenana",
+      "email": "saralifecoach20@gmail.com"
+    }
+  ],
+  "sampleMismatch": [
+    {
+      "rowNumber": 5,
+      "amount": 50,
+      "feesSum": 144.5,
+      "couponSum": 70,
+      "expectedNet": 74.5,
+      "program": "Quran 4 Little Hearts 26-27",
+      "name": "Esraa Ahmed",
+      "members": [
+        "Hana Ahmed."
+      ]
+    },
+    {
+      "rowNumber": 10,
+      "amount": 145,
+      "feesSum": 410,
+      "couponSum": 205,
+      "expectedNet": 205,
+      "program": "Quran 4 Little Hearts 26-27",
+      "name": "Nour Daghstani",
+      "members": [
+        "Hanan Abbas",
+        "Jana Abbas",
+        "Omar Abbas."
+      ]
+    },
+    {
+      "rowNumber": 12,
+      "amount": 97.5,
+      "feesSum": 277,
+      "couponSum": 137.5,
+      "expectedNet": 139.5,
+      "program": "Quran Institute Junior 26-27",
+      "name": "Abdelrahman Afifi",
+      "members": [
+        "Jana Afifi",
+        "Lujain Afifi."
+      ]
+    },
+    {
+      "rowNumber": 23,
+      "amount": 50,
+      "feesSum": 140,
+      "couponSum": 70,
+      "expectedNet": 70,
+      "program": "Quran 4 Little Hearts 26-27",
+      "name": "Abdelrahman Afifi",
+      "members": [
+        "Lina Afifi."
+      ]
+    },
+    {
+      "rowNumber": 60,
+      "amount": 200,
+      "feesSum": 225,
+      "couponSum": 0,
+      "expectedNet": 225,
+      "program": "Quran Institure for Ladies 2026-2027",
+      "name": "wafa yerrou",
+      "members": [
+        "wafa yerrou"
+      ]
+    },
+    {
+      "rowNumber": 61,
+      "amount": 400,
+      "feesSum": 450,
+      "couponSum": 0,
+      "expectedNet": 450,
+      "program": "Quran Institute For Ladies 2026-2027",
+      "name": "Sarfraz Amin",
+      "members": [
+        "Israa Alaomairi"
+      ]
+    },
+    {
+      "rowNumber": 63,
+      "amount": 50,
+      "feesSum": 141,
+      "couponSum": 70,
+      "expectedNet": 71,
+      "program": "The Companion of The Quran 26-27",
+      "name": "Hanan Ahmed",
+      "members": [
+        "Azhar Ahmed."
+      ]
+    },
+    {
+      "rowNumber": 64,
+      "amount": 50,
+      "feesSum": 140,
+      "couponSum": 70,
+      "expectedNet": 70,
+      "program": "Quran 4 Little Hearts 26-27",
+      "name": "Hanan Ahmed",
+      "members": [
+        "Haneen Ahmed."
+      ]
+    },
+    {
+      "rowNumber": 82,
+      "amount": 200,
+      "feesSum": 225,
+      "couponSum": 0,
+      "expectedNet": 225,
+      "program": "Quran Institure for Ladies 2026-2027",
+      "name": "Mona Alnaeemi",
+      "members": [
+        "Mona Alnaeemi"
+      ]
+    },
+    {
+      "rowNumber": 83,
+      "amount": 175,
+      "feesSum": 450,
+      "couponSum": 225,
+      "expectedNet": 225,
+      "program": "Quran Institute For Ladies 2026-2027",
+      "name": "Hanan Ahmed",
+      "members": [
+        "Anhar Ahmed"
+      ]
+    },
+    {
+      "rowNumber": 90,
+      "amount": 200,
+      "feesSum": 225,
+      "couponSum": 0,
+      "expectedNet": 225,
+      "program": "Quran Institure for Ladies 2026-2027",
+      "name": "Zainab Irshaid",
+      "members": [
+        "Zainab Irshaid"
+      ]
+    },
+    {
+      "rowNumber": 91,
+      "amount": 400,
+      "feesSum": 450,
+      "couponSum": 0,
+      "expectedNet": 450,
+      "program": "Quran Institute For Ladies 2026-2027",
+      "name": "Zainab Irshaid",
+      "members": [
+        "Zainab Irshaid"
+      ]
+    },
+    {
+      "rowNumber": 93,
+      "amount": 400,
+      "feesSum": 450,
+      "couponSum": 0,
+      "expectedNet": 450,
+      "program": "Quran Institute For Ladies 2026-2027",
+      "name": "Marwa Taissir Elgamal",
+      "members": [
+        "Marwa Taissir Elgamal"
+      ]
+    },
+    {
+      "rowNumber": 94,
+      "amount": 200,
+      "feesSum": 225,
+      "couponSum": 0,
+      "expectedNet": 225,
+      "program": "Quran Institure for Ladies 2026-2027",
+      "name": "Nagham Issa",
+      "members": [
+        "Nagham Issa"
+      ]
+    },
+    {
+      "rowNumber": 95,
+      "amount": 200,
+      "feesSum": 225,
+      "couponSum": 0,
+      "expectedNet": 225,
+      "program": "Quran Institure for Ladies 2026-2027",
+      "name": "Heba Hassan",
+      "members": [
+        "Heba Hassan"
+      ]
+    },
+    {
+      "rowNumber": 99,
+      "amount": 200,
+      "feesSum": 225,
+      "couponSum": 0,
+      "expectedNet": 225,
+      "program": "Quran Institure for Ladies 2026-2027",
+      "name": "Enas Elsaegh",
+      "members": [
+        "Enas Elsaegh"
+      ]
+    },
+    {
+      "rowNumber": 102,
+      "amount": 400,
+      "feesSum": 450,
+      "couponSum": 0,
+      "expectedNet": 450,
+      "program": "Quran Institute For Ladies 2026-2027",
+      "name": "NoorElaine Abushaaban",
+      "members": [
+        "NoorElaine Abushaaban"
+      ]
+    },
+    {
+      "rowNumber": 114,
+      "amount": 400,
+      "feesSum": 450,
+      "couponSum": 0,
+      "expectedNet": 450,
+      "program": "Quran Institute For Ladies 2026-2027",
+      "name": "Iman Elghandour",
+      "members": [
+        "Iman Elghandour"
+      ]
+    },
+    {
+      "rowNumber": 117,
+      "amount": 255,
+      "feesSum": 940,
+      "couponSum": 595,
+      "expectedNet": 345,
+      "program": "2026 MAS Summer Camp Two (6/29 - 7/23)",
+      "name": "Yaser Radwan",
+      "members": [
+        "Zayn Radwan",
+        "Adam Radwan"
+      ]
+    },
+    {
+      "rowNumber": 143,
+      "amount": 200,
+      "feesSum": 225,
+      "couponSum": 0,
+      "expectedNet": 225,
+      "program": "Quran Institure for Ladies 2026-2027",
+      "name": "Heba El Manawy",
+      "members": [
+        "Heba El Manawy"
+      ]
+    },
+    {
+      "rowNumber": 144,
+      "amount": 400,
+      "feesSum": 450,
+      "couponSum": 0,
+      "expectedNet": 450,
+      "program": "Quran Institute For Ladies 2026-2027",
+      "name": "Heba El Manawy",
+      "members": [
+        "Heba El Manawy"
+      ]
+    },
+    {
+      "rowNumber": 216,
+      "amount": 200,
+      "feesSum": 225,
+      "couponSum": 0,
+      "expectedNet": 225,
+      "program": "Quran Institure for Ladies 2026-2027",
+      "name": "Imene Latreche",
+      "members": [
+        "Imene Latreche"
+      ]
+    },
+    {
+      "rowNumber": 232,
+      "amount": 400,
+      "feesSum": 450,
+      "couponSum": 0,
+      "expectedNet": 450,
+      "program": "Quran Institute For Ladies 2026-2027",
+      "name": "Beyza Sahin",
+      "members": [
+        "Beyza Sahin"
+      ]
+    },
+    {
+      "rowNumber": 233,
+      "amount": 200,
+      "feesSum": 225,
+      "couponSum": 0,
+      "expectedNet": 225,
+      "program": "Quran Institure for Ladies 2026-2027",
+      "name": "Iman Ettabaq",
+      "members": [
+        "Iman Ettabaq"
+      ]
+    },
+    {
+      "rowNumber": 235,
+      "amount": 200,
+      "feesSum": 225,
+      "couponSum": 0,
+      "expectedNet": 225,
+      "program": "Quran Institure for Ladies 2026-2027",
+      "name": "Soumia B Bouhlal",
+      "members": [
+        "Soumia B Bouhlal"
+      ]
+    }
+  ],
+  "sampleNoMembers": [],
+  "sampleNeg": [],
+  "sampleZero": [
+    {
+      "rowNumber": 59,
+      "program": "Quran Institute For Ladies 2026-2027",
+      "name": "Reda Hussain Elkomy",
+      "email": "rhelkomy@mm.st"
+    },
+    {
+      "rowNumber": 62,
+      "program": "Quran Institute For Ladies 2026-2027",
+      "name": "Asmaa Ali",
+      "email": "m.asmaa0216@gmail.com"
+    },
+    {
+      "rowNumber": 116,
+      "program": "2026 MAS Summer Camp Two (6/29 - 7/23)",
+      "name": "Israt Jahan",
+      "email": "israt16_jahan@yahoo.com"
+    },
+    {
+      "rowNumber": 118,
+      "program": "2026 MAS Summer Camp Two (6/29 - 7/23)",
+      "name": "Eman Hashem",
+      "email": "eman@drhashem.com"
+    },
+    {
+      "rowNumber": 133,
+      "program": "2026 MAS Summer Camp Two (6/29 - 7/23)",
+      "name": "Reda Farghaly",
+      "email": "reda.afm@gmail.com"
+    },
+    {
+      "rowNumber": 135,
+      "program": "2026 MAS Summer Camp Two (6/29 - 7/23)",
+      "name": "Esraa Osama Osama",
+      "email": "esra.habbash.90@gmail.com"
+    },
+    {
+      "rowNumber": 136,
+      "program": "2026 MAS Summer Camp Two (6/29 - 7/23)",
+      "name": "Esraa Osama Osama",
+      "email": "esra.habbash.90@gmail.com"
+    },
+    {
+      "rowNumber": 170,
+      "program": "2026 MAS Summer Camp Two (6/29 - 7/23)",
+      "name": "Ammar Elmezayen",
+      "email": "amezyn81@gmail.com"
+    },
+    {
+      "rowNumber": 173,
+      "program": "2026 MAS Summer Camp Two (6/29 - 7/23)",
+      "name": "Mariam yasin",
+      "email": "lakiyou13@gmail.com"
+    },
+    {
+      "rowNumber": 178,
+      "program": "2026 MAS Summer Camp Two (6/29 - 7/23)",
+      "name": "Heba Turk",
+      "email": "hhtanas@yahoo.com"
+    },
+    {
+      "rowNumber": 183,
+      "program": "2026 MAS Summer Camp Two (6/29 - 7/23)",
+      "name": "Dahlia Qutteineh",
+      "email": "dahlia-92@live.com"
+    },
+    {
+      "rowNumber": 253,
+      "program": "2026 MAS Summer Camp Two (6/29 - 7/23)",
+      "name": "Lina W Othman",
+      "email": "lothman10@yahoo.com"
+    },
+    {
+      "rowNumber": 280,
+      "program": "2026 MAS Summer Camp One (June)",
+      "name": "Mohamed Awad",
+      "email": "mohamedsawad@gmail.com"
+    },
+    {
+      "rowNumber": 294,
+      "program": "2026 MAS Summer Camp One (June)",
+      "name": "Sumayyah Chenault",
+      "email": "beduliving@gmail.com"
+    },
+    {
+      "rowNumber": 307,
+      "program": "3rd Annual Youth Intensive Summer Camp 2026",
+      "name": "Ammar Elmezayen",
+      "email": "amezyn81@gmail.com"
+    }
+  ],
+  "missingEmailSample": [],
+  "missingPhoneSample": [
+    {
+      "rowNumber": 30,
+      "name": "Soumia B Bouhlal",
+      "email": "bsoumia@hotmail.com",
+      "program": "Quran Institute For Ladies 2026-2027"
+    },
+    {
+      "rowNumber": 43,
+      "name": "Sana Hamdan",
+      "email": "om.kareem@hotmail.com",
+      "program": "Quran Institute For Ladies 2026-2027"
+    },
+    {
+      "rowNumber": 53,
+      "name": "Fatema Odeh",
+      "email": "newfastlink@yahoo.com",
+      "program": "Quran Institure for Ladies 2026-2027"
+    },
+    {
+      "rowNumber": 62,
+      "name": "Asmaa Ali",
+      "email": "m.asmaa0216@gmail.com",
+      "program": "Quran Institute For Ladies 2026-2027"
+    },
+    {
+      "rowNumber": 95,
+      "name": "Heba Hassan",
+      "email": "heba1987hassan@gmail.com",
+      "program": "Quran Institure for Ladies 2026-2027"
+    },
+    {
+      "rowNumber": 99,
+      "name": "Enas Elsaegh",
+      "email": "eelsaegh@gmail.com",
+      "program": "Quran Institure for Ladies 2026-2027"
+    },
+    {
+      "rowNumber": 103,
+      "name": "Helwa Aburas",
+      "email": "helwaaburas@gmail.com",
+      "program": "Quran 4 Little Hearts 26-27"
+    },
+    {
+      "rowNumber": 108,
+      "name": "Maryam Haque",
+      "email": "begum.kamrun@yahoo.com",
+      "program": "The Companion of The Quran 26-27"
+    },
+    {
+      "rowNumber": 151,
+      "name": "Jasmine Najjar",
+      "email": "hedayeh.ahmad@gmail.com",
+      "program": "2026 MAS Summer Camp Two (6/29 - 7/23)"
+    },
+    {
+      "rowNumber": 152,
+      "name": "Nejat Zahid",
+      "email": "nejatzahid510@gmail.com",
+      "program": "2026 MAS Summer Camp Two (6/29 - 7/23)"
+    }
+  ],
+  "missingProgramSample": [],
+  "unparseableDateSample": [],
+  "trailingSpacesSample": [
+    {
+      "rowNumber": 9,
+      "raw": "\"Game Night  \""
+    },
+    {
+      "rowNumber": 113,
+      "raw": "\"Game Night  \""
+    },
+    {
+      "rowNumber": 181,
+      "raw": "\"Game Night  \""
+    },
+    {
+      "rowNumber": 347,
+      "raw": "\"Game Night  \""
+    },
+    {
+      "rowNumber": 677,
+      "raw": "\"Game Night  \""
+    },
+    {
+      "rowNumber": 995,
+      "raw": "\"Game Night  \""
+    },
+    {
+      "rowNumber": 1218,
+      "raw": "\"Game Night  \""
+    },
+    {
+      "rowNumber": 1461,
+      "raw": "\"Game Night  \""
+    },
+    {
+      "rowNumber": 1724,
+      "raw": "\"Game Night  \""
+    },
+    {
+      "rowNumber": 2049,
+      "raw": "\"Game Night  \""
+    }
+  ],
+  "topReasons": [
+    [
+      "THE DEEN DEFENDERS -  Small Hands, Big Impact",
+      {
+        "count": 226,
+        "amount": 140155
+      }
+    ],
+    [
+      "After School Program",
+      {
+        "count": 210,
+        "amount": 30931
+      }
+    ],
+    [
+      "For Girls",
+      {
+        "count": 127,
+        "amount": 3910
+      }
+    ],
+    [
+      "For Ages 5-99",
+      {
+        "count": 105,
+        "amount": 10640
+      }
+    ],
+    [
+      "2025-2026",
+      {
+        "count": 79,
+        "amount": 7516
+      }
+    ],
+    [
+      "The Rope of Allah",
+      {
+        "count": 58,
+        "amount": 6840.5
+      }
+    ],
+    [
+      "Marching to Ramadan",
+      {
+        "count": 57,
+        "amount": 14856
+      }
+    ],
+    [
+      "Boys Age 7-9",
+      {
+        "count": 50,
+        "amount": 4400
+      }
+    ],
+    [
+      "All Levels",
+      {
+        "count": 46,
+        "amount": 4550
+      }
+    ],
+    [
+      "Tajweed & Recitation",
+      {
+        "count": 41,
+        "amount": 6450
+      }
+    ],
+    [
+      "ALL LEVELS",
+      {
+        "count": 39,
+        "amount": 3900
+      }
+    ],
+    [
+      "Boys Age 10-13",
+      {
+        "count": 35,
+        "amount": 3200
+      }
+    ],
+    [
+      "Beginner & Intermediate Level",
+      {
+        "count": 20,
+        "amount": 2470
+      }
+    ],
+    [
+      "Quran Institute - Free Courses",
+      {
+        "count": 18,
+        "amount": 0
+      }
+    ],
+    [
+      "All Programs / Monthly Payment / $100",
+      {
+        "count": 15,
+        "amount": 1500
+      }
+    ],
+    [
+      "Memorization (Surat Al-Baqara & Surat Aal Imran)",
+      {
+        "count": 14,
+        "amount": 2275
+      }
+    ],
+    [
+      "All Programs / Half Payment / $250",
+      {
+        "count": 11,
+        "amount": 2750
+      }
+    ],
+    [
+      "August 10, 2026 - November 2, 2026",
+      {
+        "count": 8,
+        "amount": 650
+      }
+    ],
+    [
+      "July 11 - 13",
+      {
+        "count": 8,
+        "amount": 642
+      }
+    ],
+    [
+      "Springing Into Ramadan",
+      {
+        "count": 8,
+        "amount": 1225
+      }
+    ],
+    [
+      "June 13 - 15",
+      {
+        "count": 7,
+        "amount": 571.11
+      }
+    ],
+    [
+      "Memorization (Course 1 & Course 2)",
+      {
+        "count": 6,
+        "amount": 300
+      }
+    ],
+    [
+      "All Programs / Full Payment / $500",
+      {
+        "count": 6,
+        "amount": 2700
+      }
+    ],
+    [
+      "Memorization / Half Payment / 250$",
+      {
+        "count": 5,
+        "amount": 1250
+      }
+    ]
+  ]
+}

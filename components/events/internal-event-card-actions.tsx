@@ -83,14 +83,17 @@ export function InternalEventCardActions({
   eventName,
   compact = false,
   showEdit = true,
+  showDelete = true,
   deleteBlockedReason = null,
-  redirectAfterDelete = "/event-management",
+  redirectAfterDelete = "/event-management/events",
 }: {
   eventId: string
   eventName: string
   compact?: boolean
   /** When false, hide the edit pencil (e.g. workspace edits via Event details). */
   showEdit?: boolean
+  /** When false, hide delete (e.g. Events list — delete from the event workspace). */
+  showDelete?: boolean
   /** When set, delete is disabled and this reason is shown. */
   deleteBlockedReason?: string | null
   /** Where to go after a successful delete (workspace should leave the event page). */
@@ -164,7 +167,7 @@ export function InternalEventCardActions({
           </ActionIconButton>
         ) : null}
 
-        {deleteDisabled ? (
+        {showDelete && deleteDisabled ? (
           <Tooltip>
             <TooltipTrigger asChild>
               <span className="inline-flex">
@@ -184,7 +187,9 @@ export function InternalEventCardActions({
               {deleteBlockedReason}
             </TooltipContent>
           </Tooltip>
-        ) : (
+        ) : null}
+
+        {showDelete && !deleteDisabled ? (
           <AlertDialog>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -228,7 +233,7 @@ export function InternalEventCardActions({
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
-        )}
+        ) : null}
 
         <ActionIconButton
           label="Copy event"

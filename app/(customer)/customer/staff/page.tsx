@@ -6,6 +6,7 @@ import {
   Building2,
   CalendarPlus,
   ClipboardList,
+  GraduationCap,
   LayoutDashboard,
 } from "lucide-react"
 
@@ -22,6 +23,9 @@ import {
   isInternalEventPendingApproval,
 } from "@/lib/events/internal-event-status"
 import { formatVenueRentalTimeRange } from "@/lib/bookings/venue-rental-format"
+import { getProgramLeadsForCurrentUser } from "@/lib/programs/program-access"
+import { programLeadNavEntries } from "@/lib/programs/program-lead-nav"
+import { programWorkspaceHref } from "@/lib/programs/program-workspace-path"
 
 export default async function CustomerStaffToolsPage() {
   const { userId, organizationId } = await requireCustomerPortalPageContext()
@@ -31,14 +35,16 @@ export default async function CustomerStaffToolsPage() {
     redirect("/customer/dashboard")
   }
 
-  const [portalCapabilities, myRequests, headship] = await Promise.all([
+  const [portalCapabilities, myRequests, headship, programLeads] = await Promise.all([
     getUserPortalCapabilities(userId, organizationId),
     getMyInternalEventRequests(userId, organizationId),
     getDepartmentHeadshipForCurrentUser(),
+    getProgramLeadsForCurrentUser(),
   ])
   const pendingCount = myRequests.filter((event) =>
     isInternalEventPendingApproval(event.status)
   ).length
+  const programLeadCards = programLeadNavEntries(programLeads)
 
   return (
     <div className="mx-auto max-w-3xl space-y-8">
@@ -49,8 +55,8 @@ export default async function CustomerStaffToolsPage() {
         </div>
         <h1 className="text-2xl font-bold tracking-tight">Staff Tools</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Department workspace access and internal event requests. Personal
-          venue rentals stay under My Account.
+          Department workspace, program workspace, and internal event requests.
+          Personal venue rentals stay under My Account.
         </p>
       </div>
 
@@ -81,6 +87,39 @@ export default async function CustomerStaffToolsPage() {
           </CardContent>
         </Card>
       ) : null}
+
+      {programLeadCards.map((entry) => (
+        <Card
+          key={entry.programId}
+          className={headship ? undefined : "border-primary/20 bg-primary/5"}
+        >
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <GraduationCap className="h-4 w-4" />
+              {entry.label}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-medium">{entry.programName}</p>
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                <Badge variant="secondary">Program Lead</Badge>
+                <span className="text-sm text-muted-foreground">
+                  All offerings in this year or season
+                </span>
+              </div>
+            </div>
+            <Button asChild>
+              <Link
+                href={programWorkspaceHref(entry.programId, { tab: "offerings" })}
+              >
+                Open workspace
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      ))}
 
       <div>
         <h2 className="mb-3 text-lg font-semibold tracking-tight">

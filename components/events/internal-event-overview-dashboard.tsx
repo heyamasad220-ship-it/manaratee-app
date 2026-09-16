@@ -1,24 +1,44 @@
 "use client"
 
-import type { ReactNode } from "react"
+import type { LucideIcon } from "lucide-react"
 import {
   Activity,
   AlertTriangle,
+  Baby,
   Banknote,
+  ClipboardCheck,
   ClipboardList,
+  DollarSign,
+  HeartHandshake,
   Store,
+  UserCheck,
   Users,
   UsersRound,
 } from "lucide-react"
 
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  StatCard,
+  StatCardsRow,
+  type StatCardTone,
+} from "@/components/ui/stat-card"
 import type { EventOverviewSummary } from "@/lib/events/event-overview-metrics"
 import {
   formatActivityWhen,
   type EventRecentActivityItem,
 } from "@/lib/events/event-recent-activity"
+
+const KPI_STYLES: Record<string, { tone: StatCardTone; icon: LucideIcon }> = {
+  phase: { tone: "indigo", icon: ClipboardCheck },
+  "ticket-revenue": { tone: "blue", icon: DollarSign },
+  "ticket-donations": { tone: "rose", icon: HeartHandshake },
+  "checked-in": { tone: "emerald", icon: UserCheck },
+  youth: { tone: "violet", icon: Baby },
+  staff: { tone: "amber", icon: Users },
+  vendors: { tone: "orange", icon: Store },
+  donations: { tone: "teal", icon: HeartHandshake },
+}
 
 function formatMoney(cents: number, currency: string) {
   return new Intl.NumberFormat("en-US", {
@@ -38,28 +58,56 @@ function formatOptionalDate(value: string | null) {
   })
 }
 
+export function InternalEventOverviewKpis({
+  overview,
+}: {
+  overview: EventOverviewSummary
+}) {
+  const { kpis } = overview
+  if (kpis.length === 0) return null
+
+  const kpiColumns = Math.min(6, Math.max(2, kpis.length)) as 2 | 3 | 4 | 5 | 6
+
+  return (
+    <StatCardsRow equal columns={kpiColumns}>
+      {kpis.map((kpi) => {
+        const style = KPI_STYLES[kpi.id] ?? {
+          tone: "slate" as const,
+          icon: ClipboardList,
+        }
+        return (
+          <StatCard
+            key={kpi.id}
+            label={kpi.label}
+            value={kpi.value}
+            hint={kpi.hint}
+            icon={style.icon}
+            tone={style.tone}
+            layout="compact"
+            fill
+          />
+        )
+      })}
+    </StatCardsRow>
+  )
+}
+
 export function InternalEventOverviewDashboard({
   overview,
   canManage,
   eventId: _eventId,
-  departmentName,
-  eventTypeName,
   coordinatorName,
-  details,
   recentActivity = [],
   onNavigateTab,
 }: {
   overview: EventOverviewSummary
   canManage: boolean
   eventId: string
-  departmentName?: string | null
-  eventTypeName?: string | null
   coordinatorName?: string | null
-  details: ReactNode
   recentActivity?: EventRecentActivityItem[]
   onNavigateTab: (tab: string) => void
 }) {
-  const { features, kpis, alerts, registration, youth, staff, vendors, finance } =
+  const { features, alerts, registration, youth, staff, vendors, finance } =
     overview
 
   const showYouth = features.youth
@@ -74,40 +122,12 @@ export function InternalEventOverviewDashboard({
 
   return (
     <div className="flex flex-col gap-6">
-      {(departmentName || eventTypeName || coordinatorName) && (
+      {coordinatorName ? (
         <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
-          {departmentName ? (
-            <Badge variant="secondary">{departmentName}</Badge>
-          ) : null}
-          {eventTypeName ? (
-            <Badge variant="outline">{eventTypeName}</Badge>
-          ) : null}
-          {coordinatorName ? (
-            <span className="inline-flex items-center gap-1">
-              <Users className="h-3.5 w-3.5" />
-              Coordinator: {coordinatorName}
-            </span>
-          ) : null}
-        </div>
-      )}
-
-      {kpis.length > 0 ? (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {kpis.map((kpi) => (
-            <Card key={kpi.id}>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  {kpi.label}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-semibold tracking-tight">{kpi.value}</p>
-                {kpi.hint ? (
-                  <p className="mt-1 text-xs text-muted-foreground">{kpi.hint}</p>
-                ) : null}
-              </CardContent>
-            </Card>
-          ))}
+          <span className="inline-flex items-center gap-1">
+            <Users className="h-3.5 w-3.5" />
+            Coordinator: {coordinatorName}
+          </span>
         </div>
       ) : null}
 
@@ -148,7 +168,7 @@ export function InternalEventOverviewDashboard({
             <div>
               <CardTitle className="flex items-center gap-2 text-base">
                 <ClipboardList className="h-4 w-4" />
-                Registration
+                Tickets
               </CardTitle>
               <p className="mt-1 text-sm text-muted-foreground">
                 {registration.modeLabel}
@@ -159,7 +179,7 @@ export function InternalEventOverviewDashboard({
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => onNavigateTab("registration")}
+                onClick={() => onNavigateTab("tickets")}
               >
                 Manage
               </Button>
@@ -180,8 +200,8 @@ export function InternalEventOverviewDashboard({
               </p>
             ) : null}
             <p className="text-muted-foreground">
-              Sales: {formatOptionalDate(registration.salesOpenAt)} →{" "}
-              {formatOptionalDate(registration.salesCloseAt)}
+            Starts / ends: {formatOptionalDate(registration.salesOpenAt)} →{" "}
+            {formatOptionalDate(registration.salesCloseAt)}
             </p>
           </CardContent>
         </Card>
@@ -329,21 +349,26 @@ export function InternalEventOverviewDashboard({
                   {formatMoney(finance.netCents, finance.currency)}
                 </span>
               </p>
+              <p className="text-xs text-muted-foreground">
+                Tickets + gifts − refunds − expenses
+              </p>
             </CardContent>
           </Card>
         ) : null}
       </div>
 
-      {recentActivity.length > 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Activity className="h-4 w-4" />
-              Recent activity
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            {recentActivity.slice(0, 8).map((item) => (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Activity className="h-4 w-4" />
+            Recent orders
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          {recentActivity.length === 0 ? (
+            <p className="text-muted-foreground">No recent orders or refunds.</p>
+          ) : (
+            recentActivity.slice(0, 4).map((item) => (
               <div
                 key={item.id}
                 className="flex flex-wrap items-baseline justify-between gap-2"
@@ -353,12 +378,10 @@ export function InternalEventOverviewDashboard({
                   {formatActivityWhen(item.when)}
                 </span>
               </div>
-            ))}
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {details}
+            ))
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }

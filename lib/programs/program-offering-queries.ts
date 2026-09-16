@@ -4,7 +4,17 @@ import {
   summarizeOfferingsCapacity,
   type ProgramCatalogCapacity,
 } from "@/lib/programs/program-catalog-capacity"
-import type { ProgramOffering } from "@/lib/programs/program-offering-types"
+import { ROSTER_ENROLLMENT_STATUSES } from "@/lib/programs/enrollment-process"
+import {
+  isCancelledOfferingStatus,
+  type ProgramOffering,
+} from "@/lib/programs/program-offering-types"
+
+/** Offerings staff treat as Active (hidden cancelled; archived is already dropped). */
+export function isStaffVisibleOfferingStatus(status: string | null | undefined) {
+  const value = String(status || "").toLowerCase()
+  return value !== "archived" && !isCancelledOfferingStatus(value)
+}
 
 export async function getDefaultOfferingForProgram(programId: string) {
   const supabase = await createClient()
@@ -155,6 +165,109 @@ export async function getOfferingCountsByProgramIds(programIds: string[]) {
   return counts
 }
 
+export type StaffVisibleOfferingRow = {
+  id: string
+  program_id: string
+  capacity: number | null
+  capacity_mode: string | null
+}
+
+export async function loadStaffVisibleOfferingsForPrograms(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  organizationId: string,
+  programIds: string[]
+): Promise<StaffVisibleOfferingRow[]> {
+  if (programIds.length === 0) return []
+  const { data, error } = await supabase
+    .from("program_offerings")
+    .select("id, program_id, capacity, capacity_mode, status")
+    .eq("organization_id", organizationId)
+    .in("program_id", programIds)
+    .neq("status", "archived")
+
+  if (error) {
+    console.error("loadStaffVisibleOfferingsForPrograms:", error.message)
+    return []
+  }
+
+  return (data || [])
+    .filter((row) => isStaffVisibleOfferingStatus(row.status as string | null))
+    .map((row) => ({
+      id: row.id as string,
+      program_id: row.program_id as string,
+      capacity: (row.capacity as number | null) ?? null,
+      capacity_mode: (row.capacity_mode as string | null) ?? null,
+    }))
+}
+
+/** Roster enrollments (enrolled / active) on staff-visible offerings only. */
+export async function countRosterEnrollmentsOnVisibleOfferings(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  organizationId: string,
+  programIds: string[],
+  visibleOfferings: StaffVisibleOfferingRow[]
+): Promise<Map<string, number>> {
+  const counts = new Map<string, number>(programIds.map((id) => [id, 0]))
+  const offeringIdsByProgram = new Map<string, string[]>()
+  for (const offering of visibleOfferings) {
+    const current = offeringIdsByProgram.get(offering.program_id) || []
+    current.push(offering.id)
+    offeringIdsByProgram.set(offering.program_id, current)
+  }
+
+  const results = await Promise.all(
+    programIds.map(async (programId) => {
+      const offeringIds = offeringIdsByProgram.get(programId) || []
+      if (offeringIds.length === 0) return [programId, 0] as const
+      const { count, error } = await supabase
+        .from("program_enrollments")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", organizationId)
+        .eq("program_id", programId)
+        .in("offering_id", offeringIds)
+        .in("status", [...ROSTER_ENROLLMENT_STATUSES])
+      if (error) {
+        console.error("countRosterEnrollmentsOnVisibleOfferings:", error.message)
+        return [programId, 0] as const
+      }
+      return [programId, count ?? 0] as const
+    })
+  )
+
+  for (const [id, n] of results) counts.set(id, n)
+  return counts
+}
+
+/** Exact enrollment totals per program. Avoids the PostgREST 1,000-row select cap. */
+export async function countEnrollmentsByProgramIds(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  organizationId: string,
+  programIds: string[],
+  statuses: string[]
+): Promise<Map<string, number>> {
+  const counts = new Map<string, number>(programIds.map((id) => [id, 0]))
+  if (programIds.length === 0) return counts
+
+  const results = await Promise.all(
+    programIds.map(async (programId) => {
+      const { count, error } = await supabase
+        .from("program_enrollments")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", organizationId)
+        .eq("program_id", programId)
+        .in("status", statuses)
+      if (error) {
+        console.error("countEnrollmentsByProgramIds:", error.message)
+        return [programId, 0] as const
+      }
+      return [programId, count ?? 0] as const
+    })
+  )
+
+  for (const [id, n] of results) counts.set(id, n)
+  return counts
+}
+
 export type ProgramListStats = {
   offeringCount: number
   enrolled: number
@@ -180,61 +293,25 @@ export async function getProgramListStatsByProgramIds(
     return result
   }
 
-  const { data: offerings, error: offeringsError } = await supabase
-    .from("program_offerings")
-    .select("id, program_id")
-    .eq("organization_id", organizationId)
-    .in("program_id", programIds)
-    .neq("status", "archived")
-    .neq("status", "cancelled")
-
-  if (offeringsError) {
-    console.error(
-      "getProgramListStatsByProgramIds offerings:",
-      offeringsError.message
-    )
-    return result
-  }
-
+  const visibleOfferings = await loadStaffVisibleOfferingsForPrograms(
+    supabase,
+    organizationId,
+    programIds
+  )
   const offeringCountByProgram = new Map<string, number>()
-  const offeringToProgram = new Map<string, string>()
-  const offeringIds: string[] = []
-  for (const row of offerings || []) {
-    const programId = row.program_id as string
-    const offeringId = row.id as string
+  for (const row of visibleOfferings) {
     offeringCountByProgram.set(
-      programId,
-      (offeringCountByProgram.get(programId) || 0) + 1
+      row.program_id,
+      (offeringCountByProgram.get(row.program_id) || 0) + 1
     )
-    offeringToProgram.set(offeringId, programId)
-    offeringIds.push(offeringId)
   }
 
-  const enrolledByProgram = new Map<string, number>()
-  if (offeringIds.length > 0) {
-    const { data: enrollments, error: enrollmentsError } = await supabase
-      .from("program_enrollments")
-      .select("offering_id")
-      .eq("organization_id", organizationId)
-      .in("offering_id", offeringIds)
-      .in("status", ["enrolled", "active"])
-
-    if (enrollmentsError) {
-      console.error(
-        "getProgramListStatsByProgramIds enrollments:",
-        enrollmentsError.message
-      )
-    } else {
-      for (const row of enrollments || []) {
-        const programId = offeringToProgram.get(row.offering_id as string)
-        if (!programId) continue
-        enrolledByProgram.set(
-          programId,
-          (enrolledByProgram.get(programId) || 0) + 1
-        )
-      }
-    }
-  }
+  const enrolledByProgram = await countRosterEnrollmentsOnVisibleOfferings(
+    supabase,
+    organizationId,
+    programIds,
+    visibleOfferings
+  )
 
   for (const programId of programIds) {
     result.set(programId, {

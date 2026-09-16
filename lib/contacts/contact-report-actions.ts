@@ -31,11 +31,15 @@ function toListInput(
 ): FetchContactsListInput {
   return {
     search: filters.search?.trim() || undefined,
+    nameFilter: filters.nameFilter?.trim() || undefined,
     recordType:
       filters.recordType && filters.recordType !== "all" ? filters.recordType : undefined,
+    lockedRecordType: filters.lockedRecordType,
     role: filters.role && filters.role !== "all" ? filters.role : undefined,
     status: filters.status && filters.status !== "all" ? filters.status : undefined,
     teamId: filters.teamId && filters.teamId !== "all" ? filters.teamId : undefined,
+    sortBy: filters.sortBy,
+    sortAsc: filters.sortAsc,
     page,
     pageSize,
   }

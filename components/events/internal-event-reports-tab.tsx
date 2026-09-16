@@ -21,6 +21,7 @@ import {
 import type { EventAttendeeListItem } from "@/lib/tickets/ticket-order-queries"
 import type { ChildcareRegistration } from "@/lib/child-care/childcare-registration-types"
 import type { ServiceParticipationWithContact } from "@/lib/service-participations/service-participation-types"
+import { formatPhoneDisplay } from "@/lib/ui/format-phone"
 
 function formatMoney(cents: number, currency: string) {
   return new Intl.NumberFormat("en-US", {
@@ -131,10 +132,12 @@ export function InternalEventReportsTab({
             onClick={() =>
               downloadCsv(
                 `event-${eventId}-attendees.csv`,
-                ["name", "email", "type", "order", "status", "checked in"],
+                ["attendee", "contact", "contact email", "contact phone", "type", "order", "status", "checked in"],
                 attendees.map((row) => [
                   row.attendeeName || "",
-                  row.attendeeEmail || "",
+                  row.purchaserName || "",
+                  row.purchaserEmail || "",
+                  row.purchaserPhone || "",
                   row.ticketTypeName || "",
                   row.orderNumber || "",
                   row.status || "",
@@ -163,7 +166,7 @@ export function InternalEventReportsTab({
             customers.
           </p>
           <Button type="button" size="sm" variant="outline" asChild>
-            <Link href="/event-management/ticketing/reports">Open reports</Link>
+            <Link href="/event-management/reports/tickets">Open reports</Link>
           </Button>
         </CardContent>
       </Card>
@@ -192,7 +195,7 @@ export function InternalEventReportsTab({
                   row.child_name || "",
                   row.child_age != null ? String(row.child_age) : "",
                   row.parent_name || "",
-                  row.parent_phone || "",
+                  formatPhoneDisplay(row.parent_phone),
                   row.parent_email || "",
                   row.status || "",
                   row.allergies || "",

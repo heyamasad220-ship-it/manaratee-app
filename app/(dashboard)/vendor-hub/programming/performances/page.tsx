@@ -41,6 +41,7 @@ import {
   MapPin,
   Calendar,
 } from "lucide-react"
+import { formatPhoneDisplay } from "@/lib/ui/format-phone"
 import { cn } from "@/lib/utils"
 
 type Entertainment = {
@@ -201,7 +202,7 @@ export default function EntertainmentPage() {
                             {item.type}
                           </Badge>
                           <span>
-                            Contact: {item.contact} • {item.phone}
+                            Contact: {item.contact} • {formatPhoneDisplay(item.phone) || item.phone}
                           </span>
                         </div>
                       </div>

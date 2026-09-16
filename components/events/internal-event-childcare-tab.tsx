@@ -6,6 +6,7 @@ import { AlertTriangle, Baby, Loader2, Search } from "lucide-react"
 import Link from "next/link"
 
 import { Badge } from "@/components/ui/badge"
+import { PhoneText } from "@/components/ui/phone-text"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -408,7 +409,7 @@ export function InternalEventChildcareTab({
                             {registration.parent_name || "—"}
                           </TableCell>
                           <TableCell className="text-muted-foreground">
-                            {registration.parent_phone || "—"}
+                            <PhoneText value={registration.parent_phone} />
                           </TableCell>
                           <TableCell className="text-muted-foreground">
                             {registration.parent_email || "—"}

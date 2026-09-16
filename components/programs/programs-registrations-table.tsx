@@ -6,6 +6,7 @@ import { Clock, Users } from "lucide-react"
 
 import { RegistrationRowActions } from "@/components/programs/registration-row-actions"
 import { Badge } from "@/components/ui/badge"
+import { PhoneText } from "@/components/ui/phone-text"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -571,7 +572,7 @@ export function ProgramsRegistrationsTable({
                         {row.contactEmail || "No email"}
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        {row.contactPhone || "No phone"}
+                        <PhoneText value={row.contactPhone} empty="No phone" />
                       </div>
                     </div>
                   </TableCell>

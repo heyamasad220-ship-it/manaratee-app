@@ -160,6 +160,9 @@ export type OrganizationSettingsUser = {
   firstName: string
   lastName: string
   email: string
+  assignedContactId: string | null
+  assignedContactName: string | null
+  assignedContactEmail: string | null
   systemRole: string
   roleId: string | null
   roleName: string
@@ -209,7 +212,7 @@ export async function fetchOrganizationUsersForSettings(): Promise<{
   )
 
   return {
-    users: payload.members,
+    users: payload.members as OrganizationSettingsUser[],
     roles: visibleRoles.map((role) => ({
       id: role.id as string,
       name: role.name as string,

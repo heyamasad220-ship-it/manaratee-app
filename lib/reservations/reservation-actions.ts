@@ -34,6 +34,7 @@ const CALENDAR_REVALIDATE_PATHS = [
   "/facilities/calendar",
   "/bookings/calendar",
   "/event-management",
+  "/event-management/events",
   "/event-management/calendar",
 ]
 

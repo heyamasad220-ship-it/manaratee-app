@@ -9,6 +9,7 @@ import {
   mergeOfferingAttributes,
 } from "@/lib/programs/program-offering-attributes"
 import { DEFAULT_NEW_OFFERING_INHERIT_FLAGS } from "@/lib/programs/program-offering-inherit"
+import { assertCanManageProgram, canManageOffering } from "@/lib/programs/program-access"
 import type {
   ProgramOfferingInput,
   ProgramOfferingType,
@@ -19,6 +20,7 @@ import {
   ROSTER_ENROLLMENT_STATUSES,
 } from "@/lib/programs/enrollment-process"
 import { syncRegistrationOptionsFromProgramFlags } from "@/lib/programs/program-registration-option-actions"
+import { setOfferingScheduleFacility } from "@/lib/programs/program-schedule-actions"
 
 const PROGRAM_ATTRIBUTE_SELECT =
   "id, organization_id, start_date, end_date, enrollment_open_date, enrollment_close_date, status, full_program_registration_enabled, session_registration_enabled, single_session_registration_enabled, program_type, min_age, max_age, min_grade, max_grade, grade_levels, gender, require_guardian, require_grade, require_emergency_contact, capacity, enable_waitlist, waitlist_capacity, waitlist_offer_deadline_days"
@@ -225,6 +227,7 @@ export async function reorderProgramOfferings(input: {
   programId: string
   orderedOfferingIds: string[]
 }) {
+  await assertCanManageProgram(input.programId)
   const supabase = await createClient()
   const organizationId = await getSelectedOrganizationId()
 
@@ -283,6 +286,7 @@ export async function createProgramOffering(
   input: ProgramOfferingInput,
   organizationId?: string
 ) {
+  await assertCanManageProgram(programId)
   const supabase = await createClient()
   const resolvedOrganizationId = await resolveOrganizationId(organizationId)
 
@@ -377,6 +381,9 @@ export async function updateProgramOffering(
   offeringId: string,
   input: ProgramOfferingInput
 ) {
+  if (!(await canManageOffering(offeringId))) {
+    throw new Error("You do not have permission to manage this offering.")
+  }
   const supabase = await createClient()
   const organizationId = await getSelectedOrganizationId()
 
@@ -458,12 +465,24 @@ export async function updateProgramOffering(
     throw new Error(error.message)
   }
 
+  if (input.attributes?.delivery_format === "online") {
+    await setOfferingScheduleFacility({
+      program_id: data.program_id as string,
+      offering_id: offeringId,
+      venue_id: null,
+      location: null,
+    })
+  }
+
   revalidateProgramPaths(data.program_id as string)
 
   return data
 }
 
 export async function archiveProgramOffering(offeringId: string) {
+  if (!(await canManageOffering(offeringId))) {
+    throw new Error("You do not have permission to manage this offering.")
+  }
   const supabase = await createClient()
   const organizationId = await getSelectedOrganizationId()
 
@@ -519,6 +538,9 @@ const CANCEL_BLOCKING_ENROLLMENT_STATUSES = [
 ] as const
 
 export async function cancelProgramOffering(offeringId: string) {
+  if (!(await canManageOffering(offeringId))) {
+    throw new Error("You do not have permission to manage this offering.")
+  }
   const supabase = await createClient()
   const organizationId = await getSelectedOrganizationId()
 
@@ -577,6 +599,9 @@ export async function cancelProgramOffering(offeringId: string) {
 }
 
 export async function deleteProgramOffering(offeringId: string) {
+  if (!(await canManageOffering(offeringId))) {
+    throw new Error("You do not have permission to manage this offering.")
+  }
   const supabase = await createClient()
   const organizationId = await getSelectedOrganizationId()
 

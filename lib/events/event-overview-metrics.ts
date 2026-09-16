@@ -18,6 +18,10 @@ import type { EventAttendeeListItem } from "@/lib/tickets/ticket-order-queries"
 import type { ServiceParticipationWithContact } from "@/lib/service-participations/service-participation-types"
 import type { ChildcareRegistration } from "@/lib/child-care/childcare-registration-types"
 import {
+  splitTicketOrderRevenue,
+  ticketOrderCheckoutDonationCents,
+} from "@/lib/tickets/ticket-checkout-donation"
+import {
   ticketOrderNetRevenueCents,
   ticketOrderRefundedCents,
 } from "@/lib/tickets/ticket-refund-math"
@@ -66,6 +70,7 @@ export type EventOverviewSummary = {
   }
   finance: {
     ticketRevenueCents: number
+    checkoutDonationCents: number
     donationRevenueCents: number
     expenseCents: number
     refundCents: number
@@ -75,10 +80,10 @@ export type EventOverviewSummary = {
 }
 
 const MODE_LABELS: Record<EventAttendanceMode, string> = {
-  paid: "Paid tickets",
-  free: "Free registration",
-  paid_and_free: "Paid + free registration",
-  open_public: "Open to public",
+  paid: "Paid",
+  free: "Free",
+  paid_and_free: "Paid",
+  open_public: "Free",
 }
 
 export async function getEventOverviewSummary(input: {
@@ -165,23 +170,20 @@ export async function getEventOverviewSummary(input: {
       value: operationalPhaseLabel,
     },
   ]
-  if (attendanceMode !== "open_public" || registered > 0) {
-    kpis.push({
-      id: "attendees",
-      label: "Registered",
-      value:
-        capacityFromTypes != null
-          ? `${registered} / ${capacityFromTypes}`
-          : String(registered),
-      hint: capacityFromTypes != null ? "vs offering capacity" : undefined,
-    })
-  }
-  if (features.registration || finance.ticketRevenueCents > 0) {
+  if (features.registration || finance.ticketRevenueCents > 0 || finance.checkoutDonationCents > 0) {
     if (finance.ticketRevenueCents > 0 || attendanceMode === "paid" || attendanceMode === "paid_and_free") {
       kpis.push({
         id: "ticket-revenue",
         label: "Ticket revenue",
         value: formatMoney(finance.ticketRevenueCents, finance.currency),
+      })
+    }
+    if (finance.checkoutDonationCents > 0) {
+      kpis.push({
+        id: "ticket-donations",
+        label: "Ticket donations",
+        value: formatMoney(finance.checkoutDonationCents, finance.currency),
+        hint: "Collected with ticket purchase",
       })
     }
   }
@@ -226,19 +228,13 @@ export async function getEventOverviewSummary(input: {
         hint: "Linked donations campaign",
       })
     }
-    kpis.push({
-      id: "net",
-      label: "Event net",
-      value: formatMoney(finance.netCents, finance.currency),
-      hint: "Tickets + gifts − refunds − expenses",
-    })
   }
 
   const alerts: EventOverviewAlert[] = []
   const incomplete = input.attendees.filter(
     (row) =>
       (row.status === "valid" || row.status === "checked_in") &&
-      (!row.attendeeName || !row.attendeeEmail)
+      (!row.attendeeName || !row.purchaserEmail)
   )
   if (incomplete.length > 0) {
     alerts.push({
@@ -356,6 +352,7 @@ async function getEventFinanceTotals(
   const organizationId = await getSelectedOrganizationId()
   const empty = {
     ticketRevenueCents: 0,
+    checkoutDonationCents: 0,
     donationRevenueCents: 0,
     expenseCents: 0,
     refundCents: 0,
@@ -367,7 +364,7 @@ async function getEventFinanceTotals(
   const [ordersResult, expensesResult] = await Promise.all([
     supabase
       .from("ticket_orders")
-      .select("total_cents, refunded_amount_cents, currency, status")
+      .select("total_cents, refunded_amount_cents, currency, status, metadata")
       .eq("organization_id", organizationId)
       .eq("internal_event_id", eventId),
     supabase
@@ -382,13 +379,14 @@ async function getEventFinanceTotals(
       ? (
           await supabase
             .from("ticket_orders")
-            .select("total_cents, currency, status")
+            .select("total_cents, currency, status, metadata")
             .eq("organization_id", organizationId)
             .eq("internal_event_id", eventId)
         ).data || []
       : ordersResult.data || []
 
   let ticketRevenueCents = 0
+  let checkoutDonationCents = 0
   let refundCents = 0
   let currency = "USD"
   for (const row of orders) {
@@ -400,7 +398,13 @@ async function getEventFinanceTotals(
         (row as { refunded_amount_cents?: number }).refunded_amount_cents || 0
       ),
     }
-    ticketRevenueCents += ticketOrderNetRevenueCents(money)
+    const split = splitTicketOrderRevenue({
+      ...money,
+      checkoutDonationCents: ticketOrderCheckoutDonationCents(row.metadata),
+      netRevenueCents: ticketOrderNetRevenueCents(money),
+    })
+    ticketRevenueCents += split.ticketRevenueCents
+    checkoutDonationCents += split.checkoutDonationCents
     refundCents += ticketOrderRefundedCents(money)
   }
 
@@ -414,11 +418,13 @@ async function getEventFinanceTotals(
 
   return {
     ticketRevenueCents,
+    checkoutDonationCents,
     donationRevenueCents: linkedCampaignRaisedCents,
     expenseCents,
     refundCents,
     netCents:
       ticketRevenueCents +
+      checkoutDonationCents +
       linkedCampaignRaisedCents -
       expenseCents,
     currency,

@@ -1,7 +1,7 @@
 "use client"
 
 import { useRouter, useSearchParams } from "next/navigation"
-import { Bell, IdCard, Settings, ShieldCheck, Ticket } from "lucide-react"
+import { Bell, Settings, Ticket } from "lucide-react"
 
 import { DepartmentProgramOverviewPanel } from "@/components/departments/department-program-overview-panel"
 import { DepartmentPromoCodesSettingsPanel } from "@/components/departments/department-promo-codes-settings-panel"
@@ -44,7 +44,8 @@ export function ProgramWorkspaceSettingsPanel({
       <div>
         <h2 className="text-lg font-semibold tracking-tight">Settings</h2>
         <p className="text-sm text-muted-foreground">
-          Program defaults for this {YEAR_SEASON_LABEL.toLowerCase()}.
+          Name, dates, enrollment, and registration rules for this{" "}
+          {YEAR_SEASON_LABEL.toLowerCase()}.
         </p>
       </div>
 
@@ -58,14 +59,6 @@ export function ProgramWorkspaceSettingsPanel({
             <Settings className="size-4" />
             General
           </TabsTrigger>
-          <TabsTrigger value="defaults" className="gap-2">
-            <IdCard className="size-4" />
-            Program defaults
-          </TabsTrigger>
-          <TabsTrigger value="registration" className="gap-2">
-            <ShieldCheck className="size-4" />
-            Registration
-          </TabsTrigger>
           <TabsTrigger value="notifications" className="gap-2">
             <Bell className="size-4" />
             Notifications
@@ -77,23 +70,25 @@ export function ProgramWorkspaceSettingsPanel({
         </TabsList>
 
         <TabsContent value="general">
-          <DepartmentProgramOverviewPanel
-            departmentId={departmentId}
-            yearProgramId={program.id}
-            hideChrome
-            onProgramMetaChanged={onProgramMetaChanged}
-          />
-        </TabsContent>
-
-        <TabsContent value="defaults">
-          <ProgramDefaultsSettingsPanel program={program} />
-        </TabsContent>
-
-        <TabsContent value="registration">
-          <ProgramPolicySettingsPanel
-            departmentId={departmentId}
-            section="registration"
-          />
+          <div className="space-y-8">
+            <DepartmentProgramOverviewPanel
+              departmentId={departmentId}
+              yearProgramId={program.id}
+              hideChrome
+              hideEligibility
+              onProgramMetaChanged={onProgramMetaChanged}
+            />
+            <ProgramDefaultsSettingsPanel
+              program={program}
+              hideDates
+              hideIntro
+            />
+            <ProgramPolicySettingsPanel
+              departmentId={departmentId}
+              section="registration"
+              omitRepeatedFields
+            />
+          </div>
         </TabsContent>
 
         <TabsContent value="notifications">

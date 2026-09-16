@@ -12,6 +12,7 @@ import {
   MapPin,
 } from "lucide-react"
 
+import { CreateInternalEventButton } from "@/components/events/create-internal-event-button"
 import { Header } from "@/components/layout/header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -33,8 +34,6 @@ import {
   inferInternalEventLocationType,
 } from "@/lib/events/internal-event-location"
 import {
-  buildFacilitiesBookSpaceHref,
-  CREATE_EVENT_CTA_LABEL,
   MASTER_CALENDAR_LABEL,
 } from "@/lib/events/facility-event-request-href"
 import type { InternalEventWithRelations } from "@/lib/events/internal-event-types"
@@ -233,19 +232,6 @@ export function InternalEventsCalendarClient({
     pushQuery({ month: toMonthParam(next) })
   }
 
-  function buildBookSpaceHref(dateKey?: string) {
-    return buildFacilitiesBookSpaceHref({
-      departmentId: initialDepartmentId,
-      returnTo:
-        returnTo ||
-        eventManagementMasterCalendarHref({
-          departmentId: initialDepartmentId,
-        }),
-      openNew: true,
-      date: dateKey || undefined,
-    })
-  }
-
   const monthLabel = monthAnchor.toLocaleDateString(undefined, {
     month: "long",
     year: "numeric",
@@ -260,8 +246,9 @@ export function InternalEventsCalendarClient({
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">{MASTER_CALENDAR_LABEL}</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Read-only view of department events (Center, Online, External Venue). To create
-              an event or book facility space, use Facilities calendar.
+              Read-only view of department events (Center, Online, External Venue).
+              Create the event here. Use the facility calendar only to check on-site
+              space.
             </p>
           </div>
 
@@ -272,9 +259,10 @@ export function InternalEventsCalendarClient({
               </Link>
             </Button>
             {canBookSpace ? (
-              <Button size="sm" asChild>
-                <Link href={buildBookSpaceHref()}>{CREATE_EVENT_CTA_LABEL}</Link>
-              </Button>
+              <CreateInternalEventButton
+                departmentId={initialDepartmentId}
+                lockDepartment={Boolean(initialDepartmentId)}
+              />
             ) : null}
           </div>
         </div>
@@ -409,9 +397,10 @@ export function InternalEventsCalendarClient({
                 <div className="space-y-3 py-6 text-center">
                   <p className="text-sm text-muted-foreground">No upcoming events.</p>
                   {canBookSpace ? (
-                    <Button size="sm" asChild>
-                      <Link href={buildBookSpaceHref()}>{CREATE_EVENT_CTA_LABEL}</Link>
-                    </Button>
+                    <CreateInternalEventButton
+                      departmentId={initialDepartmentId}
+                      lockDepartment={Boolean(initialDepartmentId)}
+                    />
                   ) : null}
                 </div>
               ) : (

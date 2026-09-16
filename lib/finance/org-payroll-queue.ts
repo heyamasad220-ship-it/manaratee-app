@@ -322,7 +322,9 @@ function mapRows(
         row.hours_worked == null ? null : Number(row.hours_worked),
       amount: roundMoney(Number(row.amount || 0)),
       payBasis:
-        row.pay_basis === "hourly" || row.pay_basis === "monthly"
+        row.pay_basis === "hourly" ||
+        row.pay_basis === "monthly" ||
+        row.pay_basis === "unpaid"
           ? row.pay_basis
           : null,
       status: status as FinancePayrollQueueStatus,

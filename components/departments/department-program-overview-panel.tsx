@@ -9,8 +9,10 @@ import { Button } from "@/components/ui/button"
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { fetchDepartmentYearBasicsAction } from "@/lib/departments/department-year-actions"
 import type { Department } from "@/lib/departments/department-types"
+import { ProgramLeadSettingsCard } from "@/components/programs/program-lead-settings-card"
 import { updateProgramBasics } from "@/lib/programs/program-detail-actions"
 import { YEAR_SEASON_LABEL } from "@/lib/programs/program-display-labels"
+import { setProgramLeadAction } from "@/lib/programs/program-lead-actions"
 import type { Program } from "@/lib/programs/program-types"
 
 function toVisibility(value: string | null | undefined): VisibilityType {
@@ -23,11 +25,13 @@ export function DepartmentProgramOverviewPanel({
   departmentId,
   yearProgramId,
   hideChrome = false,
+  hideEligibility = false,
   onProgramMetaChanged,
 }: {
   departmentId: string
   yearProgramId: string
   hideChrome?: boolean
+  hideEligibility?: boolean
   onProgramMetaChanged?: () => void
 }) {
   const [loading, setLoading] = React.useState(true)
@@ -37,6 +41,7 @@ export function DepartmentProgramOverviewPanel({
   const [departments, setDepartments] = React.useState<Department[]>([])
   const [visibility, setVisibility] = React.useState<string | null>(null)
   const [programStatus, setProgramStatus] = React.useState("draft")
+  const [leadContactId, setLeadContactId] = React.useState("")
   const [canEdit, setCanEdit] = React.useState(false)
 
   const load = React.useCallback(async () => {
@@ -56,6 +61,7 @@ export function DepartmentProgramOverviewPanel({
     setDepartments(result.data.departments)
     setVisibility(result.data.visibility)
     setProgramStatus(result.data.program.status)
+    setLeadContactId(result.data.program.lead_contact_id || "")
     // Same gate as Configure dialog: department manage / year manage via basics load success;
     // editability follows staff manage on save (server enforces).
     setCanEdit(true)
@@ -97,26 +103,41 @@ export function DepartmentProgramOverviewPanel({
         String(formData.get("enrollment_open_date") || "").trim() || null,
       enrollment_close_date:
         String(formData.get("enrollment_close_date") || "").trim() || null,
-      gender: String(formData.get("gender") || "All").trim() || "All",
-      min_age: (() => {
-        const raw = String(formData.get("min_age") || "").trim()
-        if (!raw) return null
-        const n = Number(raw)
-        return Number.isFinite(n) ? n : null
-      })(),
-      max_age: (() => {
-        const raw = String(formData.get("max_age") || "").trim()
-        if (!raw) return null
-        const n = Number(raw)
-        return Number.isFinite(n) ? n : null
-      })(),
+      ...(hideEligibility
+        ? {}
+        : {
+            gender: String(formData.get("gender") || "All").trim() || "All",
+            min_age: (() => {
+              const raw = String(formData.get("min_age") || "").trim()
+              if (!raw) return null
+              const n = Number(raw)
+              return Number.isFinite(n) ? n : null
+            })(),
+            max_age: (() => {
+              const raw = String(formData.get("max_age") || "").trim()
+              if (!raw) return null
+              const n = Number(raw)
+              return Number.isFinite(n) ? n : null
+            })(),
+          }),
       syncOfferingDates: true,
+    })
+
+    if (!result.success) {
+      setSaving(false)
+      setError(result.error)
+      return
+    }
+
+    const leadResult = await setProgramLeadAction({
+      programId: program.id,
+      contactId: leadContactId || null,
     })
 
     setSaving(false)
 
-    if (!result.success) {
-      setError(result.error)
+    if (!leadResult.success) {
+      setError(leadResult.error)
       return
     }
 
@@ -176,6 +197,14 @@ export function DepartmentProgramOverviewPanel({
           programStatusFallback={program.status}
           layout="stack"
           hideDepartment
+          hideEligibility={hideEligibility}
+        />
+
+        <ProgramLeadSettingsCard
+          programId={program.id}
+          currentLeadContactId={program.lead_contact_id}
+          leadContactId={leadContactId}
+          onLeadContactIdChange={setLeadContactId}
         />
 
         {canEdit ? (
@@ -187,7 +216,7 @@ export function DepartmentProgramOverviewPanel({
                   Saving…
                 </>
               ) : (
-                "Save"
+                "Save program details"
               )}
             </Button>
           </div>

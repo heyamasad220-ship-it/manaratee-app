@@ -46,6 +46,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
+import { formatPhoneDisplay } from "@/lib/ui/format-phone"
 import { DEPARTMENT_OPEN_PROGRAM_STATUSES } from "@/lib/departments/department-program-statuses"
 import {
   fetchDepartmentParticipantsAction,
@@ -273,7 +274,9 @@ function RosterContactBlock({
         <div className="text-xs font-normal text-muted-foreground">{email}</div>
       ) : null}
       {phone ? (
-        <div className="text-xs font-normal text-muted-foreground">{phone}</div>
+        <div className="text-xs font-normal text-muted-foreground">
+          {formatPhoneDisplay(phone)}
+        </div>
       ) : null}
     </div>
   )

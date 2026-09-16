@@ -64,16 +64,18 @@ export function isAddonChargeType(chargeType: string | null | undefined) {
   return type === "addon" || type === "fee"
 }
 
-export function resolveProgramAddonType(input: {
+export type ProgramAddonTypeInput = {
   label?: string | null
   lineType?: string | null
   chargeType?: string | null
   metadata?: Record<string, unknown> | null
   quote?: Record<string, unknown> | null
-}): string {
+}
+
+function addonTypeBlob(input: ProgramAddonTypeInput) {
   const meta = input.metadata || {}
   const quote = input.quote || {}
-  const raw = [
+  return [
     input.label,
     input.lineType,
     typeof meta.label === "string" ? meta.label : null,
@@ -85,6 +87,17 @@ export function resolveProgramAddonType(input: {
     .filter(Boolean)
     .join(" ")
     .toLowerCase()
+}
+
+/** Card processing / import transaction fees are not purchased extras. */
+export function isTransactionFeeAddon(input: ProgramAddonTypeInput) {
+  const raw = addonTypeBlob(input)
+  return raw.includes("transaction")
+}
+
+export function resolveProgramAddonType(input: ProgramAddonTypeInput): string {
+  const meta = input.metadata || {}
+  const raw = addonTypeBlob(input)
 
   if (raw.includes("lunch")) return "Lunch"
   if (

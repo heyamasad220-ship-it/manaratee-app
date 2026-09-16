@@ -315,6 +315,9 @@ export function ProgramWorkspaceClient({
       {activeTab === "reports" ? (
         <ProgramWorkspaceReportsPanel
           programId={program.id}
+          programName={programName}
+          departmentId={departmentId}
+          startDate={program.start_date}
           section={reportsSection}
           onSectionChange={handleReportsSectionChange}
         />

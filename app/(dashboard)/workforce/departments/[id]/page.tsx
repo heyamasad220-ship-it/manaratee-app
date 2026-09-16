@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation"
 
 import { DepartmentGroupWorkspaceClient } from "@/components/departments/department-group-workspace-client"
-import { requireDepartmentView } from "@/lib/departments/department-access"
+import { canManageDepartment, requireDepartmentView } from "@/lib/departments/department-access"
 import { hasAnyPermission, PERMISSIONS } from "@/lib/permissions/permissions"
 import { programWorkspaceHrefFromDepartmentYearQuery } from "@/lib/programs/program-workspace-path"
 
@@ -40,7 +40,8 @@ export default async function WorkforceDepartmentDetailPage({
   const from = firstValue(resolved.from)
   const entryPoint = from === "donations" ? "donations" : "hr"
 
-  const [canManageEvents, canRequestEvents] = await Promise.all([
+  const canManageThisDepartment = await canManageDepartment(id)
+  const [canManageEventsPerm, canRequestEventsPerm] = await Promise.all([
     hasAnyPermission(PERMISSIONS.EVENTS_MANAGE, PERMISSIONS.PROGRAMS_MANAGE),
     hasAnyPermission(
       PERMISSIONS.EVENTS_VIEW,
@@ -54,8 +55,8 @@ export default async function WorkforceDepartmentDetailPage({
     <DepartmentGroupWorkspaceClient
       departmentId={id}
       entryPoint={entryPoint}
-      canManageEvents={canManageEvents}
-      canRequestEvents={canRequestEvents}
+      canManageEvents={canManageEventsPerm || canManageThisDepartment}
+      canRequestEvents={canRequestEventsPerm || canManageThisDepartment}
     />
   )
 }

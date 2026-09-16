@@ -1,0 +1,618 @@
+{
+  "mode": "execute",
+  "xlsxPath": "C:/Users/danan/Downloads/Camp_Enrollment_Growth.xlsx",
+  "generatedAt": "2026-09-02T16:47:50.745Z",
+  "excelRows": 3524,
+  "createdPrograms": 4,
+  "createdOfferings": 4,
+  "createdContacts": 279,
+  "reusedContacts": 2376,
+  "createdPeople": 518,
+  "reusedPeople": 2136,
+  "createdEnrollments": 685,
+  "skippedExisting": 1890,
+  "skippedDuplicate": 201,
+  "skippedExistingYear": 667,
+  "skippedUnmapped": 0,
+  "skippedNoMember": 0,
+  "skippedNoParent": 0,
+  "uniqueParents": 827,
+  "byProgram": {
+    "Summer Camp 1 2024": {
+      "rows": 323,
+      "enrolled": 131,
+      "skipped": 192
+    },
+    "Summer Camp 2 2024": {
+      "rows": 324,
+      "enrolled": 296,
+      "skipped": 28
+    },
+    "Spring Camp 2024": {
+      "rows": 38,
+      "enrolled": 38,
+      "skipped": 0
+    },
+    "Summer Camp 1 2025": {
+      "rows": 323,
+      "enrolled": 220,
+      "skipped": 103
+    },
+    "Summer Camp 2 2025": {
+      "rows": 308,
+      "enrolled": 0,
+      "skipped": 308
+    },
+    "Youth Intensive 2025": {
+      "rows": 47,
+      "enrolled": 0,
+      "skipped": 47
+    },
+    "Youth Intensive 2026": {
+      "rows": 35,
+      "enrolled": 0,
+      "skipped": 35
+    },
+    "Fall Camp 2023": {
+      "rows": 49,
+      "enrolled": 0,
+      "skipped": 49
+    },
+    "Fall Camp 2022": {
+      "rows": 69,
+      "enrolled": 0,
+      "skipped": 69
+    },
+    "Fall Camp 2025": {
+      "rows": 39,
+      "enrolled": 0,
+      "skipped": 39
+    },
+    "Fall Camp October 2024": {
+      "rows": 17,
+      "enrolled": 0,
+      "skipped": 17
+    },
+    "Fall Camp November 2024": {
+      "rows": 63,
+      "enrolled": 0,
+      "skipped": 63
+    },
+    "Summer Camp 1 2023": {
+      "rows": 230,
+      "enrolled": 0,
+      "skipped": 230
+    },
+    "Summer Camp 2 2023": {
+      "rows": 213,
+      "enrolled": 0,
+      "skipped": 213
+    },
+    "RIJAAL Overnight Camp 2024": {
+      "rows": 5,
+      "enrolled": 0,
+      "skipped": 5
+    },
+    "Special Needs Summer Camp 2026": {
+      "rows": 3,
+      "enrolled": 0,
+      "skipped": 3
+    },
+    "Spring Camp 2025": {
+      "rows": 16,
+      "enrolled": 0,
+      "skipped": 16
+    },
+    "Spring Camp Week 2 2023": {
+      "rows": 50,
+      "enrolled": 0,
+      "skipped": 50
+    },
+    "Spring Camp Week 1 2023": {
+      "rows": 30,
+      "enrolled": 0,
+      "skipped": 30
+    },
+    "Summer Camp 1 2022": {
+      "rows": 167,
+      "enrolled": 0,
+      "skipped": 167
+    },
+    "Summer Camp 2 2022": {
+      "rows": 133,
+      "enrolled": 0,
+      "skipped": 133
+    },
+    "Winter Break Camp 2024": {
+      "rows": 92,
+      "enrolled": 0,
+      "skipped": 92
+    },
+    "Winter Camp Ready Set Pray 2024": {
+      "rows": 98,
+      "enrolled": 0,
+      "skipped": 98
+    },
+    "Winter Camp 2022": {
+      "rows": 68,
+      "enrolled": 0,
+      "skipped": 68
+    },
+    "Winter Camp 2025": {
+      "rows": 117,
+      "enrolled": 0,
+      "skipped": 117
+    }
+  },
+  "unmapped": [],
+  "errors": [
+    {
+      "member": "Usman Khawaja",
+      "program": "Summer Camp 1 2024",
+      "error": "enrollment Usman Khawaja: canceling statement due to statement timeout"
+    },
+    {
+      "member": "Jibreal Ismail",
+      "program": "Summer Camp 1 2024",
+      "error": "enrollment Jibreal Ismail: canceling statement due to statement timeout"
+    },
+    {
+      "member": "Noor Zafar",
+      "program": "Summer Camp 1 2024",
+      "error": "find_or_create_contact: canceling statement due to statement timeout"
+    },
+    {
+      "member": "Adam Chweki",
+      "program": "Summer Camp 1 2024",
+      "error": "child person: canceling statement due to statement timeout"
+    },
+    {
+      "member": "Adam Hassanein",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Adam Hassanein: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Yusuf Abounada",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Yusuf Abounada: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Reem Hjaz",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Reem Hjaz: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Sham Hjaz",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Sham Hjaz: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Sarah Kadiwala",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Sarah Kadiwala: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Ayla Taher",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Ayla Taher: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Anas Sheatt",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Anas Sheatt: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Jas Sheatt",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Jas Sheatt: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "jana zaghmouri",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment jana zaghmouri: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "mohammad zaghmouri",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment mohammad zaghmouri: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Yusuf Ghanim",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Yusuf Ghanim: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Adnan Abusamrah",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Adnan Abusamrah: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Yaseen Abusamrah",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Yaseen Abusamrah: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Lily Hamideh",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Lily Hamideh: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Yusuf Dabaja",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Yusuf Dabaja: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Zain Khanshour Khanshour",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Zain Khanshour Khanshour: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Anna Khanshour",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Anna Khanshour: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Hassaan Massey",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Hassaan Massey: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Masarrah Massey",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Masarrah Massey: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Sara Salim",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Sara Salim: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Farrah Salim",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Farrah Salim: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Salina Elghandour",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Salina Elghandour: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Salma Elghandour",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Salma Elghandour: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Jad Eido",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Jad Eido: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Hadi Eido",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Hadi Eido: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Othman Abazid",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Othman Abazid: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Maria Abazid",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Maria Abazid: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Nuh Bryant",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Nuh Bryant: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Eman Naviwala",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Eman Naviwala: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "esa naviwala",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment esa naviwala: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Rayan Saafan",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Rayan Saafan: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Sophia Abukhalil",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Sophia Abukhalil: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Jad Adam Kawsara",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Jad Adam Kawsara: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Emaan Zaki",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Emaan Zaki: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Noora Ramadan",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Noora Ramadan: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Amin Ramadan",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Amin Ramadan: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Asya Ramadan",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Asya Ramadan: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Yaqub Sammour",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Yaqub Sammour: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Omar Owda",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Omar Owda: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Hajer Odeh",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Hajer Odeh: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Sana Younes",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Sana Younes: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Rayan Althubhani",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Rayan Althubhani: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Maysan Abusaad",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Maysan Abusaad: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Hana Ahmed",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Hana Ahmed: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Salma Ahmed",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Salma Ahmed: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Yasmeen Hassanein",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Yasmeen Hassanein: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Deena Mohammed",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Deena Mohammed: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Mira Shishakly",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Mira Shishakly: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Joori Shishakly",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Joori Shishakly: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Jana Ajaj",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Jana Ajaj: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Raafae Ahmed",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Raafae Ahmed: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Numair Ahmed",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Numair Ahmed: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Salma Abouelazm",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Salma Abouelazm: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Yahya Abouelazm",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Yahya Abouelazm: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Zain Abouelazm",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Zain Abouelazm: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Noah Shabaneh",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Noah Shabaneh: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Mira Qunies",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Mira Qunies: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Mahir Khaled Qunies",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Mahir Khaled Qunies: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Mohammad Kharashqah",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Mohammad Kharashqah: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Tameem Kharashqah",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Tameem Kharashqah: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Abdullah Rahma",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Abdullah Rahma: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Maryam Rahma",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Maryam Rahma: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Minnah Rahma",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Minnah Rahma: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Laith Luai Othman",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Laith Luai Othman: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Layan Luai Othman",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Layan Luai Othman: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Omar Ahmed",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Omar Ahmed: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Alia Muhareb",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Alia Muhareb: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Awad Muhareb",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Awad Muhareb: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Ahmad Ismail",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Ahmad Ismail: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Dana Ismail",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Dana Ismail: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Nooran Alnadari",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Nooran Alnadari: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Yamin Elmezayen",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Yamin Elmezayen: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Yousef Abunameh",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Yousef Abunameh: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Zeina Abugharbea",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Zeina Abugharbea: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Jumana Abugharbea",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Jumana Abugharbea: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Abdullah Abugharbea",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Abdullah Abugharbea: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    },
+    {
+      "member": "Yaseen odeh",
+      "program": "Summer Camp 1 2025",
+      "error": "enrollment Yaseen odeh: insert or update on table \"program_enrollments\" violates foreign key constraint \"program_enrollments_program_id_fkey\""
+    }
+  ],
+  "samples": [
+    {
+      "program": "Summer Camp 1 2024",
+      "member": "Jenin Abdelwahab",
+      "parent": "Sana Abdelwahab"
+    },
+    {
+      "program": "Summer Camp 1 2024",
+      "member": "Lulu Abdelwahab",
+      "parent": "Sana Abdelwahab"
+    },
+    {
+      "program": "Summer Camp 1 2024",
+      "member": "Adam Shmaitelly",
+      "parent": "Nadinjrab"
+    },
+    {
+      "program": "Summer Camp 1 2024",
+      "member": "Ahmad Al Hallak",
+      "parent": "Anas Hallak"
+    },
+    {
+      "program": "Summer Camp 1 2024",
+      "member": "Naya Al Hallak",
+      "parent": "Anas Hallak"
+    },
+    {
+      "program": "Summer Camp 1 2024",
+      "member": "Eiad Adi",
+      "parent": "Alia Aljoudi"
+    },
+    {
+      "program": "Summer Camp 1 2024",
+      "member": "Farouk Adi",
+      "parent": "Alia Aljoudi"
+    },
+    {
+      "program": "Summer Camp 1 2024",
+      "member": "Jenna Abu Ali",
+      "parent": "AMEERA ABUALI"
+    },
+    {
+      "program": "Summer Camp 1 2024",
+      "member": "Ameera Abdalla",
+      "parent": "Omar Syed Abdulla"
+    },
+    {
+      "program": "Summer Camp 1 2024",
+      "member": "Malak Abdalla",
+      "parent": "Omar Syed Abdulla"
+    },
+    {
+      "program": "Summer Camp 1 2024",
+      "member": "Yusuf Abdalla",
+      "parent": "Omar Syed Abdulla"
+    },
+    {
+      "program": "Summer Camp 1 2024",
+      "member": "Ibraheem Abdalla",
+      "parent": "Omar Syed Abdulla"
+    }
+  ],
+  "programCount": 25
+}

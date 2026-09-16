@@ -27,6 +27,7 @@ export interface InternalEvent {
   requires_childcare?: boolean
   requires_vendors?: boolean
   requires_ticketing?: boolean
+  ticketing_category_id?: string | null
   service_requirements?: EventServiceRequirements
   ticketing_config?: EventTicketingConfig
   /** Progressive Event Workspace module toggles (JSONB). */

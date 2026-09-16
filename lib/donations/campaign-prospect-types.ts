@@ -178,6 +178,8 @@ export type CampaignProspectsPageInput = {
   priority?: string | null
   followUp?: "overdue" | "upcoming" | "any" | null
   pledged?: "pledged" | "not_pledged" | "any" | null
+  /** When true, restrict to CAMPAIGN_PROSPECT_ASKED_STAGES (Asked or Pledged). */
+  asked?: boolean | null
   sortBy?: "contact" | "suggested_ask" | "stage" | "next_follow_up" | "assigned_to"
   sortAsc?: boolean
 }

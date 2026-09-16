@@ -11,7 +11,7 @@
  *   - $120 per student (sibling #2+ get 5% off → $114)
  *   - Payments sheet is source of truth for money received:
  *       REGISTRATION_AMOUNT → tuition payments (amount + date)
- *       ADDONS_AMOUNT → $5 transaction fee (staff families are 50% of that)
+ *       ADDONS_AMOUNT is not imported (transaction-fee add-ons are retired)
  *   - Master Registration Report is source of truth for tuition due / discounts
  *   - Staff families: 50% staff discount
  *   - Habiba Hassan: 3% full-payment discount; tuition $234; paid $240 (extra $6)
@@ -1280,6 +1280,7 @@ async function main() {
     skippedByRule: [],
     createdCharges: 0,
     createdAddonCharges: 0,
+    skippedTransactionFeeAddons: 0,
     createdPlans: 0,
     errors: [],
     feeScaledFamilies: 0,
@@ -1703,116 +1704,7 @@ async function main() {
 
       const addonAmount = round2(family.addonTotal || 0)
       if (addonAmount > 0.009) {
-        if (!execute) {
-          report.createdAddonCharges += 1
-        } else {
-          const host = family.children.find((c) => c.enrollmentId)
-          if (host?.enrollmentId) {
-            const addonKey = `${IMPORT_TAG}:txn:${family.key}`
-            const { data: existingAddon } = await sb
-              .from("program_charges")
-              .select("id")
-              .eq("organization_id", ORG_ID)
-              .eq("enrollment_id", host.enrollmentId)
-              .eq("charge_type", "addon")
-              .contains("metadata", { import_key: addonKey })
-              .maybeSingle()
-
-            const addonPayments =
-              family.addonPayments?.length > 0
-                ? family.addonPayments
-                : [
-                    {
-                      amount: addonAmount,
-                      iso:
-                        family.payments.find((p) => p.amount > 0 && p.iso)?.iso ||
-                        null,
-                      key: addonKey,
-                      amountType: "ADDONS_AMOUNT",
-                    },
-                  ]
-            const addonPaidAt = addonPayments.find((p) => p.iso)?.iso || null
-            const qty = addonPayments.length > 1 ? addonPayments.length : 1
-
-            let addonChargeId = existingAddon?.id || null
-            if (!addonChargeId) {
-              const addonCharge = await must(
-                `addon fee ${family.parentEmail || family.parentPhone}`,
-                sb
-                  .from("program_charges")
-                  .insert({
-                    organization_id: ORG_ID,
-                    enrollment_id: host.enrollmentId,
-                    charge_type: "addon",
-                    source_type: "manual",
-                    payer_contact_id: parentContact.id,
-                    registrant_contact_id: parentContact.id,
-                    program_id: program.id,
-                    offering_id: offerings.get(
-                      norm(host.offering).toLowerCase()
-                    )?.id,
-                    currency: "USD",
-                    subtotal: addonAmount,
-                    discount_total: 0,
-                    total: addonAmount,
-                    due_today: 0,
-                    amount_paid: addonAmount,
-                    payment_required: true,
-                    charge_status: "paid",
-                    checkout_status: "paid",
-                    paid_at: addonPaidAt,
-                    metadata: {
-                      import_tag: IMPORT_TAG,
-                      import_key: addonKey,
-                      label: "Transaction fee",
-                      staff_half: family.discountKind === "staff",
-                      paid_source: family.paidSource || null,
-                    },
-                    quote_snapshot: {
-                      import: IMPORT_TAG,
-                      type: "transaction_fee",
-                    },
-                  })
-                  .select("id")
-                  .single()
-              )
-              addonChargeId = addonCharge.id
-              await sb.from("program_charge_lines").insert({
-                organization_id: ORG_ID,
-                charge_id: addonChargeId,
-                line_type: "addon",
-                label: "Transaction fee",
-                quantity: qty,
-                unit_amount: round2(addonAmount / qty),
-                amount: addonAmount,
-                sort_order: 0,
-                metadata: {
-                  import_tag: IMPORT_TAG,
-                  addon_kind: "transaction_fee",
-                },
-              })
-              report.createdAddonCharges += 1
-            } else {
-              await sb
-                .from("program_charges")
-                .update({
-                  total: addonAmount,
-                  subtotal: addonAmount,
-                  amount_paid: addonAmount,
-                  paid_at: addonPaidAt,
-                })
-                .eq("id", addonChargeId)
-                .eq("organization_id", ORG_ID)
-            }
-
-            await replaceChargePaymentSchedules(
-              sb,
-              addonChargeId,
-              addonPayments,
-              "Transaction fee"
-            )
-          }
-        }
+        report.skippedTransactionFeeAddons += 1
       }
     } catch (err) {
       report.errors.push({
@@ -1850,6 +1742,7 @@ async function main() {
         skippedExisting: report.skippedExisting,
         createdCharges: report.createdCharges,
         createdAddonCharges: report.createdAddonCharges,
+        skippedTransactionFeeAddons: report.skippedTransactionFeeAddons,
         createdPlans: report.createdPlans,
         unmatchedPayments: report.unmatchedPayments,
         skippedNoOffering: report.skippedNoOffering.length,

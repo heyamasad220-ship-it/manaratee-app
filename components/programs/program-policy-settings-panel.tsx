@@ -113,9 +113,12 @@ function StubNote() {
 export function ProgramPolicySettingsPanel({
   departmentId,
   section,
+  omitRepeatedFields = false,
 }: {
   departmentId: string
   section: "registration" | "notifications"
+  /** Hide waitlist and age fields already shown on General. */
+  omitRepeatedFields?: boolean
 }) {
   const supabase = createClient()
 
@@ -340,12 +343,16 @@ export function ProgramPolicySettingsPanel({
 
   return (
     <div className="flex flex-col gap-6">
-      <StubNote />
+      {omitRepeatedFields ? null : <StubNote />}
       <Card>
         <CardHeader>
-          <CardTitle>Waitlist and payment</CardTitle>
+          <CardTitle>
+            {omitRepeatedFields ? "Payment" : "Waitlist and payment"}
+          </CardTitle>
           <CardDescription>
-            Capacity, waitlist, and payment rules used at registration.
+            {omitRepeatedFields
+              ? "Default capacity, duration, and payment rules used at registration."
+              : "Capacity, waitlist, and payment rules used at registration."}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
@@ -381,12 +388,14 @@ export function ProgramPolicySettingsPanel({
               </Select>
             </div>
           </div>
+          {omitRepeatedFields ? null : (
           <SettingSwitch
             label="Allow Waitlist"
             description="Enable waitlist when programs reach capacity"
             checked={settings.allow_waitlist}
             onCheckedChange={(checked) => updateSetting("allow_waitlist", checked)}
           />
+          )}
           <SettingSwitch
             label="Require Payment at Registration"
             description="Registrations require immediate payment"
@@ -406,6 +415,7 @@ export function ProgramPolicySettingsPanel({
         </CardContent>
       </Card>
 
+      {omitRepeatedFields ? null : (
       <Card>
         <CardHeader>
           <CardTitle>Age Verification</CardTitle>
@@ -430,6 +440,7 @@ export function ProgramPolicySettingsPanel({
           />
         </CardContent>
       </Card>
+      )}
 
       <Card>
         <CardHeader>
@@ -555,7 +566,7 @@ export function ProgramPolicySettingsPanel({
           onClick={() => void handleSaveSettings()}
           disabled={saving || loading || !tablesAvailable}
         >
-          {saving ? "Saving..." : "Save Changes"}
+          {saving ? "Saving..." : "Save registration policy"}
         </Button>
       </div>
     </div>

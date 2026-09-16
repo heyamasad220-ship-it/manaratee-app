@@ -6,6 +6,7 @@ import {
   Building2,
   Calendar as CalendarIcon,
   ChevronDown,
+  ExternalLink,
   Globe,
   Loader2,
   MapPin,
@@ -13,6 +14,7 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react"
+import Link from "next/link"
 
 import {
   Sheet,
@@ -65,6 +67,10 @@ import {
   type FacilityEventEditPayload,
 } from "@/lib/events/facility-event-edit-payload"
 import type { RoomSetupStyle } from "@/lib/setup-styles/setup-style-types"
+import {
+  buildFacilitiesCalendarHref,
+  VIEW_FACILITY_CALENDAR_CTA_LABEL,
+} from "@/lib/events/facility-event-request-href"
 
 export type FacilityEventRequestDrawerProps = {
   open: boolean
@@ -90,6 +96,15 @@ export type FacilityEventRequestDrawerProps = {
   onSubmitted?: (eventId: string) => void
   /** Prefer "member-staff" for customer portal — still calls same submit. */
   requestOrigin?: "staff-dashboard" | "member-staff"
+  /**
+   * `calendar-link`: no room picker on create; staff check Facilities then come back.
+   * `select`: pick rooms in this drawer (Facilities calendar / edit).
+   */
+  spaceMode?: "select" | "calendar-link"
+  linkedCampaignId?: string | null
+  approvalRequired?: boolean
+  calendarReturnTo?: string | null
+  calendarDepartmentId?: string | null
 }
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
@@ -184,6 +199,11 @@ export function FacilityEventRequestDrawer({
   editEventId = null,
   onSubmitted,
   requestOrigin = "staff-dashboard",
+  spaceMode = "select",
+  linkedCampaignId = null,
+  approvalRequired = false,
+  calendarReturnTo = null,
+  calendarDepartmentId = null,
 }: FacilityEventRequestDrawerProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -462,7 +482,14 @@ export function FacilityEventRequestDrawer({
     if (!name.trim()) return "Event name is required."
     if (!departmentId) return "Department is required."
     if (!eventTypeId) return "Event type is required."
-    if (isFacility && venueIds.length === 0) return "Select at least one venue."
+    if (
+      isFacility &&
+      spaceMode === "select" &&
+      !isEditMode &&
+      venueIds.length === 0
+    ) {
+      return "Select at least one venue."
+    }
     if (isExternal) {
       if (!externalVenueName.trim()) return "External venue name is required."
       if (!externalAddress.trim()) return "External venue address is required."
@@ -543,6 +570,7 @@ export function FacilityEventRequestDrawer({
           eventId = await submitInternalEventRequest({
             ...basePayload,
             recurrence_config: recurrenceConfig,
+            linkedCampaignId,
           })
         }
 
@@ -569,13 +597,25 @@ export function FacilityEventRequestDrawer({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-xl">
         <SheetHeader className="border-b px-6 py-4">
-          <SheetTitle>{isEditMode ? "Edit Event" : "Request an Event"}</SheetTitle>
+          <SheetTitle>
+            {isEditMode
+              ? "Edit Event"
+              : requestOrigin === "member-staff"
+                ? "Request an Event"
+                : "Create event"}
+          </SheetTitle>
           <p className="text-sm text-muted-foreground">
             {isEditMode
               ? "Update event details. Changes save to this occurrence."
               : isFacility
-                ? "Center events are sent to facility staff for approval so space can be coordinated."
-                : "Online and External Venue events are confirmed when you submit — no facility approval needed."}
+                ? spaceMode === "calendar-link"
+                  ? approvalRequired
+                    ? "Check the facility calendar for space, then come back to finish. This on-site event will wait in Pending until it is confirmed."
+                    : "Check the facility calendar for space, then come back to finish this form. Online and External Venue skip Facilities."
+                  : approvalRequired
+                    ? "Center events wait for approval so space can be coordinated."
+                    : "Choose spaces on this calendar, then submit. Approval is not required."
+                : "Online and External Venue events do not use Facilities and do not wait for approval."}
           </p>
         </SheetHeader>
 
@@ -934,13 +974,36 @@ export function FacilityEventRequestDrawer({
                 <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   Center details
                 </Label>
-                <FacilityVenueMultiSelect
-                  label="Venue(s)"
-                  value={venueIds}
-                  venues={venues}
-                  required
-                  onChange={setVenueIds}
-                />
+                {spaceMode === "calendar-link" && !isEditMode ? (
+                  <div className="rounded-md border bg-muted/30 p-3">
+                    <p className="text-sm text-muted-foreground">
+                      Rooms are not picked in this window. Open the facility
+                      calendar to check availability, then come back to finish.
+                    </p>
+                    <Button variant="outline" size="sm" className="mt-3" asChild>
+                      <Link
+                        href={buildFacilitiesCalendarHref({
+                          departmentId:
+                            calendarDepartmentId || departmentId || null,
+                          returnTo: calendarReturnTo,
+                        })}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <ExternalLink className="mr-2 h-4 w-4" />
+                        {VIEW_FACILITY_CALENDAR_CTA_LABEL}
+                      </Link>
+                    </Button>
+                  </div>
+                ) : (
+                  <FacilityVenueMultiSelect
+                    label="Venue(s)"
+                    value={venueIds}
+                    venues={venues}
+                    required={spaceMode === "select" && !isEditMode}
+                    onChange={setVenueIds}
+                  />
+                )}
                 <SetupStyleField
                   value={setupStyle}
                   setupStyles={setupStyles}
@@ -1051,10 +1114,10 @@ export function FacilityEventRequestDrawer({
                 </>
               ) : isEditMode ? (
                 "Save changes"
-              ) : isFacility ? (
+              ) : isFacility && approvalRequired ? (
                 "Submit for approval"
               ) : (
-                "Submit"
+                "Create event"
               )}
             </Button>
           </div>

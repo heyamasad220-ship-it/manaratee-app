@@ -6,6 +6,10 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import {
+  canManageEnrollment,
+  canManageWaitlist,
+} from "@/lib/programs/program-access"
+import {
   advanceEnrollmentStatusRpc,
   cancelEnrollmentRpc,
   promoteWaitlistRpc,
@@ -28,6 +32,18 @@ async function requireOrganizationId() {
   return organizationId
 }
 
+async function assertCanManageEnrollmentOrThrow(enrollmentId: string) {
+  if (!(await canManageEnrollment(enrollmentId))) {
+    throw new Error("You do not have permission to manage this registration.")
+  }
+}
+
+async function assertCanManageWaitlistOrThrow(waitlistId: string) {
+  if (!(await canManageWaitlist(waitlistId))) {
+    throw new Error("You do not have permission to manage this waitlist entry.")
+  }
+}
+
 export async function markEnrollmentPaymentAction(formData: FormData) {
   const organizationId = await requireOrganizationId()
   const enrollmentId = String(formData.get("enrollment_id") || "")
@@ -41,6 +57,7 @@ export async function markEnrollmentPaymentAction(formData: FormData) {
   if (!enrollmentId || !allowedStatuses.includes(paymentStatus)) {
     refreshAndRedirect(redirectTo)
   }
+  await assertCanManageEnrollmentOrThrow(enrollmentId)
 
   const supabase = await createClient()
 
@@ -93,6 +110,7 @@ export async function cancelEnrollmentAction(formData: FormData) {
   if (!enrollmentId) {
     refreshAndRedirect(redirectTo)
   }
+  await assertCanManageEnrollmentOrThrow(enrollmentId)
 
   await cancelEnrollmentRpc({
     organizationId,
@@ -117,6 +135,7 @@ export async function advanceEnrollmentStatusAction(formData: FormData) {
   if (!enrollmentId || !allowedTargets.includes(targetStatus)) {
     refreshAndRedirect(redirectTo)
   }
+  await assertCanManageEnrollmentOrThrow(enrollmentId)
 
   await advanceEnrollmentStatusRpc({
     organizationId,
@@ -139,6 +158,7 @@ export async function removeWaitlistEntryAction(formData: FormData) {
   if (!waitlistId) {
     refreshAndRedirect(redirectTo)
   }
+  await assertCanManageWaitlistOrThrow(waitlistId)
 
   await removeWaitlistRpc({
     organizationId,
@@ -162,6 +182,7 @@ export async function promoteWaitlistAction(formData: FormData) {
   if (!waitlistId) {
     refreshAndRedirect(redirectTo)
   }
+  await assertCanManageWaitlistOrThrow(waitlistId)
 
   const result = await promoteWaitlistRpc({
     organizationId,

@@ -7,9 +7,11 @@ import {
   AGE_OPTIONS,
   ageSelectValue,
 } from "@/components/programs/edit/utils"
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
+import { FacilityVenueSelect } from "@/components/reservations/facility-venue-select"
 import { PROGRAM_LABEL_PLURAL } from "@/lib/programs/program-display-labels"
 import type { OfferingDeliveryFormat } from "@/lib/programs/program-offering-attributes"
 import {
@@ -40,6 +42,8 @@ export type OfferingBasicsFormValues = {
   capacity: string
   feeAmount?: string
   openEnrollment?: boolean
+  facilityVenueId?: string
+  facilityLocationLabel?: string
 }
 
 export type OfferingBasicsFormProps = {
@@ -63,6 +67,8 @@ export type OfferingBasicsFormProps = {
   allowedKinds?: ProgramKind[]
   /** When true, Type radio is hidden (kind locked by entry CTA / parent). */
   hideKindPicker?: boolean
+  /** Edit: bookable spaces so staff can assign or clear the class room. */
+  venues?: Array<{ id: string; name: string }>
 }
 
 export function OfferingBasicsForm({
@@ -78,6 +84,7 @@ export function OfferingBasicsForm({
   kindRadioName = "offering-form-kind",
   allowedKinds,
   hideKindPicker = false,
+  venues = [],
 }: OfferingBasicsFormProps) {
   const isSeasonal = values.kind === "seasonal"
   const kindChoices =
@@ -172,6 +179,57 @@ export function OfferingBasicsForm({
           </p>
         ) : null}
       </div>
+
+      {mode === "edit" ? (
+        <div className="space-y-2">
+          {values.facilityLocationLabel ? (
+            <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-sm">
+              <span>
+                Current space:{" "}
+                <span className="font-medium">{values.facilityLocationLabel}</span>
+              </span>
+              {values.deliveryFormat === "online" ? null : (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="shrink-0"
+                  disabled={disabled}
+                  onClick={() =>
+                    onChange({
+                      facilityVenueId: "",
+                      facilityLocationLabel: "",
+                    })
+                  }
+                >
+                  Remove
+                </Button>
+              )}
+            </div>
+          ) : null}
+          {values.deliveryFormat === "online" ? (
+            <p className="text-xs text-muted-foreground">
+              {values.facilityLocationLabel
+                ? "Online classes do not reserve a room. Saving will remove this space and clear those times from the Facilities calendar."
+                : "Online classes do not reserve a room. Saving will remove any assigned space and clear those times from the Facilities calendar."}
+            </p>
+          ) : (
+            <FacilityVenueSelect
+              id={`${mode}-offering-facility`}
+              value={values.facilityVenueId ?? ""}
+              venues={venues}
+              disabled={disabled}
+              noneLabel="No space assigned"
+              onChange={(venueId, venueName) =>
+                onChange({
+                  facilityVenueId: venueId,
+                  facilityLocationLabel: venueName ?? "",
+                })
+              }
+            />
+          )}
+        </div>
+      ) : null}
 
       {mode === "edit" ? (
         <div className="space-y-2">

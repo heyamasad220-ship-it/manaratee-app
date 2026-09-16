@@ -1,5 +1,15 @@
 import type { SubItem } from "@/lib/navigation/sidebar-nav"
 import type { OrganizationProgramKindsEntitlement } from "@/lib/programs/program-kind-policy"
+import {
+  PROGRAMS_FINANCE_PATH,
+  PROGRAMS_FINANCE_PAYROLL_PATH,
+  PROGRAMS_FINANCIAL_ASSISTANCE_PATH,
+  PROGRAMS_LIST_PATH,
+  PROGRAMS_OVERVIEW_PATH,
+  PROGRAMS_REGISTRATIONS_PATH,
+  PROGRAMS_REPORTS_PATH,
+  PROGRAMS_SETTINGS_PATH,
+} from "@/lib/programs/programs-module-nav"
 
 export const ADMINISTRATION_MODULE_LABEL = "Administration"
 export const ADMINISTRATION_MODULE_SLUG = "administration"
@@ -83,17 +93,84 @@ export function buildAdministrationChildren(slugs: StaffModuleSlugSet): SubItem[
 export function buildProgramsChildren(
   _entitlement: OrganizationProgramKindsEntitlement
 ): SubItem[] {
-  return []
+  return [
+    {
+      label: "Overview",
+      href: PROGRAMS_OVERVIEW_PATH,
+      matchPrefix: PROGRAMS_OVERVIEW_PATH,
+      exact: true,
+      permissionKey: "programs.view",
+    },
+    {
+      label: "All programs",
+      href: PROGRAMS_LIST_PATH,
+      matchPrefix: "/programs",
+      excludeMatchPrefixes: [
+        PROGRAMS_REGISTRATIONS_PATH,
+        "/programs/reports",
+        PROGRAMS_SETTINGS_PATH,
+        "/programs/catalog",
+        "/programs/financial-assistance",
+        "/programs/instructors",
+        "/programs/calendar",
+        "/programs/schedule",
+        "/programs/participants",
+      ],
+      permissionKey: "programs.view",
+    },
+    {
+      label: "Registrations",
+      href: PROGRAMS_REGISTRATIONS_PATH,
+      matchPrefix: PROGRAMS_REGISTRATIONS_PATH,
+      permissionKey: "programs.view",
+    },
+    {
+      label: "Finance",
+      href: PROGRAMS_FINANCE_PATH,
+      matchPrefix: PROGRAMS_FINANCE_PATH,
+      alsoMatchPrefixes: [PROGRAMS_FINANCE_PAYROLL_PATH],
+      permissionKey: "finance.view",
+      permissionKeys: ["finance.view", "reports.view"],
+    },
+    {
+      label: "Financial Assistance",
+      href: PROGRAMS_FINANCIAL_ASSISTANCE_PATH,
+      matchPrefix: PROGRAMS_FINANCIAL_ASSISTANCE_PATH,
+      alsoMatchPrefixes: ["/programs/financial-assistance"],
+      permissionKey: "applications.view",
+      permissionKeys: ["finance.view", "applications.view"],
+    },
+    {
+      label: "Reports",
+      href: PROGRAMS_REPORTS_PATH,
+      matchPrefix: "/programs/reports",
+      permissionKey: "programs.view",
+    },
+    {
+      label: "Settings",
+      href: PROGRAMS_SETTINGS_PATH,
+      matchPrefix: PROGRAMS_SETTINGS_PATH,
+      permissionKey: "programs.view",
+    },
+  ]
 }
 
 export function buildEventManagementChildren(): SubItem[] {
   return [
     {
-      label: "Events",
+      label: "Overview",
       href: "/event-management",
+      matchPrefix: "/event-management",
+      exact: true,
+      permissionKey: "events.view",
+    },
+    {
+      label: "Events",
+      href: "/event-management/events",
       matchPrefix: "/event-management",
       excludeMatchPrefixes: [
         "/event-management/calendar",
+        "/event-management/check-in",
         "/event-management/ticketing",
         "/event-management/settings",
         "/event-management/reports",
@@ -107,10 +184,11 @@ export function buildEventManagementChildren(): SubItem[] {
       permissionKey: "events.view",
     },
     {
-      label: "Ticketing",
-      href: "/event-management/ticketing",
-      matchPrefix: "/event-management/ticketing",
-      permissionKey: "ticketing.view",
+      label: "Check-in",
+      href: "/event-management/check-in",
+      matchPrefix: "/event-management/check-in",
+      permissionKey: "events.view",
+      permissionKeys: ["events.view", "events.checkin", "ticketing.view"],
     },
     {
       label: "Reports",

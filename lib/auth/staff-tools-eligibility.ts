@@ -1,7 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 
 import { resolveDepartmentHeadship } from "@/lib/departments/department-headship"
+import { resolveProgramLeads } from "@/lib/programs/program-leadship"
 import { resolvePortalPermissions } from "@/lib/auth/resolve-portal-permissions"
+import { resolveStaffIdentityForUser } from "@/lib/organizations/work-email-lookups"
 
 /** Contact roles that can use Staff Tools in the member portal. */
 export const STAFF_TOOLS_CONTACT_ROLES = ["employee"] as const
@@ -34,7 +36,7 @@ export async function resolveStaffToolsPortalAccess(
     role: string | null
     role_id: string | null
   } | null,
-  contactId?: string | null
+  _contactId?: string | null
 ): Promise<boolean> {
   const portalPermissions = await resolvePortalPermissions(
     supabase,
@@ -46,7 +48,14 @@ export async function resolveStaffToolsPortalAccess(
     return true
   }
 
+  const identity = await resolveStaffIdentityForUser(
+    supabase,
+    organizationId,
+    userId
+  )
+
   // Department Heads get Staff Tools so they can open My department.
+  // Headship follows the work-email assignment when one exists.
   const headship = await resolveDepartmentHeadship(
     supabase,
     organizationId,
@@ -56,18 +65,12 @@ export async function resolveStaffToolsPortalAccess(
     return true
   }
 
-  let resolvedContactId = contactId
-
-  if (!resolvedContactId) {
-    const { data: contact } = await supabase
-      .from("contacts")
-      .select("id")
-      .eq("organization_id", organizationId)
-      .eq("auth_user_id", userId)
-      .maybeSingle()
-
-    resolvedContactId = contact?.id
+  const leads = await resolveProgramLeads(supabase, organizationId, userId)
+  if (leads.length > 0) {
+    return true
   }
+
+  const resolvedContactId = identity.staffContactId
 
   if (!resolvedContactId) {
     return false

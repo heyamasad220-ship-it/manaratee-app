@@ -7,6 +7,7 @@ import { getDepartments } from "@/lib/departments/department-queries"
 import { getEventTypes } from "@/lib/events/event-type-queries"
 import { getInternalEventFormDefaults } from "@/lib/events/internal-event-form-defaults"
 import { getActiveCalendarVenues } from "@/lib/bookings/venue-calendar-venues"
+import { getEventManagementSettings } from "@/lib/events/event-management-settings"
 import { getRoomSetupStyles } from "@/lib/setup-styles/setup-style-queries"
 
 type PageProps = {
@@ -28,12 +29,14 @@ export default async function CustomerStaffEventRequestPage({
   }
 
   const params = await searchParams
-  const [departments, eventTypes, venues, defaults, setupStyles] = await Promise.all([
+  const [departments, eventTypes, venues, defaults, setupStyles, settings] =
+    await Promise.all([
     getDepartments(),
     getEventTypes({ activeOnly: true }),
     getActiveCalendarVenues(),
     getInternalEventFormDefaults(),
     getRoomSetupStyles({ activeOnly: true }),
+    getEventManagementSettings(organizationId),
   ])
 
   return (
@@ -48,6 +51,7 @@ export default async function CustomerStaffEventRequestPage({
         startAt: params?.start || "",
         endAt: params?.end || "",
       }}
+      approvalRequired={settings.approvalRequired}
     />
   )
 }

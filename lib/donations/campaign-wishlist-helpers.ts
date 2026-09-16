@@ -58,11 +58,28 @@ export function mapCampaignWishlistItemRow(row: Record<string, unknown>): Campai
   }
 }
 
+export async function assertCampaignBelongsToOrganization(
+  supabase: SupabaseClient,
+  organizationId: string,
+  campaignId: string
+) {
+  const { data, error } = await supabase
+    .from("campaigns")
+    .select("id")
+    .eq("id", campaignId)
+    .eq("organization_id", organizationId)
+    .maybeSingle()
+  if (error) throw new Error(error.message)
+  if (!data) throw new Error("Campaign not found.")
+}
+
 export async function fetchCampaignWishlistItems(
   supabase: SupabaseClient,
   organizationId: string,
   campaignId: string
 ) {
+  await assertCampaignBelongsToOrganization(supabase, organizationId, campaignId)
+
   const { data, error } = await supabase
     .from("campaign_wishlist_items")
     .select(CAMPAIGN_WISHLIST_SELECT)

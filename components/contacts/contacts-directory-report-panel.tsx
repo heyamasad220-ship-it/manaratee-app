@@ -23,6 +23,7 @@ import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
 import { fetchFamilyListSummariesAction } from "@/lib/contacts/family-actions"
 import { clearSelectedOrganizationIdCache } from "@/lib/current-organization"
 import { Badge } from "@/components/ui/badge"
+import { PhoneText } from "@/components/ui/phone-text"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -547,7 +548,7 @@ function ContactDirectoryTable({
                     ) : null}
                   </TableCell>
                   <TableCell>{contact.email || "—"}</TableCell>
-                  <TableCell>{contact.phone || "—"}</TableCell>
+                  <TableCell><PhoneText value={contact.phone} /></TableCell>
                   <TableCell>
                     {contact.roles.length > 0 ? (
                       <div className="flex flex-wrap gap-1">

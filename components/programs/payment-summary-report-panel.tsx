@@ -25,6 +25,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
+import { formatPhoneDisplay } from "@/lib/ui/format-phone"
 import {
   getPaymentSummaryRows,
   type PaymentSummaryRow,
@@ -122,7 +123,9 @@ function SummaryContactBlock({
         <div className="text-xs font-normal text-muted-foreground">{email}</div>
       ) : null}
       {phone ? (
-        <div className="text-xs font-normal text-muted-foreground">{phone}</div>
+        <div className="text-xs font-normal text-muted-foreground">
+          {formatPhoneDisplay(phone)}
+        </div>
       ) : null}
     </div>
   )
@@ -329,7 +332,7 @@ export function PaymentSummaryReportPanel({
           .join("; "),
         (row.participants || [])
           .filter((participant) => !participant.isYouth && participant.phone)
-          .map((participant) => participant.phone as string)
+          .map((participant) => formatPhoneDisplay(participant.phone))
           .join("; "),
         row.offeringNames.join("; "),
         row.programFeeLines.join("; "),
@@ -342,7 +345,7 @@ export function PaymentSummaryReportPanel({
           ? [
               row.showsContact ? row.contactName : "",
               row.showsContact ? row.contactEmail || "" : "",
-              row.showsContact ? row.contactPhone || "" : "",
+              row.showsContact ? formatPhoneDisplay(row.contactPhone) : "",
             ]
           : []),
       ]),

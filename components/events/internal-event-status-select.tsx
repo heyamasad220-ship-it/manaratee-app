@@ -1,5 +1,6 @@
 "use client"
 
+import { useRouter } from "next/navigation"
 import { useTransition } from "react"
 
 import {
@@ -10,14 +11,13 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import {
-  fromWorkspaceEventStatus,
-  getInternalEventWorkspaceStatusLabel,
-  getInternalEventWorkspaceStatusOptions,
-  toWorkspaceEventStatus,
+  getInternalEventStatusMenuLabel,
+  getInternalEventStatusMenuOptions,
+  toInternalEventStatusMenuValue,
   type InternalEventStatus,
-  type InternalEventWorkspaceStatus,
+  type InternalEventStatusMenuValue,
 } from "@/lib/events/internal-event-status"
-import { updateInternalEventStatus } from "@/lib/events/internal-event-actions"
+import { setInternalEventStatusFromMenu } from "@/lib/events/internal-event-actions"
 
 export function InternalEventStatusSelect({
   eventId,
@@ -26,17 +26,19 @@ export function InternalEventStatusSelect({
   eventId: string
   status: InternalEventStatus
 }) {
+  const router = useRouter()
   const [isPending, startTransition] = useTransition()
-  const options = getInternalEventWorkspaceStatusOptions()
-  const workspaceStatus = toWorkspaceEventStatus(status)
+  const options = getInternalEventStatusMenuOptions()
+  const menuValue = toInternalEventStatusMenuValue(status)
 
   function handleChange(nextStatus: string) {
     startTransition(async () => {
       try {
-        await updateInternalEventStatus(
+        await setInternalEventStatusFromMenu(
           eventId,
-          fromWorkspaceEventStatus(nextStatus as InternalEventWorkspaceStatus)
+          nextStatus as InternalEventStatusMenuValue
         )
+        router.refresh()
       } catch (error) {
         console.error(error)
         window.alert(
@@ -48,14 +50,12 @@ export function InternalEventStatusSelect({
 
   return (
     <Select
-      value={workspaceStatus}
+      value={menuValue}
       onValueChange={handleChange}
       disabled={isPending}
     >
-      <SelectTrigger className="h-8 w-[130px]">
-        <SelectValue>
-          {getInternalEventWorkspaceStatusLabel(status)}
-        </SelectValue>
+      <SelectTrigger className="h-8 w-[150px]">
+        <SelectValue>{getInternalEventStatusMenuLabel(status)}</SelectValue>
       </SelectTrigger>
       <SelectContent>
         {options.map((option) => (

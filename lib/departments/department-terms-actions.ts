@@ -1,5 +1,6 @@
 "use server"
 
+import { canManageDepartment } from "@/lib/departments/department-access"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { getServiceRoleClient } from "@/lib/platform/require-platform-admin"
 import { hasPermission, PERMISSIONS } from "@/lib/permissions/permissions"
@@ -56,10 +57,15 @@ export type UploadDepartmentTermsPdfResult =
 export async function uploadDepartmentTermsPdf(
   formData: FormData
 ): Promise<UploadDepartmentTermsPdfResult> {
-  const canWrite =
+  const departmentId = String(formData.get("departmentId") || "draft").trim()
+  const canWriteOrgWide =
     (await hasPermission(PERMISSIONS.STAFF_MANAGE)) ||
     (await hasPermission(PERMISSIONS.STAFF_VIEW))
-  if (!canWrite) {
+  const canWriteThisDepartment =
+    departmentId && departmentId !== "draft"
+      ? await canManageDepartment(departmentId)
+      : false
+  if (!canWriteOrgWide && !canWriteThisDepartment) {
     return {
       success: false,
       error: "You do not have permission to upload department documents.",
@@ -80,7 +86,6 @@ export async function uploadDepartmentTermsPdf(
   }
 
   const file = formData.get("file")
-  const departmentId = String(formData.get("departmentId") || "draft").trim()
   if (!(file instanceof File)) {
     return { success: false, error: "Please choose a PDF file." }
   }

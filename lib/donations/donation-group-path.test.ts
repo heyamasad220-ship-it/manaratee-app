@@ -21,27 +21,30 @@ describe("parseDepartmentWorkspaceTab", () => {
     assert.equal(parseDepartmentWorkspaceTab("financial"), "financial")
   })
 
-  it("keeps Employees as a top-level tab", () => {
-    assert.equal(parseDepartmentWorkspaceTab("employees"), "employees")
+  it("maps leftover Employees bookmarks to Financial", () => {
+    assert.equal(parseDepartmentWorkspaceTab("employees"), "financial")
   })
 })
 
 describe("departmentGroupWorkspaceHref", () => {
-  it("emits ?tab=employees for the Employees tab", () => {
+  it("emits Financial → Employees for the Employees sub-tab", () => {
     assert.match(
       departmentGroupWorkspaceHref("dept-1", { tab: "employees" }),
-      /tab=employees/
+      /tab=financial/
+    )
+    assert.match(
+      departmentGroupWorkspaceHref("dept-1", { tab: "employees" }),
+      /section=employees/
     )
   })
 
-  it("rewrites leftover Financial → Employees to the Employees tab", () => {
-    assert.match(
-      departmentGroupWorkspaceHref("dept-1", {
-        tab: "financial",
-        finance: "employees",
-      }),
-      /tab=employees/
-    )
+  it("keeps Financial → Employees on the Financial tab", () => {
+    const href = departmentGroupWorkspaceHref("dept-1", {
+      tab: "financial",
+      finance: "employees",
+    })
+    assert.match(href, /tab=financial/)
+    assert.match(href, /section=employees/)
   })
 })
 
@@ -50,7 +53,11 @@ describe("parseDepartmentFinanceSection", () => {
     assert.equal(parseDepartmentFinanceSection("financial", null), "payroll")
   })
 
-  it("still reads leftover Financial → Employees section", () => {
+  it("reads leftover ?tab=employees as Financial → Employees", () => {
+    assert.equal(parseDepartmentFinanceSection("employees", null), "employees")
+  })
+
+  it("reads Financial → Employees from the section query", () => {
     assert.equal(
       parseDepartmentFinanceSection("financial", "employees"),
       "employees"

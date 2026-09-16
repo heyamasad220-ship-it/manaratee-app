@@ -73,6 +73,7 @@ export function DepartmentExpensesPanel({
   programId = null,
   readOnly = false,
   stickyStatsTop,
+  hideStats = false,
 }: {
   departmentId: string
   departmentName: string
@@ -82,6 +83,8 @@ export function DepartmentExpensesPanel({
   readOnly?: boolean
   /** CSS `top` so KPI cards stick below department workspace tab chrome. */
   stickyStatsTop?: string
+  /** Hide local KPIs when the parent Financial tab shows the combined row. */
+  hideStats?: boolean
 }) {
   const supabase = createClient()
   const [loading, setLoading] = useState(true)
@@ -184,7 +187,7 @@ export function DepartmentExpensesPanel({
 
   return (
     <div className="space-y-6">
-      {!loading && !error ? (
+      {!hideStats && !loading && !error ? (
         <div
           className={
             stickyStatsTop

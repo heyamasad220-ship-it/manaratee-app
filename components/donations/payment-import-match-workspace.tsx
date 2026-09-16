@@ -36,6 +36,7 @@ import { formatDonationCurrency } from "@/lib/donations/campaign-analytics"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { PhoneText } from "@/components/ui/phone-text"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -940,7 +941,7 @@ export function PaymentImportMatchWorkspace({
                           <tr key={index} className="border-b">
                             <td className="p-3">{row.sender_name || "—"}</td>
                             <td className="p-3">{row.email || "—"}</td>
-                            <td className="p-3">{row.phone || "—"}</td>
+                            <td className="p-3"><PhoneText value={row.phone} /></td>
                             <td className="p-3">{row.amount || "—"}</td>
                             <td className="p-3">{row.payment_date || "—"}</td>
                             <td className="p-3">{row.reference || "—"}</td>

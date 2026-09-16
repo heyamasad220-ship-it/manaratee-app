@@ -86,8 +86,8 @@ export function NavigationBreadcrumbs({
     }
 
     // Module root while already inside that module — open the menu only
-    // when there is a drawer to show. Empty-children modules (Programs)
-    // navigate back to the module home (Overview).
+    // when there is a drawer to show. Modules without a flyout navigate
+    // back to the module home.
     if (segment.module && hasDrawerItems && !segment.expandKeys?.length) {
       const prefixes = [
         segment.module.matchPrefix,
