@@ -68,7 +68,7 @@ Status: Working
 Features:
 
 * Program CRUD
-* **Program kinds** — Academic vs Seasonal (`programs.program_kind`); org entitlement `organizations.program_kinds` (SQL **`246`**); policy + hard validation in `program-kind-policy.ts`; Phase 2–5 terminology/create/report work; Phase 6 packaging: Platform Admin Product Modules nests Academic/Seasonal toggles under Programs; tenant Billing still uses the dropdown card
+* **Program kinds** — Academic vs Seasonal (`programs.program_kind`); org entitlement `organizations.program_kinds` (SQL **`246`**); policy + hard validation in `program-kind-policy.ts`; Phase 2–5 terminology/create/report work; Phase 6 packaging: Platform Admin Product Modules nests Academic/Seasonal toggles under Programs (tenant Billing no longer edits this)
 * **Quick Create** + program detail inline edit + offering manage (see `docs/programs-staff-setup-ui.md`)
 * Organization filtering
 * Program details

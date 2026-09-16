@@ -40,7 +40,7 @@ Shared Programs domain + registration/payment infra; two modes with distinct cre
 
 **Phase 5 terminology polish (Aug 2026):** Known-kind staff surfaces use `getHierarchyLabels` — program create/edit form, year configure dialog, year defaults settings, offerings section, program detail header actions, registration detail, department year breadcrumb.
 
-**Phase 6 packaging UI (Aug 2026):** Org entitlement `organizations.program_kinds` editable from Platform Admin → Organizations → Modules under **Programs** (independent Academic and Seasonal toggles; at least one required) and tenant **Billing** (org super-admin dropdown card). API `PATCH /api/platform/organizations/[id]/program-kinds`. Run SQL **`246`**.
+**Phase 6 packaging UI (Aug 2026):** Org entitlement `organizations.program_kinds` editable from Platform Admin → Organizations → Modules under **Programs** (independent Academic and Seasonal toggles; at least one required). Tenant Billing no longer includes a Program modes card (September 2026). API `PATCH /api/platform/organizations/[id]/program-kinds`. Run SQL **`246`**.
 
 **Policy defaults:** Academic → full-program registration only; monthly / semester-style fee plans. Seasonal → full-program + selected sessions + day pass (+ drop-in); one-time / deposit / per-session / installments — **no monthly academic tuition**.
 
