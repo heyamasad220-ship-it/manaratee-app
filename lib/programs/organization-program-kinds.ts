@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache"
 
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
-import { requireOrganizationSuperAdmin } from "@/lib/organizations/organization-billing-access"
 import {
   normalizeOrganizationProgramKinds,
   type OrganizationProgramKindsEntitlement,
@@ -76,34 +75,6 @@ async function writeOrganizationProgramKinds(
   revalidatePath("/workforce")
   revalidatePath("/admin/organizations")
   return { success: true }
-}
-
-/** Tenant org super-admin: update packaging for the selected organization. */
-export async function updateSelectedOrganizationProgramKindsAction(
-  programKinds: OrganizationProgramKindsEntitlement
-): Promise<
-  | { success: true; programKinds: OrganizationProgramKindsEntitlement }
-  | { success: false; error: string }
-> {
-  try {
-    await requireOrganizationSuperAdmin()
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Not authorized.",
-    }
-  }
-
-  const organizationId = await getSelectedOrganizationId()
-  if (!organizationId) {
-    return { success: false, error: "No organization selected." }
-  }
-
-  const next = normalizeOrganizationProgramKinds(programKinds)
-  const supabase = await createClient()
-  const result = await writeOrganizationProgramKinds(organizationId, next, supabase)
-  if (!result.success) return result
-  return { success: true, programKinds: next }
 }
 
 /** Platform admin path — service role write for any organization. */

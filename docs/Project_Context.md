@@ -158,7 +158,7 @@ Programs Module
 **Deferred naming (parked — high blast radius):** (1) DB rename `programs`→`seasons`, `program_offerings`→`programs` (fits years, seasons, camps); (2) align HR sidebar vs `/workforce/*` routes/folders; (3) Donations module → Fund Development in DB/routes (UI label already Fund Development). Do not start without a dedicated migration plan. Details in `docs/Features.md`.
 Registrations
 Financial Assistance
-**Programs flexibility contract** — **F1–F7** (`180`–`181`). Academic vs Seasonal modes + org `program_kinds` entitlement (SQL **`246`**); packaging UI on Platform Admin (toggles under Programs) + Billing dropdown (Phase 6). Report Type filters + URL `?kind=` presets (Phases 3–4); kind-aware staff terminology (Phase 5). See [`docs/programs-flexibility-contract.md`](./programs-flexibility-contract.md).
+**Programs flexibility contract** — **F1–F7** (`180`–`181`). Academic vs Seasonal modes + org `program_kinds` entitlement (SQL **`246`**); packaging UI on Platform Admin (toggles under Programs). Report Type filters + URL `?kind=` presets (Phases 3–4); kind-aware staff terminology (Phase 5). See [`docs/programs-flexibility-contract.md`](./programs-flexibility-contract.md).
 **Stripe Connect Express** for org donation payouts (implemented June 2026)
 **Platform subscription billing via Stripe** (orgs paying Manaratee — pending). Module prices and billed cents are stored now (`274`); do not create Stripe subscriptions until that work is scheduled. Super Admin `/admin/modules` and organization sheets scroll in the main column / sheet body so prices, discounts, and the SQL 274 reminder stay reachable.
 Customer Experience

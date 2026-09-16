@@ -4,7 +4,6 @@ import { requireOrganizationSuperAdmin } from "@/lib/organizations/organization-
 import { getOrganizationSubscriptionSummary } from "@/lib/organizations/organization-subscription-summary"
 import { computeOrganizationSubscriptionTerms } from "@/lib/organizations/organization-subscription-terms"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
-import { getOrganizationProgramKindsEntitlement } from "@/lib/programs/organization-program-kinds"
 
 const emptySummary = {
   organizationName: "your organization",
@@ -35,7 +34,6 @@ export default async function OrganizationBillingPage() {
     return (
       <OrganizationBillingClient
         summary={emptySummary}
-        programKinds="both"
         billingEmail={null}
         paymentMethods={[]}
         invoices={[]}
@@ -43,16 +41,12 @@ export default async function OrganizationBillingPage() {
     )
   }
 
-  const [profile, programKinds] = await Promise.all([
-    getOrganizationBillingProfileAction(),
-    getOrganizationProgramKindsEntitlement(),
-  ])
+  const profile = await getOrganizationBillingProfileAction()
   if (!profile.success) {
     const summary = await getOrganizationSubscriptionSummary(organizationId)
     return (
       <OrganizationBillingClient
         summary={summary}
-        programKinds={programKinds}
         billingEmail={null}
         paymentMethods={[]}
         invoices={[]}
@@ -63,7 +57,6 @@ export default async function OrganizationBillingPage() {
   return (
     <OrganizationBillingClient
       summary={profile.summary}
-      programKinds={programKinds}
       billingEmail={profile.billingEmail}
       paymentMethods={profile.paymentMethods}
       invoices={profile.invoices}

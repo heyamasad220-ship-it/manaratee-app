@@ -43,14 +43,10 @@ import {
   type OrganizationBillingInvoiceRow,
   type OrganizationPaymentMethodRow,
 } from "@/lib/organizations/organization-billing-actions"
-import { CreditCard, CalendarDays, History, Layers, Mail, Package, Plus, Trash2 } from "lucide-react"
-import { OrganizationProgramKindsSettingsCard } from "@/components/programs/organization-program-kinds-settings-card"
-import { updateSelectedOrganizationProgramKindsAction } from "@/lib/programs/organization-program-kinds"
-import type { OrganizationProgramKindsEntitlement } from "@/lib/programs/program-kind-policy"
+import { CreditCard, CalendarDays, History, Layers, Mail, Plus, Trash2 } from "lucide-react"
 
 type OrganizationBillingClientProps = {
   summary: OrganizationSubscriptionSummary
-  programKinds: OrganizationProgramKindsEntitlement
   billingEmail: string | null
   paymentMethods: OrganizationPaymentMethodRow[]
   invoices: OrganizationBillingInvoiceRow[]
@@ -93,13 +89,11 @@ function invoiceStatusVariant(status: string): "default" | "secondary" | "destru
 
 export function OrganizationBillingClient({
   summary,
-  programKinds: initialProgramKinds,
   billingEmail,
   paymentMethods: initialPaymentMethods,
   invoices,
 }: OrganizationBillingClientProps) {
   const [paymentMethods, setPaymentMethods] = useState(initialPaymentMethods)
-  const [programKinds, setProgramKinds] = useState(initialProgramKinds)
   const [showAddCard, setShowAddCard] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -189,7 +183,7 @@ export function OrganizationBillingClient({
 
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
@@ -263,25 +257,6 @@ export function OrganizationBillingClient({
               ) : null}
             </CardContent>
           </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                <Package className="h-4 w-4" />
-                Persona bundle
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold">{summary.bundleName ?? "Custom mix"}</p>
-              {summary.bundleDescription ? (
-                <p className="mt-2 text-sm text-muted-foreground">{summary.bundleDescription}</p>
-              ) : (
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Modules were configured individually for your organization.
-                </p>
-              )}
-            </CardContent>
-          </Card>
         </div>
 
         {terms.pricingNotes.length > 0 ? (
@@ -323,19 +298,6 @@ export function OrganizationBillingClient({
             </CardContent>
           </Card>
         )}
-
-        <OrganizationProgramKindsSettingsCard
-          value={programKinds}
-          description="Controls whether staff can create Academic years, Seasonal camps/seasons, or both. Create dialogs hide modes outside this entitlement."
-          onSave={async (next) => {
-            const result = await updateSelectedOrganizationProgramKindsAction(next)
-            if (!result.success) {
-              return { success: false as const, error: result.error }
-            }
-            setProgramKinds(result.programKinds)
-            return { success: true as const }
-          }}
-        />
 
         <Card>
           <CardHeader className="flex flex-row items-start justify-between gap-4">

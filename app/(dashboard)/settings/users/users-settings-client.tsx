@@ -485,8 +485,8 @@ export function UsersSettingsClient({
             </Card>
           )}
 
-          <div className="flex flex-wrap gap-4 [&>*]:w-fit">
-            <Card>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <Card className="h-full">
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
@@ -500,7 +500,7 @@ export function UsersSettingsClient({
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="h-full">
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-500/10">
@@ -514,7 +514,7 @@ export function UsersSettingsClient({
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="h-full">
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/10">
@@ -528,7 +528,7 @@ export function UsersSettingsClient({
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="h-full">
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-500/10">
