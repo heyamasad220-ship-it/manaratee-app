@@ -5,6 +5,7 @@ import {
   buildAdministrationChildren,
   buildEventManagementChildren,
   buildProgramsChildren,
+  isAdministrationNavEnabled,
   isHiddenTopLevelStaffModule,
 } from "./staff-module-nav"
 
@@ -51,6 +52,14 @@ describe("staff module nav", () => {
     assert.equal(overview?.href, "/programs")
     assert.equal(overview?.exact, true)
     assert.equal(allPrograms?.href, "/programs/list")
+  })
+
+  it("hides Administration unless Programs or Event Management is on", () => {
+    assert.equal(isAdministrationNavEnabled(new Set(["donations"])), false)
+    assert.equal(isAdministrationNavEnabled(new Set(["membership"])), false)
+    assert.equal(isAdministrationNavEnabled(new Set(["workforce"])), false)
+    assert.equal(isAdministrationNavEnabled(new Set(["programs"])), true)
+    assert.equal(isAdministrationNavEnabled(new Set(["event-management"])), true)
   })
 
   it("shows Volunteers when Programs or Event Management is on", () => {

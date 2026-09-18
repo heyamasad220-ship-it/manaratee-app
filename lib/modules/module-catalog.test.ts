@@ -27,10 +27,15 @@ describe("module catalog subscriptions", () => {
     assert.equal(isProductModuleSlug("hr"), false)
   })
 
-  it("treats Administration (workforce) as core for every tenant", () => {
-    assert.equal(isCoreModuleSlug("workforce"), true)
-    assert.equal(isCoreModuleSlug("hr"), true)
-    assert.equal(expandEnabledModuleSlugs([]).has("workforce"), true)
+  it("treats Administration (workforce) as a Programs / Event Management capability", () => {
+    assert.equal(isCoreModuleSlug("workforce"), false)
+    assert.equal(isCoreModuleSlug("hr"), false)
+    assert.equal(expandEnabledModuleSlugs([]).has("workforce"), false)
+    assert.equal(expandEnabledModuleSlugs(["donations"]).has("workforce"), false)
+    assert.equal(expandEnabledModuleSlugs(["membership"]).has("workforce"), false)
+    assert.equal(expandEnabledModuleSlugs(["programs"]).has("workforce"), true)
+    assert.equal(expandEnabledModuleSlugs(["event-management"]).has("workforce"), true)
+    assert.equal(isHiddenSubscriptionCapabilitySlug("workforce"), true)
   })
 
   it("includes Finance as a Programs capability, not a catalog SKU", () => {
