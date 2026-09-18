@@ -1,5 +1,7 @@
 "use server"
 
+import { revalidatePath } from "next/cache"
+
 import { requireDonationStaffAccess } from "@/lib/donations/donation-action-auth"
 import {
   buildRecurringDashboardMetrics,
@@ -10,6 +12,7 @@ import {
 import {
   calculateNextPaymentDate,
   initialNextPaymentDate,
+  buildRecurringPlanSchedule,
 } from "@/lib/donations/recurring-donation-schedule"
 import type {
   RecurringFrequency,
@@ -43,6 +46,8 @@ export async function createRecurringDonationPlanAction(input: {
   amount: number
   frequency: RecurringFrequency
   startDate: string
+  numberOfPayments?: number | null
+  endDate?: string | null
   notes?: string | null
 }) {
   const access = await requireDonationStaffAccess("manage")
@@ -52,6 +57,16 @@ export async function createRecurringDonationPlanAction(input: {
     return { success: false as const, error: "Amount must be greater than zero" }
   }
 
+  const schedule = buildRecurringPlanSchedule({
+    frequency: input.frequency,
+    startDate: input.startDate,
+    numberOfPayments: input.numberOfPayments,
+    endDate: input.endDate,
+  })
+  if (!schedule.ok) {
+    return { success: false as const, error: schedule.error }
+  }
+
   const nextPaymentDate = initialNextPaymentDate(input.startDate, input.frequency)
 
   const fundCheck = await validateOpenDonationFund(supabase, orgId, input.subcategoryId)
@@ -59,12 +74,23 @@ export async function createRecurringDonationPlanAction(input: {
     return { success: false as const, error: fundCheck.error }
   }
 
+  let contactId = input.contactId ?? null
+  if (!contactId) {
+    const { data: donor } = await supabase
+      .from("donors")
+      .select("contact_id")
+      .eq("id", input.donorId)
+      .eq("organization_id", orgId)
+      .maybeSingle()
+    contactId = (donor?.contact_id as string | null) ?? null
+  }
+
   const { data, error } = await supabase
     .from("recurring_donation_plans")
     .insert({
       organization_id: orgId,
       donor_id: input.donorId,
-      contact_id: input.contactId ?? null,
+      contact_id: contactId,
       campaign_id: input.campaignId ?? null,
       category_id: input.categoryId ?? null,
       subcategory_id: input.subcategoryId ?? null,
@@ -74,12 +100,22 @@ export async function createRecurringDonationPlanAction(input: {
       status: "active",
       start_date: input.startDate,
       next_payment_date: nextPaymentDate,
+      end_date: schedule.endDate,
+      total_payments: schedule.totalPayments,
+      payments_made: 0,
       notes: input.notes ?? null,
     })
     .select("id")
     .single()
 
   if (error) return { success: false as const, error: error.message }
+
+  revalidatePath("/donations/payments/recurring")
+  revalidatePath("/donations/campaigns")
+  if (input.campaignId) {
+    revalidatePath(`/donations/campaigns/${input.campaignId}`)
+  }
+
   return { success: true as const, planId: data.id }
 }
 

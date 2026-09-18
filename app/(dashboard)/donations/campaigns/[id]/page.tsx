@@ -16,6 +16,7 @@ import {
   CampaignFundraisingPlanTab,
 } from "@/components/donations/campaign-fundraising-plan-tab"
 import { CampaignDonationsKpis } from "@/components/donations/campaign-donations-kpis"
+import { CampaignDonationsTab } from "@/components/donations/campaign-donations-tab"
 import { CampaignEventKpis } from "@/components/donations/campaign-event-kpis"
 import { CampaignOverviewSummary, CampaignOverviewTab } from "@/components/donations/campaign-overview-tab"
 import { CampaignSponsorsTab } from "@/components/donations/campaign-sponsors-tab"
@@ -45,7 +46,6 @@ import {
 } from "@/components/ui/table"
 import {
   formatDonationCurrency,
-  campaignPaymentTypeLabel,
   type CampaignAnalyticsEntry,
   type CampaignDonorInsights,
   type CampaignOutstandingPledgeRow,
@@ -64,12 +64,7 @@ import {
   parseCampaignWorkspaceTab,
 } from "@/lib/donations/campaign-workspace-paths"
 import { donationPledgesHref } from "@/lib/donations/donation-pledge-paths"
-import { DONATION_RECURRING_OPS_PATH } from "@/lib/donations/donation-payment-paths"
-import {
-  formatRecurringFrequencyLabel,
-  formatRecurringStatusLabel,
-} from "@/lib/donations/recurring-donation-types"
-import { formatPaymentAllocationStatus, isOpenAllocatablePledge } from "@/lib/donations/donation-status"
+import { isOpenAllocatablePledge } from "@/lib/donations/donation-status"
 import { createClient } from "@/lib/supabase/client"
 import { STAFF_MAIN_CONTENT_STICKY_TOP_CLASS } from "@/lib/layout/staff-dashboard-chrome"
 import { cn } from "@/lib/utils"
@@ -178,176 +173,6 @@ function CampaignPledgesTab({
                       {formatDonationCurrency(pledge.balanceRemaining)}
                     </TableCell>
                     <TableCell className="capitalize">{pledge.status}</TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-    </div>
-  )
-}
-
-function CampaignDonationsTab({
-  payments,
-  recurringPlans,
-  openPledgeDonorIds,
-  openPledgeContactIds,
-  onDonorClick,
-  onPledgeClick,
-  onRecurringDonorClick,
-}: {
-  payments: CampaignPaymentRow[]
-  recurringPlans: CampaignRecurringPlanRow[]
-  openPledgeDonorIds: Set<string>
-  openPledgeContactIds: Set<string>
-  onDonorClick: (payment: CampaignPaymentRow) => void
-  onPledgeClick: (pledgeId: string) => void
-  onRecurringDonorClick: (plan: CampaignRecurringPlanRow) => void
-}) {
-  return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h2 className="text-base font-semibold text-foreground">Campaign Donations</h2>
-        <p className="text-sm text-muted-foreground">
-          Actual payments attributed to this campaign (one ledger — no duplicate records).
-        </p>
-      </div>
-
-      <Card className="border border-border shadow-sm">
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Donor</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Payment Method</TableHead>
-                <TableHead>Pledge Applied To</TableHead>
-                <TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {payments.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
-                    No donations for this campaign yet.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                payments.map((payment) => (
-                  <TableRow key={payment.id}>
-                    <TableCell>{formatShortDate(payment.payment_date)}</TableCell>
-                    <TableCell>
-                      <button
-                        type="button"
-                        className="font-medium text-primary hover:underline"
-                        onClick={() => onDonorClick(payment)}
-                      >
-                        {payment.sender_name || "Donor"}
-                      </button>
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatDonationCurrency(Number(payment.amount || 0))}
-                    </TableCell>
-                    <TableCell>{campaignPaymentTypeLabel(payment)}</TableCell>
-                    <TableCell className="capitalize">
-                      {payment.source || "—"}
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">
-                      {payment.pledge_id ? (
-                        <button
-                          type="button"
-                          className="text-primary hover:underline"
-                          title="Open pledge"
-                          onClick={() => onPledgeClick(payment.pledge_id!)}
-                        >
-                          {`${payment.pledge_id.slice(0, 8)}…`}
-                        </button>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="capitalize">
-                      {formatPaymentAllocationStatus({
-                        status: payment.status,
-                        pledgeId: payment.pledge_id,
-                        donorHasOpenPledge: Boolean(
-                          (payment.donor_id && openPledgeDonorIds.has(payment.donor_id)) ||
-                            (payment.contact_id && openPledgeContactIds.has(payment.contact_id))
-                        ),
-                      })}
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 className="text-base font-semibold text-foreground">Recurring</h2>
-          <p className="text-sm text-muted-foreground">
-            Monthly and other recurring plans tied to this campaign. Collected installments still
-            appear in the ledger above.
-          </p>
-        </div>
-        <Button variant="outline" size="sm" asChild>
-          <Link href={DONATION_RECURRING_OPS_PATH}>All recurring plans</Link>
-        </Button>
-      </div>
-
-      <Card className="border border-border shadow-sm">
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Donor</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead>Frequency</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Start</TableHead>
-                <TableHead>Next payment</TableHead>
-                <TableHead>Payments</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {recurringPlans.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
-                    No recurring plans on this campaign yet.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                recurringPlans.map((plan) => (
-                  <TableRow key={plan.id}>
-                    <TableCell>
-                      <button
-                        type="button"
-                        className="font-medium text-primary hover:underline"
-                        onClick={() => onRecurringDonorClick(plan)}
-                      >
-                        {plan.donor_name}
-                      </button>
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatDonationCurrency(plan.amount)}
-                    </TableCell>
-                    <TableCell>{formatRecurringFrequencyLabel(plan.frequency)}</TableCell>
-                    <TableCell>{formatRecurringStatusLabel(plan.status)}</TableCell>
-                    <TableCell>{formatShortDate(plan.start_date)}</TableCell>
-                    <TableCell>{formatShortDate(plan.next_payment_date)}</TableCell>
-                    <TableCell>
-                      {plan.payments_made != null
-                        ? plan.total_payments != null
-                          ? `${plan.payments_made} / ${plan.total_payments}`
-                          : String(plan.payments_made)
-                        : "—"}
-                    </TableCell>
                   </TableRow>
                 ))
               )}
@@ -632,10 +457,13 @@ export default function CampaignDetailPage() {
 
           {activeTab === "donations" ? (
             <CampaignDonationsTab
+              campaignId={campaign.id}
+              organizationId={campaign.organization_id}
               payments={campaignPayments}
               recurringPlans={campaignRecurringPlans}
               openPledgeDonorIds={openPledgeDonorIds}
               openPledgeContactIds={openPledgeContactIds}
+              canManage={canManage}
               onDonorClick={(payment) =>
                 void openContactProfile({
                   contactId: payment.contact_id,
@@ -652,6 +480,7 @@ export default function CampaignDetailPage() {
                   donorId: plan.donor_id,
                 })
               }
+              onReload={() => void loadCampaign()}
             />
           ) : null}
 
