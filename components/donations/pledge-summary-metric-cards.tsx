@@ -24,8 +24,6 @@ function getPledgeCountLabel(statusFilter?: string) {
   switch (statusFilter) {
     case "Open":
       return "open pledges"
-    case "Partial":
-      return "partial pledges"
     case "Fulfilled":
       return "fulfilled pledges"
     default:
@@ -36,9 +34,7 @@ function getPledgeCountLabel(statusFilter?: string) {
 function getActivePledgeCardLabels(statusFilter?: string) {
   switch (statusFilter) {
     case "Open":
-      return { title: "Open Pledges", description: "Matching current filters" }
-    case "Partial":
-      return { title: "Partial Pledges", description: "Matching current filters" }
+      return { title: "Open Pledges", description: "Outstanding balance" }
     case "Fulfilled":
       return { title: "Fulfilled Pledges", description: "Matching current filters" }
     default:

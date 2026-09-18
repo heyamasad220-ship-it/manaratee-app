@@ -1,7 +1,6 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { Plus } from "lucide-react"
 
 import { QuickAddContactDialog } from "@/components/contacts/quick-add-contact-dialog"
 import {
@@ -40,21 +39,19 @@ import {
   convertCampaignProspectToPledgeAction,
   getCampaignProspectForConversionAction,
 } from "@/lib/donations/campaign-prospect-actions"
-import type { PledgeDisplayStatus } from "@/lib/donations/donation-status"
 import {
   createPledgeAction,
   deletePledgeAction,
   getPledgeForEditAction,
   recordPledgePaymentAction,
   updatePledgeAction,
-  updatePledgePaymentPlanAction,
 } from "@/lib/donations/pledge-admin-actions"
 import {
   calculateInstallmentAmount,
-  defaultFirstPaymentDate,
-  pledgeHasPaymentPlan,
+  isInstallmentPledgePlan,
+  lastPaymentDateFromCount,
+  paymentCountFromLastDate,
   suggestedPledgePaymentAmount,
-  type PledgePlanFrequency,
 } from "@/lib/donations/pledge-payment-plan"
 import { createClient } from "@/lib/supabase/client"
 import { getSelectedOrganizationIdClient } from "@/lib/organizations/get-selected-organization-id-client"
@@ -64,6 +61,32 @@ function getTodayPlainDate() {
   const today = new Date()
   const timezoneOffset = today.getTimezoneOffset() * 60 * 1000
   return new Date(today.getTime() - timezoneOffset).toISOString().slice(0, 10)
+}
+
+function installmentCountFromInput(value: string) {
+  const count = Number(value)
+  return Number.isInteger(count) && count >= 2 ? count : null
+}
+
+function scheduleFieldsFromForm(input: {
+  frequency: string
+  firstPaymentDate: string
+  numberOfPayments: string
+  endDate: string
+}) {
+  if (!isInstallmentPledgePlan(input.frequency)) {
+    return {
+      firstPaymentDate: null,
+      numberOfPayments: null,
+      endDate: null,
+    }
+  }
+
+  return {
+    firstPaymentDate: input.firstPaymentDate || null,
+    numberOfPayments: installmentCountFromInput(input.numberOfPayments),
+    endDate: input.endDate || null,
+  }
 }
 
 type LoadedPledge = Extract<
@@ -111,7 +134,6 @@ export function PledgeDetailsDialog({
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [planDirty, setPlanDirty] = useState(false)
   const [suggestedPaymentAmount, setSuggestedPaymentAmount] = useState(0)
 
   const [activePledgeId, setActivePledgeId] = useState<string | null>(pledgeId)
@@ -123,7 +145,6 @@ export function PledgeDetailsDialog({
   const [amount, setAmount] = useState("")
   const [pledgeDate, setPledgeDate] = useState(getTodayPlainDate())
   const [frequency, setFrequency] = useState("One-Time")
-  const [status, setStatus] = useState<PledgeDisplayStatus>("Open")
   const [notes, setNotes] = useState("")
   const [attribution, setAttribution] = useState<DonationAttributionValue>(
     EMPTY_DONATION_ATTRIBUTION_VALUE
@@ -133,6 +154,7 @@ export function PledgeDetailsDialog({
   const [suggestedAskAmount, setSuggestedAskAmount] = useState<number | null>(null)
   const [convertProspectId, setConvertProspectId] = useState<string | null>(null)
   const [showQuickAddContact, setShowQuickAddContact] = useState(false)
+  const [contactSearchQuery, setContactSearchQuery] = useState("")
 
   const [paymentAmount, setPaymentAmount] = useState("")
   const [paymentDate, setPaymentDate] = useState(getTodayPlainDate())
@@ -142,14 +164,68 @@ export function PledgeDetailsDialog({
   const [paymentGroupLabel, setPaymentGroupLabel] = useState("")
   const [payments, setPayments] = useState<PaymentRow[]>([])
 
-  const [planFrequency, setPlanFrequency] = useState("monthly")
-  const [planPayments, setPlanPayments] = useState("10")
-  const [planInstallment, setPlanInstallment] = useState("")
-  const [planFirstDate, setPlanFirstDate] = useState(defaultFirstPaymentDate())
+  const [planPayments, setPlanPayments] = useState("")
+  const [planFirstDate, setPlanFirstDate] = useState("")
+  const [planEndDate, setPlanEndDate] = useState("")
 
   const isExisting = Boolean(activePledgeId)
   const balanceRemaining = loaded?.balanceRemaining ?? 0
   const canCollect = isExisting && balanceRemaining > 0.009 && canManage
+  const hasInstallmentSchedule = isInstallmentPledgePlan(frequency)
+  const resolvedInstallmentCount =
+    installmentCountFromInput(planPayments) ??
+    (hasInstallmentSchedule && planFirstDate && planEndDate
+      ? paymentCountFromLastDate(planFirstDate, frequency, planEndDate)
+      : 0)
+  const calculatedInstallmentAmount =
+    hasInstallmentSchedule && Number(amount) > 0 && resolvedInstallmentCount >= 2
+      ? calculateInstallmentAmount(Number(amount), resolvedInstallmentCount)
+      : 0
+
+  function applyFrequency(value: string) {
+    setFrequency(value)
+    if (!isInstallmentPledgePlan(value)) return
+    const firstDate = planFirstDate || pledgeDate || getTodayPlainDate()
+    if (!planFirstDate) setPlanFirstDate(firstDate)
+    const count = installmentCountFromInput(planPayments)
+    if (firstDate && count) {
+      setPlanEndDate(lastPaymentDateFromCount(firstDate, value, count) || "")
+      return
+    }
+    if (firstDate && planEndDate) {
+      const countFromEnd = paymentCountFromLastDate(firstDate, value, planEndDate)
+      setPlanPayments(countFromEnd >= 2 ? String(countFromEnd) : "")
+    }
+  }
+
+  function applyFirstPaymentDate(dateValue: string) {
+    setPlanFirstDate(dateValue)
+    const count = installmentCountFromInput(planPayments)
+    if (dateValue && count) {
+      setPlanEndDate(lastPaymentDateFromCount(dateValue, frequency, count) || "")
+      return
+    }
+    if (dateValue && planEndDate) {
+      const countFromEnd = paymentCountFromLastDate(dateValue, frequency, planEndDate)
+      setPlanPayments(countFromEnd >= 2 ? String(countFromEnd) : "")
+    }
+  }
+
+  function applyInstallmentCount(countValue: string) {
+    setPlanPayments(countValue)
+    const count = installmentCountFromInput(countValue)
+    if (planFirstDate && count) {
+      setPlanEndDate(lastPaymentDateFromCount(planFirstDate, frequency, count) || "")
+    }
+  }
+
+  function applyEndDate(endValue: string) {
+    setPlanEndDate(endValue)
+    if (planFirstDate && endValue) {
+      const count = paymentCountFromLastDate(planFirstDate, frequency, endValue)
+      setPlanPayments(count >= 2 ? String(count) : "")
+    }
+  }
 
   const resetAddForm = useCallback(() => {
     setActivePledgeId(null)
@@ -157,10 +233,10 @@ export function PledgeDetailsDialog({
     setCampaignName("")
     setContactId(defaultContactId || "")
     setContactLabel(defaultContactLabel || "")
+    setContactSearchQuery(defaultContactLabel || "")
     setAmount("")
     setPledgeDate(getTodayPlainDate())
     setFrequency("One-Time")
-    setStatus("Open")
     setNotes("")
     setAttribution({
       ...EMPTY_DONATION_ATTRIBUTION_VALUE,
@@ -170,7 +246,6 @@ export function PledgeDetailsDialog({
     setSuggestedAskAmount(null)
     setConvertProspectId(prospectId)
     setErrorMessage(null)
-    setPlanDirty(false)
     setSuggestedPaymentAmount(0)
     setPayments([])
     setPaymentAmount("")
@@ -179,10 +254,9 @@ export function PledgeDetailsDialog({
     setPaymentMemo("")
     setPaymentGroupContactId(null)
     setPaymentGroupLabel("")
-    setPlanFrequency("monthly")
-    setPlanPayments("10")
-    setPlanInstallment("")
-    setPlanFirstDate(defaultFirstPaymentDate())
+    setPlanPayments("")
+    setPlanFirstDate("")
+    setPlanEndDate("")
   }, [defaultCampaignId, defaultContactId, defaultContactLabel, prospectId])
 
   const applyLoadedPledge = useCallback((pledge: LoadedPledge) => {
@@ -194,7 +268,6 @@ export function PledgeDetailsDialog({
     setAmount(String(pledge.amountPledged || ""))
     setPledgeDate(pledge.pledgeDate || getTodayPlainDate())
     setFrequency(pledge.frequency || "One-Time")
-    setStatus(pledge.status)
     setNotes(pledge.notes || "")
     setAttribution({
       campaignId: pledge.campaignId || "",
@@ -217,23 +290,18 @@ export function PledgeDetailsDialog({
     setPaymentMemo("")
     setPaymentGroupContactId(null)
     setPaymentGroupLabel("")
-    setPlanDirty(false)
 
-    const hasPlan = pledgeHasPaymentPlan({
-      frequency: pledge.frequency,
-      totalPayments: pledge.totalPayments,
-      installmentAmount: pledge.installmentAmount,
-    })
-    const numberOfPayments = hasPlan ? String(pledge.totalPayments ?? 10) : "10"
-    setPlanPayments(numberOfPayments)
-    setPlanFrequency(hasPlan ? String(pledge.frequency || "monthly").toLowerCase() : "monthly")
-    setPlanFirstDate(pledge.firstPaymentDate || defaultFirstPaymentDate())
-    setPlanInstallment(
-      hasPlan
-        ? String(pledge.installmentAmount ?? "")
-        : pledge.amountPledged > 0
-          ? String(calculateInstallmentAmount(pledge.amountPledged, Number(numberOfPayments)))
-          : ""
+    const firstPaymentDate = pledge.firstPaymentDate || pledge.pledgeDate || ""
+    const numberOfPayments =
+      isInstallmentPledgePlan(pledge.frequency) && (pledge.totalPayments ?? 0) > 1
+        ? Number(pledge.totalPayments)
+        : null
+    setPlanPayments(numberOfPayments ? String(numberOfPayments) : "")
+    setPlanFirstDate(firstPaymentDate)
+    setPlanEndDate(
+      firstPaymentDate && numberOfPayments
+        ? lastPaymentDateFromCount(firstPaymentDate, pledge.frequency, numberOfPayments) || ""
+        : ""
     )
   }, [])
 
@@ -339,12 +407,22 @@ export function PledgeDetailsDialog({
       return null
     }
 
+    const schedule = scheduleFieldsFromForm({
+      frequency,
+      firstPaymentDate: planFirstDate,
+      numberOfPayments: planPayments,
+      endDate: planEndDate,
+    })
+
     if (!isExisting && convertProspectId) {
       const result = await convertCampaignProspectToPledgeAction({
         prospectId: convertProspectId,
         amountPledged: Number(amount),
         pledgeDate,
         frequency,
+        firstPaymentDate: schedule.firstPaymentDate,
+        numberOfPayments: schedule.numberOfPayments,
+        endDate: schedule.endDate,
         notes: notes || null,
         categoryId: attribution.categoryId || null,
         subcategoryId: attribution.subcategoryId || null,
@@ -363,6 +441,9 @@ export function PledgeDetailsDialog({
         amountPledged: Number(amount),
         pledgeDate,
         frequency,
+        firstPaymentDate: schedule.firstPaymentDate,
+        numberOfPayments: schedule.numberOfPayments,
+        endDate: schedule.endDate,
         notes: notes || null,
         campaignId: attribution.campaignId || null,
         categoryId: attribution.categoryId || null,
@@ -381,7 +462,9 @@ export function PledgeDetailsDialog({
       amountPledged: Number(amount),
       pledgeDate,
       frequency,
-      status,
+      firstPaymentDate: schedule.firstPaymentDate,
+      numberOfPayments: schedule.numberOfPayments,
+      endDate: schedule.endDate,
       campaignId: attribution.campaignId || null,
       categoryId: attribution.categoryId || null,
       subcategoryId: attribution.subcategoryId || null,
@@ -425,31 +508,6 @@ export function PledgeDetailsDialog({
       }
     }
 
-    const hasExistingPlan = Boolean(
-      loaded &&
-        pledgeHasPaymentPlan({
-          frequency: loaded.frequency,
-          totalPayments: loaded.totalPayments,
-          installmentAmount: loaded.installmentAmount,
-        })
-    )
-    if (planDirty || hasExistingPlan) {
-      const planResult = await updatePledgePaymentPlanAction({
-        pledgeId: savedId,
-        installmentAmount: Number(planInstallment || 0),
-        numberOfPayments: Number(planPayments || 0),
-        frequency: planFrequency as PledgePlanFrequency,
-        firstPaymentDate: planFirstDate,
-      })
-      if (!planResult.success) {
-        setSaving(false)
-        setErrorMessage(planResult.error)
-        onSaved?.(savedId)
-        await loadExisting(savedId)
-        return
-      }
-    }
-
     onOpenChange(false)
     onSaved?.(savedId)
     setSaving(false)
@@ -476,15 +534,23 @@ export function PledgeDetailsDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="flex max-h-[90vh] w-[min(96vw,56rem)] max-w-4xl flex-col gap-0 overflow-hidden sm:max-w-4xl">
+        <DialogContent
+          className="flex max-h-[90vh] w-[min(96vw,56rem)] max-w-4xl flex-col gap-0 overflow-hidden sm:max-w-4xl"
+          onPointerDownOutside={(event) => {
+            if (showQuickAddContact) event.preventDefault()
+          }}
+          onFocusOutside={(event) => {
+            if (showQuickAddContact) event.preventDefault()
+          }}
+        >
           <DialogHeader>
             <DialogTitle>Pledge Details</DialogTitle>
             <DialogDescription>
               {isExisting
-                ? "View and manage this pledge, payments, and collection. Save closes this window."
+                ? "View and manage this pledge, payments, and collection. Status is Open until the balance is paid. Save closes this window."
                 : convertProspectId
                   ? "Creates one pledge and marks the prospect as Pledged."
-                  : "Create a pledge. After you save, this window closes. Open the pledge later to record payments or reminders."}
+                  : "Create a pledge. Monthly, quarterly, and yearly pledges need a first payment date plus the number of installments or an end date. Save closes this window."}
             </DialogDescription>
           </DialogHeader>
 
@@ -495,7 +561,7 @@ export function PledgeDetailsDialog({
               <>
                 {isExisting ? (
                   <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="secondary">{status}</Badge>
+                    <Badge variant="secondary">{loaded?.status || "Open"}</Badge>
                     {campaignName ? <Badge variant="outline">{campaignName}</Badge> : null}
                     <Badge variant="outline">{frequency}</Badge>
                   </div>
@@ -518,7 +584,15 @@ export function PledgeDetailsDialog({
                     onChange={(nextId, label) => {
                       setContactId(nextId)
                       setContactLabel(label)
+                      setContactSearchQuery(label)
                     }}
+                    onQueryChange={setContactSearchQuery}
+                    onCreateClick={() => setShowQuickAddContact(true)}
+                    createLabel={
+                      contactSearchQuery.trim()
+                        ? `Create “${contactSearchQuery.trim()}”`
+                        : "Create person or organization"
+                    }
                     disabled={saving}
                     label="Contact"
                   />
@@ -528,18 +602,6 @@ export function PledgeDetailsDialog({
                     <p className="font-medium">{contactLabel || "—"}</p>
                   </div>
                 )}
-
-                {!isExisting && canManage && contactLabel.trim() && !contactId ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowQuickAddContact(true)}
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add contact
-                  </Button>
-                ) : null}
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="flex flex-col gap-2">
@@ -591,7 +653,7 @@ export function PledgeDetailsDialog({
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="flex flex-col gap-2">
                     <Label>Pledge Type</Label>
-                    <Select value={frequency} onValueChange={setFrequency} disabled={!canManage}>
+                    <Select value={frequency} onValueChange={applyFrequency} disabled={!canManage}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -603,26 +665,65 @@ export function PledgeDetailsDialog({
                       </SelectContent>
                     </Select>
                   </div>
-                  {isExisting ? (
-                    <div className="flex flex-col gap-2">
-                      <Label>Status</Label>
-                      <Select
-                        value={status}
-                        onValueChange={(value) => setStatus(value as PledgeDisplayStatus)}
-                        disabled={!canManage}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Open">Open</SelectItem>
-                          <SelectItem value="Partial">Partial</SelectItem>
-                          <SelectItem value="Fulfilled">Fulfilled</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  ) : null}
                 </div>
+
+                {hasInstallmentSchedule ? (
+                  <div className="space-y-3 rounded-lg border p-4">
+                    <div>
+                      <p className="text-sm font-semibold">Payment schedule</p>
+                      <p className="text-xs text-muted-foreground">
+                        Enter the number of installments or an end date. Amount per payment is
+                        calculated from the total.
+                      </p>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="pledge-first-payment-date">First payment date</Label>
+                        <Input
+                          id="pledge-first-payment-date"
+                          type="date"
+                          value={planFirstDate}
+                          disabled={!canManage}
+                          onChange={(event) => applyFirstPaymentDate(event.target.value)}
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="pledge-installment-count">Number of installments</Label>
+                        <Input
+                          id="pledge-installment-count"
+                          type="number"
+                          min={2}
+                          placeholder="e.g. 12"
+                          value={planPayments}
+                          disabled={!canManage}
+                          onChange={(event) => applyInstallmentCount(event.target.value)}
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="pledge-end-date">End date</Label>
+                        <Input
+                          id="pledge-end-date"
+                          type="date"
+                          value={planEndDate}
+                          disabled={!canManage}
+                          onChange={(event) => applyEndDate(event.target.value)}
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <Label>Amount per payment</Label>
+                        <Input
+                          readOnly
+                          value={
+                            calculatedInstallmentAmount > 0
+                              ? String(calculatedInstallmentAmount)
+                              : ""
+                          }
+                          placeholder="Calculated"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
 
                 <div className="flex flex-col gap-2">
                   <Label htmlFor="pledge-details-notes">Notes</Label>
@@ -735,93 +836,6 @@ export function PledgeDetailsDialog({
                       </section>
                     ) : null}
 
-                    {canManage && loaded.balanceRemaining > 0.009 ? (
-                      <section className="space-y-3 rounded-lg border p-4">
-                        <h3 className="text-sm font-semibold">
-                          {pledgeHasPaymentPlan({
-                            frequency: loaded.frequency,
-                            totalPayments: loaded.totalPayments,
-                            installmentAmount: loaded.installmentAmount,
-                          })
-                            ? "Payment Plan"
-                            : "Set Up Payment Plan"}
-                        </h3>
-                        <p className="text-xs text-muted-foreground">
-                          Change these fields, then click Save to apply.
-                        </p>
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          <div className="flex flex-col gap-1.5">
-                            <Label>Frequency</Label>
-                            <Select
-                              value={planFrequency}
-                              disabled={saving}
-                              onValueChange={(value) => {
-                                setPlanFrequency(value)
-                                setPlanDirty(true)
-                              }}
-                            >
-                              <SelectTrigger>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="monthly">Monthly</SelectItem>
-                                <SelectItem value="quarterly">Quarterly</SelectItem>
-                                <SelectItem value="annually">Annually</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="flex flex-col gap-1.5">
-                            <Label>Number of payments</Label>
-                            <Input
-                              type="number"
-                              min={2}
-                              value={planPayments}
-                              disabled={saving}
-                              onChange={(event) => {
-                                const numberOfPayments = event.target.value
-                                setPlanPayments(numberOfPayments)
-                                setPlanDirty(true)
-                                if (loaded.amountPledged > 0 && Number(numberOfPayments) > 0) {
-                                  setPlanInstallment(
-                                    String(
-                                      calculateInstallmentAmount(
-                                        loaded.amountPledged,
-                                        Number(numberOfPayments)
-                                      )
-                                    )
-                                  )
-                                }
-                              }}
-                            />
-                          </div>
-                          <div className="flex flex-col gap-1.5">
-                            <Label>Amount per payment</Label>
-                            <Input
-                              type="number"
-                              value={planInstallment}
-                              disabled={saving}
-                              onChange={(event) => {
-                                setPlanInstallment(event.target.value)
-                                setPlanDirty(true)
-                              }}
-                            />
-                          </div>
-                          <div className="flex flex-col gap-1.5">
-                            <Label>First payment date</Label>
-                            <Input
-                              type="date"
-                              value={planFirstDate}
-                              disabled={saving}
-                              onChange={(event) => {
-                                setPlanFirstDate(event.target.value)
-                                setPlanDirty(true)
-                              }}
-                            />
-                          </div>
-                        </div>
-                      </section>
-                    ) : null}
-
                     {canCollect ? (
                       <section className="space-y-3 rounded-lg border p-4">
                         <h3 className="text-sm font-semibold">Remind / Contact</h3>
@@ -870,10 +884,12 @@ export function PledgeDetailsDialog({
       <QuickAddContactDialog
         open={showQuickAddContact}
         onOpenChange={setShowQuickAddContact}
-        searchHint={contactLabel}
+        searchHint={contactSearchQuery || contactLabel}
         onCreated={(contact) => {
+          const label = contact.full_name || contact.email || contact.phone || ""
           setContactId(contact.contactId)
-          setContactLabel(contact.full_name || contact.email || contact.phone || "")
+          setContactLabel(label)
+          setContactSearchQuery(label)
         }}
       />
     </>

@@ -10,8 +10,11 @@ const nextConfig = {
   turbopack: {
     root: projectRoot,
   },
-  serverActions: {
-    bodySizeLimit: "4mb",
+  outputFileTracingRoot: projectRoot,
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "4mb",
+    },
   },
   typescript: {
     ignoreBuildErrors: true,

@@ -151,6 +151,7 @@ export function ContactProfileClient({
   const supabase = useMemo(() => createClient(), [])
   const tabParam = searchParams.get("tab")
   const sectionParam = searchParams.get("section")
+  const financialModuleParam = searchParams.get("module")
   const isDialog = variant === "dialog"
   const [dialogEditMode, setDialogEditMode] = useState(defaultEdit)
   const isEditMode = isDialog ? dialogEditMode : searchParams.get("edit") === "1"
@@ -194,8 +195,11 @@ export function ContactProfileClient({
     () => ({
       list: profileListSegment,
       ...(resolvedReturnTo ? { returnTo: resolvedReturnTo } : {}),
+      ...(tabParam === "financial" && financialModuleParam
+        ? { financialModule: financialModuleParam }
+        : {}),
     }),
-    [profileListSegment, resolvedReturnTo]
+    [financialModuleParam, profileListSegment, resolvedReturnTo, tabParam]
   )
 
   const roles = useMemo(() => {
@@ -398,6 +402,7 @@ export function ContactProfileClient({
       contactProfileHref(contact.id, {
         ...profileHrefOptions,
         tab: tab === "overview" ? undefined : tab,
+        financialModule: tab === "financial" ? financialModuleParam : undefined,
         edit: false,
       }),
       { scroll: false }
@@ -742,6 +747,23 @@ export function ContactProfileClient({
           stickyTopClass={stickyTopClass}
           refreshToken={0}
           surface={isGroup ? "full" : "staff-details"}
+          initialModuleSection={financialModuleParam}
+          onModuleSectionChange={
+            isDialog
+              ? undefined
+              : (section) => {
+                  router.replace(
+                    contactProfileHref(contact.id, {
+                      list: profileListSegment,
+                      ...(resolvedReturnTo ? { returnTo: resolvedReturnTo } : {}),
+                      tab: "financial",
+                      financialModule: section,
+                      edit: false,
+                    }),
+                    { scroll: false }
+                  )
+                }
+          }
         />
       ) : null}
 

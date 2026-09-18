@@ -2,6 +2,10 @@ import type {
   AnnualGivingStatementPayload,
   PaymentReceiptPayload,
 } from "@/lib/donations/receipt-types"
+import {
+  buildAnnualStatementPdfBase64,
+  buildPaymentReceiptPdfBase64,
+} from "@/lib/donations/receipt-pdf-server"
 
 function formatMoney(amount: number) {
   return new Intl.NumberFormat("en-US", {
@@ -112,24 +116,68 @@ function escapeHtml(value: string) {
     .replaceAll('"', "&quot;")
 }
 
+function triggerPdfDownload(filename: string, base64: string) {
+  const binary = atob(base64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i)
+  }
+  const blob = new Blob([bytes], { type: "application/pdf" })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement("a")
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+}
+
+export function downloadPaymentReceiptPdf(
+  payload: PaymentReceiptPayload,
+  filename?: string
+) {
+  triggerPdfDownload(
+    filename || `receipt-${payload.receiptNumber}.pdf`,
+    buildPaymentReceiptPdfBase64(payload)
+  )
+}
+
+export function downloadAnnualStatementPdf(
+  payload: AnnualGivingStatementPayload,
+  filename?: string
+) {
+  triggerPdfDownload(
+    filename || `giving-statement-${payload.taxYear}.pdf`,
+    buildAnnualStatementPdfBase64(payload)
+  )
+}
+
 export async function downloadReceiptPdf(filename: string, html: string) {
   const { jsPDF } = await import("jspdf")
   const doc = new jsPDF({ unit: "pt", format: "letter" })
-  const container = document.createElement("div")
-  container.innerHTML = html
-  container.style.position = "fixed"
-  container.style.left = "-9999px"
-  document.body.appendChild(container)
+  const body = html.match(/<body[^>]*>([\s\S]*)<\/body>/i)?.[1] || html
+  const holder = document.createElement("div")
+  holder.innerHTML = body.replace(/<style[\s\S]*?<\/style>/gi, "")
+  const lines = (holder.innerText || "")
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean)
 
-  await doc.html(container, {
-    x: 24,
-    y: 24,
-    width: 564,
-    windowWidth: 800,
-    autoPaging: "text",
-  })
-
-  document.body.removeChild(container)
+  let y = 48
+  doc.setFont("helvetica", "normal")
+  doc.setFontSize(11)
+  for (const line of lines) {
+    const wrapped = doc.splitTextToSize(line, 515)
+    for (const part of wrapped) {
+      if (y > 740) {
+        doc.addPage()
+        y = 48
+      }
+      doc.text(part, 48, y)
+      y += 14
+    }
+  }
   doc.save(filename)
 }
 

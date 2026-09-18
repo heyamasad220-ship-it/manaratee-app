@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import Link from "next/link"
 
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -52,7 +51,6 @@ import {
   type SponsorshipStatus,
   type SponsorshipType,
 } from "@/lib/donations/campaign-sponsorship-types"
-import { donationCampaignWorkspaceHref } from "@/lib/donations/campaign-workspace-paths"
 
 type Prefill = {
   contactId: string
@@ -98,7 +96,6 @@ export function CampaignSponsorshipDialog({
   const [events, setEvents] = useState<CampaignLinkedEventOption[]>([])
   const [packages, setPackages] = useState<SponsorshipPackageRow[]>([])
   const [benefits, setBenefits] = useState<CampaignSponsorshipBenefitRow[]>([])
-  const [linkedProspectId, setLinkedProspectId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(false)
 
@@ -143,7 +140,6 @@ export function CampaignSponsorshipDialog({
         setPaymentStatus(row.payment_status)
         setCommittedDate(row.committed_date || "")
         setNotes(row.notes || "")
-        setLinkedProspectId(row.prospectId || row.prospect_id)
         setBenefits(result.benefits || [])
       })
       return
@@ -160,7 +156,6 @@ export function CampaignSponsorshipDialog({
     setPaymentStatus("unpaid")
     setCommittedDate(new Date().toISOString().slice(0, 10))
     setNotes(prefill?.notes || "")
-    setLinkedProspectId(prospectId)
     setBenefits([])
   }, [open, sponsorshipId, prefill, prospectId])
 
@@ -241,8 +236,8 @@ export function CampaignSponsorshipDialog({
           <DialogTitle>{isEditing ? "Sponsorship" : "Create Sponsorship"}</DialogTitle>
           <DialogDescription>
             {isEditing
-              ? "Committed sponsor record for this campaign. Outreach stays on Prospects."
-              : "Creates a sponsorship from this prospect. The contact and campaign stay linked."}
+              ? "Committed sponsor record for this campaign."
+              : "Creates a sponsorship. The contact and campaign stay linked."}
           </DialogDescription>
         </DialogHeader>
 
@@ -253,19 +248,6 @@ export function CampaignSponsorshipDialog({
             <div className="flex flex-col gap-1">
               <Label>Sponsor</Label>
               <p className="text-sm font-medium">{contactName || "—"}</p>
-              {isEditing && linkedProspectId ? (
-                <Button variant="link" className="h-auto justify-start px-0" asChild>
-                  <Link
-                    href={donationCampaignWorkspaceHref(campaignId, {
-                      tab: "plan",
-                      section: "prospects",
-                      askType: "sponsorship",
-                    })}
-                  >
-                    View Original Prospect
-                  </Link>
-                </Button>
-              ) : null}
             </div>
 
             <div className="flex flex-col gap-2">

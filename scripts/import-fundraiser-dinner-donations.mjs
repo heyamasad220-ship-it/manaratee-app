@@ -7,6 +7,7 @@
  *   node scripts/import-fundraiser-dinner-donations.mjs
  *   node scripts/import-fundraiser-dinner-donations.mjs --file "C:/Users/danan/Downloads/September12Donations.csv"
  *   node scripts/import-fundraiser-dinner-donations.mjs --execute
+ *   node scripts/import-fundraiser-dinner-donations.mjs --link-recurring --execute
  *
  * Requires NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY in .env.local
  * for --execute.
@@ -93,12 +94,14 @@ function parseArgs(argv) {
     orgId: DEFAULT_ORG_ID,
     campaignId: DEFAULT_CAMPAIGN_ID,
     execute: false,
+    linkRecurring: false,
     limit: null,
   }
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]
     if (arg === "--execute") args.execute = true
+    else if (arg === "--link-recurring") args.linkRecurring = true
     else if (arg === "--file") args.file = argv[++index]
     else if (arg === "--org") args.orgId = argv[++index]
     else if (arg === "--campaign") args.campaignId = argv[++index]
@@ -144,6 +147,120 @@ function formatPhoneForStorage(value) {
 function parseMoney(value) {
   const parsed = Number(normalizeText(value).replace(/[$,]/g, ""))
   return Number.isFinite(parsed) ? parsed : 0
+}
+
+function addCalendarMonths(dateValue, months) {
+  const plain = String(dateValue).slice(0, 10)
+  const [year, month, day] = plain.split("-").map(Number)
+  const next = new Date(year, month - 1 + months, day)
+  const y = next.getFullYear()
+  const m = String(next.getMonth() + 1).padStart(2, "0")
+  const d = String(next.getDate()).padStart(2, "0")
+  return `${y}-${m}-${d}`
+}
+
+function parseImportedRecurringFromMemo(memo) {
+  const parts = String(memo || "").split("|")
+  const recurringType = String(parts[3] || "").toUpperCase()
+  const remarks = parts.slice(6).join("|")
+  if (recurringType !== "MONTHLY" && !/\bmonthly\b/i.test(remarks)) return null
+  return {
+    frequency: "monthly",
+    totalPayments: /one year/i.test(remarks) ? 12 : null,
+    notes: remarks || "Square MONTHLY donation",
+  }
+}
+
+async function linkImportedRecurringPlans(report) {
+  const { data: payments, error } = await sb
+    .from("payments")
+    .select(
+      "id, donor_id, contact_id, amount, payment_date, category_id, subcategory_id, campaign_id, memo, recurring_donation_plan_id, sender_name"
+    )
+    .eq("organization_id", args.orgId)
+    .eq("campaign_id", args.campaignId)
+    .ilike("memo", `${IMPORT_TAG}|%`)
+    .is("recurring_donation_plan_id", null)
+
+  if (error) throw new Error(`load payments for recurring link: ${error.message}`)
+
+  const candidates = []
+  for (const payment of payments || []) {
+    const recurring = parseImportedRecurringFromMemo(payment.memo)
+    if (!recurring || !payment.donor_id) continue
+    candidates.push({ payment, recurring })
+  }
+
+  report.recurringCandidates = candidates.map(({ payment, recurring }) => ({
+    name: payment.sender_name,
+    amount: Number(payment.amount),
+    frequency: recurring.frequency,
+    totalPayments: recurring.totalPayments,
+    notes: recurring.notes,
+  }))
+
+  if (!args.execute) {
+    report.recurringPlansCreated = candidates.length
+    return
+  }
+
+  report.recurringPlansCreated = 0
+  report.paymentsLinkedToPlans = 0
+
+  for (const { payment, recurring } of candidates) {
+    const startDate = String(payment.payment_date).slice(0, 10)
+    const endDate =
+      recurring.totalPayments != null
+        ? addCalendarMonths(startDate, recurring.totalPayments)
+        : null
+    const { data: plan, error: planError } = await sb
+      .from("recurring_donation_plans")
+      .insert({
+        organization_id: args.orgId,
+        donor_id: payment.donor_id,
+        contact_id: payment.contact_id,
+        campaign_id: payment.campaign_id,
+        category_id: payment.category_id,
+        subcategory_id: payment.subcategory_id,
+        amount: payment.amount,
+        frequency: recurring.frequency,
+        status: "active",
+        start_date: startDate,
+        next_payment_date: addCalendarMonths(startDate, 1),
+        end_date: endDate,
+        total_payments: recurring.totalPayments,
+        payments_made: 1,
+        notes: recurring.notes,
+        external_processor: "square",
+      })
+      .select("id")
+      .single()
+
+    if (planError) {
+      report.errors.push({
+        name: payment.sender_name,
+        error: `recurring plan: ${planError.message}`,
+      })
+      continue
+    }
+
+    const { error: linkError } = await sb
+      .from("payments")
+      .update({ recurring_donation_plan_id: plan.id })
+      .eq("id", payment.id)
+      .eq("organization_id", args.orgId)
+
+    if (linkError) {
+      report.errors.push({
+        name: payment.sender_name,
+        error: `link payment: ${linkError.message}`,
+      })
+      continue
+    }
+
+    report.recurringPlansCreated += 1
+    report.paymentsLinkedToPlans += 1
+  }
 }
 
 function parsePaymentDate(value) {
@@ -292,7 +409,7 @@ loadEnv()
 
 const args = parseArgs(process.argv.slice(2))
 
-if (!existsSync(args.file)) {
+if (!args.linkRecurring && !existsSync(args.file)) {
   console.error(`File not found: ${args.file}`)
   process.exit(1)
 }
@@ -332,6 +449,34 @@ async function fetchAll(table, filters = []) {
 }
 
 async function main() {
+  if (args.linkRecurring) {
+    const report = {
+      execute: args.execute,
+      linkRecurring: true,
+      organizationId: args.orgId,
+      campaignId: args.campaignId,
+      recurringCandidates: [],
+      recurringPlansCreated: 0,
+      paymentsLinkedToPlans: 0,
+      errors: [],
+    }
+    await linkImportedRecurringPlans(report)
+    const reportsDir = resolve(root, "scripts", "reports")
+    mkdirSync(reportsDir, { recursive: true })
+    const reportPath = resolve(
+      reportsDir,
+      args.execute
+        ? `fundraiser-dinner-recurring-link-execute.json`
+        : `fundraiser-dinner-recurring-link-dry-run.json`
+    )
+    writeFileSync(reportPath, JSON.stringify(report, null, 2))
+    console.log(JSON.stringify(report, null, 2))
+    console.log(`\nReport written to ${reportPath}`)
+    if (!args.execute) {
+      console.log("\nDry run only. Re-run with --link-recurring --execute to create plans.")
+    }
+    return
+  }
   const parsed = Papa.parse(readFileSync(args.file, "utf8").replace(/^\uFEFF/, ""), {
     header: true,
     skipEmptyLines: true,
@@ -852,6 +997,8 @@ async function main() {
         report.affiliationsSynced += 1
       }
     }
+
+    await linkImportedRecurringPlans(report)
   } else {
     report.paymentsCreated = paymentPayloads.length
   }

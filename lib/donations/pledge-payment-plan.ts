@@ -88,6 +88,123 @@ export function computeScheduledPledgePaymentDate(input: {
   return cursor
 }
 
+const MAX_INSTALLMENTS = 600
+
+export function lastPaymentDateFromCount(
+  firstPaymentDate: string,
+  frequency: string,
+  totalPayments: number
+): string | null {
+  if (!firstPaymentDate.trim() || totalPayments < 1) return null
+  return computeScheduledPledgePaymentDate({
+    firstPaymentDate,
+    frequency,
+    paymentsMade: totalPayments - 1,
+  })
+}
+
+export function paymentCountFromLastDate(
+  firstPaymentDate: string,
+  frequency: string,
+  lastPaymentDate: string
+): number {
+  const first = firstPaymentDate.trim()
+  const last = lastPaymentDate.trim()
+  if (!first || !last || last < first) return 0
+  if (last === first) return 1
+
+  const planFrequency = normalizePledgePlanFrequency(frequency)
+  if (planFrequency === "one_time") return 1
+
+  let count = 1
+  let cursor = first
+  while (count < MAX_INSTALLMENTS) {
+    const next = calculateNextPaymentDate(cursor, planFrequency as RecurringFrequency)
+    if (next > last) break
+    cursor = next
+    count += 1
+  }
+  return count
+}
+
+export type PledgePlanWriteFields = {
+  frequency: PledgePlanFrequency
+  pledge_type: PledgePlanFrequency
+  installment_amount: number | null
+  total_payments: number | null
+  first_payment_date: string | null
+  next_payment_date: string | null
+}
+
+export function buildPledgePlanWriteFields(input: {
+  frequency: string
+  amountPledged: number
+  firstPaymentDate?: string | null
+  numberOfPayments?: number | null
+  endDate?: string | null
+}): { ok: true; fields: PledgePlanWriteFields } | { ok: false; error: string } {
+  const frequency = normalizePledgePlanFrequency(input.frequency)
+  const amount = Number(input.amountPledged)
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return { ok: false, error: "Amount must be greater than zero." }
+  }
+
+  if (!isInstallmentPledgePlan(frequency)) {
+    return {
+      ok: true,
+      fields: {
+        frequency: "one_time",
+        pledge_type: "one_time",
+        installment_amount: null,
+        total_payments: null,
+        first_payment_date: null,
+        next_payment_date: null,
+      },
+    }
+  }
+
+  const firstPaymentDate = input.firstPaymentDate?.trim() || ""
+  if (!firstPaymentDate) {
+    return { ok: false, error: "Choose a first payment date." }
+  }
+
+  const countFromInput = Number(input.numberOfPayments)
+  const hasCount = Number.isInteger(countFromInput) && countFromInput >= 2
+  const endDate = input.endDate?.trim() || ""
+
+  let totalPayments = 0
+  if (hasCount) {
+    totalPayments = countFromInput
+  } else if (endDate) {
+    totalPayments = paymentCountFromLastDate(firstPaymentDate, frequency, endDate)
+    if (totalPayments < 2) {
+      return {
+        ok: false,
+        error: "End date must be on or after the second payment.",
+      }
+    }
+  } else {
+    return {
+      ok: false,
+      error: "Enter the number of installments or an end date.",
+    }
+  }
+
+  const installmentAmount = calculateInstallmentAmount(amount, totalPayments)
+  return {
+    ok: true,
+    fields: {
+      frequency,
+      pledge_type: frequency,
+      installment_amount: installmentAmount,
+      total_payments: totalPayments,
+      first_payment_date: firstPaymentDate,
+      next_payment_date: firstPaymentDate,
+    },
+  }
+}
+
 export function formatPledgePaymentPlanSummary(input: {
   totalAmount: number
   installmentAmount: number | null

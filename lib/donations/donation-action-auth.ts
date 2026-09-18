@@ -1,5 +1,3 @@
-"use server"
-
 import type { SupabaseClient } from "@supabase/supabase-js"
 
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
@@ -32,40 +30,6 @@ export type DonationStaffContext = {
 export type DonationStaffAccessResult =
   | ({ ok: true } & DonationStaffContext)
   | { ok: false; error: string }
-
-async function membershipHasPermission(
-  supabase: SupabaseClient,
-  organizationId: string,
-  membership: { role: string | null; role_id: string | null },
-  permissionKey: string
-) {
-  if (await isPlatformAdminOrgSupportSession(organizationId)) {
-    return true
-  }
-
-  if (membership.role === "owner") {
-    return true
-  }
-
-  if (!membership.role_id) {
-    return false
-  }
-
-  const { data, error } = await supabase
-    .from("role_permissions")
-    .select("enabled")
-    .eq("organization_id", organizationId)
-    .eq("role_id", membership.role_id)
-    .eq("permission_key", permissionKey)
-    .maybeSingle()
-
-  if (error) {
-    console.error("Donation permission check error:", error)
-    return false
-  }
-
-  return data?.enabled === true
-}
 
 function levelAllowed(
   level: DonationStaffAccessLevel,
@@ -120,48 +84,59 @@ export async function requireDonationStaffAccess(
     return { ok: false, error: "Unauthorized" }
   }
 
-  const canManage = await membershipHasPermission(
-    supabase,
-    organizationId,
-    membership,
-    PERMISSIONS.DONATIONS_MANAGE
-  )
-
-  const canView =
-    canManage ||
-    (await membershipHasPermission(
+  const platformSupport = await isPlatformAdminOrgSupportSession(organizationId)
+  if (
+    platformSupport ||
+    membership.role === "owner" ||
+    membership.role === "super_admin"
+  ) {
+    return {
+      ok: true,
       supabase,
-      organizationId,
-      membership,
-      PERMISSIONS.DONATIONS_VIEW
-    ))
+      orgId: organizationId,
+      userId: user.id,
+      userEmail: user.email ?? null,
+      canManage: true,
+      canManageCampaigns: true,
+      canManageProspects: true,
+      canManageReports: true,
+    }
+  }
 
+  const permissionKeys = [
+    PERMISSIONS.DONATIONS_MANAGE,
+    PERMISSIONS.DONATIONS_VIEW,
+    PERMISSIONS.DONATIONS_CAMPAIGNS_MANAGE,
+    PERMISSIONS.DONATIONS_PROSPECTS_MANAGE,
+    PERMISSIONS.DONATIONS_REPORTS_MANAGE,
+  ] as const
+
+  const enabledKeys = new Set<string>()
+  if (membership.role_id) {
+    const { data: permissionRows, error: permissionError } = await supabase
+      .from("role_permissions")
+      .select("permission_key, enabled")
+      .eq("organization_id", organizationId)
+      .eq("role_id", membership.role_id)
+      .in("permission_key", [...permissionKeys])
+
+    if (permissionError) {
+      console.error("Donation permission check error:", permissionError)
+    } else {
+      for (const row of permissionRows || []) {
+        if (row.enabled) enabledKeys.add(row.permission_key as string)
+      }
+    }
+  }
+
+  const canManage = enabledKeys.has(PERMISSIONS.DONATIONS_MANAGE)
+  const canView = canManage || enabledKeys.has(PERMISSIONS.DONATIONS_VIEW)
   const canManageCampaigns =
-    canManage ||
-    (await membershipHasPermission(
-      supabase,
-      organizationId,
-      membership,
-      PERMISSIONS.DONATIONS_CAMPAIGNS_MANAGE
-    ))
-
+    canManage || enabledKeys.has(PERMISSIONS.DONATIONS_CAMPAIGNS_MANAGE)
   const canManageProspects =
-    canManage ||
-    (await membershipHasPermission(
-      supabase,
-      organizationId,
-      membership,
-      PERMISSIONS.DONATIONS_PROSPECTS_MANAGE
-    ))
-
+    canManage || enabledKeys.has(PERMISSIONS.DONATIONS_PROSPECTS_MANAGE)
   const canManageReports =
-    canManage ||
-    (await membershipHasPermission(
-      supabase,
-      organizationId,
-      membership,
-      PERMISSIONS.DONATIONS_REPORTS_MANAGE
-    ))
+    canManage || enabledKeys.has(PERMISSIONS.DONATIONS_REPORTS_MANAGE)
 
   const allowed = levelAllowed(level, {
     canManage,

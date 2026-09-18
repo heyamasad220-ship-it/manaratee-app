@@ -3,6 +3,7 @@ import { describe, it } from "node:test"
 
 import {
   CAMPAIGN_WORKSPACE_TABS,
+  canonicalizeCampaignWorkspaceHref,
   donationCampaignWorkspaceHref,
   parseCampaignWorkspaceTab,
 } from "./campaign-workspace-paths"
@@ -29,7 +30,7 @@ describe("campaign workspace Event tab", () => {
       [
         "overview",
         "events",
-        "plan",
+        "prospects",
         "pledges",
         "donations",
         "sponsors",
@@ -43,6 +44,36 @@ describe("campaign workspace Event tab", () => {
     assert.equal(
       donationCampaignWorkspaceHref("campaign-1", { tab: "events" }),
       "/donations/campaigns/campaign-1?tab=events"
+    )
+  })
+})
+
+describe("Prospects workspace paths", () => {
+  it("opens Prospects and maps legacy plan/strategy URLs", () => {
+    assert.equal(
+      donationCampaignWorkspaceHref("campaign-1", { tab: "prospects" }),
+      "/donations/campaigns/campaign-1?tab=prospects"
+    )
+    assert.equal(
+      donationCampaignWorkspaceHref("campaign-1", { tab: "plan" }),
+      "/donations/campaigns/campaign-1?tab=prospects"
+    )
+    assert.equal(
+      donationCampaignWorkspaceHref("campaign-1", { tab: "strategy" }),
+      "/donations/campaigns/campaign-1?tab=prospects"
+    )
+  })
+
+  it("labels the tab Prospects", () => {
+    const prospectsTab = CAMPAIGN_WORKSPACE_TABS.find((tab) => tab.id === "prospects")
+    assert.equal(prospectsTab?.label, "Prospects")
+  })
+
+  it("canonicalizes legacy plan URLs to Prospects", () => {
+    const params = new URLSearchParams("tab=plan")
+    assert.equal(
+      canonicalizeCampaignWorkspaceHref("campaign-1", params),
+      "/donations/campaigns/campaign-1?tab=prospects"
     )
   })
 })

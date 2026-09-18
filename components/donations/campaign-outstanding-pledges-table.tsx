@@ -1,5 +1,5 @@
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Table,
   TableBody,
@@ -34,16 +34,12 @@ function renderStatusBadge(status: string) {
   const normalized = status.toLowerCase()
   const label = formatPledgeStatusLabel(status)
 
-  if (normalized === "open") {
+  if (normalized === "open" || normalized === "partial") {
     return (
       <Badge className="border-transparent bg-orange-100 text-orange-700 hover:bg-orange-100">
         {label}
       </Badge>
     )
-  }
-
-  if (normalized === "partial") {
-    return <Badge variant="secondary">{label}</Badge>
   }
 
   if (normalized === "fulfilled" || normalized === "paid") {
@@ -61,8 +57,11 @@ export function CampaignOutstandingPledgesTable({
 }: CampaignOutstandingPledgesTableProps) {
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0 pb-3">
-        <CardTitle className="text-base">Outstanding Pledges</CardTitle>
+      <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 pb-3">
+        <div>
+          <CardTitle className="text-base">Outstanding Pledges</CardTitle>
+          <CardDescription>Unpaid balances by donor. Gifts not applied to a pledge do not change these rows.</CardDescription>
+        </div>
         <a href={pledgesPageHref} className="text-sm text-primary hover:underline">
           View all pledges
         </a>

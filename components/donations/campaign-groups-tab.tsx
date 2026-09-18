@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
-import { Copy, Download, ExternalLink, Plus, QrCode } from "lucide-react"
+import { Copy, DollarSign, Download, ExternalLink, HeartHandshake, Plus, QrCode, Users } from "lucide-react"
 
 import { PledgeContactPicker } from "@/components/donations/pledge-contact-picker"
 import { Button } from "@/components/ui/button"
@@ -38,14 +38,18 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { StatCard, StatCardsRow } from "@/components/ui/stat-card"
 import { formatDonationCurrency } from "@/lib/donations/campaign-analytics"
+import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
 import {
   createCampaignGroupAction,
   deleteCampaignGroupAction,
+  listCampaignGroupDonorsAction,
   listCampaignGroupsAction,
   regenerateCampaignGroupLinkAction,
   searchOrganizationalGroupsAction,
   updateCampaignGroupAction,
+  type CampaignGroupDonorRow,
 } from "@/lib/donations/campaign-group-actions"
 import {
   CAMPAIGN_GROUP_STATUSES,
@@ -157,6 +161,11 @@ export function CampaignGroupsTab({
     Array<{ id: string; name: string; email: string | null }>
   >([])
   const [qrGroupId, setQrGroupId] = useState<string | null>(null)
+  const [donorsOpen, setDonorsOpen] = useState(false)
+  const [donorsLoading, setDonorsLoading] = useState(false)
+  const [donorsError, setDonorsError] = useState<string | null>(null)
+  const [donors, setDonors] = useState<CampaignGroupDonorRow[]>([])
+  const [donorsTotal, setDonorsTotal] = useState(0)
 
   const loadGroups = useCallback(async () => {
     setLoading(true)
@@ -313,6 +322,22 @@ export function CampaignGroupsTab({
     onChanged?.()
   }
 
+  async function openDonors(groupId: string) {
+    setDonorsOpen(true)
+    setDonorsLoading(true)
+    setDonorsError(null)
+    const result = await listCampaignGroupDonorsAction(groupId)
+    setDonorsLoading(false)
+    if (!result.success) {
+      setDonors([])
+      setDonorsTotal(0)
+      setDonorsError(result.error)
+      return
+    }
+    setDonors(result.donors)
+    setDonorsTotal(result.totalAmount)
+  }
+
   const donationUrlForSelected = selectedMetric
     ? buildCampaignGroupDonationUrl(selectedMetric.publicToken)
     : null
@@ -342,32 +367,48 @@ export function CampaignGroupsTab({
             ) : null}
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3">
-            <Card className="border border-border shadow-sm">
-              <CardHeader className="pb-1 pt-4">
-                <CardTitle className="text-xs uppercase text-muted-foreground">Pledged</CardTitle>
-              </CardHeader>
-              <CardContent className="pb-4 text-xl font-semibold tabular-nums">
-                {formatDonationCurrency(selectedMetric.pledged)}
-              </CardContent>
-            </Card>
-            <Card className="border border-border shadow-sm">
-              <CardHeader className="pb-1 pt-4">
-                <CardTitle className="text-xs uppercase text-muted-foreground">Collected</CardTitle>
-              </CardHeader>
-              <CardContent className="pb-4 text-xl font-semibold tabular-nums">
-                {formatDonationCurrency(selectedMetric.collected)}
-              </CardContent>
-            </Card>
-            <Card className="border border-border shadow-sm">
-              <CardHeader className="pb-1 pt-4">
-                <CardTitle className="text-xs uppercase text-muted-foreground">Donors</CardTitle>
-              </CardHeader>
-              <CardContent className="pb-4 text-xl font-semibold tabular-nums">
-                {selectedMetric.donorCount}
-              </CardContent>
-            </Card>
-          </div>
+          <StatCardsRow equal columns={3} className="gap-3">
+            <StatCard
+              fill
+              className="h-full"
+              tone="violet"
+              icon={HeartHandshake}
+              label="Pledged"
+              value={formatDonationCurrency(selectedMetric.pledged)}
+              valueClassName="text-xl"
+            />
+            <StatCard
+              fill
+              className="h-full"
+              tone="emerald"
+              icon={DollarSign}
+              label="Collected"
+              value={formatDonationCurrency(selectedMetric.collected)}
+              valueClassName="text-xl"
+            />
+            <StatCard
+              fill
+              className="h-full"
+              tone="sky"
+              icon={Users}
+              label="Donors"
+              hint={selectedMetric.donorCount > 0 ? "Click to view names and amounts" : undefined}
+              value={
+                selectedMetric.donorCount > 0 ? (
+                  <button
+                    type="button"
+                    className="text-left hover:underline"
+                    onClick={() => void openDonors(selectedMetric.groupId)}
+                  >
+                    {selectedMetric.donorCount.toLocaleString()}
+                  </button>
+                ) : (
+                  "0"
+                )
+              }
+              valueClassName="text-xl"
+            />
+          </StatCardsRow>
 
           <Card className="border border-border shadow-sm">
             <CardHeader>
@@ -760,6 +801,69 @@ export function CampaignGroupsTab({
               {saving ? "Saving..." : editingGroupId ? "Save Changes" : "Create Group"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={donorsOpen} onOpenChange={setDonorsOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Donors</DialogTitle>
+            <DialogDescription>
+              {selectedMetric
+                ? `${selectedMetric.name} — gifts attributed to this group.`
+                : "Gifts attributed to this group."}
+            </DialogDescription>
+          </DialogHeader>
+          {donorsLoading ? (
+            <p className="py-6 text-sm text-muted-foreground">Loading donors…</p>
+          ) : donorsError ? (
+            <p className="py-6 text-sm text-red-600">{donorsError}</p>
+          ) : donors.length === 0 ? (
+            <p className="py-6 text-sm text-muted-foreground">No gifts yet for this group.</p>
+          ) : (
+            <div className="max-h-[60vh] overflow-y-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Donor</TableHead>
+                    <TableHead className="text-right">Gifts</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {donors.map((donor) => (
+                    <TableRow key={donor.key}>
+                      <TableCell>
+                        {donor.contactId ? (
+                          <a
+                            href={contactProfileHref(donor.contactId, "financial")}
+                            className="font-medium text-primary hover:underline"
+                          >
+                            {donor.name}
+                          </a>
+                        ) : (
+                          donor.name
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">{donor.giftCount}</TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatDonationCurrency(donor.amount)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  <TableRow>
+                    <TableCell className="font-medium">Total</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {donors.reduce((sum, row) => sum + row.giftCount, 0)}
+                    </TableCell>
+                    <TableCell className="text-right font-medium tabular-nums">
+                      {formatDonationCurrency(donorsTotal)}
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 

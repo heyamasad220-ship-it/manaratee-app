@@ -5,6 +5,7 @@ import { Suspense, useEffect, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 
+import { StaffOrganizationHeaderSwitcher } from "@/components/layout/staff-organization-switcher"
 import { UserMenu } from "@/components/layout/user-menu"
 import { MobileMenuTrigger } from "@/components/layout/sidebar"
 import { NavigationBreadcrumbs } from "@/components/navigation/navigation-breadcrumbs"
@@ -109,11 +110,7 @@ export function Header({ showSearch = false, actions, breadcrumbExtras }: Header
 
           {organizationName || logoUrl ? (
             <div className="flex min-w-0 items-center gap-2.5">
-              {organizationName ? (
-                <p className="hidden max-w-[10rem] truncate text-sm font-semibold leading-tight text-foreground sm:block sm:max-w-[14rem] lg:max-w-[18rem] lg:text-base">
-                  {organizationName}
-                </p>
-              ) : null}
+              <StaffOrganizationHeaderSwitcher fallbackName={organizationName} />
               {logoUrl ? (
                 <div className="flex shrink-0 items-center justify-center overflow-hidden rounded-md border bg-white p-1">
                   <Image

@@ -164,7 +164,7 @@ discount_tags.organization_id → organizations.id
 
 **Group giving report (migration `166_group_giving_report.sql`):** RPC `donation_group_giving_report` powers **Donations → Reports → Donors → Group Giving**. Returns only groups with at least one non-voided gift in the date range (direct gift on the group contact or attributed member gift). Columns include group/member gift split, combined total, gift count, last gift, and group-contact pledge status.
 
-**Family households (migration `148_families_and_family_members.sql` + `196_family_members_person.sql`):** `families` + `family_members` are household containers — **not** a separate contact type or parallel profile. The **contact** is canonical (phone/email/address, donations, rentals, events). Family is an extension managed on the contact Family card (name, head, members). Members are adults (**contacts**) and minors (**people** only, no CRM profile). `family_members.contact_id` is optional; `person_id` identifies minors. One active household per person; first adult is head/primary (changeable). **UI:** `/directory/families` household directory; `/directory/families/[id]` household detail; legacy `/contacts/families` redirects there. Auto-sync when kids are added under a parent Contact (`syncHouseholdFromParentContact`). Backfill camp parents: `node scripts/sync-summer-camp-households.mjs --execute` after **196**. `person_relationships` remains the Contact profile Family panel source.
+**Family households (migration `148_families_and_family_members.sql` + `196_family_members_person.sql`):** `families` + `family_members` are household containers — **not** a separate contact type or parallel profile. The **contact** is canonical (phone/email/address, donations, rentals, events). Family is an extension managed on the contact Family card (name, head, members). Members are adults (**contacts**) and minors (**people** only, no CRM profile). `family_members.contact_id` is optional; `person_id` identifies minors. One active household per person; first adult is head/primary (changeable). **UI:** `/directory/families` household directory; `/directory/families/[id]` household detail; legacy `/contacts/families` redirects there. Auto-sync when kids are added under a parent Contact (`syncHouseholdFromParentContact`). Backfill camp parents: `node scripts/sync-summer-camp-households.mjs --execute` after **196**. `person_relationships` remains the Contact profile Family panel source. **Household Giving (`295`):** `donation_household_giving_report` returns only families with two or more adult Directory contacts who each donated in the selected period.
 
 **Contact payment methods (migration `138_contact_payment_methods.sql`):** `contact_payment_methods` stores cards on file for a contact (brand, last4, expiry, cardholder, default flag). **Staff** add cards from contact profile **Financial → Payment Methods**; **contacts** add cards from the customer portal **Profile → Payment Methods**. Both paths use the same `contact_payment_methods` rows (full PAN and CVV collected at save only; only last 4 + MM/YYYY expiration persist). Server: `lib/contacts/contact-payment-method-actions.ts`, `lib/contacts/contact-payment-method-validation.ts`, `components/contacts/contact-payment-methods-panel.tsx`. Run after `137_customer_role_merge.sql`.
 
@@ -354,7 +354,7 @@ program_enrollment_fa_awards.participant_contact_id → contacts.id
 
 Import CSV flow writes directly to `payments` + `payment_import_batches` (no row staging table).
 
-**Dev seed:** `scripts/seed-donations-dev.mjs` inserts test data into canonical tables only (see `docs/Features.md` Donations section). Does not use dropped legacy tables. Horizon demo: `scripts/seed-horizon-community-foundation-demo.mjs` (org-locked).
+**Dev seed:** `scripts/seed-donations-dev.mjs` inserts test data into canonical tables only (see `docs/Features.md` Donations section). Does not use dropped legacy tables. Horizon demo: `scripts/seed-horizon-community-foundation-demo.mjs` (org-locked). Additive sponsorship demo data: `--sponsorships-only --execute`.
 
 **`payments.source` constraint (patch `131_payments_source_square.sql`):** lowercase channel keys (`cash`, `check`, **`square`**, `zelle`, `venmo`, `paypal`, `stripe`, `import`, `manual`). **`square`** = Square terminal batch deposit on a campaign (no donor/contact). Campaign overview classifies via memo `|batch|square|` or `source = square`. Customer portal normalizes configured payment method display names via `lib/donations/payment-source-channel.ts` before insert.
 
@@ -395,13 +395,15 @@ Import CSV flow writes directly to `payments` + `payment_import_batches` (no row
 
 **RLS hardening (migration `095_donations_rls_hardening.sql`):** Row-level security on canonical ledger tables (`payments`, `pledges`, `donors`) plus donation operational tables (`recurring_donation_plans`, `donation_receipts`, `pledge_reminders`, `donation_checkout_sessions`, `payment_processor_events`, `donation_settings`). Staff policies require `donations.view` / `donations.manage` via `auth_user_can_view_donations` / `auth_user_can_manage_donations` (owner bypass included). Customers may SELECT/INSERT own rows through `auth_user_contact_ids` / `auth_user_donor_ids`. Service role bypass unchanged for webhooks and checkout creation.
 
+**Donation categories/funds RLS (migration `294_donation_categories_funds_rls.sql`):** `donation_categories` and `donation_subcategories` used leftover `profiles.role IN ('owner','admin')` policies, so Settings → Categories looked empty for Super Admin / switched-org staff even though the Square import rows were still there (MAS Development: General Donation, Zakat, Operations, Family Emergency + 13 funds). Staff SELECT/write now uses the same donations view/manage helpers as payments; customers keep org-scoped SELECT for portal pickers. Settings loads the **selected** organization (`getCurrentOrganizationId`), not `profiles.organization_id`.
+
 **Campaigns RLS (migration `258_campaigns_rls_policies.sql`):** Same permission helpers on `campaigns` (staff SELECT/INSERT/UPDATE/DELETE). Active org members may SELECT `status = active` rows for customer portal campaign pickers. Staff campaign create/edit/delete on `/donations/campaigns` goes through server actions that write with the service role after `donations.manage` checks (selected org cookie).
 
 **Campaign phases (migration `260_campaign_phases.sql`):** `campaign_phases` table (org + campaign scoped) with RLS using `auth_user_can_view_donations` / `auth_user_can_manage_donations`. Nullable `campaign_phase_id` on `pledges` and `payments`. `campaigns.goal_breakdown_enabled`. Recreates `pledge_status_view` / `donor_summary_view` to expose `campaign_phase_id`. Phase metrics are computed in `computeCampaignPhaseMetrics` (Committed / Collected / Outstanding; payments inherit pledge phase when payment phase is null — no double count).
 
-**Campaign ask levels (migration `261_campaign_ask_levels.sql`):** `campaign_ask_levels` (org + campaign scoped, optional phase FK). Nullable `pledges.ask_level_id`. Fundraising Plan → Ask Strategy metrics via `computeCampaignAskLevelMetrics` (target value = ask × count; secured from linked pledges or soft amount match; prospects/asked filled from donation prospects; Asked = stages Asked and Pledged).
+**Campaign ask levels (migration `261_campaign_ask_levels.sql`):** `campaign_ask_levels` (org + campaign scoped, optional phase FK). Nullable `pledges.ask_level_id`. Ask-strategy gift chart UI is retired (September 2026); Prospects types ask amount on each donation prospect (`suggested_ask_amount`).
 
-**Campaign prospects (migration `262_campaign_prospects.sql`, extended `284_campaign_sponsorship_prospects.sql`):** `campaign_prospects` (org + campaign scoped; FK to contacts, optional ask level / assignee / event / package / converted pledge / converted sponsorship). `ask_type` (`donation` | `sponsorship`; existing rows default donation). Unique `(campaign_id, contact_id, ask_type)`. Nullable `pledges.campaign_prospect_id`. Outreach history: `campaign_prospect_activities`. RLS via donations view/manage helpers.
+**Campaign prospects (migration `262_campaign_prospects.sql`, extended `284_campaign_sponsorship_prospects.sql`):** `campaign_prospects` (org + campaign scoped; FK to contacts, optional ask level / assignee / event / package / converted pledge / converted sponsorship). `ask_type` (`donation` | `sponsorship`; existing rows default donation). Unique `(campaign_id, contact_id, ask_type)`. Prospects lists donation rows only. Add/edit uses a popup for ask amount, assignee, last contact, next follow-up, and notes; the table is read-only. Nullable `pledges.campaign_prospect_id`. Outreach history: `campaign_prospect_activities` (table kept; not shown on the Prospects tab). RLS via donations view/manage helpers.
 
 **Campaign sponsorships (migration `284_campaign_sponsorship_prospects.sql`, extended `285_campaign_sponsorship_packages.sql`):** `sponsorship_packages` (campaign-scoped; optional related event), `sponsorship_package_benefits`, `campaign_sponsorships` (committed sponsor records; optional `prospect_id` / `event_id` / `sponsorship_package_id`), `campaign_sponsorship_benefits` (copied benefits + fulfillment). Separate from `pledges` and `payments`. Cash sponsorship commitments add to campaign `totalCommitted` only — not `totalRaised` (avoids double-counting payments). In-kind is reported separately and is not treated as cash collected. RLS via donations view/manage helpers.
 
@@ -420,6 +422,7 @@ Run after `094_transactional_email.sql`:
 ```bash
 npx supabase db query --linked -f scripts/095_donations_rls_hardening.sql
 npx supabase db query --linked -f scripts/258_campaigns_rls_policies.sql
+npx supabase db query --linked -f scripts/294_donation_categories_funds_rls.sql
 npx supabase db query --linked -f scripts/260_campaign_phases.sql
 npx supabase db query --linked -f scripts/261_campaign_ask_levels.sql
 npx supabase db query --linked -f scripts/262_campaign_prospects.sql
@@ -431,6 +434,9 @@ npx supabase db query --linked -f scripts/267_campaign_wishlist.sql
 npx supabase db query --linked -f scripts/284_campaign_sponsorship_prospects.sql
 npx supabase db query --linked -f scripts/285_campaign_sponsorship_packages.sql
 npx supabase db query --linked -f scripts/292_campaign_same_organization_fks.sql
+npx supabase db query --linked -f scripts/296_pledge_open_fulfilled_status.sql
+npx supabase db query --linked -f scripts/297_profile_full_name_and_module_capabilities.sql
+npx supabase db query --linked -f scripts/298_administration_programs_events_capability.sql
 npm run validate:donations-security
 ```
 
@@ -440,7 +446,7 @@ npm run validate:donations-security
 
 **Pilot blocker view fixes (migration `119_donations_pilot_blocker_views.sql`):** `pledge_status_view` excludes voided payments from pledge balances; cancelled pledges expose `calculated_status = cancelled` and `balance_remaining = 0`. `donor_summary_view` excludes voided from `total_donations`.
 
-**Pledge payment plans (migration `158_pledge_payment_plan.sql`):** `pledges.installment_amount`, `total_payments`, `first_payment_date`, `next_payment_date`. `pledge_status_view` exposes the new columns. Customer portal **New Pledge** writes only campaign + total; payment plans are added later via **Set Up Payment Plan**. Migration `159_customer_pledge_plan_update.sql` allows customers to UPDATE their own pledges for plan fields.
+**Pledge payment plans (migration `158_pledge_payment_plan.sql`):** `pledges.installment_amount`, `total_payments`, `first_payment_date`, `next_payment_date`. `pledge_status_view` exposes the new columns. Staff **Pledge Details** writes these columns when creating or editing a monthly / quarterly / yearly pledge (first payment date plus installment count or end date). Customer portal **New Pledge** still writes only campaign + total; payment plans can be added later via **Set Up Payment Plan**. Migration `159_customer_pledge_plan_update.sql` allows customers to UPDATE their own pledges for plan fields.
 
 **Outstanding pledge flag (migration `124_donor_summary_outstanding_pledge.sql`):** `donor_summary_view.has_open_pledge` is true only when `pledge_status_view.balance_remaining > 0`. Backfills `pledges.status` from payment totals; trigger `sync_pledge_status_after_payment_change` keeps status in sync on payment changes.
 
@@ -449,6 +455,10 @@ npm run validate:donations-security
 **People donor filter (migration `129_donor_giving_contact_search.sql`, grants `130_donor_giving_rpc_grants.sql`):** `search_donor_giving_contact_ids` — contacts with at least one non-voided payment (direct or via `donors.contact_id`). Run **`130`** so authenticated app users can call the RPC (without it, People falls back to ~95 affiliation tags). **Link orphan donors to People:** `node scripts/link-orphan-donors-to-contacts.mjs --execute` then `node scripts/sync-donor-affiliations.mjs --execute`.
 
 **Payment refunds / net totals (migration `125_payment_refunds_net_amounts.sql`):** `payment_net_amount(amount, refunded_amount)` helper. Views and dashboard RPCs use net amounts. `refresh_pledge_status` and payment trigger include `refunded_amount`. Status values `partially_refunded` and `refunded` on `payments`.
+
+**Pledge Open / Fulfilled only (migration `296_pledge_open_fulfilled_status.sql`):** `pledge_status_view.calculated_status` and `pledges.status` are `open` (any remaining balance), `fulfilled`, or `cancelled`. Former `partial` rows backfill to `open`. Recreates `pledge_status_view` / `donor_summary_view`. Run `scripts/296_pledge_open_fulfilled_status.sql`.
+
+**Administration capability (migration `298_administration_programs_events_capability.sql`):** `workforce` is not core. It is included with Programs or Event Management (`modules.included_capability_slugs`). Fund Development–only and Membership–only orgs have `organization_modules` for `workforce` disabled.
 
 **Import columns on `payments` (migration `117`):** `import_email`, `import_phone`, `import_batch_id` — CSV match hints and batch audit link. Legacy `payment_import_rows` staging removed in migration `141`.
 

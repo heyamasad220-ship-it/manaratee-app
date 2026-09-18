@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache"
 
 import { requireDonationStaffAccess } from "@/lib/donations/donation-action-auth"
 import {
+  campaignPaymentNetAmount,
+  isCountableCampaignPayment,
   type CampaignPaymentRow,
   type CampaignPledgeRow,
 } from "@/lib/donations/campaign-analytics"
@@ -193,6 +195,120 @@ export async function getCampaignGroupDetailAction(groupId: string) {
       payments: gifts || [],
       pledges: pledgeRows,
       canManage: access.canManageCampaigns,
+    }
+  } catch (error) {
+    return { success: false as const, error: (error as Error).message }
+  }
+}
+
+export type CampaignGroupDonorRow = {
+  key: string
+  name: string
+  amount: number
+  giftCount: number
+  contactId: string | null
+}
+
+export async function listCampaignGroupDonorsAction(groupId: string) {
+  const access = await requireDonationStaffAccess("view")
+  if (!access.ok) return { success: false as const, error: access.error }
+
+  const id = groupId.trim()
+  if (!id) return { success: false as const, error: "Group is required" }
+
+  try {
+    const writeClient = createServiceRoleClient()
+    const { data: group, error: groupError } = await writeClient
+      .from("campaign_groups")
+      .select("id, name, campaign_id")
+      .eq("organization_id", access.orgId)
+      .eq("id", id)
+      .maybeSingle()
+
+    if (groupError) return { success: false as const, error: groupError.message }
+    if (!group) return { success: false as const, error: "Group not found" }
+
+    const payments: CampaignPaymentRow[] = []
+    let from = 0
+    while (true) {
+      const { data, error } = await writeClient
+        .from("payments")
+        .select(
+          "id, amount, refunded_amount, status, sender_name, contact_id, donor_id"
+        )
+        .eq("organization_id", access.orgId)
+        .eq("campaign_group_id", id)
+        .range(from, from + 999)
+
+      if (error) return { success: false as const, error: error.message }
+      const rows = (data || []) as CampaignPaymentRow[]
+      payments.push(...rows)
+      if (rows.length < 1000) break
+      from += 1000
+    }
+
+    const countable = payments.filter((payment) => isCountableCampaignPayment(payment))
+    const contactIds = [
+      ...new Set(
+        countable
+          .map((payment) => payment.contact_id)
+          .filter((value): value is string => Boolean(value))
+      ),
+    ]
+    const contactNames = new Map<string, string>()
+    if (contactIds.length > 0) {
+      const { data: contacts } = await writeClient
+        .from("contacts")
+        .select("id, full_name")
+        .eq("organization_id", access.orgId)
+        .in("id", contactIds)
+      for (const row of contacts || []) {
+        const name = String(row.full_name || "").trim()
+        if (name) contactNames.set(row.id as string, name)
+      }
+    }
+
+    const grouped = new Map<string, CampaignGroupDonorRow>()
+    for (const payment of countable) {
+      const net = campaignPaymentNetAmount(payment)
+      const key = payment.donor_id
+        ? `donor:${payment.donor_id}`
+        : payment.contact_id
+          ? `contact:${payment.contact_id}`
+          : `name:${String(payment.sender_name || "").trim().toLowerCase() || "anonymous"}`
+      const existing = grouped.get(key)
+      const name =
+        (payment.contact_id && contactNames.get(payment.contact_id)) ||
+        String(payment.sender_name || "").trim() ||
+        existing?.name ||
+        "Anonymous donor"
+
+      if (existing) {
+        existing.amount += net
+        existing.giftCount += 1
+        if (!existing.contactId && payment.contact_id) existing.contactId = payment.contact_id
+        if (name && existing.name === "Anonymous donor") existing.name = name
+      } else {
+        grouped.set(key, {
+          key,
+          name,
+          amount: net,
+          giftCount: 1,
+          contactId: payment.contact_id ?? null,
+        })
+      }
+    }
+
+    const donors = [...grouped.values()].sort((left, right) => {
+      if (right.amount !== left.amount) return right.amount - left.amount
+      return left.name.localeCompare(right.name)
+    })
+
+    return {
+      success: true as const,
+      groupName: group.name as string,
+      donors,
+      totalAmount: donors.reduce((sum, row) => sum + row.amount, 0),
     }
   } catch (error) {
     return { success: false as const, error: (error as Error).message }

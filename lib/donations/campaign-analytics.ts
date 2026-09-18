@@ -10,6 +10,11 @@ import type { CampaignAskLevelMetrics } from "@/lib/donations/campaign-ask-level
 import { askLevelTargetValue } from "@/lib/donations/campaign-ask-level-types"
 import { countsTowardGivingTotals, paymentNetAmount } from "@/lib/donations/payment-net-amount"
 import { normalizePaymentSourceChannel } from "@/lib/donations/payment-source-channel"
+import {
+  monthlyEquivalentAmount,
+  RECURRING_FREQUENCIES,
+  type RecurringFrequency,
+} from "@/lib/donations/recurring-donation-types"
 
 export type CampaignRow = {
   id: string
@@ -69,6 +74,101 @@ export type CampaignPaymentRow = {
   status?: string | null
   memo?: string | null
   recurring_donation_plan_id?: string | null
+}
+
+export type CampaignRecurringPlanRow = {
+  id: string
+  donor_id: string | null
+  contact_id: string | null
+  donor_name: string
+  amount: number
+  frequency: string
+  status: string
+  start_date: string | null
+  next_payment_date: string | null
+  payments_made: number | null
+  total_payments: number | null
+}
+
+/** Square dinner import stores Recurring Type in memo part 4 and remarks after part 6. */
+export function isRecurringCampaignPayment(payment: CampaignPaymentRow): boolean {
+  if (payment.recurring_donation_plan_id) return true
+  const memo = String(payment.memo || "")
+  if (/\|MONTHLY\|/i.test(memo) || /\|recurring\|/i.test(memo)) return true
+  const remarks = memo.split("|").slice(6).join("|")
+  return /\bmonthly\b/i.test(remarks)
+}
+
+export function campaignPaymentTypeLabel(payment: CampaignPaymentRow): string {
+  return isRecurringCampaignPayment(payment) ? "Recurring" : "One-Time"
+}
+
+const LIVE_RECURRING_PLAN_STATUSES = new Set(["active", "past_due"])
+
+export type CampaignDonationKpis = {
+  oneTimeTotal: number
+  oneTimeCount: number
+  recurringCount: number
+  monthlyRecurringAmount: number
+  donorCount: number
+}
+
+function asRecurringFrequency(frequency: string): RecurringFrequency {
+  return (RECURRING_FREQUENCIES as readonly string[]).includes(frequency)
+    ? (frequency as RecurringFrequency)
+    : "monthly"
+}
+
+function isLiveRecurringPlan(plan: CampaignRecurringPlanRow): boolean {
+  return LIVE_RECURRING_PLAN_STATUSES.has(String(plan.status || "").toLowerCase())
+}
+
+function campaignDonorKey(row: {
+  donor_id?: string | null
+  contact_id?: string | null
+  sender_name?: string | null
+  donor_name?: string | null
+}): string | null {
+  if (row.donor_id) return `donor:${row.donor_id}`
+  if (row.contact_id) return `contact:${row.contact_id}`
+  const name = String(row.sender_name || row.donor_name || "")
+    .trim()
+    .toLowerCase()
+  return name ? `name:${name}` : null
+}
+
+export function computeCampaignDonationKpis(
+  payments: CampaignPaymentRow[],
+  recurringPlans: CampaignRecurringPlanRow[]
+): CampaignDonationKpis {
+  const countablePayments = payments.filter((payment) => isCountableCampaignPayment(payment))
+  const oneTimePayments = countablePayments.filter((payment) => !isRecurringCampaignPayment(payment))
+  const livePlans = recurringPlans.filter((plan) => isLiveRecurringPlan(plan))
+
+  const donorKeys = new Set<string>()
+  for (const payment of countablePayments) {
+    const key = campaignDonorKey(payment)
+    if (key) donorKeys.add(key)
+  }
+  for (const plan of livePlans) {
+    const key = campaignDonorKey(plan)
+    if (key) donorKeys.add(key)
+  }
+
+  return {
+    oneTimeTotal: oneTimePayments.reduce(
+      (sum, payment) => sum + campaignPaymentNetAmount(payment),
+      0
+    ),
+    oneTimeCount: oneTimePayments.length,
+    recurringCount: livePlans.length,
+    monthlyRecurringAmount: livePlans.reduce(
+      (sum, plan) =>
+        sum + monthlyEquivalentAmount(plan.amount, asRecurringFrequency(plan.frequency)),
+      0
+    ),
+    donorCount: donorKeys.size,
+  }
 }
 
 export type CampaignSourceBucket =
@@ -200,6 +300,25 @@ export function filterPledgesForCampaign(
   )
 }
 
+/**
+ * Campaign Goal / Campaign Performance headline math.
+ * Committed = valid pledges. Collected = all campaign payments.
+ * Outstanding = committed minus collected (never below zero).
+ * Unpaid pledge balances stay on `metrics.outstanding` for the open-pledges table.
+ */
+export function computeCampaignHeadlineTotals(metrics: {
+  pledged: number
+  raised: number
+}) {
+  const committed = Number(metrics.pledged || 0)
+  const collected = Number(metrics.raised || 0)
+  return {
+    committed,
+    collected,
+    outstanding: Math.max(committed - collected, 0),
+  }
+}
+
 export function computeCampaignMetrics(
   campaignId: string,
   goalAmount: number | null | undefined,
@@ -280,7 +399,7 @@ export function classifyCampaignPaymentSource(payment: CampaignPaymentRow): Camp
   if (memo.includes("|cash|")) return "cash"
   if (memo.includes("|checks|")) return "checks"
   if (isCampaignBatchDepositPayment(payment)) return "square"
-  if (memo.includes("|recurring|") || payment.recurring_donation_plan_id) return "ccRecurring"
+  if (isRecurringCampaignPayment(payment)) return "ccRecurring"
   if (memo.includes("|one-time|")) return "ccOneTime"
   if (memo.includes("ticket")) return "ticketSales"
 
@@ -290,7 +409,7 @@ export function classifyCampaignPaymentSource(payment: CampaignPaymentRow): Camp
   if (source === "check") return "checks"
   if (source === "square") return "square"
   if (CARD_PAYMENT_CHANNELS.has(source)) {
-    return payment.recurring_donation_plan_id ? "ccRecurring" : "ccOneTime"
+    return isRecurringCampaignPayment(payment) ? "ccRecurring" : "ccOneTime"
   }
 
   if (source === "import" || source === "manual" || source === "processor") {
@@ -736,51 +855,370 @@ export function buildCampaignDonorInsights(
   return { donors, largestGift }
 }
 
+const CAMPAIGN_LEDGER_PAGE_SIZE = 1000
+const PLEDGE_STATUS_SELECT =
+  "id, campaign_id, campaign_phase_id, donor_id, donor_name, amount_pledged, amount_paid, balance_remaining, calculated_status, pledge_date"
+const PLEDGE_STATUS_SELECT_LEGACY =
+  "id, campaign_id, donor_id, donor_name, amount_pledged, amount_paid, balance_remaining, calculated_status, pledge_date"
+const PAYMENT_SELECT =
+  "id, campaign_id, campaign_phase_id, pledge_id, donor_id, contact_id, sender_name, amount, refunded_amount, payment_date, source, status, memo, recurring_donation_plan_id"
+const PAYMENT_SELECT_LEGACY =
+  "id, campaign_id, pledge_id, donor_id, contact_id, sender_name, amount, refunded_amount, payment_date, source, status, memo, recurring_donation_plan_id"
+
+function isMissingCampaignPhaseColumnError(error: {
+  message?: string
+  code?: string
+} | null) {
+  return Boolean(
+    error &&
+      (error.code === "42703" || /campaign_phase_id/i.test(error.message || ""))
+  )
+}
+
+async function fetchPagedRows<T>(
+  fetchPage: (
+    from: number,
+    to: number
+  ) => Promise<{ data: T[] | null; error: { message?: string; code?: string } | null }>
+): Promise<{ rows: T[]; error: { message?: string; code?: string } | null }> {
+  const rows: T[] = []
+  let from = 0
+  while (true) {
+    const { data, error } = await fetchPage(from, from + CAMPAIGN_LEDGER_PAGE_SIZE - 1)
+    if (error) return { rows, error }
+    const page = data || []
+    rows.push(...page)
+    if (page.length < CAMPAIGN_LEDGER_PAGE_SIZE) return { rows, error: null }
+    from += CAMPAIGN_LEDGER_PAGE_SIZE
+  }
+}
+
+async function fetchCampaignPledgesForCampaign(
+  supabase: SupabaseClient,
+  organizationId: string,
+  campaignId: string
+): Promise<CampaignPledgeRow[]> {
+  const fetchWithSelect = (select: string) =>
+    fetchPagedRows<CampaignPledgeRow>((from, to) =>
+      supabase
+        .from("pledge_status_view")
+        .select(select)
+        .eq("organization_id", organizationId)
+        .eq("campaign_id", campaignId)
+        .order("pledge_date", { ascending: false })
+        .range(from, to)
+    )
+
+  const withPhase = await fetchWithSelect(PLEDGE_STATUS_SELECT)
+  if (!withPhase.error) return withPhase.rows
+  if (!isMissingCampaignPhaseColumnError(withPhase.error)) {
+    throw new Error(withPhase.error.message || "Failed to load campaign pledges")
+  }
+  const legacy = await fetchWithSelect(PLEDGE_STATUS_SELECT_LEGACY)
+  if (legacy.error) {
+    throw new Error(legacy.error.message || "Failed to load campaign pledges")
+  }
+  return legacy.rows
+}
+
+async function fetchCampaignPaymentsForCampaign(
+  supabase: SupabaseClient,
+  organizationId: string,
+  campaignId: string,
+  pledgeIds: string[]
+): Promise<CampaignPaymentRow[]> {
+  const fetchByCampaign = (select: string) =>
+    fetchPagedRows<CampaignPaymentRow>((from, to) =>
+      supabase
+        .from("payments")
+        .select(select)
+        .eq("organization_id", organizationId)
+        .eq("campaign_id", campaignId)
+        .order("payment_date", { ascending: false })
+        .range(from, to)
+    )
+
+  const fetchUnattributedForPledges = (select: string, chunk: string[]) =>
+    fetchPagedRows<CampaignPaymentRow>((from, to) =>
+      supabase
+        .from("payments")
+        .select(select)
+        .eq("organization_id", organizationId)
+        .in("pledge_id", chunk)
+        .is("campaign_id", null)
+        .order("payment_date", { ascending: false })
+        .range(from, to)
+    )
+
+  const mergeUnattributed = async (
+    select: string,
+    existing: CampaignPaymentRow[],
+    extraPledgeIds: string[]
+  ) => {
+    const rowsById = new Map(existing.map((row) => [row.id, row]))
+    const seenPledgeIds = new Set(
+      existing
+        .map((row) => row.pledge_id)
+        .filter((id): id is string => Boolean(id))
+    )
+    const missingPledgeIds = extraPledgeIds.filter((pledgeId) => !seenPledgeIds.has(pledgeId))
+
+    for (let index = 0; index < missingPledgeIds.length; index += 100) {
+      const extra = await fetchUnattributedForPledges(
+        select,
+        missingPledgeIds.slice(index, index + 100)
+      )
+      if (extra.error) return extra
+      for (const row of extra.rows) {
+        rowsById.set(row.id, row)
+      }
+    }
+
+    return {
+      rows: [...rowsById.values()].sort(
+        (a, b) =>
+          new Date(String(b.payment_date || 0)).getTime() -
+          new Date(String(a.payment_date || 0)).getTime()
+      ),
+      error: null,
+    }
+  }
+
+  const load = async (select: string) => {
+    const byCampaign = await fetchByCampaign(select)
+    if (byCampaign.error) return byCampaign
+    return mergeUnattributed(select, byCampaign.rows, pledgeIds)
+  }
+
+  const withPhase = await load(PAYMENT_SELECT)
+  if (!withPhase.error) return withPhase.rows
+  if (!isMissingCampaignPhaseColumnError(withPhase.error)) {
+    throw new Error(withPhase.error.message || "Failed to load campaign payments")
+  }
+  const legacy = await load(PAYMENT_SELECT_LEGACY)
+  if (legacy.error) {
+    throw new Error(legacy.error.message || "Failed to load campaign payments")
+  }
+  return legacy.rows
+}
+
+async function fetchDonorMetaByIds(
+  supabase: SupabaseClient,
+  organizationId: string,
+  donorIds: string[]
+): Promise<Map<string, DonorMetaRow>> {
+  const donorMeta = new Map<string, DonorMetaRow>()
+  if (donorIds.length === 0) return donorMeta
+
+  const { data: donorRows, error: donorError } = await supabase
+    .from("donors")
+    .select("id, full_name, donor_type, contact_id")
+    .eq("organization_id", organizationId)
+    .in("id", donorIds)
+
+  if (donorError) throw new Error(donorError.message)
+
+  for (const row of donorRows || []) {
+    donorMeta.set(row.id as string, {
+      full_name: row.full_name as string | null,
+      donor_type: row.donor_type as string | null,
+      contact_id: row.contact_id as string | null,
+    })
+  }
+  return donorMeta
+}
+
+export async function fetchCampaignScopedLedger(
+  supabase: SupabaseClient,
+  organizationId: string,
+  campaignId: string
+): Promise<{
+  pledges: CampaignPledgeRow[]
+  payments: CampaignPaymentRow[]
+}> {
+  const pledges = await fetchCampaignPledgesForCampaign(
+    supabase,
+    organizationId,
+    campaignId
+  )
+  const payments = await fetchCampaignPaymentsForCampaign(
+    supabase,
+    organizationId,
+    campaignId,
+    pledges.map((pledge) => pledge.id)
+  )
+  return { pledges, payments }
+}
+
+function mapPledgeRowToWorkspacePledge(
+  row: CampaignPledgeRow,
+  contactByDonor: Map<string, string | null>
+): CampaignOutstandingPledgeRow {
+  return {
+    id: row.id,
+    donorId: row.donor_id ?? null,
+    contactId: row.donor_id ? contactByDonor.get(row.donor_id) ?? null : null,
+    donorName: row.donor_name || "Donor",
+    amountPledged: Number(row.amount_pledged || 0),
+    amountPaid: Number(row.amount_paid || 0),
+    balanceRemaining: Number(row.balance_remaining || 0),
+    status: String(row.calculated_status || "open"),
+    pledgeDate: row.pledge_date ?? null,
+    ...emptyPledgeDonorContext(),
+  }
+}
+
+export type CampaignWorkspaceLedger = {
+  pledges: CampaignPledgeRow[]
+  payments: CampaignPaymentRow[]
+  campaignPledges: CampaignOutstandingPledgeRow[]
+  outstandingPledges: CampaignOutstandingPledgeRow[]
+  recurringPlans: CampaignRecurringPlanRow[]
+  insights: CampaignDonorInsights
+  sourceBreakdown: CampaignSourceBreakdown
+  metrics: CampaignMetrics
+}
+
+export async function fetchCampaignWorkspaceLedger(
+  supabase: SupabaseClient,
+  campaign: CampaignRow,
+  sponsorshipCash: number
+): Promise<CampaignWorkspaceLedger> {
+  const organizationId = campaign.organization_id
+  const campaignId = campaign.id
+
+  const [ledger, planResult] = await Promise.all([
+    fetchCampaignScopedLedger(supabase, organizationId, campaignId),
+    supabase
+      .from("recurring_donation_plans")
+      .select(
+        "id, donor_id, contact_id, amount, frequency, status, start_date, next_payment_date, payments_made, total_payments"
+      )
+      .eq("organization_id", organizationId)
+      .eq("campaign_id", campaignId)
+      .order("start_date", { ascending: false }),
+  ])
+
+  const { pledges, payments } = ledger
+  if (planResult.error) throw new Error(planResult.error.message)
+
+  const donorIds = new Set<string>()
+  for (const payment of payments) {
+    if (payment.donor_id) donorIds.add(payment.donor_id)
+  }
+  for (const pledge of pledges) {
+    if (pledge.donor_id) donorIds.add(pledge.donor_id)
+  }
+  for (const row of planResult.data || []) {
+    if (row.donor_id) donorIds.add(row.donor_id as string)
+  }
+
+  const donorMeta = await fetchDonorMetaByIds(supabase, organizationId, [...donorIds])
+  const contactByDonor = new Map(
+    [...donorMeta.entries()].map(([id, meta]) => [id, meta.contact_id])
+  )
+  const pledgeCampaignById = buildPledgeCampaignMap(pledges)
+  const campaignPledges = pledges.map((row) =>
+    mapPledgeRowToWorkspacePledge(row, contactByDonor)
+  )
+  const outstandingPledges = await attachPledgeDonorContext(
+    supabase,
+    organizationId,
+    campaignPledges
+      .filter(
+        (pledge) =>
+          String(pledge.status).toLowerCase() !== "cancelled" &&
+          pledge.balanceRemaining > 0
+      )
+      .sort((a, b) => b.balanceRemaining - a.balanceRemaining)
+  )
+
+  const nameByDonorId = new Map<string, string>()
+  for (const payment of payments) {
+    if (payment.donor_id && payment.sender_name && !nameByDonorId.has(payment.donor_id)) {
+      nameByDonorId.set(payment.donor_id, payment.sender_name)
+    }
+  }
+  for (const [id, meta] of donorMeta) {
+    if (meta.full_name && !nameByDonorId.has(id)) {
+      nameByDonorId.set(id, meta.full_name)
+    }
+  }
+
+  const recurringPlans: CampaignRecurringPlanRow[] = (planResult.data || []).map((row) => ({
+    id: row.id as string,
+    donor_id: (row.donor_id as string | null) ?? null,
+    contact_id: (row.contact_id as string | null) ?? null,
+    donor_name:
+      (row.donor_id ? nameByDonorId.get(row.donor_id as string) : null) || "Donor",
+    amount: Number(row.amount || 0),
+    frequency: String(row.frequency || "monthly"),
+    status: String(row.status || "active"),
+    start_date: (row.start_date as string | null) ?? null,
+    next_payment_date: (row.next_payment_date as string | null) ?? null,
+    payments_made: row.payments_made == null ? null : Number(row.payments_made),
+    total_payments: row.total_payments == null ? null : Number(row.total_payments),
+  }))
+
+  const metrics = computeCampaignMetrics(
+    campaignId,
+    campaign.goal_amount,
+    pledges,
+    payments,
+    pledgeCampaignById
+  )
+  if (sponsorshipCash > 0) {
+    metrics.totalCommitted += sponsorshipCash
+  }
+
+  return {
+    pledges,
+    payments,
+    campaignPledges,
+    outstandingPledges,
+    recurringPlans,
+    insights: buildCampaignDonorInsights(
+      campaignId,
+      pledges,
+      payments,
+      pledgeCampaignById,
+      donorMeta
+    ),
+    sourceBreakdown: computeCampaignSourceBreakdown(
+      campaignId,
+      campaign.goal_amount,
+      pledges,
+      payments,
+      pledgeCampaignById
+    ),
+    metrics,
+  }
+}
+
 export async function fetchCampaignDonorInsights(
   supabase: SupabaseClient,
   organizationId: string,
   campaignId: string
 ): Promise<CampaignDonorInsights> {
-  const { pledges, payments, error } = await fetchCampaignAnalyticsData(supabase, organizationId)
-  if (error) throw new Error(error)
-
-  const pledgeCampaignById = buildPledgeCampaignMap(pledges)
-  const campaignPayments = filterPaymentsForCampaign(campaignId, payments, pledgeCampaignById)
-  const campaignPledges = filterPledgesForCampaign(campaignId, pledges)
-
+  const { pledges, payments } = await fetchCampaignScopedLedger(
+    supabase,
+    organizationId,
+    campaignId
+  )
   const donorIds = new Set<string>()
-  for (const payment of campaignPayments) {
+  for (const payment of payments) {
     if (payment.donor_id) donorIds.add(payment.donor_id)
   }
-  for (const pledge of campaignPledges) {
+  for (const pledge of pledges) {
     if (pledge.donor_id) donorIds.add(pledge.donor_id)
-  }
-
-  const donorMeta = new Map<string, DonorMetaRow>()
-  if (donorIds.size > 0) {
-    const { data: donorRows, error: donorError } = await supabase
-      .from("donors")
-      .select("id, full_name, donor_type, contact_id")
-      .eq("organization_id", organizationId)
-      .in("id", [...donorIds])
-
-    if (donorError) throw new Error(donorError.message)
-
-    for (const row of donorRows || []) {
-      donorMeta.set(row.id as string, {
-        full_name: row.full_name as string | null,
-        donor_type: row.donor_type as string | null,
-        contact_id: row.contact_id as string | null,
-      })
-    }
   }
 
   return buildCampaignDonorInsights(
     campaignId,
     pledges,
     payments,
-    pledgeCampaignById,
-    donorMeta
+    buildPledgeCampaignMap(pledges),
+    await fetchDonorMetaByIds(supabase, organizationId, [...donorIds])
   )
 }
 

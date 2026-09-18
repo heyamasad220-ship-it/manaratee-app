@@ -77,6 +77,8 @@ import {
   Users,
   UsersRound,
 } from "lucide-react"
+import { cn } from "@/lib/utils"
+import { STAFF_BELOW_REPORTS_SUBNAV_STICKY_TOP_CLASS } from "@/lib/layout/staff-dashboard-chrome"
 
 const TAX_YEAR_OPTIONS = [0, 1, 2, 3, 4].map((offset) => new Date().getFullYear() - offset)
 
@@ -96,7 +98,7 @@ function formatContactField(value: string | null | undefined) {
 
 const INDIVIDUAL_TABLE_COLSPAN = 6
 const HOUSEHOLD_TABLE_COLSPAN = 8
-const GROUP_TABLE_COLSPAN = 8
+const GROUP_TABLE_COLSPAN = 5
 
 type DonorsReportView = "individual" | "household" | "group"
 
@@ -641,13 +643,18 @@ export function DonorsReportPanel() {
 
   return (
     <div className="flex flex-col gap-6 p-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      <div
+        className={cn(
+          "sticky z-30 -mx-6 space-y-4 border-b border-border bg-background px-6 pb-4 pt-6",
+          STAFF_BELOW_REPORTS_SUBNAV_STICKY_TOP_CLASS
+        )}
+      >
+        <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 className="text-xl font-semibold">Donor Giving</h2>
           {reportView === "group" ? null : (
             <p className="text-sm text-muted-foreground">
-              Individual, household, and CRM group giving. Household and group totals are aggregations,
-              not extra transactions. {periodLabel}.
+              Individual, household, and CRM group giving. Household totals combine gifts from families with two or more adult donors. Household and group totals are aggregations, not extra transactions. {periodLabel}.
             </p>
           )}
         </div>
@@ -730,6 +737,7 @@ export function DonorsReportPanel() {
           />
         </DonationMetricCardGrid>
       )}
+      </div>
 
       <Card>
         <CardHeader className="space-y-3">
@@ -878,7 +886,7 @@ export function DonorsReportPanel() {
               {total > 0
                 ? `${rangeStart}–${rangeEnd} of ${total}`
                 : reportView === "household"
-                  ? "No households"
+                    ? "No households with two or more adult donors in this period"
                   : reportView === "group"
                     ? "No groups with gifts in this period"
                     : "No donors"}
@@ -921,9 +929,6 @@ export function DonorsReportPanel() {
                       />
                     </TableHead>
                     <TableHead>Primary Contact</TableHead>
-                    <TableHead>Members</TableHead>
-                    <TableHead>Group Gifts</TableHead>
-                    <TableHead>Member Gifts</TableHead>
                     <TableHead>Combined Total</TableHead>
                     <TableHead>Gifts</TableHead>
                     <TableHead>
@@ -1106,7 +1111,7 @@ export function DonorsReportPanel() {
                       colSpan={HOUSEHOLD_TABLE_COLSPAN}
                       className="py-8 text-center text-muted-foreground"
                     >
-                      No households match the current filters.
+                      No households with two or more adult donors in this period.
                     </TableCell>
                   </TableRow>
                 )}
@@ -1210,13 +1215,6 @@ export function DonorsReportPanel() {
                       </Link>
                     </TableCell>
                     <TableCell>{formatContactField(group.primary_contact_name)}</TableCell>
-                    <TableCell>{group.member_count}</TableCell>
-                    <TableCell>
-                      {formatDonationCurrency(Number(group.group_gifts_total || 0))}
-                    </TableCell>
-                    <TableCell>
-                      {formatDonationCurrency(Number(group.member_gifts_total || 0))}
-                    </TableCell>
                     <TableCell>
                       {formatDonationCurrency(Number(group.total_donations || 0))}
                     </TableCell>

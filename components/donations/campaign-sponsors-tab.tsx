@@ -1,7 +1,6 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { MoreHorizontal, Plus } from "lucide-react"
 
@@ -396,20 +395,19 @@ export function CampaignSponsorsTab({
                       <TableCell colSpan={10} className="py-10 text-center">
                         <p className="font-medium text-foreground">No sponsors yet</p>
                         <p className="mt-1 text-sm text-muted-foreground">
-                          Sponsorship prospects appear here after they commit and are converted to
-                          sponsors.
+                          Add a sponsor from this tab when a commitment is ready.
                         </p>
-                        <Button variant="outline" className="mt-4" asChild>
-                          <Link
-                            href={donationCampaignWorkspaceHref(campaignId, {
-                              tab: "plan",
-                              section: "prospects",
-                              askType: "sponsorship",
-                            })}
+                        {canManage ? (
+                          <Button
+                            className="mt-4"
+                            onClick={() => {
+                              setSelectedId(null)
+                              setShowSponsorDialog(true)
+                            }}
                           >
-                            View Sponsorship Prospects
-                          </Link>
-                        </Button>
+                            Add Sponsor
+                          </Button>
+                        ) : null}
                       </TableCell>
                     </TableRow>
                   ) : (

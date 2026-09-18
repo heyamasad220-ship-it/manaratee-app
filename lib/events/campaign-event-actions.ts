@@ -44,6 +44,7 @@ export type CampaignEventTicketTypeStat = {
   sold: number
   capacity: number | null
   remaining: number | null
+  checkedIn: number
   priceCents: number
 }
 
@@ -139,7 +140,7 @@ async function loadCampaignEventStats(
     types: [],
   }
 
-  const [typesResult, ordersResult, checkedInResult, waitlistedResult] =
+  const [typesResult, ordersResult, checkedInResult, waitlistedResult, checkedInTicketsResult] =
     await Promise.all([
       writeClient
         .from("event_ticket_types")
@@ -165,6 +166,12 @@ async function loadCampaignEventStats(
         .eq("organization_id", organizationId)
         .eq("internal_event_id", event.id)
         .eq("status", "waitlisted"),
+      writeClient
+        .from("tickets")
+        .select("ticket_type_id")
+        .eq("organization_id", organizationId)
+        .eq("internal_event_id", event.id)
+        .eq("status", "checked_in"),
     ])
 
   let orderRows = ordersResult.data || []
@@ -178,18 +185,41 @@ async function loadCampaignEventStats(
     orderRows = fallback.data || []
   }
 
+  const checkedInByType = new Map<string, number>()
+  let checkedInRows = checkedInTicketsResult.data || []
+  let checkedInOffset = 0
+  while (true) {
+    for (const row of checkedInRows) {
+      const typeId = row.ticket_type_id as string | null
+      if (!typeId) continue
+      checkedInByType.set(typeId, (checkedInByType.get(typeId) || 0) + 1)
+    }
+    if (checkedInRows.length < 1000) break
+    checkedInOffset += 1000
+    const nextPage = await writeClient
+      .from("tickets")
+      .select("ticket_type_id")
+      .eq("organization_id", organizationId)
+      .eq("internal_event_id", event.id)
+      .eq("status", "checked_in")
+      .range(checkedInOffset, checkedInOffset + 999)
+    checkedInRows = nextPage.data || []
+  }
+
   const types = (typesResult.data || [])
     .filter((row) => row.is_active !== false || Number(row.quantity_sold || 0) > 0)
     .map((row) => {
       const sold = Number(row.quantity_sold || 0)
       const capacity =
         row.quantity_total == null ? null : Number(row.quantity_total)
+      const typeId = row.id as string
       return {
-        id: row.id as string,
+        id: typeId,
         name: (row.name as string) || "Ticket",
         sold,
         capacity,
         remaining: capacity == null ? null : Math.max(capacity - sold, 0),
+        checkedIn: checkedInByType.get(typeId) || 0,
         priceCents: Number(row.price_cents || 0),
       }
     })

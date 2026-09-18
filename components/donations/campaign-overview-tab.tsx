@@ -15,6 +15,7 @@ import {
 } from "@/components/donations/donation-metric-card"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
+  computeCampaignHeadlineTotals,
   formatDonationCurrency,
   type CampaignAnalyticsEntry,
   type CampaignDonorInsights,
@@ -47,9 +48,7 @@ export function CampaignOverviewSummary({
 }: CampaignOverviewSummaryProps) {
   const { metrics } = entry
   const goalAmount = Number(campaign.goal_amount || 0) || null
-  const committed = metrics.pledged
-  const collected = metrics.raised
-  const outstanding = metrics.outstanding
+  const { committed, collected, outstanding } = computeCampaignHeadlineTotals(metrics)
 
   return (
     <Card className="border border-border shadow-sm">
@@ -86,7 +85,7 @@ export function CampaignOverviewSummary({
             value={formatDonationCurrency(outstanding)}
             icon={AlertCircle}
             accent="amber"
-            description="Committed, not yet collected"
+            description="Committed minus payments received"
           />
           <DonationMetricCard
             compact
@@ -157,9 +156,7 @@ export function CampaignOverviewTab({
 }: CampaignOverviewTabProps) {
   const { metrics } = entry
   const goalAmount = Number(campaign.goal_amount || 0) || null
-  const committed = metrics.pledged
-  const collected = metrics.raised
-  const outstanding = metrics.outstanding
+  const { committed, collected, outstanding } = computeCampaignHeadlineTotals(metrics)
   const committedProgressPercent =
     goalAmount != null && goalAmount > 0
       ? Math.min((committed / goalAmount) * 100, 100)

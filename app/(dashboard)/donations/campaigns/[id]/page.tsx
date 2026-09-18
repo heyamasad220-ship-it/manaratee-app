@@ -15,6 +15,7 @@ import {
   CampaignFundraisingPlanHeader,
   CampaignFundraisingPlanTab,
 } from "@/components/donations/campaign-fundraising-plan-tab"
+import { CampaignDonationsKpis } from "@/components/donations/campaign-donations-kpis"
 import { CampaignEventKpis } from "@/components/donations/campaign-event-kpis"
 import { CampaignOverviewSummary, CampaignOverviewTab } from "@/components/donations/campaign-overview-tab"
 import { CampaignSponsorsTab } from "@/components/donations/campaign-sponsors-tab"
@@ -44,26 +45,30 @@ import {
 } from "@/components/ui/table"
 import {
   formatDonationCurrency,
+  campaignPaymentTypeLabel,
   type CampaignAnalyticsEntry,
   type CampaignDonorInsights,
   type CampaignOutstandingPledgeRow,
   type CampaignPaymentRow,
+  type CampaignRecurringPlanRow,
   type CampaignRow,
   type CampaignSourceBreakdown,
 } from "@/lib/donations/campaign-analytics"
 import { getCampaignDetailAction } from "@/lib/donations/donation-reports-actions"
 import type { CampaignEventStats } from "@/lib/events/campaign-event-actions"
 import type { CampaignOverviewMetricKey } from "@/lib/donations/campaign-overview-metrics"
-import type {
-  CampaignAskLevelMetrics,
-  CampaignAskLevelRow,
-} from "@/lib/donations/campaign-ask-level-types"
+import type { CampaignFundraisingPlanKpis } from "@/lib/donations/campaign-prospect-types"
 import {
   canonicalizeCampaignWorkspaceHref,
   isFundraisingPlanTab,
   parseCampaignWorkspaceTab,
 } from "@/lib/donations/campaign-workspace-paths"
 import { donationPledgesHref } from "@/lib/donations/donation-pledge-paths"
+import { DONATION_RECURRING_OPS_PATH } from "@/lib/donations/donation-payment-paths"
+import {
+  formatRecurringFrequencyLabel,
+  formatRecurringStatusLabel,
+} from "@/lib/donations/recurring-donation-types"
 import { formatPaymentAllocationStatus, isOpenAllocatablePledge } from "@/lib/donations/donation-status"
 import { createClient } from "@/lib/supabase/client"
 import { STAFF_MAIN_CONTENT_STICKY_TOP_CLASS } from "@/lib/layout/staff-dashboard-chrome"
@@ -186,19 +191,23 @@ function CampaignPledgesTab({
 
 function CampaignDonationsTab({
   payments,
+  recurringPlans,
   openPledgeDonorIds,
   openPledgeContactIds,
   onDonorClick,
   onPledgeClick,
+  onRecurringDonorClick,
 }: {
   payments: CampaignPaymentRow[]
+  recurringPlans: CampaignRecurringPlanRow[]
   openPledgeDonorIds: Set<string>
   openPledgeContactIds: Set<string>
   onDonorClick: (payment: CampaignPaymentRow) => void
   onPledgeClick: (pledgeId: string) => void
+  onRecurringDonorClick: (plan: CampaignRecurringPlanRow) => void
 }) {
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       <div>
         <h2 className="text-base font-semibold text-foreground">Campaign Donations</h2>
         <p className="text-sm text-muted-foreground">
@@ -214,6 +223,7 @@ function CampaignDonationsTab({
                 <TableHead>Date</TableHead>
                 <TableHead>Donor</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
+                <TableHead>Type</TableHead>
                 <TableHead>Payment Method</TableHead>
                 <TableHead>Pledge Applied To</TableHead>
                 <TableHead>Status</TableHead>
@@ -222,7 +232,7 @@ function CampaignDonationsTab({
             <TableBody>
               {payments.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                  <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
                     No donations for this campaign yet.
                   </TableCell>
                 </TableRow>
@@ -242,6 +252,7 @@ function CampaignDonationsTab({
                     <TableCell className="text-right tabular-nums">
                       {formatDonationCurrency(Number(payment.amount || 0))}
                     </TableCell>
+                    <TableCell>{campaignPaymentTypeLabel(payment)}</TableCell>
                     <TableCell className="capitalize">
                       {payment.source || "—"}
                     </TableCell>
@@ -276,6 +287,74 @@ function CampaignDonationsTab({
           </Table>
         </CardContent>
       </Card>
+
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold text-foreground">Recurring</h2>
+          <p className="text-sm text-muted-foreground">
+            Monthly and other recurring plans tied to this campaign. Collected installments still
+            appear in the ledger above.
+          </p>
+        </div>
+        <Button variant="outline" size="sm" asChild>
+          <Link href={DONATION_RECURRING_OPS_PATH}>All recurring plans</Link>
+        </Button>
+      </div>
+
+      <Card className="border border-border shadow-sm">
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Donor</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
+                <TableHead>Frequency</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Start</TableHead>
+                <TableHead>Next payment</TableHead>
+                <TableHead>Payments</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {recurringPlans.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                    No recurring plans on this campaign yet.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                recurringPlans.map((plan) => (
+                  <TableRow key={plan.id}>
+                    <TableCell>
+                      <button
+                        type="button"
+                        className="font-medium text-primary hover:underline"
+                        onClick={() => onRecurringDonorClick(plan)}
+                      >
+                        {plan.donor_name}
+                      </button>
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatDonationCurrency(plan.amount)}
+                    </TableCell>
+                    <TableCell>{formatRecurringFrequencyLabel(plan.frequency)}</TableCell>
+                    <TableCell>{formatRecurringStatusLabel(plan.status)}</TableCell>
+                    <TableCell>{formatShortDate(plan.start_date)}</TableCell>
+                    <TableCell>{formatShortDate(plan.next_payment_date)}</TableCell>
+                    <TableCell>
+                      {plan.payments_made != null
+                        ? plan.total_payments != null
+                          ? `${plan.payments_made} / ${plan.total_payments}`
+                          : String(plan.payments_made)
+                        : "—"}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
   )
 }
@@ -287,13 +366,6 @@ export default function CampaignDetailPage() {
   const campaignId = params.id as string
   const activeTab = parseCampaignWorkspaceTab(searchParams.get("tab"))
   const selectedGroupId = searchParams.get("group")
-  const prospectFollowUp = searchParams.get("followUp")
-  const prospectAssignee = searchParams.get("assignee")
-  const prospectStage = searchParams.get("stage")
-  const prospectPledged = searchParams.get("pledged")
-  const prospectAskType = searchParams.get("askType")
-  const prospectAskLevelId = searchParams.get("askLevel")
-  const prospectAsked = searchParams.get("asked") === "1"
 
   const [campaign, setCampaign] = useState<CampaignRow | null>(null)
   const [entry, setEntry] = useState<CampaignAnalyticsEntry | null>(null)
@@ -301,9 +373,10 @@ export default function CampaignDetailPage() {
   const [sourceBreakdown, setSourceBreakdown] = useState<CampaignSourceBreakdown | null>(null)
   const [outstandingPledges, setOutstandingPledges] = useState<CampaignOutstandingPledgeRow[]>([])
   const [campaignPledges, setCampaignPledges] = useState<CampaignOutstandingPledgeRow[]>([])
-  const [askLevels, setAskLevels] = useState<CampaignAskLevelRow[]>([])
-  const [askLevelMetrics, setAskLevelMetrics] = useState<CampaignAskLevelMetrics[]>([])
   const [campaignPayments, setCampaignPayments] = useState<CampaignPaymentRow[]>([])
+  const [campaignRecurringPlans, setCampaignRecurringPlans] = useState<CampaignRecurringPlanRow[]>(
+    []
+  )
   const [canManage, setCanManage] = useState(false)
   const [canManageCampaigns, setCanManageCampaigns] = useState(false)
   const [canManageProspects, setCanManageProspects] = useState(false)
@@ -320,6 +393,7 @@ export default function CampaignDetailPage() {
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [detailsPledgeId, setDetailsPledgeId] = useState<string | null>(null)
   const [eventStats, setEventStats] = useState<CampaignEventStats | null>(null)
+  const [planKpis, setPlanKpis] = useState<CampaignFundraisingPlanKpis | null>(null)
 
   const supabase = useMemo(() => createClient(), [])
 
@@ -378,9 +452,8 @@ export default function CampaignDetailPage() {
       setSourceBreakdown(null)
       setOutstandingPledges([])
       setCampaignPledges([])
-      setAskLevels([])
-      setAskLevelMetrics([])
       setCampaignPayments([])
+      setCampaignRecurringPlans([])
       setLoading(false)
       return
     }
@@ -390,88 +463,15 @@ export default function CampaignDetailPage() {
     setInsights(result.insights)
     setSourceBreakdown(result.sourceBreakdown)
     setOutstandingPledges(result.outstandingPledges)
-    setCampaignPledges(result.outstandingPledges)
-    setAskLevels(result.askLevels || [])
-    setAskLevelMetrics(result.askLevelMetrics || [])
+    setCampaignPledges(result.campaignPledges)
+    setCampaignPayments(result.campaignPayments)
+    setCampaignRecurringPlans(result.campaignRecurringPlans)
     setOverviewMetricKeys(result.overviewMetricKeys)
     setCanManage(result.canManage)
     setCanManageCampaigns(result.canManageCampaigns)
     setCanManageProspects(result.canManageProspects)
-
-    // Prefer full campaign pledge list for the Pledges tab (not only outstanding).
-    const pledgesQuery = await supabase
-      .from("pledge_status_view")
-      .select(
-        "id, donor_id, donor_name, amount_pledged, amount_paid, balance_remaining, calculated_status, pledge_date"
-      )
-      .eq("organization_id", result.campaign.organization_id)
-      .eq("campaign_id", campaignId)
-      .order("pledge_date", { ascending: false })
-
-    if (!pledgesQuery.error && pledgesQuery.data) {
-      const donorIds = pledgesQuery.data
-        .map((row) => row.donor_id as string | null)
-        .filter((id): id is string => Boolean(id))
-      const contactByDonor = new Map<string, string | null>()
-      if (donorIds.length > 0) {
-        const { data: donors } = await supabase
-          .from("donors")
-          .select("id, contact_id")
-          .eq("organization_id", result.campaign.organization_id)
-          .in("id", donorIds)
-        for (const donor of donors || []) {
-          contactByDonor.set(donor.id as string, (donor.contact_id as string | null) ?? null)
-        }
-      }
-
-      setCampaignPledges(
-        pledgesQuery.data.map((row) => ({
-          id: row.id as string,
-          donorId: (row.donor_id as string | null) ?? null,
-          contactId: row.donor_id
-            ? contactByDonor.get(row.donor_id as string) ?? null
-            : null,
-          donorName: (row.donor_name as string) || "Donor",
-          amountPledged: Number(row.amount_pledged || 0),
-          amountPaid: Number(row.amount_paid || 0),
-          balanceRemaining: Number(row.balance_remaining || 0),
-          status: String(row.calculated_status || "open"),
-          pledgeDate: (row.pledge_date as string | null) ?? null,
-          contactType: null,
-          primaryContactName: null,
-          memberGroups: [],
-        }))
-      )
-    }
-
-    // Load recent campaign payments for Donations tab (reuse payments table).
-    const { data: payments } = await supabase
-      .from("payments")
-      .select(
-        "id, campaign_id, campaign_phase_id, pledge_id, donor_id, contact_id, sender_name, amount, refunded_amount, payment_date, source, status, memo, recurring_donation_plan_id"
-      )
-      .eq("organization_id", result.campaign.organization_id)
-      .eq("campaign_id", campaignId)
-      .order("payment_date", { ascending: false })
-      .limit(100)
-
-    if (payments) {
-      setCampaignPayments(payments as CampaignPaymentRow[])
-    } else {
-      const legacy = await supabase
-        .from("payments")
-        .select(
-          "id, campaign_id, pledge_id, donor_id, contact_id, sender_name, amount, refunded_amount, payment_date, source, status, memo, recurring_donation_plan_id"
-        )
-        .eq("organization_id", result.campaign.organization_id)
-        .eq("campaign_id", campaignId)
-        .order("payment_date", { ascending: false })
-        .limit(100)
-      setCampaignPayments((legacy.data || []) as CampaignPaymentRow[])
-    }
-
     setLoading(false)
-  }, [campaignId, supabase])
+  }, [campaignId])
 
   useEffect(() => {
     if (!campaignId) return
@@ -553,13 +553,16 @@ export default function CampaignDetailPage() {
               />
             ) : null}
             {isFundraisingPlanTab(activeTab) ? (
-              <CampaignFundraisingPlanHeader
-                campaignId={campaign.id}
-                askLevelMetrics={askLevelMetrics}
-              />
+              <CampaignFundraisingPlanHeader kpis={planKpis} />
             ) : null}
             {activeTab === "events" && eventStats ? (
               <CampaignEventKpis stats={eventStats} />
+            ) : null}
+            {activeTab === "donations" ? (
+              <CampaignDonationsKpis
+                payments={campaignPayments}
+                recurringPlans={campaignRecurringPlans}
+              />
             ) : null}
           </div>
 
@@ -598,31 +601,9 @@ export default function CampaignDetailPage() {
             <CampaignFundraisingPlanTab
               campaignId={campaign.id}
               organizationId={campaign.organization_id}
-              askLevels={askLevels}
-              askLevelMetrics={askLevelMetrics}
-              canManageStrategy={canManageCampaigns}
               canManageProspects={canManageProspects}
-              onStrategySaved={() => void loadCampaign()}
               onProspectsChanged={() => void loadCampaign()}
-              initialFollowUp={
-                prospectFollowUp === "overdue" || prospectFollowUp === "upcoming"
-                  ? prospectFollowUp
-                  : null
-              }
-              initialAssignee={prospectAssignee}
-              initialStage={prospectStage}
-              initialPledged={
-                prospectPledged === "pledged" || prospectPledged === "not_pledged"
-                  ? prospectPledged
-                  : null
-              }
-              initialAskType={
-                prospectAskType === "donation" || prospectAskType === "sponsorship"
-                  ? prospectAskType
-                  : null
-              }
-              initialAskLevelId={prospectAskLevelId}
-              initialAsked={prospectAsked}
+              onKpisChange={setPlanKpis}
               showHeader={false}
             />
           ) : null}
@@ -652,6 +633,7 @@ export default function CampaignDetailPage() {
           {activeTab === "donations" ? (
             <CampaignDonationsTab
               payments={campaignPayments}
+              recurringPlans={campaignRecurringPlans}
               openPledgeDonorIds={openPledgeDonorIds}
               openPledgeContactIds={openPledgeContactIds}
               onDonorClick={(payment) =>
@@ -664,6 +646,12 @@ export default function CampaignDetailPage() {
                 setDetailsPledgeId(pledgeId)
                 setDetailsOpen(true)
               }}
+              onRecurringDonorClick={(plan) =>
+                void openContactProfile({
+                  contactId: plan.contact_id,
+                  donorId: plan.donor_id,
+                })
+              }
             />
           ) : null}
 

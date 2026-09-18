@@ -23,7 +23,7 @@ import {
 import type { PaymentReceiptPayload } from "@/lib/donations/receipt-types"
 import {
   buildPaymentReceiptHtml,
-  downloadReceiptPdf,
+  downloadPaymentReceiptPdf,
   openReceiptPrintWindow,
 } from "@/lib/donations/receipt-pdf"
 
@@ -81,11 +81,10 @@ export function PaymentReceiptActions({
   async function handleDownload() {
     const payload = await ensurePayload()
     if (!payload) return
-    const html = buildPaymentReceiptHtml(payload)
     try {
-      await downloadReceiptPdf(`receipt-${payload.receiptNumber}.pdf`, html)
+      downloadPaymentReceiptPdf(payload)
     } catch {
-      openReceiptPrintWindow(html)
+      openReceiptPrintWindow(buildPaymentReceiptHtml(payload))
     }
   }
 

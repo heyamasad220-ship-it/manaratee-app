@@ -111,6 +111,51 @@ async function fetchByIdChunks<T>(
   return rows
 }
 
+const ENROLLMENT_PAGE_SIZE = 1000
+
+async function fetchAllEnrollmentRows(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  organizationId: string,
+  programIds: string[]
+): Promise<{ rows: EnrollmentRow[] } | { error: string }> {
+  const rows: EnrollmentRow[] = []
+  const select = `
+        id,
+        program_id,
+        offering_id,
+        child_name,
+        child_person_id,
+        participant_contact_id,
+        parent_name,
+        parent_email,
+        parent_phone,
+        registrant_contact_id,
+        payment_status,
+        payment_required,
+        total_amount,
+        amount_paid
+      `
+  for (let from = 0; ; from += ENROLLMENT_PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from("program_enrollments")
+      .select(select)
+      .eq("organization_id", organizationId)
+      .in("program_id", programIds)
+      .order("created_at", { ascending: false })
+      .range(from, from + ENROLLMENT_PAGE_SIZE - 1)
+
+    if (error) {
+      return { error: error.message || "Could not load enrollments." }
+    }
+
+    const chunk = (data || []) as EnrollmentRow[]
+    rows.push(...chunk)
+    if (chunk.length < ENROLLMENT_PAGE_SIZE) break
+  }
+
+  return { rows }
+}
+
 function titleCaseLabel(value: string) {
   const trimmed = value.trim()
   if (!trimmed) return "Additional fee"
@@ -216,38 +261,19 @@ export async function getPaymentSummaryRows(): Promise<
       ] as const)
     )
 
-    const { data: enrollmentData, error: enrollmentError } = await supabase
-      .from("program_enrollments")
-      .select(
-        `
-        id,
-        program_id,
-        offering_id,
-        child_name,
-        child_person_id,
-        participant_contact_id,
-        parent_name,
-        parent_email,
-        parent_phone,
-        registrant_contact_id,
-        payment_status,
-        payment_required,
-        total_amount,
-        amount_paid
-      `
-      )
-      .eq("organization_id", organizationId)
-      .in("program_id", programIds)
-      .order("created_at", { ascending: false })
-
-    if (enrollmentError) {
+    const enrollmentResult = await fetchAllEnrollmentRows(
+      supabase,
+      organizationId,
+      programIds
+    )
+    if ("error" in enrollmentResult) {
       return {
         success: false,
-        error: enrollmentError.message || "Could not load enrollments.",
+        error: enrollmentResult.error,
       }
     }
 
-    const allEnrollments = (enrollmentData || []) as EnrollmentRow[]
+    const allEnrollments = enrollmentResult.rows
     const offeringIds = [
       ...new Set(
         allEnrollments

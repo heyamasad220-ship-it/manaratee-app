@@ -25,6 +25,8 @@ import {
   type CampaignProspectWriteInput,
 } from "@/lib/donations/campaign-prospect-types"
 import { createServiceRoleClient } from "@/lib/supabase/service-role"
+import { isCustomerPortalSystemRole } from "@/lib/organizations/organization-member-constants"
+import { buildPledgePlanWriteFields } from "@/lib/donations/pledge-payment-plan"
 
 function revalidateProspectPaths(campaignId: string) {
   revalidatePath(`/donations/campaigns/${campaignId}`)
@@ -479,6 +481,108 @@ export async function listCampaignProspectAssigneesAction(campaignId: string) {
   }
 }
 
+export async function fetchCampaignFundraisingPlanProspectsAction(campaignId: string) {
+  const pageSize = 100
+  const first = await fetchCampaignProspectsPageAction({
+    campaignId,
+    page: 1,
+    pageSize,
+    askType: "donation",
+  })
+  if (!first.success) return first
+
+  const prospects = [...first.prospects]
+  const total = first.total
+  const pages = Math.max(1, Math.ceil(total / pageSize))
+  for (let page = 2; page <= pages; page += 1) {
+    const next = await fetchCampaignProspectsPageAction({
+      campaignId,
+      page,
+      pageSize,
+      askType: "donation",
+    })
+    if (!next.success) return next
+    prospects.push(...next.prospects)
+  }
+
+  prospects.sort((a, b) => a.contactName.localeCompare(b.contactName))
+
+  return {
+    success: true as const,
+    prospects,
+    total,
+    canManage: first.canManage,
+  }
+}
+
+export async function listCampaignPlanAssigneeOptionsAction(campaignId: string) {
+  const access = await requireDonationStaffAccess("view")
+  if (!access.ok) return { success: false as const, error: access.error }
+
+  const id = campaignId.trim()
+  if (!id) return { success: false as const, error: "Campaign is required" }
+
+  try {
+    const writeClient = createServiceRoleClient()
+    const { data: members, error: memberError } = await writeClient
+      .from("organization_members")
+      .select("user_id, assigned_contact_id, role")
+      .eq("organization_id", access.orgId)
+
+    if (memberError) return { success: false as const, error: memberError.message }
+
+    const staffMembers = (members || []).filter(
+      (row) => !isCustomerPortalSystemRole(row.role as string | null)
+    )
+    const assignedIds = staffMembers
+      .map((row) => row.assigned_contact_id as string | null)
+      .filter((value): value is string => Boolean(value))
+    const userIds = staffMembers
+      .map((row) => row.user_id as string | null)
+      .filter((value): value is string => Boolean(value))
+
+    const [assignedContacts, loginContacts, currentAssignees] = await Promise.all([
+      assignedIds.length
+        ? writeClient
+            .from("contacts")
+            .select("id, full_name")
+            .eq("organization_id", access.orgId)
+            .in("id", assignedIds)
+        : Promise.resolve({ data: [] as Array<{ id: string; full_name: string | null }> }),
+      userIds.length
+        ? writeClient
+            .from("contacts")
+            .select("id, full_name")
+            .eq("organization_id", access.orgId)
+            .in("auth_user_id", userIds)
+        : Promise.resolve({ data: [] as Array<{ id: string; full_name: string | null }> }),
+      listCampaignProspectAssigneesAction(id),
+    ])
+
+    const options = new Map<string, string>()
+    for (const row of assignedContacts.data || []) {
+      options.set(row.id, (row.full_name as string) || "Unnamed")
+    }
+    for (const row of loginContacts.data || []) {
+      options.set(row.id, (row.full_name as string) || "Unnamed")
+    }
+    if (currentAssignees.success) {
+      for (const assignee of currentAssignees.assignees) {
+        if (!options.has(assignee.id)) options.set(assignee.id, assignee.name)
+      }
+    }
+
+    return {
+      success: true as const,
+      assignees: [...options.entries()]
+        .map(([assigneeId, name]) => ({ id: assigneeId, name }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    }
+  } catch (error) {
+    return { success: false as const, error: (error as Error).message }
+  }
+}
+
 export async function createCampaignProspectAction(
   campaignId: string,
   input: CampaignProspectWriteInput
@@ -832,6 +936,9 @@ export async function convertCampaignProspectToPledgeAction(input: {
   amountPledged: number
   pledgeDate?: string | null
   frequency?: string | null
+  firstPaymentDate?: string | null
+  numberOfPayments?: number | null
+  endDate?: string | null
   notes?: string | null
   categoryId?: string | null
   subcategoryId?: string | null
@@ -884,12 +991,19 @@ export async function convertCampaignProspectToPledgeAction(input: {
       }
     }
 
-    const frequency = String(input.frequency || "one_time")
-      .toLowerCase()
-      .replace(/-/g, "_")
     const pledgeDate =
       (input.pledgeDate && input.pledgeDate.slice(0, 10)) ||
       new Date().toISOString().slice(0, 10)
+    const plan = buildPledgePlanWriteFields({
+      frequency: input.frequency || "one_time",
+      amountPledged: amount,
+      firstPaymentDate: input.firstPaymentDate,
+      numberOfPayments: input.numberOfPayments,
+      endDate: input.endDate,
+    })
+    if (!plan.ok) {
+      return { success: false as const, error: plan.error }
+    }
 
     const suggestedNote =
       prospect.suggested_ask_amount != null
@@ -910,10 +1024,14 @@ export async function convertCampaignProspectToPledgeAction(input: {
       wishlist_item_id: input.wishlistItemId || null,
       amount_pledged: amount,
       pledge_date: pledgeDate,
-      pledge_type: frequency,
-      frequency,
+      pledge_type: plan.fields.pledge_type,
+      frequency: plan.fields.frequency,
       status: "open",
       notes: combinedNotes,
+      installment_amount: plan.fields.installment_amount,
+      total_payments: plan.fields.total_payments,
+      first_payment_date: plan.fields.first_payment_date,
+      next_payment_date: plan.fields.next_payment_date,
       campaign_phase_id: null,
       ask_level_id: prospect.ask_level_id,
       campaign_prospect_id: prospect.id,

@@ -6,6 +6,7 @@
  *   node scripts/seed-horizon-community-foundation-demo.mjs --execute
  *   node scripts/seed-horizon-community-foundation-demo.mjs --clean --execute
  *   node scripts/seed-horizon-community-foundation-demo.mjs --wishlist-only --execute
+ *   node scripts/seed-horizon-community-foundation-demo.mjs --sponsorships-only --execute
  *   node scripts/seed-horizon-community-foundation-demo.mjs --programs --execute
  *   node scripts/seed-horizon-community-foundation-demo.mjs --programs --clean --execute
  *
@@ -53,6 +54,8 @@ function parseArgs(argv) {
     clean: argv.includes("--clean") || argv.includes("--clean-only"),
     cleanOnly: argv.includes("--clean-only"),
     wishlistOnly: argv.includes("--wishlist-only"),
+    sponsorshipsOnly:
+      argv.includes("--sponsorships-only") || argv.includes("--sponsorships"),
     programsOnly: argv.includes("--programs") || argv.includes("--programs-only"),
   }
 }
@@ -71,7 +74,7 @@ function throwIfError(label, error) {
 
 loadEnvLocal()
 
-const { execute, clean, cleanOnly, wishlistOnly, programsOnly } = parseArgs(
+const { execute, clean, cleanOnly, wishlistOnly, sponsorshipsOnly, programsOnly } = parseArgs(
   process.argv.slice(2)
 )
 
@@ -229,6 +232,8 @@ async function cleanSeed(orgId) {
   }
 
   await sb.from("pledges").delete().eq("organization_id", orgId).ilike("notes", `%${SEED_TAG}%`)
+
+  await cleanSponsorshipsSeed(orgId)
 
   if (campaignIds.length) {
     await sb.from("campaign_prospects").delete().eq("organization_id", orgId).in("campaign_id", campaignIds)
@@ -853,12 +858,15 @@ async function seed(orgId) {
     }
   }
 
+  const sponsorships = await seedSponsorships(orgId)
+
   return {
     contacts: PEOPLE.length + 1,
     donors: 6,
     campaigns: 2,
     annualCampaignId: annual.id,
     scholarshipCampaignId: scholar.id,
+    ...sponsorships,
   }
 }
 
@@ -953,6 +961,336 @@ async function deleteByIds(table, orgId, ids, label) {
   if (!ids.length) return
   const { error } = await sb.from(table).delete().eq("organization_id", orgId).in("id", ids)
   throwIfError(label, error)
+}
+
+async function findDemoContactId(orgId, { fullName, email }) {
+  const { data: byEmail, error: emailError } = await sb
+    .from("contacts")
+    .select("id")
+    .eq("organization_id", orgId)
+    .eq("email", email)
+    .maybeSingle()
+  throwIfError(`find contact ${email}`, emailError)
+  if (byEmail?.id) return byEmail.id
+
+  const { data: byName, error: nameError } = await sb
+    .from("contacts")
+    .select("id")
+    .eq("organization_id", orgId)
+    .eq("full_name", fullName)
+    .maybeSingle()
+  throwIfError(`find contact ${fullName}`, nameError)
+  return byName?.id || null
+}
+
+async function cleanSponsorshipsSeed(orgId) {
+  const { data: taggedSponsorships, error: sponsorshipError } = await sb
+    .from("campaign_sponsorships")
+    .select("id")
+    .eq("organization_id", orgId)
+    .ilike("notes", `%${SEED_TAG}%`)
+  throwIfError("find seed sponsorships", sponsorshipError)
+  const sponsorshipIds = (taggedSponsorships || []).map((row) => row.id)
+
+  if (sponsorshipIds.length) {
+    await sb
+      .from("campaign_sponsorship_benefits")
+      .delete()
+      .eq("organization_id", orgId)
+      .in("sponsorship_id", sponsorshipIds)
+    await sb
+      .from("campaign_sponsorships")
+      .delete()
+      .eq("organization_id", orgId)
+      .in("id", sponsorshipIds)
+  }
+
+  const packageIds = await idsByTaggedDescription("sponsorship_packages", orgId)
+  if (packageIds.length) {
+    await sb
+      .from("sponsorship_package_benefits")
+      .delete()
+      .eq("organization_id", orgId)
+      .in("package_id", packageIds)
+    await deleteByIds("sponsorship_packages", orgId, packageIds, "delete seed packages")
+  }
+}
+
+async function snapshotSponsorshipBenefits(orgId, sponsorshipId, packageId, statuses) {
+  const { data: benefits, error } = await sb
+    .from("sponsorship_package_benefits")
+    .select("id, name, value, display_order")
+    .eq("organization_id", orgId)
+    .eq("package_id", packageId)
+    .order("display_order", { ascending: true })
+  throwIfError("load package benefits", error)
+  if (!benefits?.length) return
+
+  const rows = benefits.map((benefit, index) => {
+    const status = statuses?.[index] || "pending"
+    return {
+      organization_id: orgId,
+      sponsorship_id: sponsorshipId,
+      package_benefit_id: benefit.id,
+      name: benefit.name,
+      value: benefit.value,
+      status,
+      completed_at: status === "completed" ? new Date().toISOString() : null,
+      display_order: benefit.display_order ?? index,
+    }
+  })
+  const { error: insertError } = await sb.from("campaign_sponsorship_benefits").insert(rows)
+  throwIfError("sponsorship benefits", insertError)
+}
+
+async function seedSponsorships(orgId) {
+  console.log(`Seeding sponsorship packages and sponsors for ${ORG_NAME}...`)
+  await cleanSponsorshipsSeed(orgId)
+
+  const { data: campaign, error: campaignError } = await sb
+    .from("campaigns")
+    .select("id, name")
+    .eq("organization_id", orgId)
+    .eq("code", CAMPAIGN_ANNUAL_CODE)
+    .maybeSingle()
+  throwIfError("load annual campaign", campaignError)
+  if (!campaign?.id) {
+    throw new Error("Annual Community Impact 2026 was not found. Run the full seed first.")
+  }
+
+  const lakesideId = await findDemoContactId(orgId, {
+    fullName: ORG_CONTACT.name,
+    email: ORG_CONTACT.email,
+  })
+  const whitakerId = await findDemoContactId(orgId, {
+    fullName: "James Whitaker",
+    email: emailFor("James", "Whitaker"),
+  })
+  const alvarezId = await findDemoContactId(orgId, {
+    fullName: "Sofia Alvarez",
+    email: emailFor("Sofia", "Alvarez"),
+  })
+  const thompsonId = await findDemoContactId(orgId, {
+    fullName: "Grace Thompson",
+    email: emailFor("Grace", "Thompson"),
+  })
+  if (!lakesideId || !whitakerId || !alvarezId || !thompsonId) {
+    throw new Error("Expected demo contacts were not found. Run the full seed first.")
+  }
+
+  const { data: familyNight } = await sb
+    .from("internal_events")
+    .select("id")
+    .eq("organization_id", orgId)
+    .eq("name", "Family Welcome Night")
+    .maybeSingle()
+  const familyNightId = familyNight?.id || null
+
+  const packages = [
+    {
+      name: "Presenting Sponsor",
+      amount: 10000,
+      description: taggedDescription(
+        "Headline underwriting for Annual Community Impact 2026."
+      ),
+      display_order: 10,
+      benefits: [
+        {
+          benefit_type: "stage_presentation",
+          name: "Opening remarks at the dinner",
+          value: "3 minutes",
+        },
+        {
+          benefit_type: "logo_placement",
+          name: "Logo on invitation and stage backdrop",
+          value: "Exclusive",
+        },
+        {
+          benefit_type: "complimentary_table",
+          name: "Premier table of 10",
+          value: "1 table",
+        },
+        {
+          benefit_type: "social_media",
+          name: "Social media spotlight",
+          value: "4 posts",
+        },
+      ],
+    },
+    {
+      name: "Community Partner",
+      amount: 5000,
+      description: taggedDescription(
+        "Visible partnership package for the annual campaign."
+      ),
+      display_order: 20,
+      benefits: [
+        {
+          benefit_type: "banner_display",
+          name: "Banner at registration",
+          value: "30 days",
+        },
+        {
+          benefit_type: "complimentary_seats",
+          name: "Reserved seats",
+          value: "6 seats",
+        },
+        {
+          benefit_type: "enewsletter",
+          name: "Feature in donor newsletter",
+          value: "1 issue",
+        },
+      ],
+    },
+    {
+      name: "Table Host",
+      amount: 2500,
+      description: taggedDescription(
+        "Host a table and support Youth Programs at Family Welcome Night."
+      ),
+      display_order: 30,
+      event_id: familyNightId,
+      benefits: [
+        {
+          benefit_type: "complimentary_table",
+          name: "Complimentary table of 8",
+          value: "1 table",
+        },
+        {
+          benefit_type: "event_slideshow",
+          name: "Logo in event slideshow",
+          value: "Full evening",
+        },
+      ],
+    },
+  ]
+
+  const packageIds = {}
+  for (const pkg of packages) {
+    const inserted = await insertIgnoringUnknownColumns(
+      "sponsorship_packages",
+      {
+        organization_id: orgId,
+        campaign_id: campaign.id,
+        event_id: pkg.event_id || null,
+        name: pkg.name,
+        amount: pkg.amount,
+        description: pkg.description,
+        display_order: pkg.display_order,
+        active: true,
+      },
+      `package ${pkg.name}`
+    )
+    packageIds[pkg.name] = inserted.id
+
+    for (const [index, benefit] of pkg.benefits.entries()) {
+      const { error } = await sb.from("sponsorship_package_benefits").insert({
+        organization_id: orgId,
+        package_id: inserted.id,
+        benefit_type: benefit.benefit_type,
+        name: benefit.name,
+        value: benefit.value,
+        display_order: index,
+      })
+      throwIfError(`package benefit ${benefit.name}`, error)
+    }
+  }
+
+  const sponsors = [
+    {
+      name: "Lakeside Family Fund",
+      contactId: lakesideId,
+      packageName: "Presenting Sponsor",
+      sponsorship_type: "cash",
+      committed_amount: 10000,
+      cash_amount: 10000,
+      in_kind_value: 0,
+      status: "confirmed",
+      payment_status: "paid",
+      committed_date: "2026-02-18",
+      notes: taggedDescription("Board-approved presenting underwrite. Check received."),
+      benefitStatuses: ["completed", "completed", "in_progress", "pending"],
+    },
+    {
+      name: "James Whitaker",
+      contactId: whitakerId,
+      packageName: "Community Partner",
+      sponsorship_type: "cash",
+      committed_amount: 5000,
+      cash_amount: 5000,
+      in_kind_value: 0,
+      status: "committed",
+      payment_status: "partial",
+      committed_date: "2026-03-04",
+      notes: taggedDescription("First half invoiced. Remainder due before the dinner."),
+      benefitStatuses: ["completed", "pending", "pending"],
+    },
+    {
+      name: "Sofia Alvarez",
+      contactId: alvarezId,
+      packageName: "Table Host",
+      event_id: familyNightId,
+      sponsorship_type: "cash",
+      committed_amount: 2500,
+      cash_amount: 2500,
+      in_kind_value: 0,
+      status: "committed",
+      payment_status: "unpaid",
+      committed_date: "2026-04-12",
+      notes: taggedDescription("Hosting a Family Welcome Night table for neighbors."),
+    },
+    {
+      name: "Grace Thompson",
+      contactId: thompsonId,
+      packageName: "Community Partner",
+      sponsorship_type: "mixed",
+      committed_amount: 5000,
+      cash_amount: 2000,
+      in_kind_value: 3000,
+      status: "confirmed",
+      payment_status: "partial",
+      committed_date: "2026-03-22",
+      notes: taggedDescription("Cash plus in-kind catering for Family Welcome Night."),
+      benefitStatuses: ["in_progress", "pending", "completed"],
+    },
+  ]
+
+  const createdSponsors = []
+  for (const sponsor of sponsors) {
+    const packageId = packageIds[sponsor.packageName]
+    const inserted = await insertIgnoringUnknownColumns(
+      "campaign_sponsorships",
+      {
+        organization_id: orgId,
+        campaign_id: campaign.id,
+        event_id: sponsor.event_id || null,
+        contact_id: sponsor.contactId,
+        sponsorship_package_id: packageId,
+        sponsorship_type: sponsor.sponsorship_type,
+        committed_amount: sponsor.committed_amount,
+        cash_amount: sponsor.cash_amount,
+        in_kind_value: sponsor.in_kind_value,
+        status: sponsor.status,
+        payment_status: sponsor.payment_status,
+        committed_date: sponsor.committed_date,
+        notes: sponsor.notes,
+      },
+      `sponsorship ${sponsor.name}`
+    )
+    await snapshotSponsorshipBenefits(
+      orgId,
+      inserted.id,
+      packageId,
+      sponsor.benefitStatuses
+    )
+    createdSponsors.push(sponsor.name)
+  }
+
+  return {
+    sponsorshipCampaign: campaign.name,
+    sponsorshipPackages: Object.keys(packageIds),
+    sponsors: createdSponsors,
+  }
 }
 
 async function cleanProgramsSeed(orgId) {
@@ -1339,6 +1677,12 @@ try {
     process.exit(0)
   }
 
+  if (sponsorshipsOnly) {
+    const sponsorships = await seedSponsorships(org.id)
+    console.log(JSON.stringify({ ok: true, org: org.name, ...sponsorships }, null, 2))
+    process.exit(0)
+  }
+
   if (programsOnly) {
     if (clean) {
       await cleanProgramsSeed(org.id)
@@ -1360,7 +1704,7 @@ try {
     }
   } else if (existing.length > 0) {
     console.error(
-      "Demo contacts already exist. Run with --clean --execute to reset and re-seed, or --programs --execute to add departments/programs/events only."
+      "Demo contacts already exist. Run with --clean --execute to reset and re-seed, --sponsorships-only --execute to add packages/sponsors, or --programs --execute to add departments/programs/events only."
     )
     process.exit(1)
   }

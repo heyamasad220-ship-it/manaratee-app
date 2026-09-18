@@ -521,6 +521,50 @@ export type DonationGivingBreakdown = {
   byMethod: Array<{ method: string; amount: number; count: number }>
 }
 
+function toDateOnlyLocal(value: Date) {
+  const year = value.getFullYear()
+  const month = String(value.getMonth() + 1).padStart(2, "0")
+  const day = String(value.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
+
+function parseDateOnly(value: string) {
+  return new Date(`${value}T12:00:00`)
+}
+
+function daysInclusive(dateFrom: string, dateTo: string) {
+  const start = parseDateOnly(dateFrom)
+  const end = parseDateOnly(dateTo)
+  return Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1
+}
+
+function fillGivingPeriods(
+  monthMap: Map<string, { amount: number; count: number }>,
+  dateFrom: string | undefined,
+  dateTo: string | undefined,
+  useDaily: boolean
+) {
+  const sortedExisting = [...monthMap.entries()].sort(([a], [b]) => a.localeCompare(b))
+  if (!useDaily || !dateFrom || !dateTo) {
+    return sortedExisting.map(([month, value]) => ({
+      month,
+      amount: value.amount,
+      count: value.count,
+    }))
+  }
+
+  const points: Array<{ month: string; amount: number; count: number }> = []
+  const cursor = parseDateOnly(dateFrom)
+  const end = parseDateOnly(dateTo)
+  while (cursor.getTime() <= end.getTime()) {
+    const key = toDateOnlyLocal(cursor)
+    const value = monthMap.get(key) || { amount: 0, count: 0 }
+    points.push({ month: key, amount: value.amount, count: value.count })
+    cursor.setDate(cursor.getDate() + 1)
+  }
+  return points
+}
+
 export async function getDonationGivingBreakdownAction(input: PaymentsPageInput = {}) {
   const access = await requireDonationStaffAccess("view")
   if (!access.ok) return { success: false as const, error: access.error }
@@ -535,6 +579,9 @@ export async function getDonationGivingBreakdownAction(input: PaymentsPageInput 
 
     const monthMap = new Map<string, { amount: number; count: number }>()
     const methodMap = new Map<string, { amount: number; count: number }>()
+    const useDaily =
+      Boolean(input.dateFrom && input.dateTo) &&
+      daysInclusive(String(input.dateFrom), String(input.dateTo)) <= 92
 
     for (const row of rows) {
       if (
@@ -548,8 +595,14 @@ export async function getDonationGivingBreakdownAction(input: PaymentsPageInput 
       }
 
       const net = paymentNetAmount(Number(row.amount || 0), Number(row.refunded_amount || 0))
-      const date = String(row.payment_date || "").slice(0, 7)
-      const monthKey = date.length === 7 ? date : "Unknown"
+      const rawDate = String(row.payment_date || "")
+      const periodKey = useDaily
+        ? rawDate.slice(0, 10)
+        : rawDate.slice(0, 7)
+      const monthKey =
+        (useDaily ? periodKey.length === 10 : periodKey.length === 7)
+          ? periodKey
+          : "Unknown"
       const monthEntry = monthMap.get(monthKey) || { amount: 0, count: 0 }
       monthEntry.amount += net
       monthEntry.count += 1
@@ -562,13 +615,12 @@ export async function getDonationGivingBreakdownAction(input: PaymentsPageInput 
       methodMap.set(method, methodEntry)
     }
 
-    const byMonth = [...monthMap.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([month, value]) => ({
-        month,
-        amount: value.amount,
-        count: value.count,
-      }))
+    const byMonth = fillGivingPeriods(
+      monthMap,
+      input.dateFrom,
+      input.dateTo,
+      useDaily
+    )
 
     const byMethod = [...methodMap.entries()]
       .sort((a, b) => b[1].amount - a[1].amount)
@@ -643,13 +695,18 @@ export type PledgeListFilters = {
 function applyPledgeListFilters<
   T extends {
     eq: (column: string, value: unknown) => T
+    in: (column: string, values: readonly string[]) => T
     is: (column: string, value: null) => T
     gte: (column: string, value: number) => T
     or: (filters: string) => T
   },
 >(query: T, input: PledgeListFilters) {
   if (input.status && input.status !== "all") {
-    query = query.eq("calculated_status", input.status)
+    if (input.status === "open" || input.status === "partial") {
+      query = query.in("calculated_status", ["open", "partial"])
+    } else {
+      query = query.eq("calculated_status", input.status)
+    }
   }
   if (input.campaignId === "__none__") {
     query = query.is("campaign_id", null)
@@ -1160,7 +1217,7 @@ export async function fetchHouseholdGivingReportPageAction(
     return {
       success: false as const,
       error: error.message.includes("donation_household_giving_report")
-        ? "Household giving report is not available yet. Run migration scripts/149_household_giving_report.sql."
+        ? "Household giving report is not available yet. Run migration scripts/295_household_giving_multi_adult.sql."
         : error.message,
     }
   }

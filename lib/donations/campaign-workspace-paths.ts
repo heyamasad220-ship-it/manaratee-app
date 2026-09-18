@@ -10,12 +10,10 @@ export type CampaignWorkspaceTab =
   | "groups"
   | "wishlist"
 
-export type FundraisingPlanSection = "strategy" | "prospects"
-
 export const CAMPAIGN_WORKSPACE_TABS = [
   { id: "overview", label: "Overview" },
   { id: "events", label: "Event" },
-  { id: "plan", label: "Fundraising Plan" },
+  { id: "prospects", label: "Prospects" },
   { id: "pledges", label: "Pledges" },
   { id: "donations", label: "Donations" },
   { id: "sponsors", label: "Sponsorship" },
@@ -47,14 +45,6 @@ export function isFundraisingPlanTab(tab: CampaignWorkspaceTab): boolean {
   return tab === "plan" || tab === "strategy" || tab === "prospects"
 }
 
-export function parseFundraisingPlanSection(
-  tab: CampaignWorkspaceTab,
-  section: string | null | undefined
-): FundraisingPlanSection {
-  if (tab === "prospects" || section === "prospects") return "prospects"
-  return "strategy"
-}
-
 export type CampaignWorkspaceHrefOptions = {
   tab?: CampaignWorkspaceTab
   groupId?: string
@@ -80,12 +70,6 @@ function prospectPledgedParam(
   return value === "pledged" || value === "not_pledged" ? value : undefined
 }
 
-function prospectAskTypeParam(
-  value: string | null | undefined
-): "donation" | "sponsorship" | undefined {
-  return value === "donation" || value === "sponsorship" ? value : undefined
-}
-
 export function donationCampaignWorkspaceHref(
   campaignId: string,
   options?: CampaignWorkspaceHrefOptions
@@ -96,12 +80,9 @@ export function donationCampaignWorkspaceHref(
   let tab = options?.tab
   let section = options?.section
 
-  if (tab === "strategy") {
-    tab = "plan"
-    if (section !== "prospects") section = undefined
-  } else if (tab === "prospects") {
-    tab = "plan"
-    section = "prospects"
+  if (tab === "strategy" || tab === "plan") {
+    tab = "prospects"
+    if (section !== "packages") section = undefined
   }
 
   if (tab && tab !== "overview") {
@@ -124,8 +105,6 @@ export function donationCampaignWorkspaceHref(
   }
   if (tab === "sponsors" && section === "packages") {
     params.set("section", "packages")
-  } else if (tab === "plan" && section === "prospects") {
-    params.set("section", "prospects")
   }
   if (options?.askType) {
     params.set("askType", options.askType)
@@ -145,18 +124,24 @@ export function canonicalizeCampaignWorkspaceHref(
   searchParams: { get(name: string): string | null }
 ): string | null {
   const tab = searchParams.get("tab")
-  if (tab !== "strategy" && tab !== "prospects") return null
+  const section = searchParams.get("section")
+  const shouldCanonicalizeProspects =
+    tab === "strategy" ||
+    tab === "plan" ||
+    (tab === "prospects" &&
+      (section === "prospects" ||
+        Boolean(searchParams.get("stage")) ||
+        Boolean(searchParams.get("askType")) ||
+        Boolean(searchParams.get("askLevel")) ||
+        searchParams.get("asked") === "1"))
+
+  if (!shouldCanonicalizeProspects) return null
 
   return donationCampaignWorkspaceHref(campaignId, {
-    tab: "plan",
-    section: tab === "prospects" ? "prospects" : undefined,
+    tab: "prospects",
     groupId: searchParams.get("group") || undefined,
     followUp: prospectFollowUpParam(searchParams.get("followUp")),
     assignee: searchParams.get("assignee") || undefined,
-    stage: searchParams.get("stage") || undefined,
     pledged: prospectPledgedParam(searchParams.get("pledged")),
-    askType: prospectAskTypeParam(searchParams.get("askType")),
-    askLevelId: searchParams.get("askLevel") || undefined,
-    asked: searchParams.get("asked") === "1",
   })
 }

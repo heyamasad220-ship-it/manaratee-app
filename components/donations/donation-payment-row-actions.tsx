@@ -30,7 +30,7 @@ import {
 import type { PaymentReceiptPayload } from "@/lib/donations/receipt-types"
 import {
   buildPaymentReceiptHtml,
-  downloadReceiptPdf,
+  downloadPaymentReceiptPdf,
   openReceiptPrintWindow,
 } from "@/lib/donations/receipt-pdf"
 import {
@@ -114,10 +114,7 @@ export function DonationPaymentRowActions({
       return existing.payload
     }
 
-    setReceiptLoading(true)
     const generated = await generatePaymentReceiptAction(row.id)
-    setReceiptLoading(false)
-
     if (!generated.success) {
       alert(generated.error || "Could not generate receipt")
       return null
@@ -128,14 +125,17 @@ export function DonationPaymentRowActions({
   }
 
   async function handleDownloadReceipt() {
-    const payload = await ensureReceiptPayload()
-    if (!payload) return
-
-    const html = buildPaymentReceiptHtml(payload)
+    setReceiptLoading(true)
     try {
-      await downloadReceiptPdf(`receipt-${payload.receiptNumber}.pdf`, html)
-    } catch {
-      openReceiptPrintWindow(html)
+      const payload = await ensureReceiptPayload()
+      if (!payload) return
+      try {
+        downloadPaymentReceiptPdf(payload)
+      } catch {
+        openReceiptPrintWindow(buildPaymentReceiptHtml(payload))
+      }
+    } finally {
+      setReceiptLoading(false)
     }
   }
 

@@ -14,3 +14,10 @@ export const STAFF_MAIN_CONTENT_STICKY_TOP_REM = 11.75
 /** Sidebar nav + module drawer start below the header spacer and breadcrumb spacer. */
 export const STAFF_SIDEBAR_NAV_TOP_CLASS = STAFF_MAIN_CONTENT_STICKY_TOP_CLASS
 export const STAFF_SIDEBAR_NAV_HEIGHT_CLASS = "h-[calc(100vh-11.75rem)]"
+
+/** Programs Reports secondary tab bar (`ProgramsReportsNav`) — keep in sync with `h-11`. */
+export const STAFF_REPORTS_SUBNAV_HEIGHT_CLASS = "h-11"
+export const STAFF_REPORTS_SUBNAV_HEIGHT_REM = 2.75
+
+/** Sticky `top` for content that pins below the staff header and Reports tabs. */
+export const STAFF_BELOW_REPORTS_SUBNAV_STICKY_TOP_CLASS = "top-[14.5rem]"

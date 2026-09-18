@@ -17,7 +17,7 @@ export default function CustomerMyTransactionsPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-foreground">My Transactions</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Review your giving, program payments, venue rentals, and outstanding balances.
+          Review your payments and outstanding balances.
         </p>
       </div>
 

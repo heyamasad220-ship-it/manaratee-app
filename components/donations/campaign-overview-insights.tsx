@@ -124,7 +124,6 @@ export function CampaignOverviewInsightsPanel({
                   <TableHead>Assignee</TableHead>
                   <TableHead className="text-right">Open</TableHead>
                   <TableHead className="text-right">Overdue</TableHead>
-                  <TableHead className="text-right">Asked</TableHead>
                   <TableHead className="text-right">Pledged</TableHead>
                   <TableHead className="text-right">Ask $</TableHead>
                 </TableRow>
@@ -144,7 +143,6 @@ export function CampaignOverviewInsightsPanel({
                     >
                       {row.overdueCount}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">{row.askedCount}</TableCell>
                     <TableCell className="text-right tabular-nums">{row.pledgedCount}</TableCell>
                     <TableCell className="text-right tabular-nums">
                       {formatDonationCurrency(row.suggestedAskTotal)}

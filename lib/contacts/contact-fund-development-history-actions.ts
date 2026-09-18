@@ -118,7 +118,6 @@ export async function loadContactFundDevelopmentHistoryAction(contactId: string)
         detail: CAMPAIGN_PROSPECT_STAGE_LABELS[stage],
         href: donationCampaignWorkspaceHref(row.campaign_id as string, {
           tab: "plan",
-          section: "prospects",
         }),
         amountLabel:
           row.suggested_ask_amount != null
@@ -142,7 +141,6 @@ export async function loadContactFundDevelopmentHistoryAction(contactId: string)
         detail: `${prospectName} · ${CAMPAIGN_PROSPECT_STAGE_LABELS[stage]}`,
         href: donationCampaignWorkspaceHref(row.campaign_id as string, {
           tab: "plan",
-          section: "prospects",
         }),
         amountLabel: null,
       })

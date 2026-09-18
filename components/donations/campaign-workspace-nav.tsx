@@ -23,7 +23,7 @@ export function CampaignWorkspaceNav({ campaignId, activeTab }: CampaignWorkspac
     >
       {CAMPAIGN_WORKSPACE_TABS.map((tab) => {
         const isActive =
-          tab.id === "plan" ? isFundraisingPlanTab(activeTab) : tab.id === activeTab
+          tab.id === "prospects" ? isFundraisingPlanTab(activeTab) : tab.id === activeTab
         return (
           <Link
             key={tab.id}

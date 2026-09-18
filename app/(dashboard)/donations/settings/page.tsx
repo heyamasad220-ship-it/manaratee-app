@@ -38,6 +38,7 @@ import { cn } from "@/lib/utils"
 import { DonationReceiptSettingsForm } from "@/components/donations/donation-receipt-settings-form"
 import { PledgeReminderSettingsForm } from "@/components/donations/pledge-reminder-settings-form"
 import { DonationStripeConnectPanel } from "@/components/donations/donation-stripe-connect-panel"
+import { getCurrentOrganizationId } from "@/lib/current-organization"
 
 const settingsTabs = ["Categories", "Online Payments", "Receipts", "Pledge Reminders", "Notifications"] as const
 type SettingsTab = (typeof settingsTabs)[number]
@@ -92,25 +93,8 @@ function DonationsSettingsPageFallback() {
 function DonationsSettingsPageContent() {
   const supabase = createClient()
   async function getOrganizationId() {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) return null
-
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("organization_id")
-    .eq("id", user.id)
-    .single()
-
-  if (error) {
-    console.error("Error loading organization:", error)
-    return null
+    return getCurrentOrganizationId()
   }
-
-  return data?.organization_id || null
-}
   const [activeTab, setActiveTab] = useState<SettingsTab>("Categories")
   const [categories, setCategories] = useState<Category[]>([])
   const [showAddCategoryDialog, setShowAddCategoryDialog] = useState(false)
@@ -321,10 +305,18 @@ useEffect(() => {
 async function handleDeleteCategory(categoryId: string) {
   if (!confirm("Delete this category?")) return
 
+  const orgId = await getOrganizationId()
+
+  if (!orgId) {
+    alert("No organization found.")
+    return
+  }
+
   const { error } = await supabase
     .from("donation_categories")
     .delete()
     .eq("id", categoryId)
+    .eq("organization_id", orgId)
 
   if (error) {
     alert(error.message)
