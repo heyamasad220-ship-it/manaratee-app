@@ -87,18 +87,28 @@ export function DepartmentsManager() {
     setSaving(true)
 
     try {
-      await createDepartment({
+      const result = await createDepartment({
         name: newDepartment.name.trim(),
         description: newDepartment.description.trim() || undefined,
         color: newDepartment.color || "#3b82f6",
       })
+
+      if (!result.success) {
+        alert(result.error)
+        return
+      }
 
       setDepartmentDialogOpen(false)
       setNewDepartment(emptyDepartment)
       await loadDepartments()
     } catch (error: unknown) {
       console.error("Save department error:", error)
-      alert(error instanceof Error ? error.message : "Could not save department.")
+      const message = error instanceof Error ? error.message : ""
+      alert(
+        !message || message.includes("Server Components render")
+          ? "Could not save department. Please try again."
+          : message
+      )
     } finally {
       setSaving(false)
     }

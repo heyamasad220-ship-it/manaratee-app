@@ -12,7 +12,9 @@ import {
   departmentDeleteBlockedReason,
   type DepartmentDeleteUsage,
 } from "@/lib/departments/department-delete-blockers"
-import { hasPermission, PERMISSIONS } from "@/lib/permissions/permissions"
+import { PERMISSIONS } from "@/lib/permissions/permissions"
+import { isOrganizationSystemAdmin } from "@/lib/organizations/organization-system-admin"
+import { isPlatformAdminOrgSupportSession } from "@/lib/platform/platform-org-access"
 import { isRichTextEmpty, sanitizeRichTextHtml } from "@/lib/ui/rich-text"
 import { DEPARTMENT_OPEN_PROGRAM_STATUSES } from "@/lib/departments/department-program-statuses"
 import { isStaffVisibleOfferingStatus } from "@/lib/programs/program-offering-queries"
@@ -50,14 +52,20 @@ export type DepartmentWithProgramCount = {
 }
 
 function revalidateDepartmentPaths(departmentId?: string) {
-  revalidatePath("/programs")
-  revalidatePath("/programs/catalog")
-  revalidatePath("/workforce?tab=departments")
-  revalidatePath("/workforce/settings")
-  revalidatePath("/workforce/departments")
-  revalidatePath("/workforce/employees")
+  const paths = [
+    "/workforce/departments",
+    "/workforce/employees",
+    "/workforce/settings",
+  ]
   if (departmentId) {
-    revalidatePath(`/workforce/departments/${departmentId}`)
+    paths.push(`/workforce/departments/${departmentId}`)
+  }
+  for (const path of paths) {
+    try {
+      revalidatePath(path)
+    } catch (error) {
+      console.error(`revalidatePath ${path}:`, error)
+    }
   }
 }
 
@@ -79,50 +87,73 @@ function formatDepartmentError(error: { code?: string; message?: string }, actio
   return error.message || `Failed to ${action} department`
 }
 
-async function requireDepartmentWriteAccess(departmentId?: string) {
-  const canWriteOrgWide =
-    (await hasPermission(PERMISSIONS.STAFF_MANAGE)) ||
-    (await hasPermission(PERMISSIONS.STAFF_VIEW))
-  const canWriteThisDepartment = departmentId
-    ? await canManageDepartment(departmentId)
-    : false
+type DepartmentWriteAccess =
+  | {
+      ok: true
+      organizationId: string
+      supabase: ReturnType<typeof createServiceRoleClient>
+    }
+  | { ok: false; error: string }
 
-  if (!canWriteOrgWide && !canWriteThisDepartment) {
-    throw new Error("You do not have permission to manage departments.")
-  }
-
+async function requireDepartmentWriteAccess(
+  departmentId?: string
+): Promise<DepartmentWriteAccess> {
   const organizationId = await getSelectedOrganizationId()
   if (!organizationId) {
-    throw new Error("No organization selected")
+    return { ok: false, error: "No organization selected" }
   }
 
-  // Verify the signed-in user belongs to the selected org (session client),
-  // then write with service role so legacy/incomplete departments RLS cannot block saves.
   const sessionClient = await createClient()
   const {
     data: { user },
   } = await sessionClient.auth.getUser()
 
   if (!user) {
-    throw new Error("You must be signed in to manage departments.")
+    return { ok: false, error: "You must be signed in to manage departments." }
   }
+
+  const platformSupport = await isPlatformAdminOrgSupportSession(organizationId)
 
   const { data: membership, error: membershipError } = await sessionClient
     .from("organization_members")
-    .select("id")
+    .select("id, role, role_id")
     .eq("organization_id", organizationId)
     .eq("user_id", user.id)
     .maybeSingle()
 
   if (membershipError) {
-    throw new Error(membershipError.message || "Could not verify organization membership.")
+    return {
+      ok: false,
+      error: membershipError.message || "Could not verify organization membership.",
+    }
   }
 
-  if (!membership) {
-    throw new Error("You are not a member of the selected organization.")
+  if (!membership && !platformSupport) {
+    return { ok: false, error: "You are not a member of the selected organization." }
+  }
+
+  let canWriteOrgWide = platformSupport || isOrganizationSystemAdmin(membership?.role)
+  if (!canWriteOrgWide && membership?.role_id) {
+    const { data: permissionRows } = await sessionClient
+      .from("role_permissions")
+      .select("permission_key")
+      .eq("organization_id", organizationId)
+      .eq("role_id", membership.role_id)
+      .eq("enabled", true)
+      .in("permission_key", [PERMISSIONS.STAFF_VIEW, PERMISSIONS.STAFF_MANAGE])
+    canWriteOrgWide = (permissionRows || []).length > 0
+  }
+
+  const canWriteThisDepartment = departmentId
+    ? await canManageDepartment(departmentId)
+    : false
+
+  if (!canWriteOrgWide && !canWriteThisDepartment) {
+    return { ok: false, error: "You do not have permission to manage departments." }
   }
 
   return {
+    ok: true,
     organizationId,
     supabase: createServiceRoleClient(),
   }
@@ -185,32 +216,57 @@ export async function fetchDepartmentDeleteUsage(
 }
 
 export async function createDepartment(input: CreateDepartmentInput) {
-  const name = input.name.trim()
-  if (!name) {
-    throw new Error("Department name is required")
+  try {
+    const name = input.name.trim()
+    if (!name) {
+      return { success: false as const, error: "Department name is required" }
+    }
+
+    const access = await requireDepartmentWriteAccess()
+    if (!access.ok) {
+      return { success: false as const, error: access.error }
+    }
+
+    const { data, error } = await access.supabase
+      .from("departments")
+      .insert({
+        organization_id: access.organizationId,
+        name,
+        description: normalizeDepartmentDescription(input.description),
+        color: normalizeDepartmentColor(input.color),
+        flyer_url: input.flyerUrl?.trim() || null,
+      })
+      .select("id")
+      .maybeSingle()
+
+    if (error) {
+      console.error("createDepartment error:", error)
+      return { success: false as const, error: formatDepartmentError(error, "create") }
+    }
+    if (!data?.id) {
+      return {
+        success: false as const,
+        error: "Could not create the department. Please try again.",
+      }
+    }
+
+    revalidateDepartmentPaths(data.id)
+    return { success: true as const, id: data.id as string }
+  } catch (error) {
+    console.error("createDepartment exception:", error)
+    const message = error instanceof Error ? error.message : ""
+    const hiddenByNext =
+      !message ||
+      message.includes("Server Components render") ||
+      message.includes("NEXT_REDIRECT") ||
+      ("digest" in ((error as object) || {}) && typeof (error as { digest?: unknown }).digest === "string")
+    return {
+      success: false as const,
+      error: hiddenByNext
+        ? "Could not create the department. Please try again."
+        : message,
+    }
   }
-
-  const { organizationId, supabase } = await requireDepartmentWriteAccess()
-
-  const { data, error } = await supabase
-    .from("departments")
-    .insert({
-      organization_id: organizationId,
-      name,
-      description: normalizeDepartmentDescription(input.description),
-      color: normalizeDepartmentColor(input.color),
-      flyer_url: input.flyerUrl?.trim() || null,
-    })
-    .select("id")
-    .single()
-
-  if (error) {
-    console.error("createDepartment error:", error)
-    throw new Error(formatDepartmentError(error, "create"))
-  }
-
-  revalidateDepartmentPaths(data?.id)
-  return { id: data.id as string }
 }
 
 export async function updateDepartment(input: UpdateDepartmentInput) {
@@ -219,7 +275,11 @@ export async function updateDepartment(input: UpdateDepartmentInput) {
     throw new Error("Department name is required")
   }
 
-  const { organizationId, supabase } = await requireDepartmentWriteAccess(input.id)
+  const access = await requireDepartmentWriteAccess(input.id)
+  if (!access.ok) {
+    throw new Error(access.error)
+  }
+  const { organizationId, supabase } = access
 
   const updatePayload: Record<string, unknown> = {
     name,
@@ -250,7 +310,11 @@ export async function updateDepartmentFlyer(input: {
   id: string
   flyerUrl: string | null
 }) {
-  const { organizationId, supabase } = await requireDepartmentWriteAccess(input.id)
+  const access = await requireDepartmentWriteAccess(input.id)
+  if (!access.ok) {
+    throw new Error(access.error)
+  }
+  const { organizationId, supabase } = access
 
   const { error } = await supabase
     .from("departments")
@@ -269,7 +333,11 @@ export async function updateDepartmentFlyer(input: {
 }
 
 export async function deleteDepartment(id: string) {
-  const { organizationId, supabase } = await requireDepartmentWriteAccess()
+  const access = await requireDepartmentWriteAccess()
+  if (!access.ok) {
+    throw new Error(access.error)
+  }
+  const { organizationId, supabase } = access
 
   const usage = await loadDepartmentDeleteUsage(supabase, organizationId, id)
   const blockedReason = departmentDeleteBlockedReason(usage)
@@ -623,7 +691,11 @@ export async function updateDepartmentTerms(input: {
   termsHtml?: string | null
   termsPdfUrl?: string | null
 }) {
-  const { organizationId, supabase } = await requireDepartmentWriteAccess(input.id)
+  const access = await requireDepartmentWriteAccess(input.id)
+  if (!access.ok) {
+    throw new Error(access.error)
+  }
+  const { organizationId, supabase } = access
 
   const patch: Record<string, string | null> = {}
   if (input.termsHtml !== undefined) {
