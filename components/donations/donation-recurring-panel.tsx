@@ -77,7 +77,12 @@ import type { ContactPaymentMethodRow } from "@/lib/contacts/contact-payment-met
 import {
   formatRecurringFrequencyLabel,
   formatRecurringStatusLabel,
+  type RecurringFrequency,
 } from "@/lib/donations/recurring-donation-types"
+import {
+  lastRecurringDateFromCount,
+  paymentCountFromLastRecurringDate,
+} from "@/lib/donations/recurring-donation-schedule"
 import { receivePaymentActionLabel } from "@/lib/donations/payment-admin-copy"
 import { getDonorProfilePath } from "@/lib/donations/donor-profile-path"
 import { TableColumnHeaderFilter, TableColumnHeaderSort } from "@/components/ui/table-column-header-filter"
@@ -304,8 +309,10 @@ export function DonationRecurringPanel({
   )
   const [donorId, setDonorId] = useState(scopedDonorId || "")
   const [amount, setAmount] = useState("")
-  const [frequency, setFrequency] = useState<"daily" | "weekly" | "monthly" | "quarterly" | "annually">("monthly")
+  const [frequency, setFrequency] = useState<RecurringFrequency>("monthly")
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10))
+  const [planPayments, setPlanPayments] = useState("")
+  const [planEndDate, setPlanEndDate] = useState("")
   const [notes, setNotes] = useState("")
   const [paymentSource, setPaymentSource] = useState("cash")
 
@@ -451,6 +458,47 @@ export function DonationRecurringPanel({
     return sorted
   }, [plans, statusFilter, categoryFundFilter, frequencyFilter, donorNameFilter, sortKey])
 
+  function applyCreateInstallmentCount(value: string) {
+    setPlanPayments(value)
+    const count = Number(value)
+    if (startDate && Number.isInteger(count) && count >= 2) {
+      const last = lastRecurringDateFromCount(startDate, frequency, count)
+      if (last) setPlanEndDate(last)
+    }
+  }
+
+  function applyCreateEndDate(value: string) {
+    setPlanEndDate(value)
+    if (startDate && value) {
+      const count = paymentCountFromLastRecurringDate(startDate, frequency, value)
+      setPlanPayments(count >= 2 ? String(count) : "")
+    }
+  }
+
+  function applyCreateStartDate(value: string) {
+    setStartDate(value)
+    const count = Number(planPayments)
+    if (value && Number.isInteger(count) && count >= 2) {
+      const last = lastRecurringDateFromCount(value, frequency, count)
+      if (last) setPlanEndDate(last)
+    } else if (value && planEndDate) {
+      const nextCount = paymentCountFromLastRecurringDate(value, frequency, planEndDate)
+      setPlanPayments(nextCount >= 2 ? String(nextCount) : "")
+    }
+  }
+
+  function applyCreateFrequency(value: RecurringFrequency) {
+    setFrequency(value)
+    const count = Number(planPayments)
+    if (startDate && Number.isInteger(count) && count >= 2) {
+      const last = lastRecurringDateFromCount(startDate, value, count)
+      if (last) setPlanEndDate(last)
+    } else if (startDate && planEndDate) {
+      const nextCount = paymentCountFromLastRecurringDate(startDate, value, planEndDate)
+      setPlanPayments(nextCount >= 2 ? String(nextCount) : "")
+    }
+  }
+
   async function handleCreatePlan() {
     if (!donorId) {
       alert("Select a donor")
@@ -471,6 +519,8 @@ export function DonationRecurringPanel({
       amount: Number(amount),
       frequency,
       startDate,
+      numberOfPayments: planPayments ? Number(planPayments) : null,
+      endDate: planEndDate || null,
       notes: notes || null,
     })
     setSaving(false)
@@ -484,6 +534,8 @@ export function DonationRecurringPanel({
     setDonorId(scopedDonorId || "")
     setAttribution(EMPTY_DONATION_ATTRIBUTION_VALUE)
     setAmount("")
+    setPlanPayments("")
+    setPlanEndDate("")
     setNotes("")
     await refreshAfterChange()
   }
@@ -1037,8 +1089,8 @@ export function DonationRecurringPanel({
           <DialogHeader>
             <DialogTitle>New Recurring Donation Plan</DialogTitle>
             <DialogDescription>
-              Create a schedule record. Payments are recorded manually until processor billing is
-              added.
+              Create a schedule record. Enter the number of installments or an end date. Payments
+              are recorded manually until processor billing is added.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-4 py-2">
@@ -1071,7 +1123,7 @@ export function DonationRecurringPanel({
               </div>
               <div className="flex flex-col gap-2">
                 <Label>Frequency</Label>
-                <Select value={frequency} onValueChange={(v) => setFrequency(v as typeof frequency)}>
+                <Select value={frequency} onValueChange={(v) => applyCreateFrequency(v as RecurringFrequency)}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -1088,7 +1140,27 @@ export function DonationRecurringPanel({
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-2">
                 <Label>Start Date</Label>
-                <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                <Input type="date" value={startDate} onChange={(e) => applyCreateStartDate(e.target.value)} />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="recurring-create-installments">Number of installments</Label>
+                <Input
+                  id="recurring-create-installments"
+                  type="number"
+                  min={2}
+                  placeholder="e.g. 12"
+                  value={planPayments}
+                  onChange={(e) => applyCreateInstallmentCount(e.target.value)}
+                />
+              </div>
+              <div className="flex flex-col gap-2 sm:col-span-2">
+                <Label htmlFor="recurring-create-end">End date</Label>
+                <Input
+                  id="recurring-create-end"
+                  type="date"
+                  value={planEndDate}
+                  onChange={(e) => applyCreateEndDate(e.target.value)}
+                />
               </div>
             </div>
             <DonationAttributionFields

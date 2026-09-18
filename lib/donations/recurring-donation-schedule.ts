@@ -59,3 +59,75 @@ export function initialNextPaymentDate(
   }
   return cursor
 }
+
+const MAX_RECURRING_INSTALLMENTS = 600
+
+export function lastRecurringDateFromCount(
+  startDate: string,
+  frequency: RecurringFrequency,
+  totalPayments: number
+): string | null {
+  if (!startDate.trim() || totalPayments < 1) return null
+  let cursor = startDate.trim()
+  for (let index = 1; index < totalPayments; index += 1) {
+    cursor = calculateNextPaymentDate(cursor, frequency)
+  }
+  return cursor
+}
+
+export function paymentCountFromLastRecurringDate(
+  startDate: string,
+  frequency: RecurringFrequency,
+  endDate: string
+): number {
+  const first = startDate.trim()
+  const last = endDate.trim()
+  if (!first || !last || last < first) return 0
+  if (last === first) return 1
+
+  let count = 1
+  let cursor = first
+  while (count < MAX_RECURRING_INSTALLMENTS) {
+    const next = calculateNextPaymentDate(cursor, frequency)
+    if (next > last) break
+    cursor = next
+    count += 1
+  }
+  return count
+}
+
+export function buildRecurringPlanSchedule(input: {
+  frequency: RecurringFrequency
+  startDate: string
+  numberOfPayments?: number | null
+  endDate?: string | null
+}):
+  | { ok: true; totalPayments: number; endDate: string }
+  | { ok: false; error: string } {
+  const startDate = input.startDate.trim()
+  if (!startDate) {
+    return { ok: false, error: "Choose a start date." }
+  }
+
+  const countFromInput = Number(input.numberOfPayments)
+  const hasCount = Number.isInteger(countFromInput) && countFromInput >= 2
+  const endDate = input.endDate?.trim() || ""
+
+  let totalPayments = 0
+  if (hasCount) {
+    totalPayments = countFromInput
+  } else if (endDate) {
+    totalPayments = paymentCountFromLastRecurringDate(startDate, input.frequency, endDate)
+    if (totalPayments < 2) {
+      return { ok: false, error: "End date must be on or after the second payment." }
+    }
+  } else {
+    return { ok: false, error: "Enter the number of installments or an end date." }
+  }
+
+  return {
+    ok: true,
+    totalPayments,
+    endDate: lastRecurringDateFromCount(startDate, input.frequency, totalPayments) || endDate,
+  }
+}
