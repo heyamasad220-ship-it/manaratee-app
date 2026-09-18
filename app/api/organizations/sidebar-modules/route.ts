@@ -9,6 +9,8 @@ import { isCurrentUserPlatformAdmin } from "@/lib/platform/is-platform-admin-use
 import { getPlatformAdminOrgAccessOrganizationId } from "@/lib/platform/platform-org-access"
 import { getServiceRoleClient } from "@/lib/platform/require-platform-admin"
 import { normalizeOrganizationProgramKinds } from "@/lib/programs/program-kind-policy"
+import { fetchCachedDirectoryNavSummary } from "@/lib/directory/directory-nav-summary"
+import { PERMISSIONS } from "@/lib/permissions/permission-keys"
 import { createClient } from "@/lib/supabase/server"
 
 export const dynamic = "force-dynamic"
@@ -77,19 +79,25 @@ export async function GET() {
 
   try {
     const admin = getServiceRoleClient()
-    const [modules, permissionContext, headship, programLeads] = await Promise.all([
-      loadOrganizationSidebarModules(admin, organizationId),
-      buildSidebarPermissionContext({
-        supabase,
-        organizationId,
-        userId: user.id,
-        membershipRole,
-        membershipRoleId,
-        platformSupportMode,
-      }),
-      resolveDepartmentHeadship(supabase, organizationId, user.id),
-      resolveProgramLeads(supabase, organizationId, user.id),
-    ])
+    const [modules, permissionContext, headship, programLeads, organizationRow, directorySummary] =
+      await Promise.all([
+        loadOrganizationSidebarModules(admin, organizationId),
+        buildSidebarPermissionContext({
+          supabase,
+          organizationId,
+          userId: user.id,
+          membershipRole,
+          membershipRoleId,
+          platformSupportMode,
+        }),
+        resolveDepartmentHeadship(supabase, organizationId, user.id),
+        resolveProgramLeads(supabase, organizationId, user.id),
+        admin.from("organizations").select("program_kinds").eq("id", organizationId).maybeSingle(),
+        fetchCachedDirectoryNavSummary(organizationId).catch((error) => {
+          console.warn("directory role counts unavailable:", error)
+          return null
+        }),
+      ])
 
     const myDepartment = headship
       ? {
@@ -103,37 +111,30 @@ export async function GET() {
       name: lead.programName,
     }))
 
-    let directoryRoleCounts = {}
-    try {
-      const { fetchDirectoryNavSummary } = await import(
-        "@/lib/directory/directory-nav-summary"
-      )
-      const summary = await fetchDirectoryNavSummary(organizationId)
-      directoryRoleCounts = summary.roles
-    } catch (error) {
-      console.warn("directory role counts unavailable:", error)
-    }
+    const canViewContacts =
+      permissionContext.isOwner ||
+      permissionContext.isSuperAdmin ||
+      permissionContext.enabledPermissions.includes(PERMISSIONS.CONTACTS_VIEW) ||
+      permissionContext.enabledPermissions.includes(PERMISSIONS.CONTACTS_MANAGE)
+
+    const directoryRoleCounts = canViewContacts ? directorySummary?.roles || {} : {}
 
     let programKinds = normalizeOrganizationProgramKinds(null)
-    try {
-      const { data: organizationRow, error: programKindsError } = await admin
-        .from("organizations")
-        .select("program_kinds")
-        .eq("id", organizationId)
-        .maybeSingle()
-
-      if (
-        programKindsError &&
-        !/program_kinds|does not exist/i.test(programKindsError.message || "")
-      ) {
-        console.warn("program kinds unavailable:", programKindsError.message)
-      }
-
-      programKinds = normalizeOrganizationProgramKinds(
-        (organizationRow as { program_kinds?: string | null } | null)?.program_kinds
+    const programKindsError = organizationRow && "error" in organizationRow ? organizationRow.error : null
+    if (
+      programKindsError &&
+      !/program_kinds|does not exist/i.test(
+        (programKindsError as { message?: string } | null)?.message || ""
       )
-    } catch (error) {
-      console.warn("program kinds unavailable:", error)
+    ) {
+      console.warn(
+        "program kinds unavailable:",
+        (programKindsError as { message?: string }).message
+      )
+    } else {
+      programKinds = normalizeOrganizationProgramKinds(
+        (organizationRow?.data as { program_kinds?: string | null } | null)?.program_kinds
+      )
     }
 
     return NextResponse.json({

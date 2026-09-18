@@ -1,4 +1,9 @@
 import type { ContactsListSegment } from "@/lib/contacts/contact-module-label"
+import {
+  financialModuleSectionQueryValue,
+  parseFinancialModuleSection,
+  type ContactFinancialModuleSection,
+} from "@/lib/contacts/contact-financial-nav"
 import { isSafeReturnToPath, RETURN_TO_QUERY_PARAM } from "@/lib/navigation/return-to"
 
 /** Top-level profile surfaces. Legacy aliases map to current tabs. */
@@ -21,6 +26,8 @@ export type NormalizedContactProfileTab = "overview" | "financial" | "activity"
 type ContactProfileHrefOptions = {
   tab?: ContactProfileTab
   section?: ContactProfileOverviewSection
+  /** Inner Financial module section (`?module=programs`). */
+  financialModule?: ContactFinancialModuleSection | string | null
   edit?: boolean
   list?: ContactsListSegment
   returnTo?: string
@@ -47,6 +54,7 @@ export function contactProfileHref(
 ): string {
   let tab: ContactProfileTab | undefined
   let section: ContactProfileOverviewSection | undefined
+  let financialModule: ContactFinancialModuleSection | string | null | undefined
   let edit = false
   let list: ContactsListSegment | undefined
   let returnTo: string | undefined
@@ -56,6 +64,7 @@ export function contactProfileHref(
   } else if (tabOrOptions) {
     tab = tabOrOptions.tab
     section = tabOrOptions.section
+    financialModule = tabOrOptions.financialModule
     edit = tabOrOptions.edit ?? false
     list = tabOrOptions.list
     returnTo = tabOrOptions.returnTo
@@ -73,6 +82,15 @@ export function contactProfileHref(
   }
   if (normalized !== "overview") {
     params.set("tab", normalized)
+  }
+
+  if (normalized === "financial") {
+    const parsedModule = parseFinancialModuleSection(
+      typeof financialModule === "string" ? financialModule : financialModule ?? null
+    )
+    if (parsedModule) {
+      params.set("module", financialModuleSectionQueryValue(parsedModule))
+    }
   }
 
   if (edit) {

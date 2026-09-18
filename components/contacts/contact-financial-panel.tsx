@@ -8,7 +8,6 @@ import {
   Calendar,
   CreditCard,
   DollarSign,
-  FileText,
   Info,
   Loader2,
   Mail,
@@ -68,6 +67,18 @@ import type { DonationHistoryRow } from "@/components/donations/donor-donation-h
 import { ContactTransactionRowActions } from "@/components/contacts/contact-transaction-row-actions"
 import type { ContactProfileModuleFlags } from "@/lib/contacts/contact-profile-module-access"
 import type { ContactPaymentMethodRow } from "@/lib/contacts/contact-payment-method-actions"
+import {
+  detectContactFinancialActivity,
+  filterFinancialRowsBySection,
+  FINANCIAL_BILLING_MODULE_LABELS,
+  getEnabledFinancialBillingModules,
+  getFinancialDetailTabs,
+  parseFinancialModuleSection,
+  resolveFinancialModuleSection,
+  shouldShowFinancialModuleNav,
+  type ContactFinancialDetailTab,
+  type ContactFinancialModuleSection,
+} from "@/lib/contacts/contact-financial-nav"
 import { cn } from "@/lib/utils"
 
 const ContactFinancialPaymentEditDialog = dynamic(
@@ -97,13 +108,6 @@ const MODULE_LABELS: Record<ContactFinancialSourceModule, string> = {
   membership: "Membership",
   other: "Other",
 }
-
-type FinancialDetailTab =
-  | "payment-plans"
-  | "pledges"
-  | "invoices"
-  | "refunds"
-  | "payment-methods"
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("en-US", {
@@ -157,14 +161,14 @@ function isPaidTransaction(event: ContactFinancialTimelineEvent) {
 function OpenBalancesTable({
   rows,
   onPledgeClick,
+  emptyMessage = "No open balances found for this contact.",
 }: {
   rows: ContactOpenBalanceRow[]
   onPledgeClick?: (pledgeId: string) => void
+  emptyMessage?: string
 }) {
   if (rows.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">No open balances found for this contact.</p>
-    )
+    return <p className="text-sm text-muted-foreground">{emptyMessage}</p>
   }
 
   return (
@@ -255,6 +259,9 @@ type ContactFinancialPanelProps = {
    * full: customer / legacy complete layout.
    */
   surface?: "full" | "staff-overview" | "staff-details"
+  /** URL `?module=` on the Financial tab (`fund-development`, `programs`, …). */
+  initialModuleSection?: string | null
+  onModuleSectionChange?: (section: ContactFinancialModuleSection) => void
 }
 
 function ContactFinancialIdentity({
@@ -482,6 +489,8 @@ export function ContactFinancialPanel({
   refreshToken = 0,
   stickyTopClass = "top-0",
   surface = "full",
+  initialModuleSection = null,
+  onModuleSectionChange,
 }: ContactFinancialPanelProps) {
   const isCustomer = variant === "customer"
   const [loading, setLoading] = useState(true)
@@ -495,7 +504,11 @@ export function ContactFinancialPanel({
   const [modules, setModules] = useState(modulesProp)
   const [openBalancesOpen, setOpenBalancesOpen] = useState(false)
   const [allTransactionsOpen, setAllTransactionsOpen] = useState(false)
-  const [detailTab, setDetailTab] = useState<FinancialDetailTab>("payment-plans")
+  const [requestedModuleSection, setRequestedModuleSection] =
+    useState<ContactFinancialModuleSection | null>(() =>
+      parseFinancialModuleSection(initialModuleSection)
+    )
+  const [userDetailTab, setUserDetailTab] = useState<ContactFinancialDetailTab | null>(null)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [detailsPledgeId, setDetailsPledgeId] = useState<string | null>(null)
 
@@ -566,37 +579,77 @@ export function ContactFinancialPanel({
     modulesProp,
   ])
 
-  const showDonationSidebar = Boolean(modules.donations && donorId) && !isCustomer
-  const showPaymentPlansTab = showDonationSidebar && !isGroup
+  useEffect(() => {
+    setRequestedModuleSection(parseFinancialModuleSection(initialModuleSection))
+  }, [initialModuleSection])
+
+  const enabledBillingModules = getEnabledFinancialBillingModules(modules)
+  const activity = data
+    ? detectContactFinancialActivity(data)
+    : {
+        donations: false,
+        programs: false,
+        bookings: false,
+        vendorHub: false,
+        membership: false,
+      }
+  const moduleSection = resolveFinancialModuleSection(
+    modules,
+    requestedModuleSection,
+    activity
+  )
+  const showModuleNav =
+    shouldShowFinancialModuleNav(modules) && !isCustomer && !isGroup
   const showPaymentMethodsTab = showPaymentMethods && !isCustomer
-  const showStatementsTab = showDonationSidebar && Boolean(donorId) && !isGroup
-  const showPledgesTab = Boolean(modules.donations) && !isGroup && !isCustomer
-  const showRefundsTab =
-    Boolean(modules.donations || modules.bookings) && !isGroup && !isCustomer
   const showHomepage =
     surface === "full" || surface === "staff-overview"
   const showDetails =
     surface === "full" || surface === "staff-details"
+  const hasAnyModule = enabledBillingModules.length > 0
   const showDetailTabsCard =
-    showDetails &&
-    !isCustomer &&
-    !isGroup &&
-    (showPaymentPlansTab ||
-      showPledgesTab ||
-      showRefundsTab ||
-      showPaymentMethodsTab ||
-      Boolean(modules.donations))
-  const showFinancialAside =
-    showDetails && !isGroup && surface !== "staff-overview"
+    showDetails && !isCustomer && !isGroup && hasAnyModule
+  const showFinancialAside = showDetails && !isGroup
   const showFinancialSummaryAside = showFinancialAside && surface === "full"
+  const showStatementsCard =
+    showFinancialAside &&
+    Boolean(modules.donations && donorId) &&
+    !isGroup &&
+    !isCustomer &&
+    moduleSection === "donations"
   const readOnlyTransactions = isCustomer
 
-  const hasAnyModule =
-    modules.donations ||
-    modules.bookings ||
-    modules.programs ||
-    modules.membership ||
-    modules.vendorHub
+  const detailTabSpecs = useMemo(
+    () =>
+      getFinancialDetailTabs({
+        section: moduleSection,
+        modules,
+        showPaymentMethods: showPaymentMethodsTab,
+        isGroup,
+        isCustomer,
+      }),
+    [isCustomer, isGroup, moduleSection, modules, showPaymentMethodsTab]
+  )
+  const availableDetailTabs = detailTabSpecs.map((tab) => tab.id)
+  const resolvedDetailTab =
+    userDetailTab && availableDetailTabs.includes(userDetailTab)
+      ? userDetailTab
+      : (availableDetailTabs[0] ?? "transactions")
+
+  function handleModuleSectionChange(next: string) {
+    const parsed = parseFinancialModuleSection(next)
+    if (!parsed) return
+    setRequestedModuleSection(parsed)
+    setUserDetailTab(null)
+    onModuleSectionChange?.(parsed)
+  }
+
+  function goToPaymentMethods() {
+    if (showModuleNav && moduleSection !== "all") {
+      setRequestedModuleSection("all")
+      onModuleSectionChange?.("all")
+    }
+    setUserDetailTab("payment-methods")
+  }
 
   const contactIdentity = hideIdentity ? null : (
     <ContactFinancialIdentity
@@ -625,22 +678,6 @@ export function ContactFinancialPanel({
     "sticky z-40 -mx-6 border-b border-border bg-background px-6 pb-4 pt-1",
     stickyTopClass
   )
-
-  const availableDetailTabs = useMemo(() => {
-    const tabs: FinancialDetailTab[] = []
-    if (showPaymentPlansTab) tabs.push("payment-plans")
-    if (showPledgesTab) tabs.push("pledges")
-    if (!isGroup) tabs.push("invoices")
-    if (showRefundsTab) tabs.push("refunds")
-    if (showPaymentMethodsTab) tabs.push("payment-methods")
-    return tabs
-  }, [isGroup, showPaymentMethodsTab, showPaymentPlansTab, showPledgesTab, showRefundsTab])
-
-  useEffect(() => {
-    if (!availableDetailTabs.includes(detailTab)) {
-      setDetailTab(availableDetailTabs[0] ?? "invoices")
-    }
-  }, [availableDetailTabs, detailTab])
 
   if (loading) {
     return (
@@ -722,6 +759,9 @@ export function ContactFinancialPanel({
   const { metrics, openBalances, timeline } = data
   const transactions = timeline.filter(isPaidTransaction)
   const refunds = timeline.filter(isRefundEvent)
+  const sectionTransactions = filterFinancialRowsBySection(transactions, moduleSection)
+  const sectionRefunds = filterFinancialRowsBySection(refunds, moduleSection)
+  const sectionOpenBalances = filterFinancialRowsBySection(openBalances, moduleSection)
   const lastPayment = transactions[0] ?? null
   const moduleBreakdown = buildModuleBreakdown(timeline, modules)
   const recentTransactions = transactions.slice(0, RECENT_TRANSACTION_LIMIT)
@@ -861,6 +901,7 @@ export function ContactFinancialPanel({
                     onUpdated={() => void loadData()}
                     compact
                     readOnly={readOnlyTransactions}
+                    allowLinkToPledge={Boolean(modules.donations)}
                   />
                   {transactions.length > 0 ? (
                     <Button
@@ -903,92 +944,156 @@ export function ContactFinancialPanel({
 
           {showDetailTabsCard ? (
             <Card>
-              <Tabs
-                value={detailTab}
-                onValueChange={(value) => setDetailTab(value as FinancialDetailTab)}
-              >
-                <CardHeader className="pb-2 pt-4">
-                  <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
-                    {showPaymentPlansTab ? (
-                      <TabsTrigger value="payment-plans">Recurring</TabsTrigger>
-                    ) : null}
-                    {showPledgesTab ? <TabsTrigger value="pledges">Pledges</TabsTrigger> : null}
-                    <TabsTrigger value="invoices">Invoices</TabsTrigger>
-                    {showRefundsTab ? <TabsTrigger value="refunds">Refunds</TabsTrigger> : null}
-                    {showPaymentMethodsTab ? (
-                      <TabsTrigger value="payment-methods">Payment Methods</TabsTrigger>
-                    ) : null}
-                  </TabsList>
-                </CardHeader>
-                <CardContent className="pt-3">
-                  {showPaymentPlansTab && donorId ? (
-                    <TabsContent value="payment-plans" className="mt-0">
-                      <DonationRecurringPanel
-                        embedded
-                        donorId={donorId}
-                        onUpdated={() => void loadData()}
-                      />
-                    </TabsContent>
-                  ) : null}
+              {showModuleNav ? (
+                <div className="border-b border-border px-4 pt-4">
+                  <Tabs
+                    value={moduleSection}
+                    onValueChange={handleModuleSectionChange}
+                  >
+                    <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
+                      <TabsTrigger value="all">All</TabsTrigger>
+                      {enabledBillingModules.map((module) => (
+                        <TabsTrigger key={module} value={module}>
+                          {FINANCIAL_BILLING_MODULE_LABELS[module]}
+                        </TabsTrigger>
+                      ))}
+                    </TabsList>
+                  </Tabs>
+                </div>
+              ) : null}
 
-                  {showPledgesTab ? (
-                    <TabsContent value="pledges" className="mt-0">
-                      {donorId ? (
-                        <DonorPledgesTab
-                          donorId={donorId}
-                          donorName={contactName}
-                          contactId={contactId}
-                          embedded
-                          onUpdated={() => void loadData()}
-                        />
-                      ) : (
-                        <p className="text-sm text-muted-foreground">There are no pledges.</p>
-                      )}
-                    </TabsContent>
-                  ) : null}
-
-                  <TabsContent value="invoices" className="mt-0">
-                    <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
-                      <FileText className="h-8 w-8 text-muted-foreground/60" />
-                      <p className="text-sm font-medium">No invoices</p>
-                      <p className="max-w-sm text-xs text-muted-foreground">
-                        Invoice history for this contact will appear here when billing invoices are
-                        linked.
-                      </p>
-                    </div>
-                  </TabsContent>
-
-                  {showRefundsTab ? (
-                    <TabsContent value="refunds" className="mt-0">
-                      <FinancialTransactionsTable
-                        rows={refunds}
-                        emptyMessage="No refunds recorded for this contact."
-                        contactId={contactId}
-                        contactName={contactName}
-                        contactEmail={contactEmail}
-                        onUpdated={() => void loadData()}
-                      />
-                    </TabsContent>
-                  ) : null}
-
-                  {showPaymentMethodsTab ? (
-                    <TabsContent value="payment-methods" className="mt-0">
-                      {paymentMethodsLoading ? (
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          Loading payment methods...
-                        </div>
-                      ) : (
-                        <ContactPaymentMethodsPanel
-                          contactId={contactId}
-                          paymentMethods={paymentMethods}
-                          embedded
-                        />
-                      )}
-                    </TabsContent>
-                  ) : null}
+              {moduleSection === "membership" ? (
+                <CardContent className="pt-6 text-sm text-muted-foreground">
+                  Membership dues and billing history will appear here when membership financial
+                  records are linked to contacts.
                 </CardContent>
-              </Tabs>
+              ) : (
+                <Tabs
+                  value={resolvedDetailTab}
+                  onValueChange={(value) =>
+                    setUserDetailTab(value as ContactFinancialDetailTab)
+                  }
+                >
+                  <CardHeader className={cn("pb-2", showModuleNav ? "pt-3" : "pt-4")}>
+                    <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
+                      {detailTabSpecs.map((tab) => (
+                        <TabsTrigger key={tab.id} value={tab.id}>
+                          {tab.label}
+                        </TabsTrigger>
+                      ))}
+                    </TabsList>
+                  </CardHeader>
+                  <CardContent className="pt-3">
+                    {availableDetailTabs.includes("recurring") ? (
+                      <TabsContent value="recurring" className="mt-0">
+                        {donorId ? (
+                          <DonationRecurringPanel
+                            embedded
+                            donorId={donorId}
+                            onUpdated={() => void loadData()}
+                          />
+                        ) : (
+                          <p className="text-sm text-muted-foreground">
+                            No recurring gifts for this contact yet.
+                          </p>
+                        )}
+                      </TabsContent>
+                    ) : null}
+
+                    {availableDetailTabs.includes("pledges") ? (
+                      <TabsContent value="pledges" className="mt-0">
+                        {donorId ? (
+                          <DonorPledgesTab
+                            donorId={donorId}
+                            donorName={contactName}
+                            contactId={contactId}
+                            embedded
+                            onUpdated={() => void loadData()}
+                          />
+                        ) : (
+                          <p className="text-sm text-muted-foreground">There are no pledges.</p>
+                        )}
+                      </TabsContent>
+                    ) : null}
+
+                    {availableDetailTabs.includes("charges") ? (
+                      <TabsContent value="charges" className="mt-0">
+                        <OpenBalancesTable
+                          rows={sectionOpenBalances}
+                          emptyMessage={
+                            moduleSection === "programs"
+                              ? "No open program charges for this contact."
+                              : moduleSection === "bookings"
+                                ? "No open venue rental charges for this contact."
+                                : "No open charges for this contact."
+                          }
+                          onPledgeClick={
+                            isCustomer
+                              ? undefined
+                              : (pledgeId) => {
+                                  setDetailsPledgeId(pledgeId)
+                                  setDetailsOpen(true)
+                                }
+                          }
+                        />
+                      </TabsContent>
+                    ) : null}
+
+                    {availableDetailTabs.includes("transactions") ? (
+                      <TabsContent value="transactions" className="mt-0">
+                        <FinancialTransactionsTable
+                          rows={sectionTransactions}
+                          emptyMessage={
+                            moduleSection === "programs"
+                              ? "No program payments recorded for this contact."
+                              : moduleSection === "bookings"
+                                ? "No venue rental payments recorded for this contact."
+                                : moduleSection === "vendorHub"
+                                  ? "No vendor payments recorded for this contact."
+                                  : "No payments recorded for this contact yet."
+                          }
+                          contactId={contactId}
+                          contactName={contactName}
+                          contactEmail={contactEmail}
+                          onUpdated={() => void loadData()}
+                          allowLinkToPledge={Boolean(modules.donations)}
+                        />
+                      </TabsContent>
+                    ) : null}
+
+                    {availableDetailTabs.includes("refunds") ? (
+                      <TabsContent value="refunds" className="mt-0">
+                        <FinancialTransactionsTable
+                          rows={sectionRefunds}
+                          emptyMessage="No refunds recorded for this contact."
+                          contactId={contactId}
+                          contactName={contactName}
+                          contactEmail={contactEmail}
+                          onUpdated={() => void loadData()}
+                          allowLinkToPledge={Boolean(modules.donations)}
+                        />
+                      </TabsContent>
+                    ) : null}
+
+                    {availableDetailTabs.includes("payment-methods") ? (
+                      <TabsContent value="payment-methods" className="mt-0">
+                        {paymentMethodsLoading ? (
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Loading payment methods...
+                          </div>
+                        ) : (
+                          <ContactPaymentMethodsPanel
+                            contactId={contactId}
+                            paymentMethods={paymentMethods}
+                            embedded
+                          />
+                        )}
+                      </TabsContent>
+                    ) : null}
+                  </CardContent>
+                </Tabs>
+              )}
             </Card>
           ) : null}
 
@@ -1029,11 +1134,11 @@ export function ContactFinancialPanel({
                   value={formatCurrency(metrics.totalPaid)}
                   valueClassName="text-emerald-600"
                 />
-                {showRefundsTab ? (
+                {refundTotal > 0 ? (
                   <SummaryRow
                     label="Refunds"
                     value={formatCurrency(refundTotal)}
-                    valueClassName={refundTotal > 0 ? "text-rose-600" : undefined}
+                    valueClassName="text-rose-600"
                   />
                 ) : null}
                 <SummaryRow
@@ -1062,7 +1167,7 @@ export function ContactFinancialPanel({
                     variant="outline"
                     size="sm"
                     className="h-7 px-2 text-xs"
-                    onClick={() => setDetailTab("payment-methods")}
+                    onClick={goToPaymentMethods}
                   >
                     + Add
                   </Button>
@@ -1089,7 +1194,7 @@ export function ContactFinancialPanel({
                   <Button
                     variant="ghost"
                     className="h-8 w-full justify-start px-0 text-sm text-primary"
-                    onClick={() => setDetailTab("payment-methods")}
+                    onClick={goToPaymentMethods}
                   >
                     Manage payment methods
                   </Button>
@@ -1097,7 +1202,7 @@ export function ContactFinancialPanel({
               </Card>
             ) : null}
 
-            {showStatementsTab && donorId ? (
+            {showStatementsCard && donorId ? (
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base">Statements</CardTitle>
@@ -1107,18 +1212,6 @@ export function ContactFinancialPanel({
                     Generate, preview, download, or email annual giving statements.
                   </p>
                   <GivingStatementActions donorId={donorId} donorName={contactName} />
-                </CardContent>
-              </Card>
-            ) : null}
-
-            {modules.membership ? (
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Membership</CardTitle>
-                </CardHeader>
-                <CardContent className="text-sm text-muted-foreground">
-                  Membership dues and billing history will appear here when membership financial
-                  records are linked to contacts.
                 </CardContent>
               </Card>
             ) : null}
@@ -1173,6 +1266,7 @@ function FinancialTransactionsTable({
   onUpdated,
   compact = false,
   readOnly = false,
+  allowLinkToPledge = true,
 }: {
   rows: ContactFinancialTimelineEvent[]
   emptyMessage: string
@@ -1182,6 +1276,7 @@ function FinancialTransactionsTable({
   onUpdated?: () => void
   compact?: boolean
   readOnly?: boolean
+  allowLinkToPledge?: boolean
 }) {
   const router = useRouter()
   const [openingPaymentId, setOpeningPaymentId] = useState<string | null>(null)
@@ -1326,7 +1421,7 @@ function FinancialTransactionsTable({
                         contactEmail={contactEmail}
                         donationRow={actionRow}
                         onLinkToPledge={
-                          paymentId
+                          allowLinkToPledge && paymentId
                             ? () => void openPaymentEditor(paymentId, "allocate")
                             : undefined
                         }

@@ -56,7 +56,6 @@ import {
   type DonationPaymentFilterOptions,
   type DonationTransactionsSummary,
   type PaymentStatusDisplayFilter,
-  type PaymentTransactionTypeFilter,
   type PaymentsPageInput,
 } from "@/lib/donations/donation-list-actions";
 import {
@@ -72,6 +71,7 @@ import { ensureDonorExtensionForContact } from "@/lib/donations/donor-contact-br
 import { ensureGroupMembershipForDonationAction } from "@/lib/contacts/group-giving-actions";
 import { DonationGroupPicker } from "@/components/donations/donation-group-picker";
 import { DONATIONS_PAGE_SIZE } from "@/lib/donations/donation-pagination";
+import { STAFF_BELOW_REPORTS_SUBNAV_STICKY_TOP_CLASS } from "@/lib/layout/staff-dashboard-chrome";
 import {
   Pagination,
   PaginationContent,
@@ -148,12 +148,6 @@ function formatCurrency(value: number) {
     style: "currency",
     currency: "USD",
   }).format(value);
-}
-
-function paymentTypeLabel(payment: Payment) {
-  if (payment.recurring_donation_plan_id) return "Recurring Donation";
-  if (payment.pledge_id) return "Pledge Payment";
-  return "One-Time Donation";
 }
 
 function formatDate(date: string | null) {
@@ -240,11 +234,9 @@ export function DonationPaymentsPanel({
   const [statusFilter, setStatusFilter] = useState<PaymentStatusDisplayFilter | "all">(
     defaultStatusDisplay
   );
-  const [typeFilter, setTypeFilter] = useState<PaymentTransactionTypeFilter>("all");
   const [sourceFilter, setSourceFilter] = useState("all");
   const [campaignFilter, setCampaignFilter] = useState("all");
   const [fundFilter, setFundFilter] = useState("all");
-  const [groupFilter, setGroupFilter] = useState("all");
   const [filterOptions, setFilterOptions] = useState<DonationPaymentFilterOptions>({
     sources: [],
     campaigns: [],
@@ -304,22 +296,18 @@ export function DonationPaymentsPanel({
       statusDisplay: statusFilter === "all" ? undefined : statusFilter,
       dateFrom: dateFrom || undefined,
       dateTo: dateTo || undefined,
-      transactionType: typeFilter === "all" ? undefined : typeFilter,
       source: sourceFilter === "all" ? undefined : sourceFilter,
       campaignId: campaignFilter === "all" ? undefined : campaignFilter,
       fundId: fundFilter === "all" ? undefined : fundFilter,
-      campaignGroupId: groupFilter === "all" ? undefined : groupFilter,
     }),
     [
       donorNameFilter,
       statusFilter,
       dateFrom,
       dateTo,
-      typeFilter,
       sourceFilter,
       campaignFilter,
       fundFilter,
-      groupFilter,
     ]
   );
 
@@ -400,7 +388,7 @@ export function DonationPaymentsPanel({
 
   useEffect(() => {
     setPage(1);
-  }, [donorNameFilter, statusFilter, range, typeFilter, sourceFilter, campaignFilter, fundFilter, groupFilter]);
+  }, [donorNameFilter, statusFilter, range, sourceFilter, campaignFilter, fundFilter]);
 
   useEffect(() => {
     void (async () => {
@@ -717,6 +705,26 @@ export function DonationPaymentsPanel({
       {!embedded ? <Header title="Payments" /> : null}
 
       <div className={embedded ? "space-y-6" : "p-6 space-y-6"}>
+        <div
+          className={
+            showCharts
+              ? cn(
+                  "sticky z-30 -mx-6 space-y-4 border-b border-border bg-background px-6 pb-4 pt-6",
+                  STAFF_BELOW_REPORTS_SUBNAV_STICKY_TOP_CLASS
+                )
+              : "contents"
+          }
+        >
+        {showCharts ? (
+          <div>
+            <h2 className="text-xl font-semibold text-foreground">Giving Summary</h2>
+            <p className="text-sm text-muted-foreground">
+              Successful received payments for this organization. Open a row to view the transaction;
+              receive, import, and receipt actions live under Donations.
+            </p>
+          </div>
+        ) : null}
+
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold">
@@ -756,6 +764,7 @@ export function DonationPaymentsPanel({
         </div>
 
         <DonationOneTimeOverviewCards loading={summaryLoading} summary={summary} />
+        </div>
 
         {showCharts ? <DonationGivingCharts loading={summaryLoading} breakdown={breakdown} /> : null}
 
@@ -805,32 +814,6 @@ export function DonationPaymentsPanel({
                       </TableColumnHeaderFilter>
                     </th>
                     <th className="text-left p-3">Amount</th>
-                    <th className="text-left p-3">
-                      <TableColumnHeaderFilter
-                        label="Type"
-                        active={typeFilter !== "all"}
-                      >
-                        {({ close }) => (
-                          <Select
-                            value={typeFilter}
-                            onValueChange={(value) => {
-                              setTypeFilter(value as PaymentTransactionTypeFilter);
-                              close();
-                            }}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select type" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="all">All types</SelectItem>
-                              <SelectItem value="one_time">One-Time Donation</SelectItem>
-                              <SelectItem value="pledge">Pledge Payment</SelectItem>
-                              <SelectItem value="recurring">Recurring Donation</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        )}
-                      </TableColumnHeaderFilter>
-                    </th>
                     <th className="text-left p-3">
                       <TableColumnHeaderFilter
                         label="Method"
@@ -915,34 +898,6 @@ export function DonationPaymentsPanel({
                         )}
                       </TableColumnHeaderFilter>
                     </th>
-                    <th className="text-left p-3">
-                      <TableColumnHeaderFilter
-                        label="Group"
-                        active={groupFilter !== "all"}
-                      >
-                        {({ close }) => (
-                          <Select
-                            value={groupFilter}
-                            onValueChange={(value) => {
-                              setGroupFilter(value);
-                              close();
-                            }}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select group" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="all">All groups</SelectItem>
-                              {filterOptions.campaignGroups.map((group) => (
-                                <SelectItem key={group.id} value={group.id}>
-                                  {group.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        )}
-                      </TableColumnHeaderFilter>
-                    </th>
                     <th className="text-left p-3">Receipt</th>
                     <th className="text-left p-3">
                       <TableColumnHeaderFilter
@@ -997,15 +952,12 @@ export function DonationPaymentsPanel({
                         {formatCurrency(Number(payment.amount || 0))}
                       </td>
 
-                      <td className="p-3 text-muted-foreground">{paymentTypeLabel(payment)}</td>
-
                       <td className="p-3 text-muted-foreground">
                         {payment.method_display || "—"}
                       </td>
 
                       <td className="p-3 text-muted-foreground">{payment.campaign_name || "—"}</td>
                       <td className="p-3 text-muted-foreground">{payment.fund_name || "—"}</td>
-                      <td className="p-3 text-muted-foreground">{payment.campaign_group_name || "—"}</td>
                       <td className="p-3 text-muted-foreground">{payment.receipt_status || "—"}</td>
 
                       <td className="p-3">

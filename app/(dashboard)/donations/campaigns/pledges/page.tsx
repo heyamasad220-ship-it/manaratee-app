@@ -201,7 +201,7 @@ export default function PledgesPage() {
   const [organizationId, setOrganizationId] = useState<string | null>(null);
   const [donorNameFilter, setDonorNameFilter] = useState("");
   const [donorNameFilterInput, setDonorNameFilterInput] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("Open");
   const [campaignFilter, setCampaignFilter] = useState<string>("all");
   const [page, setPage] = useState(1);
   const [totalPledges, setTotalPledges] = useState(0);
@@ -313,21 +313,22 @@ export default function PledgesPage() {
 
     const statusMap: Record<string, string> = {
       Open: "open",
-      Partial: "partial",
       Fulfilled: "fulfilled",
     };
+
+    const resolvedStatus = statusFilter === "Partial" ? "Open" : statusFilter;
 
     const pageResult = await fetchPledgesPageAction({
       page: nextPage,
       pageSize: DONATIONS_PAGE_SIZE,
       search: donorNameFilter || undefined,
-      status: statusFilter === "all" ? undefined : statusMap[statusFilter],
+      status: resolvedStatus === "all" ? undefined : statusMap[resolvedStatus],
       campaignId: campaignFilter === "all" ? undefined : campaignFilter,
     });
 
     const metricsResult = await fetchPledgeSummaryMetricsAction({
       search: donorNameFilter || undefined,
-      status: statusFilter === "all" ? undefined : statusMap[statusFilter],
+      status: resolvedStatus === "all" ? undefined : statusMap[resolvedStatus],
       campaignId: campaignFilter === "all" ? undefined : campaignFilter,
     });
 
@@ -494,8 +495,6 @@ export default function PledgesPage() {
     switch (status) {
       case "Open":
         return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">Open</Badge>;
-      case "Partial":
-        return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">Partial</Badge>;
       case "Fulfilled":
         return <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">Fulfilled</Badge>;
       default:
@@ -505,8 +504,8 @@ export default function PledgesPage() {
 
   return (
     <>
-      <div className="p-6">
-        <div className="mb-4 flex justify-end">
+      <div className="flex h-[calc(100vh-11.75rem)] min-h-0 flex-col overflow-hidden p-6">
+        <div className="mb-4 flex shrink-0 justify-end">
           <Button onClick={openAddPledge}>
             <Plus className="mr-2 h-4 w-4" />
             Add Pledge
@@ -515,15 +514,18 @@ export default function PledgesPage() {
 
         <PledgeSummaryMetricCards
           metrics={summaryMetrics}
-          statusFilter={statusFilter}
-          className="mb-6"
+          statusFilter={statusFilter === "Partial" ? "Open" : statusFilter}
+          className="mb-6 shrink-0"
         />
 
-        <Card id="collection-queue" className="scroll-mt-6">
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
+        <Card
+          id="collection-queue"
+          className="flex min-h-0 flex-1 flex-col gap-0 overflow-hidden py-0 scroll-mt-6"
+        >
+          <CardContent className="min-h-0 flex-1 overflow-auto p-0">
+            <Table containerClassName="overflow-visible">
+              <TableHeader className="sticky top-0 z-20 bg-card [&_th]:bg-card">
+                <TableRow className="hover:bg-transparent">
                   <TableHead>
                     <TableColumnHeaderFilter
                       label="Donor Name"
@@ -562,7 +564,7 @@ export default function PledgesPage() {
                     >
                       {({ close }) => (
                         <Select
-                          value={statusFilter}
+                          value={statusFilter === "Partial" ? "Open" : statusFilter}
                           onValueChange={(value) => {
                             setStatusFilter(value);
                             close();
@@ -574,7 +576,6 @@ export default function PledgesPage() {
                           <SelectContent>
                             <SelectItem value="all">All Status</SelectItem>
                             <SelectItem value="Open">Open</SelectItem>
-                            <SelectItem value="Partial">Partial</SelectItem>
                             <SelectItem value="Fulfilled">Fulfilled</SelectItem>
                           </SelectContent>
                         </Select>
@@ -697,7 +698,7 @@ export default function PledgesPage() {
         </Card>
 
         {Math.ceil(totalPledges / DONATIONS_PAGE_SIZE) > 1 ? (
-          <Pagination>
+          <Pagination className="mt-4 shrink-0">
             <PaginationContent>
               <PaginationItem>
                 <PaginationPrevious

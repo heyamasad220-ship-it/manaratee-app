@@ -29,7 +29,7 @@ import {
 import type { AnnualGivingStatementPayload } from "@/lib/donations/receipt-types"
 import {
   buildAnnualStatementHtml,
-  downloadReceiptPdf,
+  downloadAnnualStatementPdf,
   openReceiptPrintWindow,
 } from "@/lib/donations/receipt-pdf"
 
@@ -86,7 +86,7 @@ export function GivingStatementActions({
     if (!data) return
     const html = buildAnnualStatementHtml(data)
     try {
-      await downloadReceiptPdf(`giving-statement-${donorName}-${data.taxYear}.pdf`, html)
+      downloadAnnualStatementPdf(data, `giving-statement-${donorName}-${data.taxYear}.pdf`)
     } catch {
       openReceiptPrintWindow(html)
     }

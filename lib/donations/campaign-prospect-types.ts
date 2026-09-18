@@ -279,6 +279,38 @@ export function isProspectFollowUpOverdue(
   return due.getTime() < today.getTime()
 }
 
+/** Ask amount typed on the Prospects row; falls back to a retired ask-level chart amount. */
+export function campaignProspectAskAmount(
+  prospect: Pick<CampaignProspectListItem, "suggested_ask_amount" | "askLevelAmount">
+): number | null {
+  if (prospect.suggested_ask_amount != null) return prospect.suggested_ask_amount
+  if (prospect.askLevelAmount != null) return prospect.askLevelAmount
+  return null
+}
+
+export type CampaignFundraisingPlanKpis = {
+  prospectCount: number
+  totalAsk: number
+  overdueCount: number
+  pledgedAmount: number
+}
+
+export function computeCampaignFundraisingPlanKpis(
+  prospects: CampaignProspectListItem[]
+): CampaignFundraisingPlanKpis {
+  const donation = prospects.filter((prospect) => prospect.ask_type === "donation")
+  return {
+    prospectCount: donation.length,
+    totalAsk: donation.reduce((sum, prospect) => sum + (campaignProspectAskAmount(prospect) || 0), 0),
+    overdueCount: donation.filter(
+      (prospect) =>
+        !prospect.converted_pledge_id &&
+        isProspectFollowUpOverdue(prospect.next_follow_up_at, prospect.stage)
+    ).length,
+    pledgedAmount: donation.reduce((sum, prospect) => sum + (prospect.pledgeAmount || 0), 0),
+  }
+}
+
 export function isProspectFollowUpToday(nextFollowUpAt: string | null | undefined): boolean {
   if (!nextFollowUpAt) return false
   const due = new Date(`${nextFollowUpAt}T00:00:00`)
@@ -286,4 +318,18 @@ export function isProspectFollowUpToday(nextFollowUpAt: string | null | undefine
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   return due.getTime() === today.getTime()
+}
+
+export function isProspectFollowUpUpcoming(
+  nextFollowUpAt: string | null | undefined,
+  days = 7
+): boolean {
+  if (!nextFollowUpAt) return false
+  const due = new Date(`${nextFollowUpAt}T00:00:00`)
+  if (Number.isNaN(due.getTime())) return false
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const end = new Date(today)
+  end.setDate(end.getDate() + days)
+  return due.getTime() >= today.getTime() && due.getTime() <= end.getTime()
 }

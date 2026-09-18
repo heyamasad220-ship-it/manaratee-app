@@ -28,7 +28,11 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { formatDonationCurrency, type CampaignAnalyticsEntry } from "@/lib/donations/campaign-analytics"
+import {
+  computeCampaignHeadlineTotals,
+  formatDonationCurrency,
+  type CampaignAnalyticsEntry,
+} from "@/lib/donations/campaign-analytics"
 import { getCampaignAnalyticsAction } from "@/lib/donations/donation-reports-actions"
 import { donationCampaignWorkspaceHref } from "@/lib/donations/campaign-workspace-paths"
 import { DollarSign, Target, Users } from "lucide-react"
@@ -78,10 +82,11 @@ export function CampaignPerformanceReportPanel() {
   const totals = useMemo(() => {
     return filtered.reduce(
       (acc, entry) => {
+        const headline = computeCampaignHeadlineTotals(entry.metrics)
         acc.goal += Number(entry.campaign.goal_amount || 0)
-        acc.committed += entry.metrics.pledged
-        acc.collected += entry.metrics.raised
-        acc.outstanding += entry.metrics.outstanding
+        acc.committed += headline.committed
+        acc.collected += headline.collected
+        acc.outstanding += headline.outstanding
         acc.donors += entry.metrics.donorCount
         return acc
       },
@@ -94,8 +99,9 @@ export function CampaignPerformanceReportPanel() {
       <div>
         <h2 className="text-xl font-semibold">Campaign Performance</h2>
         <p className="text-sm text-muted-foreground">
-          Collected is received payments. Committed is valid pledge amounts. Outstanding is unpaid
-          pledge balances. Campaign groups are a report view of fundraising teams, not CRM groups.
+          Collected is received payments. Committed is valid pledge amounts. Outstanding is
+          committed minus collected. Open pledge balances stay on the campaign Pledges table.
+          Campaign groups are a report view of fundraising teams, not CRM groups.
         </p>
       </div>
 
@@ -237,7 +243,9 @@ export function CampaignPerformanceReportPanel() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filtered.map((entry) => (
+                    filtered.map((entry) => {
+                      const headline = computeCampaignHeadlineTotals(entry.metrics)
+                      return (
                       <TableRow key={entry.campaign.id}>
                         <TableCell className="font-medium">
                           <Link
@@ -252,9 +260,9 @@ export function CampaignPerformanceReportPanel() {
                             ? "—"
                             : formatDonationCurrency(entry.campaign.goal_amount)}
                         </TableCell>
-                        <TableCell>{formatDonationCurrency(entry.metrics.pledged)}</TableCell>
-                        <TableCell>{formatDonationCurrency(entry.metrics.raised)}</TableCell>
-                        <TableCell>{formatDonationCurrency(entry.metrics.outstanding)}</TableCell>
+                        <TableCell>{formatDonationCurrency(headline.committed)}</TableCell>
+                        <TableCell>{formatDonationCurrency(headline.collected)}</TableCell>
+                        <TableCell>{formatDonationCurrency(headline.outstanding)}</TableCell>
                         <TableCell>{entry.metrics.donorCount}</TableCell>
                         <TableCell className="min-w-[140px]">
                           <CampaignProgressBar
@@ -268,7 +276,8 @@ export function CampaignPerformanceReportPanel() {
                           </Badge>
                         </TableCell>
                       </TableRow>
-                    ))
+                      )
+                    })
                   )}
                 </TableBody>
               </Table>

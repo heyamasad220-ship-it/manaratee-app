@@ -67,6 +67,7 @@ export function ContactFundDevelopmentHistory({
   }, [load])
 
   if (!enabled || !contactId || hidden) return null
+  if (!loading && !errorMessage && items.length === 0) return null
 
   return (
     <Card className="border border-border shadow-sm">

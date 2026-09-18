@@ -7,12 +7,10 @@ import { handleDonationAffiliationSync, syncContactAffiliations } from "@/lib/co
 import { ensureGroupMembershipForDonationAction } from "@/lib/contacts/group-giving-actions"
 import { requireDonationStaffAccess } from "@/lib/donations/donation-action-auth"
 import { ensureDonorExtensionForContact } from "@/lib/donations/donor-contact-bridge"
+import { pledgeDisplayStatus } from "@/lib/donations/donation-status"
 import {
-  pledgeDisplayStatus,
-  pledgeStatusToDb,
-  type PledgeDisplayStatus,
-} from "@/lib/donations/donation-status"
-import {
+  buildPledgePlanWriteFields,
+  normalizePledgePlanFrequency,
   validatePledgePaymentPlanInput,
   type PledgePlanFrequency,
 } from "@/lib/donations/pledge-payment-plan"
@@ -36,12 +34,6 @@ function getTodayPlainDate() {
   const today = new Date()
   const timezoneOffset = today.getTimezoneOffset() * 60 * 1000
   return new Date(today.getTime() - timezoneOffset).toISOString().slice(0, 10)
-}
-
-function frequencyToStorage(value: string) {
-  const normalized = value.trim().toLowerCase().replace("-", "_")
-  if (normalized === "yearly") return "annually"
-  return normalized
 }
 
 function frequencyToDisplay(value: string | null | undefined) {
@@ -229,6 +221,9 @@ export async function createPledgeAction(input: {
   amountPledged: number
   pledgeDate?: string | null
   frequency?: string | null
+  firstPaymentDate?: string | null
+  numberOfPayments?: number | null
+  endDate?: string | null
   notes?: string | null
   campaignId?: string | null
   categoryId?: string | null
@@ -268,7 +263,17 @@ export async function createPledgeAction(input: {
     }
   }
 
-  const frequency = frequencyToStorage(input.frequency || "One-Time")
+  const plan = buildPledgePlanWriteFields({
+    frequency: input.frequency || "One-Time",
+    amountPledged: amount,
+    firstPaymentDate: input.firstPaymentDate,
+    numberOfPayments: input.numberOfPayments,
+    endDate: input.endDate,
+  })
+  if (!plan.ok) {
+    return { success: false, error: plan.error }
+  }
+
   const { data: pledge, error } = await access.supabase
     .from("pledges")
     .insert({
@@ -280,10 +285,14 @@ export async function createPledgeAction(input: {
       wishlist_item_id: input.campaignId ? input.wishlistItemId || null : null,
       amount_pledged: amount,
       pledge_date: normalizeDateInput(input.pledgeDate) || getTodayPlainDate(),
-      pledge_type: frequency,
-      frequency,
+      pledge_type: plan.fields.pledge_type,
+      frequency: plan.fields.frequency,
       status: "open",
       notes: input.notes?.trim() || null,
+      installment_amount: plan.fields.installment_amount,
+      total_payments: plan.fields.total_payments,
+      first_payment_date: plan.fields.first_payment_date,
+      next_payment_date: plan.fields.next_payment_date,
     })
     .select("id")
     .single()
@@ -316,7 +325,13 @@ export async function createPledgeAction(input: {
     targetId: pledge.id,
     targetLabel: formatMoney(amount),
     summary: `Created pledge ${formatMoney(amount)}`,
-    metadata: { amount, frequency, contactId, campaignId: input.campaignId || null },
+    metadata: {
+      amount,
+      frequency: plan.fields.frequency,
+      totalPayments: plan.fields.total_payments,
+      contactId,
+      campaignId: input.campaignId || null,
+    },
   })
 
   revalidatePledgePaths(donorId, [contactId])
@@ -368,7 +383,9 @@ export async function updatePledgeAction(input: {
   amountPledged: number
   pledgeDate: string
   frequency: string
-  status: PledgeDisplayStatus
+  firstPaymentDate?: string | null
+  numberOfPayments?: number | null
+  endDate?: string | null
   campaignId?: string | null
   categoryId?: string | null
   subcategoryId?: string | null
@@ -418,6 +435,26 @@ export async function updatePledgeAction(input: {
     }
   }
 
+  const plan = buildPledgePlanWriteFields({
+    frequency: input.frequency,
+    amountPledged: amount,
+    firstPaymentDate: input.firstPaymentDate,
+    numberOfPayments: input.numberOfPayments,
+    endDate: input.endDate,
+  })
+  if (!plan.ok) {
+    return { success: false as const, error: plan.error }
+  }
+
+  const existingFirst = normalizeDateInput(loaded.pledge.first_payment_date)
+  const existingTotal =
+    loaded.pledge.total_payments == null ? null : Number(loaded.pledge.total_payments)
+  const keepNextPaymentDate =
+    plan.fields.frequency !== "one_time" &&
+    existingFirst === plan.fields.first_payment_date &&
+    existingTotal === plan.fields.total_payments &&
+    normalizePledgePlanFrequency(String(loaded.pledge.frequency || "")) === plan.fields.frequency
+
   const { error } = await loaded.access.supabase
     .from("pledges")
     .update({
@@ -427,9 +464,14 @@ export async function updatePledgeAction(input: {
       subcategory_id: input.subcategoryId || null,
       wishlist_item_id: input.campaignId ? input.wishlistItemId || null : null,
       pledge_date: normalizeDateInput(input.pledgeDate) || getTodayPlainDate(),
-      frequency: frequencyToStorage(input.frequency),
-      pledge_type: frequencyToStorage(input.frequency),
-      status: pledgeStatusToDb(input.status),
+      frequency: plan.fields.frequency,
+      pledge_type: plan.fields.pledge_type,
+      installment_amount: plan.fields.installment_amount,
+      total_payments: plan.fields.total_payments,
+      first_payment_date: plan.fields.first_payment_date,
+      next_payment_date: keepNextPaymentDate
+        ? normalizeDateInput(loaded.pledge.next_payment_date) || plan.fields.next_payment_date
+        : plan.fields.next_payment_date,
       notes: input.notes?.trim() || null,
     })
     .eq("id", input.pledgeId)
@@ -452,8 +494,8 @@ export async function updatePledgeAction(input: {
     summary: `Updated pledge ${label} (${formatMoney(amount)})`,
     metadata: {
       amount,
-      frequency: input.frequency,
-      status: input.status,
+      frequency: plan.fields.frequency,
+      totalPayments: plan.fields.total_payments,
       contactReassigned: Boolean(reassignment?.ok && reassignment.changed),
     },
   })

@@ -22,15 +22,7 @@ export default async function ProgramsPaymentSummaryReportPage() {
       <Header title="Reports" />
       <ProgramsStaffSubnav secondary="reports" />
 
-      <div className="flex flex-col gap-6 p-6">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Payment Summary
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Family registration balances, program fees, and additional charges.
-          </p>
-        </div>
+      <div className="px-6 pb-6">
         <Suspense fallback={null}>
           <PaymentSummaryReportPanel />
         </Suspense>

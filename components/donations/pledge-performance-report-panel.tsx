@@ -26,6 +26,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { formatDonationCurrency } from "@/lib/donations/campaign-analytics"
+import { formatPledgeStatusLabel } from "@/lib/donations/donation-status"
 import {
   fetchPledgeLastPaymentDatesAction,
   fetchPledgesPageAction,
@@ -81,7 +82,8 @@ export function PledgePerformanceReportPanel() {
   const load = useCallback(async () => {
     setLoading(true)
     setErrorMessage(null)
-    const status = statusFilter === ALL ? undefined : statusFilter
+    const status =
+      statusFilter === ALL ? undefined : statusFilter === "partial" ? "open" : statusFilter
     const [listResult, summaryResult, collectionResult] = await Promise.all([
       fetchPledgesPageAction({
         page,
@@ -190,7 +192,6 @@ export function PledgePerformanceReportPanel() {
               <SelectContent>
                 <SelectItem value={ALL}>All statuses</SelectItem>
                 <SelectItem value="open">Open</SelectItem>
-                <SelectItem value="partial">Partial</SelectItem>
                 <SelectItem value="fulfilled">Fulfilled</SelectItem>
                 <SelectItem value="cancelled">Cancelled</SelectItem>
               </SelectContent>
@@ -261,8 +262,8 @@ export function PledgePerformanceReportPanel() {
                       <TableCell>{formatDate(pledge.next_payment_date)}</TableCell>
                       <TableCell>{formatDate(pledge.last_payment_date ?? null)}</TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="capitalize">
-                          {pledge.calculated_status || "—"}
+                        <Badge variant="outline">
+                          {formatPledgeStatusLabel(pledge.calculated_status)}
                         </Badge>
                       </TableCell>
                     </TableRow>

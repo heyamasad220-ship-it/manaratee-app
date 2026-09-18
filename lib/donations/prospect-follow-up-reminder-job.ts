@@ -144,7 +144,6 @@ export async function runProspectFollowUpReminderJob(input?: { asOf?: Date }) {
       followUpDate: formatFollowUpDate(row.next_follow_up_at || reminderDate),
       href: `${baseUrl}${donationCampaignWorkspaceHref(row.campaign_id, {
         tab: "plan",
-        section: "prospects",
         followUp: "overdue",
       })}`,
     })

@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { usePathname, useSearchParams } from "next/navigation"
 import { cn } from "@/lib/utils"
+import { STAFF_MAIN_CONTENT_STICKY_TOP_CLASS, STAFF_REPORTS_SUBNAV_HEIGHT_CLASS } from "@/lib/layout/staff-dashboard-chrome"
 import {
   DONATION_REPORTS_CAMPAIGNS_PATH,
   DONATION_REPORTS_DONORS_PATH,
@@ -84,8 +85,19 @@ export function DonationReportsNav({ className }: { canManage?: boolean; classNa
   }
 
   return (
-    <div className={cn("border-b border-border", className)}>
-      <nav className="-mb-px flex gap-0 overflow-x-auto">
+    <div
+      className={cn(
+        "sticky z-40 shrink-0 border-b border-border bg-background",
+        STAFF_MAIN_CONTENT_STICKY_TOP_CLASS,
+        className
+      )}
+    >
+      <nav
+        className={cn(
+          "-mb-px flex gap-0 overflow-x-auto",
+          STAFF_REPORTS_SUBNAV_HEIGHT_CLASS
+        )}
+      >
         {DONATION_REPORTS_TABS.map((tab) => {
           const active = isTabActive(tab, pathname, DONATION_REPORTS_TABS)
           const view = searchParams.get("view")
@@ -102,7 +114,7 @@ export function DonationReportsNav({ className }: { canManage?: boolean; classNa
               href={href}
               prefetch={false}
               className={cn(
-                "relative shrink-0 px-4 py-2.5 text-sm font-medium transition-colors",
+                "relative flex h-full shrink-0 items-center px-4 text-sm font-medium transition-colors",
                 active ? "text-primary" : "text-muted-foreground hover:text-foreground"
               )}
             >

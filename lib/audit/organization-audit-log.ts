@@ -61,12 +61,15 @@ async function resolveActorDisplayName(userId: string | null | undefined) {
   const admin = createServiceRoleClient()
   const { data } = await admin
     .from("profiles")
-    .select("full_name, email")
+    .select("first_name, last_name, email")
     .eq("id", userId)
     .maybeSingle()
 
   if (!data) return null
-  const fullName = String(data.full_name || "").trim()
+  const fullName = [data.first_name, data.last_name]
+    .map((part) => String(part || "").trim())
+    .filter(Boolean)
+    .join(" ")
   const email = String(data.email || "").trim()
   return fullName || email || null
 }

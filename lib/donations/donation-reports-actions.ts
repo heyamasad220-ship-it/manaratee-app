@@ -5,23 +5,13 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 
 import { requireDonationStaffAccess } from "@/lib/donations/donation-action-auth"
 import {
-  buildPledgeCampaignMap,
-  computeCampaignAskLevelMetrics,
-  computeCampaignSourceBreakdown,
-  fetchCampaignAnalyticsData,
   fetchCampaignAnalyticsEntries,
-  fetchCampaignDonorInsights,
-  fetchCampaignOutstandingPledges,
+  fetchCampaignWorkspaceLedger,
   fetchDonorTaxYearTotals,
   fetchOrgReportsOverview,
   fetchRecurringReportSummary,
-  type CampaignAnalyticsEntry,
   type CampaignRow,
 } from "@/lib/donations/campaign-analytics"
-import {
-  fetchCampaignAskLevels,
-} from "@/lib/donations/campaign-ask-level-actions"
-import { fetchCampaignProspectAskLevelStats } from "@/lib/donations/campaign-prospect-actions"
 import { sumActiveCampaignSponsorships } from "@/lib/donations/campaign-sponsorship-actions"
 import { syncCampaignPhases } from "@/lib/donations/campaign-phase-actions"
 import { ensureCampaignDonationFund } from "@/lib/donations/ensure-campaign-donation-fund"
@@ -207,76 +197,14 @@ export async function getCampaignDetailAction(campaignId: string) {
       return { success: false as const, error: error?.message || "Campaign not found" }
     }
 
-    const entries = await fetchCampaignAnalyticsEntries(access.supabase, access.orgId)
-    const entry =
-      entries.find((row) => row.campaign.id === campaignId) ||
-      ({
-        campaign: campaign as CampaignRow,
-        metrics: {
-          campaignId,
-          raised: 0,
-          pledged: 0,
-          collectedAgainstPledges: 0,
-          outstanding: 0,
-          totalCommitted: 0,
-          progressPercent: null,
-          donorCount: 0,
-          paymentCount: 0,
-          averageGift: 0,
-          largestGift: 0,
-        },
-      } satisfies CampaignAnalyticsEntry)
-    const insights = await fetchCampaignDonorInsights(
-      access.supabase,
-      access.orgId,
-      campaignId
-    )
-
-    const analyticsData = await fetchCampaignAnalyticsData(access.supabase, access.orgId)
-    if (analyticsData.error) {
-      return { success: false as const, error: analyticsData.error }
-    }
-
-    const sourceBreakdown = computeCampaignSourceBreakdown(
-      campaignId,
-      campaign.goal_amount,
-      analyticsData.pledges,
-      analyticsData.payments,
-      buildPledgeCampaignMap(analyticsData.pledges)
-    )
-
-    const outstandingPledges = await fetchCampaignOutstandingPledges(
-      access.supabase,
-      access.orgId,
-      campaignId
-    )
-
-    let askLevels: Awaited<ReturnType<typeof fetchCampaignAskLevels>> = []
-    try {
-      askLevels = await fetchCampaignAskLevels(access.supabase, access.orgId, campaignId)
-    } catch {
-      askLevels = []
-    }
-
-    const askLevelMetrics = computeCampaignAskLevelMetrics({
-      askLevels,
-      phases: [],
-      campaignId,
-      pledges: analyticsData.pledges,
-      prospectStatsByAskLevelId: await fetchCampaignProspectAskLevelStats(
-        access.orgId,
-        campaignId
-      ),
-    })
-
-    const sponsorshipTotals = await sumActiveCampaignSponsorships(
-      access.orgId,
-      campaignId
-    )
+    const [workspace, sponsorshipTotals] = await Promise.all([
+      fetchCampaignWorkspaceLedger(access.supabase, campaign as CampaignRow, 0),
+      sumActiveCampaignSponsorships(access.orgId, campaignId),
+    ])
     // Cash sponsorship commitments roll into campaign committed totals. Do not add them to
     // totalRaised — collected donations already live on payments, and in-kind is not cash.
     if (sponsorshipTotals.cash > 0) {
-      entry.metrics.totalCommitted += sponsorshipTotals.cash
+      workspace.metrics.totalCommitted += sponsorshipTotals.cash
     }
 
     return {
@@ -288,12 +216,16 @@ export async function getCampaignDetailAction(campaignId: string) {
       overviewMetricKeys: parseCampaignOverviewMetricKeys(
         "overview_metric_keys" in campaign ? campaign.overview_metric_keys : null
       ),
-      entry,
-      insights,
-      sourceBreakdown,
-      outstandingPledges,
-      askLevels,
-      askLevelMetrics,
+      entry: {
+        campaign: campaign as CampaignRow,
+        metrics: workspace.metrics,
+      },
+      insights: workspace.insights,
+      sourceBreakdown: workspace.sourceBreakdown,
+      outstandingPledges: workspace.outstandingPledges,
+      campaignPledges: workspace.campaignPledges,
+      campaignPayments: workspace.payments,
+      campaignRecurringPlans: workspace.recurringPlans,
       canManage: access.canManage,
       canManageCampaigns: access.canManageCampaigns,
       canManageProspects: access.canManageProspects,

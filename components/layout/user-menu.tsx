@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { ChevronDown, LogOut, User } from "lucide-react"
+import { Building2, Check, ChevronDown, LogOut, User } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { getBrowserAuthUser } from "@/lib/supabase/browser-auth-user"
 
@@ -20,13 +20,16 @@ import {
 import type { UserPortalCapabilities } from "@/lib/auth/portal-capabilities-types"
 import { PortalSwitcher } from "@/components/portal/portal-switcher"
 
+import { useStaffOrganizations } from "@/components/layout/staff-organization-switcher"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { cn } from "@/lib/utils"
 
 interface UserProfile {
   full_name?: string | null
@@ -40,6 +43,13 @@ export function UserMenu() {
   const [organizationName, setOrganizationName] = useState<string | null>(null)
   const [portalCapabilities, setPortalCapabilities] =
     useState<UserPortalCapabilities | null>(null)
+  const {
+    organizations,
+    currentOrganizationId,
+    switchingId,
+    error: organizationSwitchError,
+    switchTo,
+  } = useStaffOrganizations()
 
   useEffect(() => {
     let cancelled = false
@@ -51,14 +61,19 @@ export function UserMenu() {
 
       const { data: profileData } = await supabase
         .from("profiles")
-        .select("full_name")
+        .select("first_name, last_name")
         .eq("id", user.id)
         .maybeSingle()
 
       if (cancelled) return
 
+      const fullName = [profileData?.first_name, profileData?.last_name]
+        .map((part) => String(part || "").trim())
+        .filter(Boolean)
+        .join(" ")
+
       setProfile({
-        full_name: profileData?.full_name || null,
+        full_name: fullName || null,
         email: user.email || null,
       })
 
@@ -131,7 +146,7 @@ export function UserMenu() {
         </Button>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end" className="w-52">
+      <DropdownMenuContent align="end" className="z-[100] w-64">
         <DropdownMenuItem asChild>
           <Link href="/profile" className="flex items-center gap-2">
             <User className="h-4 w-4" />
@@ -147,6 +162,49 @@ export function UserMenu() {
               variant="compact"
             />
           </div>
+        ) : null}
+
+        {organizations.length > 1 ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="flex items-center gap-2 font-normal text-muted-foreground">
+              <Building2 className="h-4 w-4" />
+              Organizations
+            </DropdownMenuLabel>
+            {organizations.map((organization) => {
+              const isCurrent = organization.organizationId === currentOrganizationId
+              return (
+                <DropdownMenuItem
+                  key={organization.organizationId}
+                  disabled={switchingId !== null}
+                  onSelect={(event) => {
+                    event.preventDefault()
+                    void switchTo(organization.organizationId)
+                  }}
+                >
+                  <Check
+                    className={cn(
+                      "h-4 w-4 shrink-0",
+                      isCurrent ? "opacity-100" : "opacity-0"
+                    )}
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate">{organization.organizationName}</span>
+                    <span className="block truncate text-xs text-muted-foreground">
+                      {switchingId === organization.organizationId
+                        ? "Switching…"
+                        : organization.roleLabel}
+                    </span>
+                  </span>
+                </DropdownMenuItem>
+              )
+            })}
+            {organizationSwitchError ? (
+              <p className="px-2 py-1.5 text-xs text-destructive">
+                {organizationSwitchError}
+              </p>
+            ) : null}
+          </>
         ) : null}
 
         <DropdownMenuSeparator />

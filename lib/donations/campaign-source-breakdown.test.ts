@@ -3,6 +3,8 @@ import { describe, it } from "node:test"
 
 import {
   classifyCampaignPaymentSource,
+  campaignPaymentTypeLabel,
+  computeCampaignDonationKpis,
   computeCampaignSourceBreakdown,
 } from "./campaign-analytics"
 
@@ -39,6 +41,33 @@ describe("campaign source breakdown", () => {
         source: "square",
       }),
       "square"
+    )
+  })
+
+  it("treats Square dinner monthly gifts as recurring, including remark-only commitments", () => {
+    assert.equal(
+      classifyCampaignPaymentSource({
+        id: "m1",
+        source: "import",
+        memo: "FUNDRAISER_DINNER_DONATIONS_SEP2026_V1|hash|Annual Fundraiser|MONTHLY|CARD|last4:178",
+      }),
+      "ccRecurring"
+    )
+    assert.equal(
+      campaignPaymentTypeLabel({
+        id: "m2",
+        source: "import",
+        memo: "FUNDRAISER_DINNER_DONATIONS_SEP2026_V1|hash|CYP|ONE_TIME|APPLE_PAY|last4:5105|50 monthly for one year",
+      }),
+      "Recurring"
+    )
+    assert.equal(
+      campaignPaymentTypeLabel({
+        id: "m3",
+        source: "import",
+        memo: "FUNDRAISER_DINNER_DONATIONS_SEP2026_V1|hash|QIL|ONE_TIME|CARD|last4:1234",
+      }),
+      "One-Time"
     )
   })
 
@@ -89,5 +118,65 @@ describe("campaign source breakdown", () => {
     assert.equal(breakdown.totalRaised, 98100)
     assert.equal(breakdown.target, 200000)
     assert.equal(Number(breakdown.percentRemaining?.toFixed(1)), 22.6)
+  })
+})
+
+describe("campaign donation kpis", () => {
+  it("splits one-time totals from live recurring plans", () => {
+    const kpis = computeCampaignDonationKpis(
+      [
+        { id: "ot-1", amount: 200, donor_id: "a", sender_name: "Ali" },
+        { id: "ot-2", amount: 100, donor_id: "a", sender_name: "Ali" },
+        { id: "rec-1", amount: 50, donor_id: "susan", sender_name: "Susan", recurring_donation_plan_id: "p1" },
+        { id: "voided", amount: 25, status: "voided", donor_id: "z", sender_name: "Voided" },
+      ],
+      [
+        {
+          id: "p1",
+          donor_id: "susan",
+          contact_id: null,
+          donor_name: "Susan",
+          amount: 50,
+          frequency: "monthly",
+          status: "active",
+          start_date: null,
+          next_payment_date: null,
+          payments_made: 1,
+          total_payments: 12,
+        },
+        {
+          id: "p2",
+          donor_id: "b",
+          contact_id: null,
+          donor_name: "Quarterly Donor",
+          amount: 120,
+          frequency: "quarterly",
+          status: "active",
+          start_date: null,
+          next_payment_date: null,
+          payments_made: 0,
+          total_payments: null,
+        },
+        {
+          id: "paused",
+          donor_id: "c",
+          contact_id: null,
+          donor_name: "Paused",
+          amount: 1000,
+          frequency: "monthly",
+          status: "paused",
+          start_date: null,
+          next_payment_date: null,
+          payments_made: 0,
+          total_payments: null,
+        },
+      ]
+    )
+
+    assert.equal(kpis.oneTimeTotal, 300)
+    assert.equal(kpis.oneTimeCount, 2)
+    assert.equal(kpis.recurringCount, 2)
+    assert.equal(kpis.monthlyRecurringAmount, 90)
+    assert.equal(kpis.donorCount, 3)
   })
 })

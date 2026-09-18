@@ -39,6 +39,11 @@ import {
   slicePageItems,
 } from "@/lib/ui/list-pagination"
 import { useProgramKindReportPreset } from "@/hooks/use-program-kind-report-preset"
+import {
+  STAFF_BELOW_REPORTS_SUBNAV_STICKY_TOP_CLASS,
+  STAFF_MAIN_CONTENT_STICKY_TOP_CLASS,
+} from "@/lib/layout/staff-dashboard-chrome"
+import { cn } from "@/lib/utils"
 
 const ALL = "all"
 
@@ -359,48 +364,68 @@ export function PaymentSummaryReportPanel({
     statusFilter !== ALL
 
   return (
-    <div className="space-y-4">
-      {!loading && !error ? (
-        <StatCardsRow equal columns={3} className="gap-3">
-          <button
-            type="button"
-            className="min-w-0 w-full text-left"
-            onClick={() =>
-              setStatusFilter(
-                statusFilter === "outstanding" ? ALL : "outstanding"
-              )
-            }
-          >
+    <div>
+      <div
+        className={cn(
+          "sticky z-30 -mx-6 space-y-4 border-b border-border bg-background px-6 pb-4",
+          lockedProgramId
+            ? cn("pt-1", STAFF_MAIN_CONTENT_STICKY_TOP_CLASS)
+            : cn("pt-6", STAFF_BELOW_REPORTS_SUBNAV_STICKY_TOP_CLASS)
+        )}
+      >
+        {lockedProgramId ? null : (
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              Payment Summary
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Family registration balances, program fees, and additional charges.
+            </p>
+          </div>
+        )}
+        {!loading && !error ? (
+          <StatCardsRow equal columns={3} className="gap-3">
+            <button
+              type="button"
+              className="min-w-0 w-full text-left"
+              onClick={() =>
+                setStatusFilter(
+                  statusFilter === "outstanding" ? ALL : "outstanding"
+                )
+              }
+            >
+              <StatCard
+                layout="compact"
+                fill
+                tone="orange"
+                label="Balance Due"
+                value={totals.outstanding}
+                icon={AlertCircle}
+                valueClassName="text-xl"
+                hint={formatCurrency(totals.balance)}
+              />
+            </button>
             <StatCard
               layout="compact"
               fill
-              tone="orange"
-              label="Balance Due"
-              value={totals.outstanding}
-              icon={AlertCircle}
+              tone="emerald"
+              label="Received"
+              value={formatCurrency(totals.received)}
               valueClassName="text-xl"
-              hint={formatCurrency(totals.balance)}
             />
-          </button>
-          <StatCard
-            layout="compact"
-            fill
-            tone="emerald"
-            label="Received"
-            value={formatCurrency(totals.received)}
-            valueClassName="text-xl"
-          />
-          <StatCard
-            layout="compact"
-            fill
-            tone="slate"
-            label="Outstanding"
-            value={formatCurrency(totals.balance)}
-            valueClassName="text-xl"
-          />
-        </StatCardsRow>
-      ) : null}
+            <StatCard
+              layout="compact"
+              fill
+              tone="slate"
+              label="Outstanding"
+              value={formatCurrency(totals.balance)}
+              valueClassName="text-xl"
+            />
+          </StatCardsRow>
+        ) : null}
+      </div>
 
+      <div className="space-y-4 pt-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
         {lockedProgramId ? null : (
           <>
@@ -662,6 +687,7 @@ export function PaymentSummaryReportPanel({
           }}
         />
       ) : null}
+      </div>
     </div>
   )
 }

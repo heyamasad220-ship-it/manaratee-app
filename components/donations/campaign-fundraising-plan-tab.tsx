@@ -1,202 +1,208 @@
 "use client"
 
-import { useMemo } from "react"
-import Link from "next/link"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation"
 
-import { CampaignProspectsTab } from "@/components/donations/campaign-prospects-tab"
-import { CampaignStrategyTab } from "@/components/donations/campaign-strategy-tab"
+import {
+  CampaignFundraisingPlanTable,
+  type FundraisingPlanSaveInput,
+} from "@/components/donations/campaign-fundraising-plan-table"
 import { StatCard, StatCardsRow } from "@/components/ui/stat-card"
 import { formatDonationCurrency } from "@/lib/donations/campaign-analytics"
-import type {
-  CampaignAskLevelMetrics,
-  CampaignAskLevelRow,
-} from "@/lib/donations/campaign-ask-level-types"
-import type { CampaignProspectAskType } from "@/lib/donations/campaign-prospect-types"
 import {
-  donationCampaignWorkspaceHref,
-  parseCampaignWorkspaceTab,
-  parseFundraisingPlanSection,
-} from "@/lib/donations/campaign-workspace-paths"
-import { cn } from "@/lib/utils"
-
-type CampaignFundraisingPlanHeaderProps = {
-  campaignId: string
-  askLevelMetrics: CampaignAskLevelMetrics[]
-}
+  createCampaignProspectAction,
+  deleteCampaignProspectAction,
+  fetchCampaignFundraisingPlanProspectsAction,
+  updateCampaignProspectAction,
+} from "@/lib/donations/campaign-prospect-actions"
+import {
+  computeCampaignFundraisingPlanKpis,
+  type CampaignFundraisingPlanKpis,
+  type CampaignProspectListItem,
+} from "@/lib/donations/campaign-prospect-types"
 
 export function CampaignFundraisingPlanHeader({
-  campaignId,
-  askLevelMetrics,
-}: CampaignFundraisingPlanHeaderProps) {
-  const searchParams = useSearchParams()
-  const tab = parseCampaignWorkspaceTab(searchParams.get("tab"))
-  const section = parseFundraisingPlanSection(tab, searchParams.get("section"))
-
-  const totals = useMemo(() => {
-    return askLevelMetrics.reduce(
-      (acc, row) => {
-        acc.targetGifts += row.targetCount
-        acc.targetValue += row.targetValue
-        acc.amountSecured += row.amountSecured
-        acc.gap += row.gap
-        return acc
-      },
-      { targetGifts: 0, targetValue: 0, amountSecured: 0, gap: 0 }
-    )
-  }, [askLevelMetrics])
-
-  const planSections = [
-    {
-      id: "strategy" as const,
-      label: "Strategy",
-      href: donationCampaignWorkspaceHref(campaignId, { tab: "plan" }),
-    },
-    {
-      id: "prospects" as const,
-      label: "Prospects",
-      href: donationCampaignWorkspaceHref(campaignId, {
-        tab: "plan",
-        section: "prospects",
-      }),
-    },
-  ]
+  kpis,
+}: {
+  kpis: CampaignFundraisingPlanKpis | null
+}) {
+  const values = kpis || {
+    prospectCount: 0,
+    totalAsk: 0,
+    overdueCount: 0,
+    pledgedAmount: 0,
+  }
 
   return (
-    <div className="space-y-3">
-      <StatCardsRow equal columns={4} className="gap-3">
-        <StatCard
-          layout="compact"
-          fill
-          tone="violet"
-          label="Targeted gifts"
-          value={totals.targetGifts}
-          valueClassName="text-xl"
-        />
-        <StatCard
-          layout="compact"
-          fill
-          tone="sky"
-          label="Target value"
-          value={formatDonationCurrency(totals.targetValue)}
-          valueClassName="text-xl"
-        />
-        <StatCard
-          layout="compact"
-          fill
-          tone="emerald"
-          label="Amount secured"
-          value={formatDonationCurrency(totals.amountSecured)}
-          valueClassName="text-xl"
-        />
-        <StatCard
-          layout="compact"
-          fill
-          tone="amber"
-          label="Gap"
-          value={formatDonationCurrency(totals.gap)}
-          valueClassName="text-xl"
-        />
-      </StatCardsRow>
-
-      <nav
-        aria-label="Fundraising Plan views"
-        className="flex flex-wrap gap-1 border-b border-border pb-px"
-      >
-        {planSections.map((item) => {
-          const isActive = item.id === section
-          return (
-            <Link
-              key={item.id}
-              href={item.href}
-              className={cn(
-                "-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors",
-                isActive
-                  ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
-              )}
-            >
-              {item.label}
-            </Link>
-          )
-        })}
-      </nav>
-    </div>
+    <StatCardsRow equal columns={4} className="gap-3">
+      <StatCard
+        layout="compact"
+        fill
+        tone="violet"
+        label="Prospects"
+        value={values.prospectCount.toLocaleString()}
+        valueClassName="text-xl"
+      />
+      <StatCard
+        layout="compact"
+        fill
+        tone="sky"
+        label="Total ask"
+        value={formatDonationCurrency(values.totalAsk)}
+        valueClassName="text-xl"
+      />
+      <StatCard
+        layout="compact"
+        fill
+        tone="amber"
+        label="Overdue follow-ups"
+        value={values.overdueCount.toLocaleString()}
+        valueClassName="text-xl"
+      />
+      <StatCard
+        layout="compact"
+        fill
+        tone="emerald"
+        label="Pledged"
+        value={formatDonationCurrency(values.pledgedAmount)}
+        valueClassName="text-xl"
+      />
+    </StatCardsRow>
   )
 }
 
 type CampaignFundraisingPlanTabProps = {
   campaignId: string
   organizationId: string
-  askLevels: CampaignAskLevelRow[]
-  askLevelMetrics: CampaignAskLevelMetrics[]
-  canManageStrategy: boolean
   canManageProspects: boolean
-  onStrategySaved: () => void
   onProspectsChanged: () => void
-  initialFollowUp?: "overdue" | "upcoming" | null
-  initialAssignee?: string | null
-  initialStage?: string | null
-  initialPledged?: "pledged" | "not_pledged" | null
-  initialAskType?: CampaignProspectAskType | null
-  initialAskLevelId?: string | null
-  initialAsked?: boolean
+  onKpisChange?: (kpis: CampaignFundraisingPlanKpis) => void
   showHeader?: boolean
 }
 
 export function CampaignFundraisingPlanTab({
   campaignId,
   organizationId,
-  askLevels,
-  askLevelMetrics,
-  canManageStrategy,
   canManageProspects,
-  onStrategySaved,
   onProspectsChanged,
-  initialFollowUp = null,
-  initialAssignee = null,
-  initialStage = null,
-  initialPledged = null,
-  initialAskType = null,
-  initialAskLevelId = null,
-  initialAsked = false,
+  onKpisChange,
   showHeader = true,
 }: CampaignFundraisingPlanTabProps) {
   const searchParams = useSearchParams()
-  const tab = parseCampaignWorkspaceTab(searchParams.get("tab"))
-  const section = parseFundraisingPlanSection(tab, searchParams.get("section"))
+  const followUpParam = searchParams.get("followUp")
+  const followUpFilter =
+    followUpParam === "overdue" || followUpParam === "upcoming" ? followUpParam : null
+  const assigneeFilter = searchParams.get("assignee")
+
+  const [prospects, setProspects] = useState<CampaignProspectListItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  const kpis = useMemo(() => computeCampaignFundraisingPlanKpis(prospects), [prospects])
+
+  const load = useCallback(async (showSpinner = false) => {
+    if (showSpinner) setLoading(true)
+    setErrorMessage(null)
+    const prospectResult = await fetchCampaignFundraisingPlanProspectsAction(campaignId)
+    if (!prospectResult.success) {
+      setErrorMessage(prospectResult.error)
+      setProspects([])
+      setLoading(false)
+      return
+    }
+    setProspects(prospectResult.prospects)
+    setLoading(false)
+  }, [campaignId])
+
+  useEffect(() => {
+    void load(true)
+  }, [load])
+
+  useEffect(() => {
+    onKpisChange?.(kpis)
+  }, [kpis, onKpisChange])
+
+  async function addProspect(input: FundraisingPlanSaveInput) {
+    setSaving(true)
+    setErrorMessage(null)
+    const result = await createCampaignProspectAction(campaignId, {
+      contact_id: input.contact_id,
+      ask_type: "donation",
+      ask_level_id: null,
+      suggested_ask_amount: input.suggested_ask_amount,
+      assigned_to_contact_id: input.assigned_to_contact_id,
+      last_contacted_at: input.last_contacted_at,
+      next_follow_up_at: input.next_follow_up_at,
+      notes: input.notes,
+      stage: "identified",
+    })
+    setSaving(false)
+    if (!result.success) {
+      setErrorMessage(result.error)
+      return false
+    }
+    setProspects((current) =>
+      [...current, result.prospect].sort((a, b) => a.contactName.localeCompare(b.contactName))
+    )
+    return true
+  }
+
+  async function saveProspect(prospectId: string, input: FundraisingPlanSaveInput) {
+    setSaving(true)
+    setErrorMessage(null)
+    const result = await updateCampaignProspectAction(prospectId, {
+      suggested_ask_amount: input.suggested_ask_amount,
+      ask_level_id: null,
+      assigned_to_contact_id: input.assigned_to_contact_id,
+      last_contacted_at: input.last_contacted_at,
+      next_follow_up_at: input.next_follow_up_at,
+      notes: input.notes,
+    })
+    setSaving(false)
+    if (!result.success) {
+      setErrorMessage(result.error)
+      return false
+    }
+    setProspects((current) =>
+      current.map((row) => (row.id === prospectId ? result.prospect : row))
+    )
+    return true
+  }
+
+  async function deleteProspect(prospectId: string) {
+    setErrorMessage(null)
+    const result = await deleteCampaignProspectAction(prospectId)
+    if (!result.success) {
+      setErrorMessage(result.error)
+      return false
+    }
+    setProspects((current) => current.filter((row) => row.id !== prospectId))
+    return true
+  }
 
   return (
     <div className="flex flex-col gap-4">
-      {showHeader ? (
-        <CampaignFundraisingPlanHeader
-          campaignId={campaignId}
-          askLevelMetrics={askLevelMetrics}
-        />
-      ) : null}
-
-      {section === "strategy" ? (
-        <CampaignStrategyTab
-          campaignId={campaignId}
-          askLevels={askLevels}
-          askLevelMetrics={askLevelMetrics}
-          canManage={canManageStrategy}
-          onSaved={onStrategySaved}
-        />
+      {showHeader ? <CampaignFundraisingPlanHeader kpis={kpis} /> : null}
+      {loading ? (
+        <p className="text-sm text-muted-foreground">Loading prospects...</p>
       ) : (
-        <CampaignProspectsTab
+        <CampaignFundraisingPlanTable
           campaignId={campaignId}
           organizationId={organizationId}
-          askLevels={askLevels}
+          prospects={prospects}
           canManage={canManageProspects}
-          onChanged={onProspectsChanged}
-          initialFollowUp={initialFollowUp}
-          initialAssignee={initialAssignee}
-          initialStage={initialStage}
-          initialPledged={initialPledged}
-          initialAskType={initialAskType}
-          initialAskLevelId={initialAskLevelId}
-          initialAsked={initialAsked}
+          followUpFilter={followUpFilter}
+          assigneeFilter={assigneeFilter}
+          saving={saving}
+          errorMessage={errorMessage}
+          onSaveProspect={saveProspect}
+          onAddProspect={addProspect}
+          onDeleteProspect={deleteProspect}
+          onPledgeChanged={() => {
+            void load(false)
+            onProspectsChanged()
+          }}
         />
       )}
     </div>

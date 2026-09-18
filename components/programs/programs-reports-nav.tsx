@@ -7,6 +7,7 @@ import {
   parseProgramKindReportFilter,
   withProgramKindReportQuery,
 } from "@/lib/programs/program-kind-report-preset"
+import { STAFF_MAIN_CONTENT_STICKY_TOP_CLASS, STAFF_REPORTS_SUBNAV_HEIGHT_CLASS } from "@/lib/layout/staff-dashboard-chrome"
 import { cn } from "@/lib/utils"
 
 export type ProgramsReportsTabId =
@@ -139,8 +140,18 @@ export function ProgramsReportsNav() {
   const kindFilter = parseProgramKindReportFilter(searchParams.get("kind"))
 
   return (
-    <div className="border-b border-border bg-background">
-      <nav className="-mb-px flex gap-0 overflow-x-auto">
+    <div
+      className={cn(
+        "sticky z-40 shrink-0 border-b border-border bg-background",
+        STAFF_MAIN_CONTENT_STICKY_TOP_CLASS
+      )}
+    >
+      <nav
+        className={cn(
+          "-mb-px flex gap-0 overflow-x-auto",
+          STAFF_REPORTS_SUBNAV_HEIGHT_CLASS
+        )}
+      >
         {PROGRAMS_REPORTS_TABS.map((tab) => {
           const active = tab.id === activeId
           const href = withProgramKindReportQuery(tab.href, kindFilter)
@@ -149,7 +160,7 @@ export function ProgramsReportsNav() {
               key={tab.id}
               href={href}
               className={cn(
-                "relative shrink-0 px-4 py-2.5 text-sm font-medium transition-colors",
+                "relative flex h-full shrink-0 items-center px-4 text-sm font-medium transition-colors",
                 active
                   ? "text-primary"
                   : "text-muted-foreground hover:text-foreground"

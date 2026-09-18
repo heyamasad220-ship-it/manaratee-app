@@ -119,16 +119,19 @@ export async function getCampaignOverviewInsightsAction(campaignId: string) {
       return { success: false as const, error: prospectError.message }
     }
 
-    const prospects = (prospectRows || []).map((row) => ({
-      id: row.id as string,
-      contact_id: row.contact_id as string,
-      assigned_to_contact_id: (row.assigned_to_contact_id as string | null) ?? null,
-      stage: normalizeProspectStage(row.stage as string),
-      suggested_ask_amount:
-        row.suggested_ask_amount == null ? null : Number(row.suggested_ask_amount),
-      next_follow_up_at: (row.next_follow_up_at as string | null) ?? null,
-      converted_pledge_id: (row.converted_pledge_id as string | null) ?? null,
-    }))
+    const prospects = (prospectRows || [])
+      .map((row) => ({
+        id: row.id as string,
+        contact_id: row.contact_id as string,
+        assigned_to_contact_id: (row.assigned_to_contact_id as string | null) ?? null,
+        stage: normalizeProspectStage(row.stage as string),
+        suggested_ask_amount:
+          row.suggested_ask_amount == null ? null : Number(row.suggested_ask_amount),
+        next_follow_up_at: (row.next_follow_up_at as string | null) ?? null,
+        converted_pledge_id: (row.converted_pledge_id as string | null) ?? null,
+        ask_type: String(row.ask_type || "donation"),
+      }))
+      .filter((prospect) => prospect.ask_type === "donation")
 
     const contactIds = new Set<string>()
     for (const prospect of prospects) {
@@ -166,10 +169,6 @@ export async function getCampaignOverviewInsightsAction(campaignId: string) {
     const unassigned = prospects.filter(
       (prospect) => !prospect.assigned_to_contact_id && isOpenPipelineStage(prospect.stage)
     )
-    const askedWithoutPledge = prospects.filter(
-      (prospect) =>
-        prospect.stage === "asked" && !prospect.converted_pledge_id
-    )
 
     const actionItems: CampaignOverviewActionItem[] = []
     if (overdue.length > 0) {
@@ -178,7 +177,6 @@ export async function getCampaignOverviewInsightsAction(campaignId: string) {
         label: `${overdue.length} overdue prospect follow-up${overdue.length === 1 ? "" : "s"}`,
         href: donationCampaignWorkspaceHref(campaignId, {
           tab: "plan",
-          section: "prospects",
           followUp: "overdue",
         }),
         severity: "urgent",
@@ -190,7 +188,6 @@ export async function getCampaignOverviewInsightsAction(campaignId: string) {
         label: `${upcoming.length} follow-up${upcoming.length === 1 ? "" : "s"} due in the next 7 days`,
         href: donationCampaignWorkspaceHref(campaignId, {
           tab: "plan",
-          section: "prospects",
           followUp: "upcoming",
         }),
         severity: "attention",
@@ -202,23 +199,9 @@ export async function getCampaignOverviewInsightsAction(campaignId: string) {
         label: `${unassigned.length} open prospect${unassigned.length === 1 ? "" : "s"} unassigned`,
         href: donationCampaignWorkspaceHref(campaignId, {
           tab: "plan",
-          section: "prospects",
           assignee: "unassigned",
         }),
         severity: "attention",
-      })
-    }
-    if (askedWithoutPledge.length > 0) {
-      actionItems.push({
-        id: "asked-without-pledge",
-        label: `${askedWithoutPledge.length} asked prospect${askedWithoutPledge.length === 1 ? "" : "s"} still need a pledge`,
-        href: donationCampaignWorkspaceHref(campaignId, {
-          tab: "plan",
-          section: "prospects",
-          stage: "asked",
-          pledged: "not_pledged",
-        }),
-        severity: "info",
       })
     }
 
@@ -253,7 +236,7 @@ export async function getCampaignOverviewInsightsAction(campaignId: string) {
       if (CAMPAIGN_PROSPECT_ASKED_STAGES.includes(prospect.stage)) {
         row.askedCount += 1
       }
-      if (prospect.stage === "pledged") {
+      if (prospect.converted_pledge_id || prospect.stage === "pledged") {
         row.pledgedCount += 1
       }
       if (isOpenPipelineStage(prospect.stage)) {

@@ -896,8 +896,7 @@ export default function CustomerDonationsPage() {
     const updatedPaidAmount = selectedPledge.paidAmount + paymentValue
     const updatedBalance = Math.max(selectedPledge.totalAmount - updatedPaidAmount, 0)
     const updatedPaymentsMade = selectedPledge.paymentsMade + 1
-    const updatedStatus =
-      updatedBalance <= 0 ? "Fulfilled" : updatedPaidAmount > 0 ? "Partial" : selectedPledge.status
+    const updatedStatus = updatedBalance <= 0 ? "Fulfilled" : "Open"
 
     setPledges((currentPledges) =>
       currentPledges.map((pledge) =>
@@ -1031,9 +1030,7 @@ export default function CustomerDonationsPage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "Open":
-        return <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">Open</Badge>
-      case "Partial":
-        return <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">Partial</Badge>
+        return <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">Open</Badge>
       case "Active":
         return <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">Active</Badge>
       case "Fulfilled":

@@ -8,12 +8,37 @@ import { isOrganizationModuleEnabled, loadOrganizationEnabledModuleSlugs } from 
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { PERMISSIONS } from "@/lib/permissions/permission-keys"
 import { hasPermission } from "@/lib/permissions/permissions"
-import { createClient } from "@/lib/supabase/server"
+import { createServiceRoleClient } from "@/lib/supabase/service-role"
 
 const PARENT_FAMILY_ROLES = ["parent", "guardian"] as const
+const DIRECTORY_NAV_CACHE_TTL_MS = 60_000
+
+const directoryNavCache = new Map<
+  string,
+  { expiresAt: number; value: DirectoryNavSummary }
+>()
 
 function excludedStatusFilter() {
   return `(${VENUE_RENTAL_CUSTOMER_EXCLUDED_STATUSES.join(",")})`
+}
+
+function emptyDirectoryNavSummary(): DirectoryNavSummary {
+  return {
+    people: 0,
+    families: 0,
+    organizations: 0,
+    groups: 0,
+    roles: {},
+    facilitiesEnabled: false,
+  }
+}
+
+export function clearDirectoryNavSummaryCache(organizationId?: string) {
+  if (organizationId) {
+    directoryNavCache.delete(organizationId)
+    return
+  }
+  directoryNavCache.clear()
 }
 
 export async function isDirectoryFacilitiesEnabled(
@@ -25,80 +50,68 @@ export async function isDirectoryFacilitiesEnabled(
   return isOrganizationModuleEnabled(slugs, "spaces")
 }
 
-export async function fetchDirectoryNavSummary(
-  organizationId?: string | null
-): Promise<DirectoryNavSummary> {
-  const empty: DirectoryNavSummary = {
-    people: 0,
-    families: 0,
-    organizations: 0,
-    groups: 0,
-    roles: {},
-    facilitiesEnabled: false,
-  }
-
-  const allowed = await hasPermission(PERMISSIONS.CONTACTS_VIEW)
-  if (!allowed) return empty
-
-  const supabase = await createClient()
-  const orgId = organizationId ?? (await getSelectedOrganizationId())
-  if (!orgId) return empty
-
+async function loadDirectoryNavSummary(orgId: string): Promise<DirectoryNavSummary> {
+  const admin = createServiceRoleClient()
   const roleDefs = DIRECTORY_DYNAMIC_ROLE_DEFS.filter((def) => def.source === "contact_roles")
 
-  const queries = await Promise.all([
-    supabase
+  const [
+    peopleRes,
+    familiesRes,
+    organizationsRes,
+    parentRes,
+    rentalRes,
+    enabledSlugs,
+    ...roleCountResults
+  ] = await Promise.all([
+    admin
       .from("contacts")
       .select("id", { count: "exact", head: true })
       .eq("organization_id", orgId)
       .eq("contact_type", "individual"),
-    supabase
+    admin
       .from("families")
       .select("id", { count: "exact", head: true })
       .eq("organization_id", orgId)
       .eq("status", "active"),
-    supabase
+    admin
       .from("contacts")
       .select("id", { count: "exact", head: true })
       .eq("organization_id", orgId)
       .eq("contact_type", "organization"),
-    ...roleDefs.map((def) =>
-      supabase
-        .from("contact_roles")
-        .select("id", { count: "exact", head: true })
-        .eq("organization_id", orgId)
-        .eq("role", def.contactRole)
-    ),
-    supabase
+    admin
       .from("family_members")
       .select("id", { count: "exact", head: true })
       .eq("organization_id", orgId)
       .in("role", [...PARENT_FAMILY_ROLES])
       .is("end_date", null)
       .not("contact_id", "is", null),
-    supabase
+    admin
       .from("venue_rentals")
       .select("id", { count: "exact", head: true })
       .eq("organization_id", orgId)
       .not("billing_contact_id", "is", null)
       .not("status", "in", excludedStatusFilter()),
+    loadOrganizationEnabledModuleSlugs(orgId),
+    ...roleDefs.map((def) =>
+      admin
+        .from("contact_roles")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", orgId)
+        .eq("role", def.contactRole)
+    ),
   ])
 
-  const [peopleRes, familiesRes, organizationsRes, ...rest] = queries
   const roles: DirectoryRoleCountMap = {}
-
   roleDefs.forEach((def, index) => {
-    const count = rest[index]?.count ?? 0
+    const count = roleCountResults[index]?.count ?? 0
     if (count > 0) roles[def.key] = count
   })
 
-  const parentCount = rest[roleDefs.length]?.count ?? 0
+  const parentCount = parentRes.count ?? 0
   if (parentCount > 0) roles.parents = parentCount
 
-  const rentalCount = rest[roleDefs.length + 1]?.count ?? 0
+  const rentalCount = rentalRes.count ?? 0
   if (rentalCount > 0) roles["rental-customers"] = rentalCount
-
-  const enabledSlugs = await loadOrganizationEnabledModuleSlugs(orgId)
 
   return {
     people: peopleRes.count ?? 0,
@@ -108,4 +121,32 @@ export async function fetchDirectoryNavSummary(
     roles,
     facilitiesEnabled: isOrganizationModuleEnabled(enabledSlugs, "spaces"),
   }
+}
+
+export async function fetchCachedDirectoryNavSummary(
+  organizationId: string
+): Promise<DirectoryNavSummary> {
+  const cached = directoryNavCache.get(organizationId)
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.value
+  }
+
+  const value = await loadDirectoryNavSummary(organizationId)
+  directoryNavCache.set(organizationId, {
+    expiresAt: Date.now() + DIRECTORY_NAV_CACHE_TTL_MS,
+    value,
+  })
+  return value
+}
+
+export async function fetchDirectoryNavSummary(
+  organizationId?: string | null
+): Promise<DirectoryNavSummary> {
+  const allowed = await hasPermission(PERMISSIONS.CONTACTS_VIEW)
+  if (!allowed) return emptyDirectoryNavSummary()
+
+  const orgId = organizationId ?? (await getSelectedOrganizationId())
+  if (!orgId) return emptyDirectoryNavSummary()
+
+  return fetchCachedDirectoryNavSummary(orgId)
 }
