@@ -15,7 +15,6 @@ export const CORE_MODULE_SLUGS = [
   "dashboard",
   "contacts",
   "settings",
-  "workforce",
 ] as const
 
 /** Billable product modules shown in the platform admin catalog. */
@@ -36,6 +35,7 @@ export const CAPABILITY_MODULE_SLUGS = [
   "child-care",
   "bazaar",
   "hr",
+  "workforce",
   "reports",
   "applications",
   "finance",
@@ -46,6 +46,7 @@ export const CAPABILITY_MODULE_SLUGS = [
 export const HIDDEN_SUBSCRIPTION_CAPABILITY_SLUGS = [
   "finance",
   "hr",
+  "workforce",
   "bazaar",
   "spaces",
   "community-calendar",
@@ -61,6 +62,7 @@ export const EDITABLE_CAPABILITY_SLUGS = [
   "sign-ups",
   "child-care",
   "finance",
+  "workforce",
   "reports",
   "applications",
 ] as const
@@ -74,9 +76,10 @@ export const IMPLIED_MODULE_SLUGS: Record<string, readonly string[]> = {
     "community-calendar",
     "sign-ups",
     "child-care",
+    "workforce",
   ],
-  /** Facilities, program billing, volunteer sign-ups, and childcare. */
-  programs: ["spaces", "finance", "sign-ups", "child-care"],
+  /** Facilities, program billing, volunteer sign-ups, childcare, and Administration. */
+  programs: ["spaces", "finance", "sign-ups", "child-care", "workforce"],
   bookings: ["spaces"],
   /** Bazaar/vendor events that reserve campus spaces, plus the public community calendar. */
   "vendor-hub": ["spaces", "community-calendar"],

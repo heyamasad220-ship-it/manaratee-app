@@ -32,6 +32,11 @@ function hasWorkforceOpsDemand(slugs: StaffModuleSlugSet) {
   return hasPrograms(slugs) || hasEventManagement(slugs)
 }
 
+/** Administration is a Programs / Event Management capability, not a core rail item. */
+export function isAdministrationNavEnabled(slugs: StaffModuleSlugSet) {
+  return hasWorkforceOpsDemand(slugs)
+}
+
 /** Top-level product modules replaced by Administration or Programs. */
 export function isHiddenTopLevelStaffModule(
   slug: string,

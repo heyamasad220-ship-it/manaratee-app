@@ -446,7 +446,9 @@ export async function replaceOrganizationProductModules(
     await seedAdminRolePermissionsForModule(admin, organizationId, productSlug)
   }
 
-  await seedAdminRolePermissionsForModule(admin, organizationId, "workforce")
+  if (enabledSlugs.has("workforce")) {
+    await seedAdminRolePermissionsForModule(admin, organizationId, "workforce")
+  }
 
   const { error: orgError } = await admin
     .from("organizations")

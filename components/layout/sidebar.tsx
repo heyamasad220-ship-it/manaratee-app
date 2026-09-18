@@ -42,6 +42,7 @@ import {
   ADMINISTRATION_MODULE_LABEL,
   ADMINISTRATION_MODULE_SLUG,
   buildAdministrationChildren,
+  isAdministrationNavEnabled,
   buildEventManagementChildren,
   buildFinanceChildren,
   buildProgramsChildren,
@@ -413,6 +414,10 @@ function injectAdministrationNavItem(
   items: NavItem[],
   availableSlugs: Set<string>
 ): NavItem[] {
+  if (!isAdministrationNavEnabled(availableSlugs)) {
+    return items
+  }
+
   const children = buildAdministrationChildren(availableSlugs)
   if (children.length === 0) {
     return items
@@ -782,7 +787,7 @@ function buildNavItems(
     permissionContext.enabledPermissions.has("programs.manage")
 
   const myDepartmentItem: NavItem | null =
-    myDepartment && !hasStaffView
+    myDepartment && !hasStaffView && isAdministrationNavEnabled(availableSlugs)
       ? {
           label: "My department",
           href: `/workforce/departments/${myDepartment.id}`,
