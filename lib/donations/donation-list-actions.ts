@@ -768,6 +768,137 @@ export async function fetchPledgesPageAction(input: PledgesPageInput = {}) {
   }
 }
 
+export type PledgeExportRow = {
+  id: string
+  donor_name: string | null
+  amount_pledged: number
+  amount_paid: number
+  balance_remaining: number
+  calculated_status: string | null
+  campaign_name: string | null
+  last_reminder_status: string | null
+  last_reminder_at: string | null
+  last_contacted_at: string | null
+}
+
+async function attachPledgeReminderExportSummaries(
+  supabase: SupabaseClient,
+  orgId: string,
+  pledges: PledgeExportRow[]
+) {
+  const pledgeIds = pledges.map((pledge) => pledge.id)
+  const chunkSize = 200
+
+  for (let index = 0; index < pledgeIds.length; index += chunkSize) {
+    const slice = pledgeIds.slice(index, index + chunkSize)
+    const { data, error } = await supabase
+      .from("pledge_reminders")
+      .select("pledge_id, status, reminder_type, sent_at, created_at")
+      .eq("organization_id", orgId)
+      .in("pledge_id", slice)
+      .order("created_at", { ascending: false })
+
+    if (error) throw new Error(error.message)
+
+    const summaryByPledge = new Map<
+      string,
+      { last_reminder_status: string | null; last_reminder_at: string | null; last_contacted_at: string | null }
+    >()
+
+    for (const row of data || []) {
+      const pledgeId = String(row.pledge_id || "")
+      if (!pledgeId) continue
+      const existing = summaryByPledge.get(pledgeId) || {
+        last_reminder_status: null,
+        last_reminder_at: null,
+        last_contacted_at: null,
+      }
+
+      if (row.reminder_type === "contacted" && !existing.last_contacted_at) {
+        existing.last_contacted_at = (row.sent_at || row.created_at) as string
+      }
+
+      if (row.reminder_type !== "contacted" && !existing.last_reminder_at) {
+        existing.last_reminder_at = (row.sent_at || row.created_at) as string
+        existing.last_reminder_status = (row.status as string | null) ?? null
+      }
+
+      summaryByPledge.set(pledgeId, existing)
+    }
+
+    for (const pledge of pledges) {
+      const summary = summaryByPledge.get(pledge.id)
+      if (!summary) continue
+      pledge.last_reminder_status = summary.last_reminder_status
+      pledge.last_reminder_at = summary.last_reminder_at
+      pledge.last_contacted_at = summary.last_contacted_at
+    }
+  }
+}
+
+export async function fetchPledgesExportAction(input: PledgeListFilters = {}) {
+  const access = await requireDonationStaffAccess("view")
+  if (!access.ok) return { success: false as const, error: access.error }
+
+  try {
+    const rows: Array<{
+      id: string
+      donor_name: string | null
+      campaign_name: string | null
+      amount_pledged: number | string | null
+      amount_paid: number | string | null
+      balance_remaining: number | string | null
+      calculated_status: string | null
+    }> = []
+    const pageSize = 500
+    let from = 0
+
+    while (true) {
+      let query = access.supabase
+        .from("pledge_status_view")
+        .select(
+          "id, donor_name, campaign_name, amount_pledged, amount_paid, balance_remaining, calculated_status"
+        )
+        .eq("organization_id", access.orgId)
+        .neq("calculated_status", "cancelled")
+        .order("pledge_date", { ascending: false })
+        .range(from, from + pageSize - 1)
+
+      query = applyPledgeListFilters(query, input)
+      const { data, error } = await query
+      if (error) throw new Error(error.message)
+
+      const batch = data || []
+      rows.push(...batch)
+      if (batch.length < pageSize) break
+      from += pageSize
+      if (from > 50000) break
+    }
+
+    const pledges: PledgeExportRow[] = rows.map((row) => ({
+      id: row.id,
+      donor_name: row.donor_name,
+      amount_pledged: Number(row.amount_pledged || 0),
+      amount_paid: Number(row.amount_paid || 0),
+      balance_remaining: Number(row.balance_remaining || 0),
+      calculated_status: row.calculated_status,
+      campaign_name: row.campaign_name,
+      last_reminder_status: null,
+      last_reminder_at: null,
+      last_contacted_at: null,
+    }))
+
+    await attachPledgeReminderExportSummaries(access.supabase, access.orgId, pledges)
+
+    return { success: true as const, pledges }
+  } catch (error) {
+    return {
+      success: false as const,
+      error: error instanceof Error ? error.message : "Could not export pledges",
+    }
+  }
+}
+
 export async function fetchPledgeLastPaymentDatesAction(pledgeIds: string[]) {
   const access = await requireDonationStaffAccess("view")
   if (!access.ok) return { success: false as const, error: access.error }

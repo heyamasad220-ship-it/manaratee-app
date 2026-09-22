@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { Plus } from "lucide-react"
+import { DollarSign, Plus, Target, Users } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -34,13 +34,13 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { CampaignProgressBar } from "@/components/donations/campaign-progress-bar"
 import {
-  PledgeSummaryMetricCards,
-  type PledgeSummaryMetrics,
-} from "@/components/donations/pledge-summary-metric-cards"
+  DonationMetricCard,
+  DonationMetricCardGrid,
+} from "@/components/donations/donation-metric-card"
 import {
+  computeCampaignHeadlineTotals,
   formatDonationCurrency,
 } from "@/lib/donations/campaign-analytics"
-import { fetchPledgeSummaryMetricsAction } from "@/lib/donations/donation-list-actions"
 import {
   createCampaignAction,
   getCampaignAnalyticsAction,
@@ -55,6 +55,9 @@ interface CampaignRow {
   description: string
   goalAmount: number
   raisedAmount: number
+  committedAmount: number
+  outstandingAmount: number
+  donorCount: number
   startDate: string
   endDate: string
   status: CampaignStatus
@@ -141,28 +144,7 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
     endDate: "",
     status: "Draft" as CampaignStatus,
   })
-  const [summaryMetrics, setSummaryMetrics] = useState<PledgeSummaryMetrics>({
-    totalPledged: 0,
-    totalCollected: 0,
-    outstandingBalance: 0,
-    activePledgeCount: 0,
-    pledgeCount: 0,
-  })
-  const [metricsLoading, setMetricsLoading] = useState(true)
   const [showAllCampaigns, setShowAllCampaigns] = useState(false)
-
-  async function loadSummaryMetrics() {
-    setMetricsLoading(true)
-    const result = await fetchPledgeSummaryMetricsAction()
-
-    if (result.success) {
-      setSummaryMetrics(result.metrics)
-    } else {
-      setErrorMessage(result.error)
-    }
-
-    setMetricsLoading(false)
-  }
 
   async function loadCampaigns() {
     setLoading(true)
@@ -177,23 +159,28 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
     }
 
     setCampaigns(
-      (result.entries || []).map(({ campaign, metrics }) => ({
-        id: campaign.id,
-        name: campaign.name,
-        description: campaign.description || "",
-        goalAmount: Number(campaign.goal_amount || 0),
-        raisedAmount: metrics.raised,
-        startDate: campaign.start_date || "",
-        endDate: campaign.end_date || "",
-        status: mapCampaignStatus(campaign.status),
-      }))
+      (result.entries || []).map(({ campaign, metrics }) => {
+        const headline = computeCampaignHeadlineTotals(metrics)
+        return {
+          id: campaign.id,
+          name: campaign.name,
+          description: campaign.description || "",
+          goalAmount: Number(campaign.goal_amount || 0),
+          raisedAmount: headline.collected,
+          committedAmount: headline.committed,
+          outstandingAmount: headline.outstanding,
+          donorCount: metrics.donorCount,
+          startDate: campaign.start_date || "",
+          endDate: campaign.end_date || "",
+          status: mapCampaignStatus(campaign.status),
+        }
+      })
     )
     setLoading(false)
   }
 
   useEffect(() => {
     void loadCampaigns()
-    void loadSummaryMetrics()
   }, [])
 
   useEffect(() => {
@@ -228,6 +215,21 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
 
   const displayedCampaigns = showAllCampaigns ? sortedCampaigns : defaultVisibleCampaigns
   const hiddenCampaignCount = Math.max(sortedCampaigns.length - defaultVisibleCampaigns.length, 0)
+  const campaignTotals = useMemo(
+    () =>
+      campaigns.reduce(
+        (acc, campaign) => {
+          acc.goal += campaign.goalAmount
+          acc.committed += campaign.committedAmount
+          acc.collected += campaign.raisedAmount
+          acc.outstanding += campaign.outstandingAmount
+          acc.donors += campaign.donorCount
+          return acc
+        },
+        { goal: 0, committed: 0, collected: 0, outstanding: 0, donors: 0 }
+      ),
+    [campaigns]
+  )
 
   async function handleSaveCampaign() {
     if (!campaignForm.name.trim()) {
@@ -267,7 +269,6 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
     setShowCampaignDialog(false)
     setEditingCampaign(null)
     await loadCampaigns()
-    await loadSummaryMetrics()
   }
 
   function openCreateDialog() {
@@ -292,10 +293,42 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
           ) : null}
         </div>
 
-        {metricsLoading ? (
-          <p className="text-sm text-muted-foreground">Loading pledge summary...</p>
+        {loading ? (
+          <p className="text-sm text-muted-foreground">Loading campaign totals...</p>
         ) : (
-          <PledgeSummaryMetricCards metrics={summaryMetrics} />
+          <DonationMetricCardGrid colorful className="lg:grid-cols-5">
+            <DonationMetricCard
+              title="Campaigns"
+              value={campaigns.length}
+              icon={Target}
+              accent="blue"
+            />
+            <DonationMetricCard
+              title="Total Goal"
+              value={formatDonationCurrency(campaignTotals.goal)}
+              icon={Target}
+              accent="purple"
+            />
+            <DonationMetricCard
+              title="Total Committed"
+              value={formatDonationCurrency(campaignTotals.committed)}
+              icon={DollarSign}
+              accent="amber"
+            />
+            <DonationMetricCard
+              title="Total Collected"
+              value={formatDonationCurrency(campaignTotals.collected)}
+              icon={DollarSign}
+              accent="emerald"
+            />
+            <DonationMetricCard
+              title="Outstanding"
+              value={formatDonationCurrency(campaignTotals.outstanding)}
+              icon={Users}
+              accent="rose"
+              description={`${campaignTotals.donors} donors`}
+            />
+          </DonationMetricCardGrid>
         )}
 
         <Card className="border border-border shadow-sm">
@@ -309,7 +342,10 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
                 <TableRow>
                   <TableHead>Campaign</TableHead>
                   <TableHead>Goal</TableHead>
+                  <TableHead>Committed</TableHead>
                   <TableHead>Collected</TableHead>
+                  <TableHead>Outstanding</TableHead>
+                  <TableHead>Donors</TableHead>
                   <TableHead>Progress</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
@@ -318,7 +354,7 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
                 {displayedCampaigns.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={5}
+                      colSpan={8}
                       className="py-8 text-center text-muted-foreground"
                     >
                       {loading ? "Loading campaigns..." : "No campaigns yet"}
@@ -349,9 +385,16 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
                         <TableCell className="font-medium">
                           {formatDonationCurrency(campaign.goalAmount)}
                         </TableCell>
+                        <TableCell className="font-medium">
+                          {formatDonationCurrency(campaign.committedAmount)}
+                        </TableCell>
                         <TableCell className="font-medium text-emerald-600">
                           {formatDonationCurrency(campaign.raisedAmount)}
                         </TableCell>
+                        <TableCell className="font-medium">
+                          {formatDonationCurrency(campaign.outstandingAmount)}
+                        </TableCell>
+                        <TableCell>{campaign.donorCount}</TableCell>
                         <TableCell className="min-w-[120px]">
                           <CampaignProgressBar progressPercent={progressPercent} />
                         </TableCell>

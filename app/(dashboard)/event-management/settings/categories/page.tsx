@@ -1,14 +1,7 @@
-import { EventManagementCategoriesSettingsClient } from "@/components/events/event-management-categories-settings-client"
-import { getTicketingEventCategories } from "@/lib/tickets/ticketing-event-category-queries"
-import {
-  PERMISSIONS,
-  requireAnyPermission,
-} from "@/lib/permissions/permissions"
+import { redirect } from "next/navigation"
 
-export default async function EventManagementCategoriesSettingsPage() {
-  await requireAnyPermission(PERMISSIONS.EVENTS_MANAGE, PERMISSIONS.PROGRAMS_MANAGE)
+import { EVENT_MANAGEMENT_TICKETING_SETTINGS_PATH } from "@/lib/events/event-management-section-path"
 
-  const categories = await getTicketingEventCategories()
-
-  return <EventManagementCategoriesSettingsClient categories={categories} />
+export default function EventManagementCategoriesSettingsPage() {
+  redirect(EVENT_MANAGEMENT_TICKETING_SETTINGS_PATH)
 }

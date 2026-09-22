@@ -34,6 +34,8 @@ export interface VendorHubBoothSetupTemplateLine {
   description: string | null
   sort_order: number
   attribute_slugs: string[]
+  selection_fee: number
+  booth_numbers: string[]
 }
 
 export interface VendorHubBoothSetupTemplateWithLines extends VendorHubBoothSetupTemplate {

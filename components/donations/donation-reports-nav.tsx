@@ -8,7 +8,6 @@ import {
   DONATION_REPORTS_CAMPAIGNS_PATH,
   DONATION_REPORTS_DONORS_PATH,
   DONATION_REPORTS_GIVING_PATH,
-  DONATION_REPORTS_HOME_PATH,
   DONATION_REPORTS_PLEDGES_ANALYTICS_PATH,
   DONATION_REPORTS_RECURRING_ANALYTICS_PATH,
 } from "@/lib/donations/donation-payment-paths"
@@ -79,10 +78,6 @@ export function DonationReportsNav({ className }: { canManage?: boolean; classNa
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const range = searchParams.get("range")
-
-  if (pathname === DONATION_REPORTS_HOME_PATH) {
-    return null
-  }
 
   return (
     <div

@@ -80,7 +80,9 @@ export function CampaignFundraisingPlanTable({
 
   const visibleProspects = useMemo(() => {
     return prospects.filter((prospect) => {
-      if (assigneeFilter === "unassigned" && prospect.assigned_to_contact_id) return false
+      if (assigneeFilter === "unassigned" && (prospect.assignedToName || prospect.assigned_to_contact_id)) {
+        return false
+      }
       if (
         assigneeFilter &&
         assigneeFilter !== "unassigned" &&

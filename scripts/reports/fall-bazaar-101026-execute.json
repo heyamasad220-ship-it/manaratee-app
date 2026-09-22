@@ -1,0 +1,161 @@
+{
+  "importTag": "FALL_BAZAAR_101026_V1",
+  "mode": "execute",
+  "orgId": "e057e00a-e4e3-4adf-9af5-f465db1894be",
+  "csv": "C:/Users/danan/Downloads/FallBazaar101026.csv",
+  "event": {
+    "name": "MAS Fall Bazaar",
+    "date": "2026-10-10",
+    "start": "11:00:00",
+    "end": "19:00:00",
+    "location": "MAS Dallas Islamic Center"
+  },
+  "summary": {
+    "csv_rows": 25,
+    "skipped": 0,
+    "unique_contacts": 25,
+    "orders": 25,
+    "booth_types": 7,
+    "total_revenue": 4525
+  },
+  "booth_types": [
+    {
+      "name": "Regular Booth - Main Prayer Hall",
+      "price": 150,
+      "count": 16,
+      "location": "Main Prayer Hall"
+    },
+    {
+      "name": "Corner Booth - Main Prayer Hall",
+      "price": 175,
+      "count": 2,
+      "location": "Main Prayer Hall"
+    },
+    {
+      "name": "Booth on the stage",
+      "price": 150,
+      "count": 1,
+      "location": "Main Prayer Hall (stage)"
+    },
+    {
+      "name": "Booth in the entrance (Lobby)",
+      "price": 300,
+      "count": 2,
+      "location": "Main Lobby"
+    },
+    {
+      "name": "Coffee",
+      "price": 300,
+      "count": 1,
+      "location": "Outside"
+    },
+    {
+      "name": "Mocktail/ Smoothie (outside)",
+      "price": 175,
+      "count": 1,
+      "location": "Outside"
+    },
+    {
+      "name": "Food Vendors between the two buildings (Hot Meal)",
+      "price": 275,
+      "count": 2,
+      "location": "Between the two buildings"
+    }
+  ],
+  "sample_orders": [
+    {
+      "name": "Nusrat Yeasmin",
+      "email": "nyeas001@gmail.com",
+      "booth": "MPH-01",
+      "category": "Regular Booth - Main Prayer Hall",
+      "fee": 150,
+      "method": "STRIPE"
+    },
+    {
+      "name": "Anas Hussein",
+      "email": "anas.hussian@yahoo.com",
+      "booth": "COFF-01",
+      "category": "Coffee",
+      "fee": 300,
+      "method": "STRIPE"
+    },
+    {
+      "name": "Hiba Mobarak",
+      "email": "sujoodsouq@gmail.com",
+      "booth": "MPH-02",
+      "category": "Regular Booth - Main Prayer Hall",
+      "fee": 150,
+      "method": "STRIPE"
+    },
+    {
+      "name": "Iman Jassim",
+      "email": "imanjassim2@gmail.com",
+      "booth": "SMTH-01",
+      "category": "Mocktail/ Smoothie (outside)",
+      "fee": 175,
+      "method": "STRIPE"
+    },
+    {
+      "name": "Baydaa Hussain",
+      "email": "bhussain67@gmail.com",
+      "booth": "CRN-01",
+      "category": "Corner Booth - Main Prayer Hall",
+      "fee": 175,
+      "method": "STRIPE"
+    },
+    {
+      "name": "Walaa Alsaghir",
+      "email": "walaaalsaghir124@gmail.com",
+      "booth": "MPH-03",
+      "category": "Regular Booth - Main Prayer Hall",
+      "fee": 150,
+      "method": "STRIPE"
+    },
+    {
+      "name": "Laiba Jahanzeb",
+      "email": "tanzilaj2024@gmail.com",
+      "booth": "CRN-02",
+      "category": "Corner Booth - Main Prayer Hall",
+      "fee": 175,
+      "method": "PAYPAL"
+    },
+    {
+      "name": "Tawakkul Zakarriyah",
+      "email": "tawadenike@gmail.com",
+      "booth": "MPH-04",
+      "category": "Regular Booth - Main Prayer Hall",
+      "fee": 150,
+      "method": "STRIPE"
+    }
+  ],
+  "skipped": [],
+  "counters": {
+    "contactsMatched": 25,
+    "contactsCreated": 0,
+    "applicationsCreated": 25,
+    "applicationsApproved": 0,
+    "applicationsExisting": 0,
+    "affiliationsSynced": 25,
+    "internalEventsCreated": 1,
+    "internalEventsExisting": 0,
+    "eventsCreated": 1,
+    "eventsExisting": 0,
+    "boothTypesCreated": 7,
+    "boothTypesExisting": 0,
+    "boothsCreated": 25,
+    "boothsExisting": 0,
+    "participantsCreated": 25,
+    "participantsUpdated": 0,
+    "participantsExisting": 0,
+    "assignmentsCreated": 25,
+    "assignmentsExisting": 0,
+    "paymentsCreated": 25,
+    "paymentsExisting": 0,
+    "paymentsSkippedZero": 0
+  },
+  "ids": {
+    "vendor_hub_event_id": "1342449e-38ca-4882-9fb4-1ae4e6120472",
+    "internal_event_id": "aa95da90-de3b-4df9-b7c5-07f051f3d6ab"
+  },
+  "errors": []
+}

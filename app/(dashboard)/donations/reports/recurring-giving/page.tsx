@@ -1,5 +1,7 @@
-import { RecurringGivingReportPanel } from "@/components/donations/recurring-giving-report-panel"
+import { redirect } from "next/navigation"
 
-export default function DonationRecurringGivingReportPage() {
-  return <RecurringGivingReportPanel />
+import { DONATION_RECURRING_OPS_PATH } from "@/lib/donations/donation-payment-paths"
+
+export default function DonationRecurringGivingRedirectPage() {
+  redirect(DONATION_RECURRING_OPS_PATH)
 }

@@ -1,6 +1,7 @@
+import { Suspense } from "react"
 import { redirect } from "next/navigation"
 
-import { DonationCampaignsOverviewTable } from "@/components/donations/donation-campaigns-overview-table"
+import { DonationCampaignsHome } from "@/components/donations/donation-campaigns-home"
 import { requireDonationStaffAccess } from "@/lib/donations/donation-action-auth"
 
 export default async function DonationsCampaignsOverviewPage() {
@@ -11,7 +12,9 @@ export default async function DonationsCampaignsOverviewPage() {
 
   return (
     <div className="p-6">
-      <DonationCampaignsOverviewTable canManage={access.canManageCampaigns} />
+      <Suspense fallback={<p className="text-sm text-muted-foreground">Loading campaigns...</p>}>
+        <DonationCampaignsHome canManage={access.canManageCampaigns} />
+      </Suspense>
     </div>
   )
 }

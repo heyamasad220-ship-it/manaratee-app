@@ -5,12 +5,14 @@ import { format, isValid, parseISO } from "date-fns"
 import {
   Building2,
   Calendar as CalendarIcon,
+  CalendarRange,
   ChevronDown,
   ExternalLink,
   Globe,
   Loader2,
   MapPin,
   Plus,
+  Repeat,
   X,
   type LucideIcon,
 } from "lucide-react"
@@ -26,7 +28,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Switch } from "@/components/ui/switch"
 import {
   Select,
   SelectContent,
@@ -57,9 +58,11 @@ import {
   type InternalEventLocationType,
 } from "@/lib/events/internal-event-location"
 import {
+  expandEventOccurrences,
   formatEventRecurrenceSummary,
   type EventRecurrenceConfig,
   type EventRecurrenceFrequency,
+  type EventScheduleMode,
 } from "@/lib/events/event-recurrence"
 import { submitInternalEventRequest, updateInternalEvent } from "@/lib/events/internal-event-actions"
 import {
@@ -93,7 +96,10 @@ export type FacilityEventRequestDrawerProps = {
   /** When set, drawer loads this event for editing. */
   editEventId?: string | null
   /** After success: call this (parent may router.refresh / redirect). Receives primary event id. */
-  onSubmitted?: (eventId: string) => void
+  onSubmitted?: (
+    eventId: string,
+    extras?: { recurring: boolean; recurrenceChanged: boolean }
+  ) => void
   /** Prefer "member-staff" for customer portal — still calls same submit. */
   requestOrigin?: "staff-dashboard" | "member-staff"
   /**
@@ -108,6 +114,17 @@ export type FacilityEventRequestDrawerProps = {
 }
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+
+const SCHEDULE_OPTIONS: Array<{
+  value: EventScheduleMode
+  label: string
+  hint: string
+  icon: LucideIcon
+}> = [
+  { value: "one_time", label: "One-time", hint: "One meeting", icon: CalendarIcon },
+  { value: "recurring", label: "Recurring", hint: "Same rule each time", icon: Repeat },
+  { value: "custom", label: "Custom dates", hint: "Add dates one by one", icon: CalendarRange },
+]
 
 const LOCATION_OPTIONS: { value: InternalEventLocationType; icon: LucideIcon }[] = [
   { value: INTERNAL_EVENT_LOCATION_TYPES.facility, icon: Building2 },
@@ -234,7 +251,9 @@ export function FacilityEventRequestDrawer({
   const [externalAddress, setExternalAddress] = useState("")
   const [meetingUrl, setMeetingUrl] = useState("")
 
-  const [isRecurring, setIsRecurring] = useState(false)
+  const [scheduleMode, setScheduleMode] = useState<EventScheduleMode>("one_time")
+  const [loadedScheduleMode, setLoadedScheduleMode] =
+    useState<EventScheduleMode>("one_time")
   const [frequency, setFrequency] = useState<EventRecurrenceFrequency>("weekly")
   const [interval, setIntervalValue] = useState(1)
   const [weekdays, setWeekdays] = useState<number[]>([])
@@ -243,6 +262,9 @@ export function FacilityEventRequestDrawer({
   const [endCount, setEndCount] = useState(10)
   const [exceptions, setExceptions] = useState<string[]>([])
   const [exceptionDraft, setExceptionDraft] = useState("")
+  const [extraCustomDates, setExtraCustomDates] = useState<string[]>([])
+  const [customDateDraft, setCustomDateDraft] = useState("")
+  const [loadedSeriesDateKeys, setLoadedSeriesDateKeys] = useState<string[]>([])
 
   const wasOpenRef = useRef(false)
 
@@ -273,7 +295,8 @@ export function FacilityEventRequestDrawer({
     setExternalVenueName("")
     setExternalAddress("")
     setMeetingUrl("")
-    setIsRecurring(false)
+    setScheduleMode("one_time")
+    setLoadedScheduleMode("one_time")
     setFrequency("weekly")
     setIntervalValue(1)
     setWeekdays([])
@@ -282,6 +305,9 @@ export function FacilityEventRequestDrawer({
     setEndCount(10)
     setExceptions([])
     setExceptionDraft("")
+    setExtraCustomDates([])
+    setCustomDateDraft("")
+    setLoadedSeriesDateKeys([])
   }
 
   function applyEditPayload(payload: FacilityEventEditPayload) {
@@ -321,9 +347,24 @@ export function FacilityEventRequestDrawer({
       payload.locationType === "online" ? payload.locationAddress : ""
     )
     const recurrence = payload.recurrence
-    setIsRecurring(Boolean(recurrence?.enabled))
-    if (recurrence?.enabled) {
-      setFrequency(recurrence.frequency)
+    const nextMode: EventScheduleMode = !recurrence?.enabled
+      ? "one_time"
+      : recurrence.frequency === "custom"
+        ? "custom"
+        : "recurring"
+    const currentDateKey = startParts.dateKey
+    const seriesKeys = (payload.seriesDateKeys || []).filter(Boolean)
+    setLoadedScheduleMode(nextMode)
+    setScheduleMode(nextMode)
+    setLoadedSeriesDateKeys(seriesKeys)
+    setExtraCustomDates(
+      seriesKeys.filter((key) => key && key !== currentDateKey)
+    )
+    setCustomDateDraft("")
+    if (nextMode === "recurring" && recurrence) {
+      setFrequency(
+        recurrence.frequency === "custom" ? "weekly" : recurrence.frequency
+      )
       setIntervalValue(recurrence.interval)
       setWeekdays(recurrence.weekdays || [])
       setEndType(recurrence.endType)
@@ -371,6 +412,20 @@ export function FacilityEventRequestDrawer({
 
   const isEditMode = Boolean(editingEventId)
 
+  function handleScheduleModeChange(next: EventScheduleMode) {
+    setScheduleMode(next)
+    if (next === "recurring") {
+      if (frequency === "weekly" && weekdays.length === 0 && eventDate) {
+        const parsed = parseISO(`${eventDate}T12:00:00`)
+        if (isValid(parsed)) setWeekdays([parsed.getDay()])
+      }
+      if (loadedScheduleMode === "one_time") {
+        setEndType("count")
+        setEndCount(1)
+      }
+    }
+  }
+
   function setLocationType(next: InternalEventLocationType) {
     setLocationTypeState(next)
     if (next !== INTERNAL_EVENT_LOCATION_TYPES.facility) {
@@ -404,6 +459,24 @@ export function FacilityEventRequestDrawer({
     setExceptions((prev) => prev.filter((d) => d !== date))
   }
 
+  function addCustomDate() {
+    if (!customDateDraft) return
+    if (customDateDraft === eventDate) {
+      setCustomDateDraft("")
+      return
+    }
+    setExtraCustomDates((prev) =>
+      prev.includes(customDateDraft)
+        ? prev
+        : [...prev, customDateDraft].sort()
+    )
+    setCustomDateDraft("")
+  }
+
+  function removeCustomDate(date: string) {
+    setExtraCustomDates((prev) => prev.filter((item) => item !== date))
+  }
+
   const startAt = useMemo(
     () => combineDateAndTime(eventDate, startTime),
     [eventDate, startTime]
@@ -420,19 +493,33 @@ export function FacilityEventRequestDrawer({
   }, [eventDate])
 
   const dateDisplay = formatLongDateLabel(eventDate)
+  const isRecurring = scheduleMode !== "one_time"
+  const allCustomDates = Array.from(
+    new Set([eventDate, ...extraCustomDates].filter(Boolean))
+  ).sort()
 
-  const recurrenceConfig: EventRecurrenceConfig | null = isRecurring
-    ? {
-        enabled: true,
-        frequency,
-        interval,
-        weekdays: frequency === "weekly" ? weekdays : undefined,
-        endType,
-        endDate: endType === "date" ? endDate || null : null,
-        endCount: endType === "count" ? endCount : null,
-        exceptions,
-      }
-    : null
+  const recurrenceConfig: EventRecurrenceConfig | null =
+    scheduleMode === "one_time"
+      ? null
+      : scheduleMode === "custom"
+        ? {
+            enabled: true,
+            frequency: "custom",
+            interval: 1,
+            endType: "count",
+            endCount: Math.max(1, allCustomDates.length),
+            customDates: allCustomDates,
+          }
+        : {
+            enabled: true,
+            frequency,
+            interval,
+            weekdays: frequency === "weekly" ? weekdays : undefined,
+            endType,
+            endDate: endType === "date" ? endDate || null : null,
+            endCount: endType === "count" ? endCount : null,
+            exceptions,
+          }
 
   const recurrenceSummary = (() => {
     if (!isRecurring || !startAt || !endAt) return null
@@ -444,6 +531,30 @@ export function FacilityEventRequestDrawer({
       )
     } catch {
       return null
+    }
+  })()
+
+  const extraOccurrenceCount = (() => {
+    if (!isEditMode || scheduleMode === "one_time") return 0
+    if (scheduleMode === "custom") {
+      return extraCustomDates.filter(
+        (key) => !loadedSeriesDateKeys.includes(key)
+      ).length
+    }
+    if (loadedScheduleMode !== "one_time" || !startAt || !endAt || !recurrenceConfig) {
+      return 0
+    }
+    try {
+      return Math.max(
+        0,
+        expandEventOccurrences(
+          new Date(startAt),
+          new Date(endAt),
+          recurrenceConfig
+        ).length - 1
+      )
+    } catch {
+      return 0
     }
   })()
 
@@ -504,10 +615,10 @@ export function FacilityEventRequestDrawer({
         return "Meeting link must be a valid URL."
       }
     }
-    if (isRecurring && frequency === "weekly" && weekdays.length === 0) {
+    if (scheduleMode === "recurring" && frequency === "weekly" && weekdays.length === 0) {
       return "Select at least one weekday for weekly recurrence."
     }
-    if (isRecurring && endType === "date" && !endDate) {
+    if (scheduleMode === "recurring" && endType === "date" && !endDate) {
       return "Choose an end date for the recurring series."
     }
     return null
@@ -564,6 +675,7 @@ export function FacilityEventRequestDrawer({
             id: editingEventId,
             ...basePayload,
             status: (editStatus as never) || undefined,
+            recurrence_config: recurrenceConfig,
           })
           eventId = editingEventId
         } else {
@@ -575,7 +687,12 @@ export function FacilityEventRequestDrawer({
         }
 
         onOpenChange(false)
-        onSubmitted?.(eventId)
+        onSubmitted?.(eventId, {
+          recurring: isRecurring,
+          recurrenceChanged:
+            isEditMode &&
+            (scheduleMode === "one_time") !== (loadedScheduleMode === "one_time"),
+        })
       } catch (submitError) {
         const message =
           submitError instanceof Error
@@ -606,7 +723,7 @@ export function FacilityEventRequestDrawer({
           </SheetTitle>
           <p className="text-sm text-muted-foreground">
             {isEditMode
-              ? "Update event details. Changes save to this occurrence."
+              ? "Update event details. Choose One-time, Recurring (same rule), or Custom dates."
               : isFacility
                 ? spaceMode === "calendar-link"
                   ? approvalRequired
@@ -731,24 +848,33 @@ export function FacilityEventRequestDrawer({
                 </div>
               </div>
 
-              <div className="flex items-center justify-between rounded-lg border p-3">
-                <span className="text-sm">
-                  {isEditMode ? "Recurring series (view only)" : "Recurring event?"}
-                </span>
-                <Switch
-                  checked={isRecurring}
-                  onCheckedChange={setIsRecurring}
-                  disabled={isEditMode}
-                />
+              <div className="flex flex-col gap-2">
+                <Label>Schedule</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  {SCHEDULE_OPTIONS.map(({ value, label, hint, icon: Icon }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => handleScheduleModeChange(value)}
+                      className={cn(
+                        "flex flex-col items-center gap-1 rounded-lg border p-3 text-center transition-colors",
+                        scheduleMode === value
+                          ? "border-primary bg-primary/5 text-primary"
+                          : "text-muted-foreground hover:bg-muted/50"
+                      )}
+                    >
+                      <Icon className="h-5 w-5" />
+                      <span className="text-sm font-medium">{label}</span>
+                      <span className="text-[11px] leading-tight text-muted-foreground">
+                        {hint}
+                      </span>
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              {isRecurring ? (
-                <div
-                  className={cn(
-                    "flex flex-col gap-4 rounded-lg border bg-muted/30 p-4",
-                    isEditMode && "pointer-events-none opacity-70"
-                  )}
-                >
+              {scheduleMode === "recurring" ? (
+                <div className="flex flex-col gap-4 rounded-lg border bg-muted/30 p-4">
                   <div className="flex flex-wrap items-end gap-3">
                     <div className="flex flex-col gap-1.5">
                       <Label className="text-xs text-muted-foreground">Frequency</Label>
@@ -884,6 +1010,72 @@ export function FacilityEventRequestDrawer({
                   {recurrenceSummary ? (
                     <p className="rounded-md bg-primary/5 p-3 text-xs text-muted-foreground">
                       {recurrenceSummary}
+                    </p>
+                  ) : null}
+                  {extraOccurrenceCount > 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      Saving will add {extraOccurrenceCount} more meeting{" "}
+                      {extraOccurrenceCount === 1 ? "date" : "dates"}.
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {scheduleMode === "custom" ? (
+                <div className="flex flex-col gap-4 rounded-lg border bg-muted/30 p-4">
+                  <p className="text-sm text-muted-foreground">
+                    Add each meeting date one at a time. Every date uses the same
+                    start and end time. Custom dates still appear on the Recurring
+                    tab.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {eventDate ? (
+                      <div className="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+                        {formatLongDateLabel(eventDate)}
+                      </div>
+                    ) : null}
+                    {extraCustomDates.map((date) => (
+                      <div
+                        key={date}
+                        className="flex items-center gap-1 rounded-full bg-background px-2 py-1 text-xs"
+                      >
+                        {formatLongDateLabel(date) || date}
+                        <button
+                          type="button"
+                          onClick={() => removeCustomDate(date)}
+                          aria-label={`Remove ${date}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Input
+                      type="date"
+                      value={customDateDraft}
+                      onChange={(event) => setCustomDateDraft(event.target.value)}
+                      className="w-40"
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={addCustomDate}
+                    >
+                      <Plus className="mr-1 h-3.5 w-3.5" />
+                      Add date
+                    </Button>
+                  </div>
+                  {recurrenceSummary ? (
+                    <p className="rounded-md bg-primary/5 p-3 text-xs text-muted-foreground">
+                      {recurrenceSummary}
+                    </p>
+                  ) : null}
+                  {extraOccurrenceCount > 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      Saving will add {extraOccurrenceCount} more meeting{" "}
+                      {extraOccurrenceCount === 1 ? "date" : "dates"}.
                     </p>
                   ) : null}
                 </div>

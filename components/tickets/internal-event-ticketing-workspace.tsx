@@ -17,6 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { updateInternalEventModules } from "@/lib/events/internal-event-actions"
+import { eventManagementOrdersHref } from "@/lib/events/event-management-reports-path"
 import {
   formatTicketPrice,
   ticketingFormFromEvent,
@@ -110,7 +111,7 @@ export function InternalEventTicketingWorkspace({
           </div>
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" size="sm" asChild>
-              <Link href={`/event-management/reports/orders?event=${eventId}`}>
+              <Link href={eventManagementOrdersHref(eventId)}>
                 View orders
               </Link>
             </Button>

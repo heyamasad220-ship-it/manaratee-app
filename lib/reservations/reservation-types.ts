@@ -11,7 +11,7 @@ export type ReservationSourceType =
 
 export type CalendarContext = "venue_rentals" | "internal_events" | "facilities"
 
-export type CalendarViewMode = "day" | "grid"
+export type CalendarViewMode = "day" | "grid" | "list"
 
 export interface CalendarVenue {
   id: string
@@ -33,6 +33,9 @@ export interface CalendarReservation {
   status: string
   metadata: Record<string, unknown>
   href: string | null
+  holderLabel?: string | null
+  contactName?: string | null
+  contactPhone?: string | null
 }
 
 export interface CalendarData {

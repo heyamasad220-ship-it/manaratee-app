@@ -13,6 +13,7 @@ import {
   type ReservableBazaarEvent,
   type ReservableBooth,
 } from "@/lib/vendor-hub/vendor-participation-model"
+import { boothSelectionTotal } from "@/lib/vendor-hub/booth-pricing"
 import { VENDOR_HUB_ROUTES } from "@/lib/vendor-hub/vendor-hub-routes"
 
 export async function getReservableBazaarEventsForCurrentUser(): Promise<
@@ -150,17 +151,18 @@ export async function getAvailableBoothsForEvent(
     ),
   ]
 
-  const boothTypeById = new Map<string, { name: string; price: number }>()
+  const boothTypeById = new Map<string, { name: string; price: number; selectionFee: number }>()
   if (boothTypeIds.length > 0) {
     const { data: boothTypes } = await supabase
       .from("vendor_hub_booth_types")
-      .select("id, name, price")
+      .select("id, name, price, selection_fee")
       .in("id", boothTypeIds)
 
     for (const row of boothTypes ?? []) {
       boothTypeById.set(row.id as string, {
         name: row.name as string,
         price: Number(row.price ?? 0),
+        selectionFee: Number(row.selection_fee ?? 0),
       })
     }
   }
@@ -168,6 +170,8 @@ export async function getAvailableBoothsForEvent(
   return (booths ?? []).map((row) => {
     const boothTypeId = row.booth_type_id as string | null
     const boothType = boothTypeId ? boothTypeById.get(boothTypeId) : null
+    const baseFee = boothType?.price ?? 0
+    const selectionFee = boothType?.selectionFee ?? 0
 
     return {
       id: row.id as string,
@@ -175,7 +179,9 @@ export async function getAvailableBoothsForEvent(
       location: (row.location as string | null) ?? null,
       boothTypeId,
       boothTypeName: boothType?.name ?? null,
-      feeAmount: boothType?.price ?? 0,
+      baseFee,
+      selectionFee,
+      feeAmount: boothSelectionTotal(baseFee, selectionFee),
     }
   })
 }

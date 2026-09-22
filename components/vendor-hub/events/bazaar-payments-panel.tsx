@@ -218,7 +218,7 @@ async function loadBoothAssignmentsForEvent(
     allContactIds.length > 0
       ? supabase
           .from("contacts")
-          .select("id, first_name, last_name, email, phone, organization_name, company_name")
+          .select("id, full_name, email, phone")
           .in("id", allContactIds)
       : Promise.resolve({ data: [], error: null }),
   ])

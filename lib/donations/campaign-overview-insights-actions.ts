@@ -124,6 +124,7 @@ export async function getCampaignOverviewInsightsAction(campaignId: string) {
         id: row.id as string,
         contact_id: row.contact_id as string,
         assigned_to_contact_id: (row.assigned_to_contact_id as string | null) ?? null,
+        assigned_to_name: ((row.assigned_to_name as string | null) ?? "").trim() || null,
         stage: normalizeProspectStage(row.stage as string),
         suggested_ask_amount:
           row.suggested_ask_amount == null ? null : Number(row.suggested_ask_amount),
@@ -167,7 +168,10 @@ export async function getCampaignOverviewInsightsAction(campaignId: string) {
       )
     })
     const unassigned = prospects.filter(
-      (prospect) => !prospect.assigned_to_contact_id && isOpenPipelineStage(prospect.stage)
+      (prospect) =>
+        !prospect.assigned_to_name &&
+        !prospect.assigned_to_contact_id &&
+        isOpenPipelineStage(prospect.stage)
     )
 
     const actionItems: CampaignOverviewActionItem[] = []
@@ -206,15 +210,20 @@ export async function getCampaignOverviewInsightsAction(campaignId: string) {
     }
 
     const teamMap = new Map<string, CampaignTeamMetricRow>()
-    const ensureTeamRow = (assigneeContactId: string | null): CampaignTeamMetricRow => {
-      const key = assigneeContactId || "__unassigned__"
+    const ensureTeamRow = (
+      assigneeContactId: string | null,
+      assigneeName: string | null
+    ): CampaignTeamMetricRow => {
+      const key = assigneeName || assigneeContactId || "__unassigned__"
       let row = teamMap.get(key)
       if (!row) {
         row = {
           assigneeContactId,
-          assigneeName: assigneeContactId
-            ? contactNames.get(assigneeContactId) || "Unknown"
-            : "Unassigned",
+          assigneeName: assigneeName
+            ? assigneeName
+            : assigneeContactId
+              ? contactNames.get(assigneeContactId) || "Unknown"
+              : "Unassigned",
           assignedCount: 0,
           overdueCount: 0,
           askedCount: 0,
@@ -228,7 +237,13 @@ export async function getCampaignOverviewInsightsAction(campaignId: string) {
     }
 
     for (const prospect of prospects) {
-      const row = ensureTeamRow(prospect.assigned_to_contact_id)
+      const row = ensureTeamRow(
+        prospect.assigned_to_contact_id,
+        prospect.assigned_to_name ||
+          (prospect.assigned_to_contact_id
+            ? contactNames.get(prospect.assigned_to_contact_id) || null
+            : null)
+      )
       row.assignedCount += 1
       if (isProspectFollowUpOverdue(prospect.next_follow_up_at, prospect.stage)) {
         row.overdueCount += 1

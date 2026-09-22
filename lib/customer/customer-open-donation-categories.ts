@@ -1,4 +1,8 @@
 import { isDonationFundActive } from "@/lib/donations/donation-fund-status"
+import {
+  donationAttributionNamesMatch,
+  findGeneralDonationCategory,
+} from "@/lib/donations/donation-default-attribution"
 
 export type CustomerDonationCategoryOption = {
   id: string
@@ -9,6 +13,8 @@ export type CustomerDonationCategoryOption = {
     category_id: string
   }>
 }
+
+const UNRESTRICTED_GIVING_CATEGORY_NAME = "Unrestricted Giving"
 
 /** True when the donor must pick one of the category's open funds before giving. */
 export function customerDonationCategoryRequiresFund(
@@ -30,7 +36,7 @@ export function buildCustomerOpenDonationCategories(
     isDonationFundActive(fund.is_active)
   )
 
-  return categories.map((category) => ({
+  const openCategories = categories.map((category) => ({
     id: category.id,
     name: category.name,
     funds: activeSubcategories
@@ -41,4 +47,13 @@ export function buildCustomerOpenDonationCategories(
         category_id: fund.category_id,
       })),
   }))
+
+  if (!findGeneralDonationCategory(openCategories)) {
+    return openCategories
+  }
+
+  return openCategories.filter(
+    (category) =>
+      !donationAttributionNamesMatch(category.name, UNRESTRICTED_GIVING_CATEGORY_NAME)
+  )
 }

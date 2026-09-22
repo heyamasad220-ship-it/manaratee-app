@@ -4,7 +4,6 @@ import Link from "next/link"
 import { useMemo, useState } from "react"
 import { FolderOpen, Settings2 } from "lucide-react"
 
-import { TicketingEventCategoriesDialog } from "@/components/tickets/ticketing-event-categories-dialog"
 import { TicketingEventSalesTable } from "@/components/tickets/ticketing-event-sales-table"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -36,11 +35,12 @@ export function TicketingEventsClient({
   categories: TicketingEventCategory[]
   canManage: boolean
 }) {
-  const [whenFilter, setWhenFilter] = useState<TicketingEventsWhenFilter>("all")
+  const [whenFilter, setWhenFilter] = useState<TicketingEventsWhenFilter>(
+    "active"
+  )
   const [categoryFilter, setCategoryFilter] = useState(
     TICKETING_EVENTS_CATEGORY_FILTER_ALL
   )
-  const [manageOpen, setManageOpen] = useState(false)
 
   const visibleEvents = useMemo(() => {
     const byWhen = filterTicketedEventsByWhen(events, whenFilter)
@@ -53,14 +53,16 @@ export function TicketingEventsClient({
         <div>
           <h2 className="text-lg font-semibold tracking-tight">Events</h2>
           <p className="text-sm text-muted-foreground">
-            Ticket sales and capacity. Filter by category, or change a row to
-            recategorize it.
+            Ticket sales and capacity for active events. Filter to Past to see
+            earlier dates, or change a row to recategorize it.
           </p>
         </div>
         {canManage ? (
-          <Button variant="outline" onClick={() => setManageOpen(true)}>
-            <Settings2 className="mr-2 h-4 w-4" />
-            Manage categories
+          <Button variant="outline" asChild>
+            <Link href="/event-management/ticketing/settings">
+              <Settings2 className="mr-2 h-4 w-4" />
+              Manage categories
+            </Link>
           </Button>
         ) : null}
       </div>
@@ -78,9 +80,9 @@ export function TicketingEventsClient({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All events</SelectItem>
               <SelectItem value="active">Active events</SelectItem>
               <SelectItem value="past">Past events</SelectItem>
+              <SelectItem value="all">All events</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -129,15 +131,16 @@ export function TicketingEventsClient({
             events={visibleEvents}
             canManage={canManage}
             categories={categories}
+            emptyMessage={
+              whenFilter === "active"
+                ? "No active ticketed events. Choose Past events to see earlier dates."
+                : whenFilter === "past"
+                  ? "No past ticketed events."
+                  : "No events match these filters."
+            }
           />
         </div>
       )}
-
-      <TicketingEventCategoriesDialog
-        open={manageOpen}
-        onOpenChange={setManageOpen}
-        categories={categories}
-      />
     </div>
   )
 }

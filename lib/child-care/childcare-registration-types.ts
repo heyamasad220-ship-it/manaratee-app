@@ -90,4 +90,6 @@ export type ChildcareEventInput = {
   end_time?: string | null
   capacity?: number
   notes?: string | null
+  source_type?: "internal_event" | "program" | null
+  source_id?: string | null
 }

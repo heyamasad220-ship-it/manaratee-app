@@ -3,11 +3,16 @@ export const DONATION_RECURRING_OPS_PATH = "/donations/payments/recurring"
 export const DONATION_IMPORT_MATCH_PATH = "/donations/payments/import-match"
 export const DONATION_RECEIPTS_OPS_PATH = "/donations/payments/receipts"
 
+/** @deprecated Redirects to {@link DONATION_TRANSACTIONS_PATH}. */
 export const DONATION_REPORTS_HOME_PATH = "/donations/reports"
+/** @deprecated Redirects to {@link DONATION_TRANSACTIONS_PATH}. */
 export const DONATION_REPORTS_GIVING_PATH = "/donations/reports/giving"
 export const DONATION_REPORTS_DONORS_PATH = "/donations/reports/donors"
+/** @deprecated Redirects to `/donations/campaigns`. */
 export const DONATION_REPORTS_CAMPAIGNS_PATH = "/donations/reports/campaigns"
+/** @deprecated Redirects to `/donations/campaigns/pledges`. */
 export const DONATION_REPORTS_PLEDGES_ANALYTICS_PATH = "/donations/reports/pledges"
+/** @deprecated Redirects to {@link DONATION_RECURRING_OPS_PATH}. */
 export const DONATION_REPORTS_RECURRING_ANALYTICS_PATH = "/donations/reports/recurring-giving"
 
 /** @deprecated Redirects to {@link DONATION_TRANSACTIONS_PATH}. */

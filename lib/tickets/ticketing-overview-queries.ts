@@ -40,6 +40,7 @@ const EVENT_SELECT = `
         name,
         start_at,
         end_at,
+        status,
         location_label,
         ticketing_config,
         ticketing_category_id,
@@ -52,6 +53,7 @@ const EVENT_SELECT_WITHOUT_CATEGORY = `
         name,
         start_at,
         end_at,
+        status,
         location_label,
         ticketing_config,
         venues:venue_id ( name )
@@ -195,6 +197,7 @@ export async function getTicketedEventsOverview(): Promise<TicketedEventOverview
       locationLabel: row.location_label ?? null,
       startAt: row.start_at ?? null,
       endAt: row.end_at ?? null,
+      eventStatus: (row.status as string | null) ?? null,
       salesStatus: resolveSalesStatus(row.ticketing_config),
       ticketsIssued: stats.issued,
       ticketsCapacity: capacity,

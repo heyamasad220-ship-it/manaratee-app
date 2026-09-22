@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache"
 
 import { requireDonationStaffAccess } from "@/lib/donations/donation-action-auth"
 import { canLinkEventToCampaign, EVENT_WORKSPACE_VIEW_PERMISSIONS } from "@/lib/events/event-access"
-import { linkedCampaignIdFromConfig } from "@/lib/events/event-finance-types"
+import { linkedCampaignIdFromEvent, withLinkedCampaignConfig } from "@/lib/events/event-campaign-id"
 import { getInternalEventRecordById } from "@/lib/events/internal-event-queries"
 import { getInternalEventStatusLabel } from "@/lib/events/internal-event-status"
 import { hasAnyPermission, PERMISSIONS } from "@/lib/permissions/permissions"
@@ -20,7 +20,7 @@ import {
 } from "@/lib/modules/dashboard-module-access-server"
 
 const EVENT_LIST_SELECT =
-  "id, name, start_at, end_at, status, requires_ticketing, location_label, ticketing_config, departments:department_id ( name )"
+  "id, name, start_at, end_at, status, requires_ticketing, location_label, ticketing_config, campaign_id, departments:department_id ( name )"
 
 export type CampaignEventListItem = {
   id: string
@@ -107,14 +107,33 @@ async function fetchOrgEvents(
     .limit(limit)
 
   if (options?.linkedCampaignId) {
-    query = query.filter(
-      "ticketing_config->>linkedCampaignId",
-      "eq",
-      options.linkedCampaignId
-    )
+    query = query.eq("campaign_id", options.linkedCampaignId)
   }
 
-  const { data, error } = await query
+  let { data, error } = await query
+  if (
+    error &&
+    (error.code === "42703" || error.message?.includes("campaign_id"))
+  ) {
+    let fallback = writeClient
+      .from("internal_events")
+      .select(
+        "id, name, start_at, end_at, status, requires_ticketing, location_label, ticketing_config, departments:department_id ( name )"
+      )
+      .eq("organization_id", organizationId)
+      .order("start_at", { ascending: false, nullsFirst: false })
+      .limit(limit)
+    if (options?.linkedCampaignId) {
+      fallback = fallback.filter(
+        "ticketing_config->>linkedCampaignId",
+        "eq",
+        options.linkedCampaignId
+      )
+    }
+    const retry = await fallback
+    data = retry.data
+    error = retry.error
+  }
   if (error) {
     throw new Error(error.message)
   }
@@ -288,9 +307,10 @@ export async function listCampaignEventsAction(
       const allRows = await fetchOrgEvents(access.orgId, { limit: 200 })
       rows = allRows.filter(
         (row) =>
-          linkedCampaignIdFromConfig(
-            row.ticketing_config as EventTicketingConfig | null
-          ) === id
+          linkedCampaignIdFromEvent({
+            campaign_id: row.campaign_id as string | null,
+            ticketing_config: row.ticketing_config as EventTicketingConfig | null,
+          }) === id
       )
     }
 
@@ -363,9 +383,10 @@ export async function listAttachableCampaignEventsAction(
     const rows = await fetchOrgEvents(access.orgId, { limit: 200 })
     const events = rows
       .map((row) => {
-        const linkedCampaignId = linkedCampaignIdFromConfig(
-          row.ticketing_config as EventTicketingConfig | null
-        )
+        const linkedCampaignId = linkedCampaignIdFromEvent({
+          campaign_id: row.campaign_id as string | null,
+          ticketing_config: row.ticketing_config as EventTicketingConfig | null,
+        })
         return { ...mapEventRow(row), linkedCampaignId }
       })
       .filter((event) => event.linkedCampaignId !== id)
@@ -402,9 +423,10 @@ async function writeLinkedCampaign(input: {
     return { success: false, error: "Event not found." }
   }
 
-  const previousCampaignId = linkedCampaignIdFromConfig(
-    existingEvent.ticketing_config as EventTicketingConfig | null
-  )
+  const previousCampaignId = linkedCampaignIdFromEvent({
+    campaign_id: (existingEvent as { campaign_id?: string | null }).campaign_id,
+    ticketing_config: existingEvent.ticketing_config as EventTicketingConfig | null,
+  })
 
   if (input.linkedCampaignId) {
     const { data: campaign, error: campaignError } = await supabase
@@ -425,10 +447,11 @@ async function writeLinkedCampaign(input: {
   const { error } = await supabase
     .from("internal_events")
     .update({
-      ticketing_config: {
-        ...ticketingConfig,
-        linkedCampaignId: input.linkedCampaignId,
-      },
+      campaign_id: input.linkedCampaignId,
+      ticketing_config: withLinkedCampaignConfig(
+        ticketingConfig,
+        input.linkedCampaignId
+      ),
     })
     .eq("id", input.eventId)
     .eq("organization_id", organizationId)

@@ -19,6 +19,7 @@ import {
   calculateInstallmentAmount,
   computeScheduledPledgePaymentDate,
   defaultFirstPaymentDate,
+  formatPledgePaymentPlanSummary,
   pledgeHasPaymentPlan,
   suggestedPledgePaymentAmount,
 } from "@/lib/donations/pledge-payment-plan"
@@ -26,6 +27,7 @@ import { ensureDonorExtensionForContact } from "@/lib/donations/donor-contact-br
 import {
   formatPaymentStatusLabel,
   formatPledgeStatusLabel,
+  isOutstandingPledgeStatus,
   normalizePaymentStatus,
 } from "@/lib/donations/donation-status"
 import { normalizePaymentSourceChannel, isStripeCheckoutPaymentMethod } from "@/lib/donations/payment-source-channel"
@@ -112,6 +114,10 @@ type DonationCampaign = {
   id: string
   name: string
   description: string | null
+  status: string | null
+  imageUrl: string | null
+  goalAmount: number | null
+  raisedAmount: number | null
 }
 
 type DonationTab = "giving" | "pledges" | "payments"
@@ -241,6 +247,20 @@ function formatGivingHistoryDate(value?: string | null) {
 
   return date.toLocaleDateString("en-US", {
     month: "short",
+    day: "numeric",
+    year: "numeric",
+  })
+}
+
+function formatDueDate(value?: string | null) {
+  if (!value) return null
+
+  const raw = value.trim()
+  const date = new Date(raw.includes("T") ? raw : `${raw}T12:00:00`)
+  if (Number.isNaN(date.getTime())) return raw
+
+  return date.toLocaleDateString("en-US", {
+    month: "long",
     day: "numeric",
     year: "numeric",
   })
@@ -385,9 +405,13 @@ export default function CustomerDonationsPage() {
         setDonationCategories(formattedCategories)
         setCampaigns(
           (result.campaigns || []).map((campaign) => ({
-            id: campaign.id as string,
-            name: campaign.name as string,
-            description: (campaign.description as string | null) ?? null,
+            id: campaign.id,
+            name: campaign.name,
+            description: campaign.description ?? null,
+            status: campaign.status ?? null,
+            imageUrl: campaign.imageUrl ?? null,
+            goalAmount: campaign.goalAmount ?? null,
+            raisedAmount: campaign.raisedAmount ?? null,
           }))
         )
 
@@ -569,30 +593,32 @@ export default function CustomerDonationsPage() {
     return fund?.name || category?.name || "General Fund"
   }
 
-  const totalPledged = pledges.reduce((sum, pledge) => sum + Number(pledge.totalAmount || 0), 0)
-  const totalPaid = payments
+  const lifetimeGiving = payments
     .filter((payment) => normalizePaymentStatus(payment.status) !== "voided")
     .reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
-  const outstandingBalance = pledges.reduce((sum, pledge) => sum + Number(pledge.balance || 0), 0)
   const activePledges = pledges.filter(
-    (pledge) => pledge.status !== "Fulfilled" && pledge.status !== "Cancelled" && pledge.balance > 0
+    (pledge) => isOutstandingPledgeStatus(pledge.status) && pledge.balance > 0
   )
-  const upcomingPaymentTotal = activePledges.reduce(
-    (sum, pledge) =>
-      sum +
-      suggestedPledgePaymentAmount({
-        balance: pledge.balance,
-        installmentAmount: pledge.installmentAmount,
-        frequency: pledge.frequency,
-        totalPayments: pledge.totalPayments,
-      }),
+  const outstandingBalance = activePledges.reduce(
+    (sum, pledge) => sum + Number(pledge.balance || 0),
     0
   )
-  const nextPaymentDate =
-    activePledges
-      .map((pledge) => pledge.nextPaymentDate)
-      .filter(Boolean)
-      .sort()[0] || "—"
+  const nextPaymentPledge = [...activePledges]
+    .filter(
+      (pledge) => pledgeHasPaymentPlan(pledge) && Boolean(pledge.nextPaymentDate)
+    )
+    .sort((a, b) => String(a.nextPaymentDate).localeCompare(String(b.nextPaymentDate)))[0]
+  const nextPaymentAmount = nextPaymentPledge
+    ? suggestedPledgePaymentAmount({
+        balance: nextPaymentPledge.balance,
+        installmentAmount: nextPaymentPledge.installmentAmount,
+        frequency: nextPaymentPledge.frequency,
+        totalPayments: nextPaymentPledge.totalPayments,
+      })
+    : 0
+  const nextPaymentDueLabel = formatDueDate(nextPaymentPledge?.nextPaymentDate)
+  const showNextPaymentCard =
+    !loading && Boolean(nextPaymentPledge && nextPaymentDueLabel && nextPaymentAmount > 0)
 
   const handlePayPledge = (pledge: DonationPledge, presetAmount?: number) => {
     setSelectedPledge(pledge)
@@ -617,6 +643,24 @@ export default function CustomerDonationsPage() {
     setPaymentSuccess(false)
     setFormError("")
   }
+
+  useEffect(() => {
+    if (loading || typeof window === "undefined") return
+
+    const params = new URLSearchParams(window.location.search)
+    const action = params.get("action")?.trim() || ""
+    const pledgeId = params.get("pledge")?.trim() || ""
+
+    if (action !== "pay" || !pledgeId) return
+
+    const pledge = pledges.find((row) => row.id === pledgeId)
+    if (!pledge) return
+
+    setActiveTab("pledges")
+    handlePayPledge(pledge)
+    window.history.replaceState({}, "", "/customer/donation")
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, pledges])
 
   const handleOpenDonate = (
     frequency: DonationFrequency = "one-time",
@@ -1047,11 +1091,11 @@ export default function CustomerDonationsPage() {
   }
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-foreground">My Donations</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Explore giving opportunities, manage pledges, and review payment history.
+          Explore giving opportunities, manage pledges, and review your giving history.
         </p>
       </div>
 
@@ -1061,33 +1105,19 @@ export default function CustomerDonationsPage() {
         </div>
       ) : null}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Card className="h-full border-l-4 border-l-primary">
-          <CardContent className="flex h-full flex-col p-5">
+      <div
+        className={`grid gap-4 sm:grid-cols-2 ${
+          showNextPaymentCard ? "xl:grid-cols-4" : "xl:grid-cols-3"
+        }`}
+      >
+        <Card className="border-l-4 border-l-emerald-500">
+          <CardContent className="p-5">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0 flex-1">
-                <p className="text-sm text-muted-foreground">Total Pledged</p>
-                <p className="mt-1 text-2xl font-bold text-foreground">
-                  {loading ? "—" : formatCurrency(totalPledged)}
-                </p>
-                <p className="mt-1 min-h-4 text-xs text-muted-foreground">&nbsp;</p>
-              </div>
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                <Heart className="h-5 w-5 text-primary" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="h-full border-l-4 border-l-emerald-500">
-          <CardContent className="flex h-full flex-col p-5">
-            <div className="flex items-start justify-between gap-4">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm text-muted-foreground">Total Paid</p>
+                <p className="text-sm text-muted-foreground">Lifetime Giving</p>
                 <p className="mt-1 text-2xl font-bold text-emerald-600">
-                  {loading ? "—" : formatCurrency(totalPaid)}
+                  {loading ? "—" : formatCurrency(lifetimeGiving)}
                 </p>
-                <p className="mt-1 min-h-4 text-xs text-muted-foreground">&nbsp;</p>
               </div>
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-100">
                 <CheckCircle2 className="h-5 w-5 text-emerald-600" />
@@ -1096,15 +1126,30 @@ export default function CustomerDonationsPage() {
           </CardContent>
         </Card>
 
-        <Card className="h-full border-l-4 border-l-amber-500">
-          <CardContent className="flex h-full flex-col p-5">
+        <Card className="border-l-4 border-l-primary">
+          <CardContent className="p-5">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0 flex-1">
-                <p className="text-sm text-muted-foreground">Outstanding Balance</p>
+                <p className="text-sm text-muted-foreground">Active Pledges</p>
+                <p className="mt-1 text-2xl font-bold text-foreground">
+                  {loading ? "—" : activePledges.length}
+                </p>
+              </div>
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                <Heart className="h-5 w-5 text-primary" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-l-4 border-l-amber-500">
+          <CardContent className="p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm text-muted-foreground">Outstanding Pledge Balance</p>
                 <p className="mt-1 text-2xl font-bold text-amber-600">
                   {loading ? "—" : formatCurrency(outstandingBalance)}
                 </p>
-                <p className="mt-1 min-h-4 text-xs text-muted-foreground">&nbsp;</p>
               </div>
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-100">
                 <DollarSign className="h-5 w-5 text-amber-600" />
@@ -1113,22 +1158,24 @@ export default function CustomerDonationsPage() {
           </CardContent>
         </Card>
 
-        <Card className="h-full border-l-4 border-l-violet-500">
-          <CardContent className="flex h-full flex-col p-5">
-            <div className="flex items-start justify-between gap-4">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm text-muted-foreground">Next Payment Due</p>
-                <p className="mt-1 text-2xl font-bold text-violet-600">
-                  {loading ? "—" : formatCurrency(upcomingPaymentTotal)}
-                </p>
-                <p className="mt-1 min-h-4 text-xs text-muted-foreground">{nextPaymentDate}</p>
+        {showNextPaymentCard ? (
+          <Card className="border-l-4 border-l-violet-500">
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm text-muted-foreground">Next Payment</p>
+                  <p className="mt-1 text-2xl font-bold text-violet-600">
+                    {formatCurrency(nextPaymentAmount)}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">Due {nextPaymentDueLabel}</p>
+                </div>
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-100">
+                  <Calendar className="h-5 w-5 text-violet-600" />
+                </div>
               </div>
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-100">
-                <Calendar className="h-5 w-5 text-violet-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        ) : null}
       </div>
 
       <Tabs
@@ -1139,7 +1186,7 @@ export default function CustomerDonationsPage() {
         <TabsList className="grid w-full max-w-xl grid-cols-3">
           <TabsTrigger value="giving">Giving Opportunities</TabsTrigger>
           <TabsTrigger value="pledges">My Pledges</TabsTrigger>
-          <TabsTrigger value="payments">Giving history</TabsTrigger>
+          <TabsTrigger value="payments">Giving History</TabsTrigger>
         </TabsList>
 
         <TabsContent value="giving" className="mt-6">
@@ -1151,20 +1198,10 @@ export default function CustomerDonationsPage() {
             </Card>
           ) : (
             <CustomerDashboardGivingSection
-              campaigns={campaigns.map((campaign) => ({
-                ...campaign,
-                flyerUrl: null,
-              }))}
               categories={donationCategories.map((category) => ({
                 id: category.id,
                 name: category.name,
               }))}
-              onPledge={(campaignId) => {
-                setActiveTab("pledges")
-                setNewPledgeForm({ campaign: campaignId, totalAmount: "" })
-                setFormError("")
-                setShowNewPledgeDialog(true)
-              }}
             />
           )}
         </TabsContent>
@@ -1199,9 +1236,16 @@ export default function CustomerDonationsPage() {
                     <div>
                       <p className="text-sm font-medium text-foreground">No pledges yet</p>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        Create a pledge toward a campaign when you are ready to support a fund.
+                        You don't currently have any active pledges.
                       </p>
                     </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setActiveTab("giving")}
+                    >
+                      Explore Giving Opportunities
+                    </Button>
                   </CardContent>
                 </Card>
               ) : (
@@ -1211,87 +1255,99 @@ export default function CustomerDonationsPage() {
                     pledge.balance > 0 &&
                     pledge.status !== "Fulfilled" &&
                     pledge.status !== "Cancelled"
+                  const suggestedAmount = suggestedPledgePaymentAmount({
+                    balance: pledge.balance,
+                    installmentAmount: pledge.installmentAmount,
+                    frequency: pledge.frequency,
+                    totalPayments: pledge.totalPayments,
+                  })
+                  const nextPaymentLabel = formatDueDate(pledge.nextPaymentDate)
+                  const progressPercent =
+                    pledge.totalAmount > 0
+                      ? (pledge.paidAmount / pledge.totalAmount) * 100
+                      : 0
 
                   return (
-                  <Card key={pledge.id} className="overflow-hidden">
-                    <CardContent className="p-0">
-                      <div className="flex flex-col lg:flex-row">
-                        <div className="flex-1 p-5">
-                          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
-                            <div className="flex items-center gap-2">
-                              <h3 className="font-semibold text-foreground">{pledge.campaign}</h3>
-                              {getStatusBadge(pledge.status)}
-                            </div>
-                            <div>
-                              <span className="text-muted-foreground">Pledged </span>
-                              <span className="font-medium text-foreground">
-                                {pledge.pledgeDate || "—"}
-                              </span>
-                            </div>
-                            <div>
-                              <span className="text-muted-foreground">Total pledge </span>
-                              <span className="font-medium text-foreground">
-                                {formatCurrency(pledge.totalAmount)}
-                              </span>
-                            </div>
-                            <div>
-                              <span className="text-muted-foreground">Payments made </span>
-                              <span className="font-medium text-foreground">
-                                {hasPlan
-                                  ? `${pledge.paymentsMade} of ${pledge.totalPayments}`
-                                  : pledge.paymentsMade}
-                              </span>
-                            </div>
-                            <div>
-                              <span className="text-muted-foreground">Remaining balance </span>
-                              <span className="font-medium text-foreground">
-                                {formatCurrency(pledge.balance)}
-                              </span>
-                            </div>
-                          </div>
-
-                          <div className="mt-4">
-                            <div className="mb-2 flex justify-between text-sm">
-                              <span className="text-muted-foreground">Progress</span>
-                              <span className="font-medium">
-                                {formatCurrency(pledge.paidAmount)} of {formatCurrency(pledge.totalAmount)}
-                              </span>
-                            </div>
-                            <Progress
-                              value={pledge.totalAmount > 0 ? (pledge.paidAmount / pledge.totalAmount) * 100 : 0}
-                              className="h-2"
-                            />
-                          </div>
+                  <Card key={pledge.id}>
+                    <CardContent className="p-5">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <h3 className="font-semibold text-foreground">{pledge.campaign}</h3>
+                          <div className="mt-2">{getStatusBadge(pledge.status)}</div>
                         </div>
-
-                        {canPay ? (
-                          <div className="flex flex-col justify-center gap-2 border-t border-border p-5 lg:w-56 lg:border-l lg:border-t-0">
-                            <Button
-                              className="w-full gap-2"
-                              onClick={() => handlePayPledge(pledge)}
-                            >
-                              <CreditCard className="h-4 w-4" />
-                              Pay Now
-                            </Button>
-                            <Button
-                              variant="outline"
-                              className="w-full gap-2"
-                              onClick={() => handleOpenPaymentPlan(pledge)}
-                            >
-                              <Calendar className="h-4 w-4" />
-                              {hasPlan ? "Edit Payment Plan" : "Set Up Payment Plan"}
-                            </Button>
-                          </div>
-                        ) : null}
-
-                        {pledge.status === "Fulfilled" && (
-                          <div className="flex flex-col items-center justify-center gap-2 border-t border-border bg-emerald-50 p-5 lg:w-64 lg:border-l lg:border-t-0">
-                            <CheckCircle2 className="h-8 w-8 text-emerald-600" />
-                            <p className="text-sm font-medium text-emerald-700">Fully Paid</p>
-                            <p className="text-xs text-emerald-600">Thank you!</p>
-                          </div>
-                        )}
                       </div>
+
+                      <div className="mt-4 grid grid-cols-3 gap-3 text-sm">
+                        <div>
+                          <p className="text-muted-foreground">Pledged</p>
+                          <p className="mt-1 font-semibold text-foreground">
+                            {formatCurrency(pledge.totalAmount)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Paid</p>
+                          <p className="mt-1 font-semibold text-foreground">
+                            {formatCurrency(pledge.paidAmount)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Remaining</p>
+                          <p className="mt-1 font-semibold text-foreground">
+                            {formatCurrency(pledge.balance)}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-4">
+                        <Progress value={progressPercent} className="h-2" />
+                      </div>
+
+                      {hasPlan ? (
+                        <p className="mt-3 text-sm text-muted-foreground">
+                          {formatPledgePaymentPlanSummary({
+                            totalAmount: pledge.totalAmount,
+                            installmentAmount: pledge.installmentAmount,
+                            totalPayments: pledge.totalPayments,
+                            frequency: pledge.frequency,
+                          })}
+                        </p>
+                      ) : null}
+
+                      {canPay && hasPlan && nextPaymentLabel ? (
+                        <p className="mt-2 text-sm text-foreground">
+                          Next payment:{" "}
+                          <span className="font-medium">
+                            {formatCurrency(suggestedAmount)} due {nextPaymentLabel}
+                          </span>
+                        </p>
+                      ) : null}
+
+                      {canPay ? (
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          <Button
+                            className="gap-2"
+                            onClick={() => handlePayPledge(pledge)}
+                          >
+                            <CreditCard className="h-4 w-4" />
+                            Make a Payment
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="gap-2"
+                            onClick={() => handleOpenPaymentPlan(pledge)}
+                          >
+                            <Calendar className="h-4 w-4" />
+                            {hasPlan ? "Edit Payment Plan" : "Set Up Payment Plan"}
+                          </Button>
+                        </div>
+                      ) : null}
+
+                      {pledge.status === "Fulfilled" ? (
+                        <div className="mt-4 flex items-center gap-2 text-sm text-emerald-700">
+                          <CheckCircle2 className="h-4 w-4" />
+                          Fully paid. Thank you!
+                        </div>
+                      ) : null}
                     </CardContent>
                   </Card>
                   )
@@ -1303,7 +1359,7 @@ export default function CustomerDonationsPage() {
 
         <TabsContent value="payments" className="mt-6">
           <div className="flex flex-col gap-4">
-            <h2 className="text-lg font-semibold text-foreground">Giving history</h2>
+            <h2 className="text-lg font-semibold text-foreground">Giving History</h2>
 
             <Card>
               <CardContent className="p-0">
@@ -1315,11 +1371,18 @@ export default function CustomerDonationsPage() {
                   <div className="flex flex-col items-center justify-center gap-3 p-8 text-center">
                     <CreditCard className="h-10 w-10 text-muted-foreground/50" />
                     <div>
-                      <p className="text-sm font-medium text-foreground">No payments yet</p>
+                      <p className="text-sm font-medium text-foreground">No giving history yet</p>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        Pledge payments, recurring donations, and one-time donations will appear here.
+                        Your donations and pledge payments will appear here.
                       </p>
                     </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setActiveTab("giving")}
+                    >
+                      Explore Giving Opportunities
+                    </Button>
                   </div>
                 ) : (
                   <div className="divide-y divide-border">
@@ -1332,7 +1395,7 @@ export default function CustomerDonationsPage() {
                           <div>
                             <p className="font-medium text-foreground">{payment.paymentType}</p>
                             <p className="text-sm text-muted-foreground">
-                              {formatGivingHistoryDate(payment.date)}
+                              {payment.campaign} · {formatGivingHistoryDate(payment.date)}
                             </p>
                           </div>
                         </div>
@@ -1355,7 +1418,7 @@ export default function CustomerDonationsPage() {
 
       {/* Donate Dialog */}
       <Dialog open={showDonateDialog} onOpenChange={setShowDonateDialog}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>
               {donationSuccessType === "recurring"
@@ -1399,48 +1462,50 @@ export default function CustomerDonationsPage() {
           ) : (
             <>
               <div className="flex flex-col gap-4 py-4">
-                <div className="flex flex-col gap-2">
-                  <Label>Frequency</Label>
-                  <Select
-                    value={donationForm.frequency}
-                    onValueChange={(v) =>
-                      setDonationForm({
-                        ...donationForm,
-                        frequency: v as DonationFrequency,
-                      })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {DONATION_FREQUENCY_OPTIONS.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <Label>Donation Amount</Label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                      $
-                    </span>
-                    <Input
-                      type="number"
-                      value={donationForm.amount}
-                      onChange={(e) =>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="flex flex-col gap-2">
+                    <Label>Frequency</Label>
+                    <Select
+                      value={donationForm.frequency}
+                      onValueChange={(v) =>
                         setDonationForm({
                           ...donationForm,
-                          amount: e.target.value,
+                          frequency: v as DonationFrequency,
                         })
                       }
-                      className="pl-7"
-                      placeholder="0.00"
-                    />
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {DONATION_FREQUENCY_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <Label>Donation Amount</Label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                        $
+                      </span>
+                      <Input
+                        type="number"
+                        value={donationForm.amount}
+                        onChange={(e) =>
+                          setDonationForm({
+                            ...donationForm,
+                            amount: e.target.value,
+                          })
+                        }
+                        className="pl-7"
+                        placeholder="0.00"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -1471,56 +1536,74 @@ export default function CustomerDonationsPage() {
                   </div>
                 ) : null}
 
-                <div className="flex flex-col gap-2">
-                  <Label>Donation Category</Label>
-                  <Select
-                    value={donationForm.category}
-                    onValueChange={(v) =>
-                      setDonationForm({
-                        ...donationForm,
-                        category: v,
-                        fund: "",
-                      })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {donationCategories.map((cat) => (
-                        <SelectItem key={cat.id} value={cat.id}>
-                          {cat.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {donationForm.category && selectedCategoryRequiresFund ? (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div className="flex flex-col gap-2">
-                    <Label>Specific Fund</Label>
+                    <Label>Donation Category</Label>
                     <Select
-                      value={donationForm.fund}
-                      onValueChange={(v) =>
+                      value={donationForm.category}
+                      onValueChange={(v) => {
+                        const category = donationCategories.find((cat) => cat.id === v)
                         setDonationForm({
                           ...donationForm,
-                          fund: v,
+                          category: v,
+                          fund: category?.funds.length === 1 ? category.funds[0].id : "",
                         })
-                      }
+                      }}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Select fund" />
+                        <SelectValue placeholder="Select category" />
                       </SelectTrigger>
                       <SelectContent>
-                        {selectedDonationCategory?.funds.map((fund) => (
-                          <SelectItem key={fund.id} value={fund.id}>
-                            {fund.name}
+                        {donationCategories.map((cat) => (
+                          <SelectItem key={cat.id} value={cat.id}>
+                            {cat.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
-                ) : null}
+
+                  <div className="flex flex-col gap-2">
+                    <Label>Fund</Label>
+                    <Select
+                      value={
+                        selectedCategoryRequiresFund
+                          ? donationForm.fund || undefined
+                          : "none"
+                      }
+                      onValueChange={(v) =>
+                        setDonationForm({
+                          ...donationForm,
+                          fund: v === "none" ? "" : v,
+                        })
+                      }
+                      disabled={!donationForm.category || !selectedCategoryRequiresFund}
+                    >
+                      <SelectTrigger>
+                        <SelectValue
+                          placeholder={
+                            !donationForm.category
+                              ? "Select a category first"
+                              : selectedCategoryRequiresFund
+                                ? "Select fund"
+                                : "No funds"
+                          }
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {!selectedCategoryRequiresFund ? (
+                          <SelectItem value="none">No funds</SelectItem>
+                        ) : (
+                          selectedDonationCategory?.funds.map((fund) => (
+                            <SelectItem key={fund.id} value={fund.id}>
+                              {fund.name}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
 
                 {isOneTimeDonation ? (
                   contact ? (

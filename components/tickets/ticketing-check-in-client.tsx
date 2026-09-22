@@ -7,6 +7,7 @@ import { ScanLine, Ticket } from "lucide-react"
 import { TicketCheckInScanner } from "@/components/tickets/ticket-check-in-scanner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { eventManagementOrdersHref } from "@/lib/events/event-management-reports-path"
 import { isTicketedEventPast, type TicketedEventOverviewRow } from "@/lib/tickets/ticketing-overview-types"
 import { formatEventSchedule } from "@/lib/tickets/ticketing-overview-types"
 
@@ -92,8 +93,8 @@ export function TicketingCheckInClient({
                   </div>
                   <div className="flex flex-wrap items-center justify-end gap-2">
                     <Button variant="outline" size="sm" asChild>
-                      <Link href={`/event-management/${event.id}?tab=orders`}>
-                        Open check-in
+                      <Link href={eventManagementOrdersHref(event.id)}>
+                        Orders
                       </Link>
                     </Button>
                     <Button variant="ghost" size="sm" asChild>

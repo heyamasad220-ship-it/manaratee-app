@@ -189,9 +189,9 @@ export function buildEventManagementChildren(): SubItem[] {
       permissionKey: "events.view",
     },
     {
-      label: "Check-in",
-      href: "/event-management/check-in",
-      matchPrefix: "/event-management/check-in",
+      label: "Ticketing",
+      href: "/event-management/ticketing",
+      matchPrefix: "/event-management/ticketing",
       permissionKey: "events.view",
       permissionKeys: ["events.view", "events.checkin", "ticketing.view"],
     },

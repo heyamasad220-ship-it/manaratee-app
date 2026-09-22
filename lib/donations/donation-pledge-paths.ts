@@ -1,6 +1,6 @@
 export const DONATION_PLEDGES_PATH = "/donations/campaigns/pledges"
 
-/** Pledge Performance analytics report (not the operational pledges ledger). */
+/** @deprecated Redirects to {@link DONATION_PLEDGES_PATH}. */
 export const DONATION_REPORTS_PLEDGES_PATH = "/donations/reports/pledges"
 
 export function donationPledgesHref(input?: {

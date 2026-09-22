@@ -8,6 +8,14 @@ export function resolveCustomerDisplayName(
   return "Customer"
 }
 
+export function resolveCustomerFirstName(
+  fullName: string | null | undefined,
+  email: string | null | undefined
+) {
+  const displayName = resolveCustomerDisplayName(fullName, email)
+  return displayName.trim().split(/\s+/).filter(Boolean)[0] || displayName
+}
+
 export function resolveCustomerInitials(
   fullName: string,
   email: string | null | undefined

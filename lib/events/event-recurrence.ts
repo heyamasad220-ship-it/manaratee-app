@@ -1,7 +1,15 @@
 /** Recurrence for internal event requests (stored on `internal_events.recurrence_config`). */
 
-export const EVENT_RECURRENCE_FREQUENCIES = ["daily", "weekly", "monthly"] as const
+export const EVENT_RECURRENCE_FREQUENCIES = [
+  "daily",
+  "weekly",
+  "monthly",
+  "custom",
+] as const
 export type EventRecurrenceFrequency = (typeof EVENT_RECURRENCE_FREQUENCIES)[number]
+
+export const EVENT_SCHEDULE_MODES = ["one_time", "recurring", "custom"] as const
+export type EventScheduleMode = (typeof EVENT_SCHEDULE_MODES)[number]
 
 export const EVENT_RECURRENCE_END_TYPES = ["date", "count"] as const
 export type EventRecurrenceEndType = (typeof EVENT_RECURRENCE_END_TYPES)[number]
@@ -18,6 +26,8 @@ export type EventRecurrenceConfig = {
   endCount?: number | null
   /** YYYY-MM-DD dates to skip */
   exceptions?: string[]
+  /** YYYY-MM-DD meetings when frequency is custom */
+  customDates?: string[]
   seriesId?: string | null
 }
 
@@ -29,6 +39,15 @@ export type EventOccurrence = {
 export const MAX_EVENT_OCCURRENCES = 100
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+const WEEKDAY_FULL_LABELS = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+]
 
 function toDateKey(date: Date): string {
   const y = date.getFullYear()
@@ -73,8 +92,51 @@ export function isEventRecurrenceFrequency(
   value: string | null | undefined
 ): value is EventRecurrenceFrequency {
   return (
-    value === "daily" || value === "weekly" || value === "monthly"
+    value === "daily" ||
+    value === "weekly" ||
+    value === "monthly" ||
+    value === "custom"
   )
+}
+
+export function isCustomEventRecurrence(
+  config: EventRecurrenceConfig | Record<string, unknown> | null | undefined
+): boolean {
+  return normalizeEventRecurrenceConfig(config)?.frequency === "custom"
+}
+
+export function calendarDateKey(
+  value: Date | string | null | undefined,
+  timeZone = "America/Chicago"
+): string {
+  if (!value) return ""
+  const date = typeof value === "string" ? new Date(value) : value
+  if (Number.isNaN(date.getTime())) return ""
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date)
+}
+
+function uniqueDateKeys(values: unknown): string[] {
+  if (!Array.isArray(values)) return []
+  return Array.from(
+    new Set(
+      values
+        .map((value) => String(value).trim())
+        .filter((value) => Boolean(parseDateKey(value)))
+    )
+  )
+    .sort()
+    .slice(0, MAX_EVENT_OCCURRENCES)
+}
+
+export function isInternalEventRecurring(
+  config: EventRecurrenceConfig | Record<string, unknown> | null | undefined
+): boolean {
+  return normalizeEventRecurrenceConfig(config)?.enabled === true
 }
 
 export function normalizeEventRecurrenceConfig(
@@ -107,14 +169,9 @@ export function normalizeEventRecurrenceConfig(
     : []
 
   const exceptions = Array.isArray((input as EventRecurrenceConfig).exceptions)
-    ? Array.from(
-        new Set(
-          ((input as EventRecurrenceConfig).exceptions || [])
-            .map((d) => String(d).trim())
-            .filter((d) => Boolean(parseDateKey(d)))
-        )
-      ).sort()
+    ? uniqueDateKeys((input as EventRecurrenceConfig).exceptions)
     : []
+  const customDates = uniqueDateKeys((input as EventRecurrenceConfig).customDates)
 
   const endDate =
     typeof (input as EventRecurrenceConfig).endDate === "string"
@@ -137,10 +194,52 @@ export function normalizeEventRecurrenceConfig(
     endDate: endType === "date" ? endDate : null,
     endCount: endType === "count" ? endCount : null,
     exceptions,
+    customDates: frequency === "custom" ? customDates : undefined,
     seriesId:
       typeof (input as EventRecurrenceConfig).seriesId === "string"
         ? (input as EventRecurrenceConfig).seriesId
         : null,
+  }
+}
+
+export function resolveEventRecurrenceSave(options: {
+  existingConfig: EventRecurrenceConfig | Record<string, unknown> | null | undefined
+  nextConfig: EventRecurrenceConfig | Record<string, unknown> | null | undefined
+  nextConfigProvided: boolean
+}): {
+  storedRecurrence: EventRecurrenceConfig | null
+  createExtraOccurrences: boolean
+  needsSeriesId: boolean
+} {
+  const existing = normalizeEventRecurrenceConfig(options.existingConfig)
+  const wasEnabled = existing?.enabled === true
+
+  if (!options.nextConfigProvided) {
+    return {
+      storedRecurrence: wasEnabled ? existing : null,
+      createExtraOccurrences: false,
+      needsSeriesId: false,
+    }
+  }
+
+  const next = normalizeEventRecurrenceConfig(options.nextConfig)
+  if (!next?.enabled) {
+    return {
+      storedRecurrence: null,
+      createExtraOccurrences: false,
+      needsSeriesId: false,
+    }
+  }
+
+  const seriesId = String(next.seriesId || existing?.seriesId || "").trim()
+  return {
+    storedRecurrence: {
+      ...next,
+      enabled: true,
+      seriesId: seriesId || null,
+    },
+    createExtraOccurrences: !wasEnabled,
+    needsSeriesId: !seriesId,
   }
 }
 
@@ -162,6 +261,32 @@ export function expandEventOccurrences(
 
   if (!normalized?.enabled) {
     return [{ startAt: new Date(startAt), endAt: new Date(endAt) }]
+  }
+
+  if (normalized.frequency === "custom") {
+    const time = {
+      h: startAt.getHours(),
+      m: startAt.getMinutes(),
+      s: startAt.getSeconds(),
+      ms: startAt.getMilliseconds(),
+    }
+    const keys = uniqueDateKeys(
+      normalized.customDates && normalized.customDates.length > 0
+        ? normalized.customDates
+        : [calendarDateKey(startAt)]
+    )
+    if (keys.length === 0) {
+      return [{ startAt: new Date(startAt), endAt: new Date(endAt) }]
+    }
+    return keys.map((key) => {
+      const day = parseDateKey(key)
+      const occurrenceStart = day ? new Date(day) : new Date(startAt)
+      occurrenceStart.setHours(time.h, time.m, time.s, time.ms)
+      return {
+        startAt: occurrenceStart,
+        endAt: new Date(occurrenceStart.getTime() + durationMs),
+      }
+    })
   }
 
   if (normalized.frequency === "weekly" && (normalized.weekdays?.length || 0) === 0) {
@@ -284,6 +409,17 @@ export function formatEventRecurrenceSummary(
     return "Does not repeat"
   }
 
+  if (normalized.frequency === "custom") {
+    const occurrences = expandEventOccurrences(startAt, endAt, normalized)
+    const sample = occurrences
+      .slice(0, 5)
+      .map((item) => toDateKey(item.startAt))
+      .join(", ")
+    const more =
+      occurrences.length > 5 ? ` (+${occurrences.length - 5} more)` : ""
+    return `Custom dates. Meetings: ${sample}${more}.`
+  }
+
   const interval = normalized.interval
   let rule = ""
   if (normalized.frequency === "daily") {
@@ -316,4 +452,26 @@ export function formatEventRecurrenceSummary(
     occurrences.length > 5 ? ` (+${occurrences.length - 5} more)` : ""
 
   return `${rule}. ${endText}. Occurrences: ${sample}${more}.`
+}
+
+export function formatEventRecurrenceSchedule(
+  config: EventRecurrenceConfig | Record<string, unknown> | null | undefined
+): string | null {
+  const normalized = normalizeEventRecurrenceConfig(config)
+  if (!normalized?.enabled) return null
+  if (normalized.frequency === "custom") return "Custom dates"
+
+  const interval = normalized.interval
+  if (normalized.frequency === "daily") {
+    return interval === 1 ? "Every day" : `Every ${interval} days`
+  }
+  if (normalized.frequency === "weekly") {
+    const days = (normalized.weekdays || [])
+      .map((day) => WEEKDAY_FULL_LABELS[day] || "")
+      .filter(Boolean)
+    if (interval === 1 && days.length === 1) return `Every ${days[0]}`
+    if (interval === 1) return `Every week on ${days.join(", ") || "—"}`
+    return `Every ${interval} weeks on ${days.join(", ") || "—"}`
+  }
+  return interval === 1 ? "Every month" : `Every ${interval} months`
 }

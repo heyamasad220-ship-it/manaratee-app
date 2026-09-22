@@ -1,11 +1,11 @@
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 
-import { getTicketedEventsOverview } from "@/lib/tickets/ticketing-overview-queries"
-import { summarizeTicketedEventsOverview } from "@/lib/tickets/ticketing-overview-types"
-
+import { isSameYearMonth } from "./event-datetime"
+import { countUpcomingEventsByRecurrence } from "./event-management-events-filters"
 import {
   daysUntil,
   eventHasEnded,
+  eventHasNotStarted,
   formatEventDate,
 } from "./internal-event-format"
 import type {
@@ -264,11 +264,14 @@ function buildDashboardFromEvents(
   period: DashboardTimePeriod
 ): EventManagementDashboardData {
   const periodEvents = filterEventsForDashboardPeriod(events, period)
+  const upcomingEvents = events.filter(
+    (event) => isListableStatus(event.status) && eventHasNotStarted(event)
+  )
+  const upcomingByRecurrence = countUpcomingEventsByRecurrence(events)
 
   const kpis = {
-    scheduledCount: periodEvents.filter(
-      (event) => event.status === INTERNAL_EVENT_STATUSES.scheduled
-    ).length,
+    upcomingOneTimeCount: upcomingByRecurrence.oneTimeCount,
+    upcomingRecurringCount: upcomingByRecurrence.recurringCount,
     childcareRequired: periodEvents.filter(
       (event) =>
         event.requires_childcare === true && isOperationalEvent(event.status)
@@ -281,20 +284,26 @@ function buildDashboardFromEvents(
       (event) =>
         event.requires_vendors === true && isOperationalEvent(event.status)
     ).length,
-    ticketedEvents: periodEvents.filter(
-      (event) => event.requires_ticketing === true && isOperationalEvent(event.status)
-    ).length,
   }
+
+  const upcomingThisMonth = upcomingEvents
+    .filter((event) => isSameYearMonth(event.start_at))
+    .sort(sortByStartAsc)
+    .map((event) => ({
+      id: event.id,
+      name: event.name,
+      startAt: event.start_at,
+      endAt: event.end_at,
+      href: `/event-management/${event.id}`,
+      ticketed: event.requires_ticketing === true,
+      needsChildcare: event.requires_childcare === true,
+      needsVolunteers: event.requires_volunteers === true,
+      needsVendors: event.requires_vendors === true,
+    }))
 
   return {
     kpis,
-    ticketSales: {
-      totalTicketedEvents: 0,
-      activeTicketedEvents: 0,
-      ticketsIssued: 0,
-      revenueCents: 0,
-      currency: "USD",
-    },
+    upcomingThisMonth,
     attentionItems: buildAttentionItems(events, pendingRequests, period),
   }
 }
@@ -309,27 +318,14 @@ export async function getEventManagementDashboard(
     return buildDashboardFromEvents([], [], period)
   }
 
-  const [events, pendingRequests, ticketedEvents] = await Promise.all([
+  const [events, pendingRequests] = await Promise.all([
     preloadedEvents
       ? Promise.resolve(preloadedEvents)
       : getInternalEvents(),
     getPendingInternalEventRequests(),
-    getTicketedEventsOverview(),
   ])
 
-  const dashboard = buildDashboardFromEvents(events, pendingRequests, period)
-  const ticketSales = summarizeTicketedEventsOverview(ticketedEvents)
-
-  return {
-    ...dashboard,
-    ticketSales: {
-      totalTicketedEvents: ticketSales.totalEvents,
-      activeTicketedEvents: ticketSales.activeEvents,
-      ticketsIssued: ticketSales.ticketsIssued,
-      revenueCents: ticketSales.revenueCents,
-      currency: ticketSales.currency,
-    },
-  }
+  return buildDashboardFromEvents(events, pendingRequests, period)
 }
 
 export function parseDashboardTimePeriod(

@@ -71,7 +71,7 @@ export async function getEventVendorEvaluations(
       .eq("organization_id", organizationId),
     supabase
       .from("contacts")
-      .select("id, first_name, last_name, email, organization_name, company_name")
+      .select("id, full_name, email")
       .in("id", contactIds),
     boothIds.length > 0
       ? supabase.from("vendor_hub_booths").select("id, number").in("id", boothIds)

@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation"
 
+import { EVENT_MANAGEMENT_TICKETING_SETTINGS_PATH } from "@/lib/events/event-management-section-path"
+
 export default function TicketingSettingsRedirectPage() {
-  redirect("/event-management/settings/general")
+  redirect(EVENT_MANAGEMENT_TICKETING_SETTINGS_PATH)
 }

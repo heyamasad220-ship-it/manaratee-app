@@ -84,8 +84,7 @@ export function CampaignGroupsReportPanel({ embedded = false }: { embedded?: boo
         <div>
           <h2 className="text-xl font-semibold">Campaign Groups</h2>
           <p className="text-sm text-muted-foreground">
-            Fundraising teams across campaigns. Separate from CRM Group Giving on the Donors
-            report.
+            Fundraising teams across campaigns. Separate from CRM Group Giving on Donors.
           </p>
         </div>
       )}

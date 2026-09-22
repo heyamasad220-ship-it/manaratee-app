@@ -137,11 +137,7 @@ export type WorkspaceVisibilityContext = {
 export function getVisibleWorkspaceTabs(
   ctx: WorkspaceVisibilityContext
 ): EventWorkspaceTabDef[] {
-  const { features, attendanceMode } = ctx
-  const showAttendees =
-    attendanceMode !== "open_public" ||
-    Boolean(ctx.hasAttendees) ||
-    features.registration
+  const { features } = ctx
   const showStaff = features.staff || Boolean(ctx.hasStaffAssignments)
   const showYouth = features.youth
   const showVendors = features.vendors
@@ -154,7 +150,7 @@ export function getVisibleWorkspaceTabs(
       case "settings":
         return true
       case "attendees":
-        return showAttendees
+        return false
       case "staff":
         return showStaff
       case "youth":

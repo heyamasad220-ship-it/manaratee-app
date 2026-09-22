@@ -1,4 +1,4 @@
-/** Shared deep-link into Facilities calendar to open the event request drawer. */
+/** Deep-link into Facilities calendar. Pass start (and optional venue/end) to open create on a chosen slot. */
 
 /** Primary CTA label for opening the Facilities event create drawer. */
 export const CREATE_EVENT_CTA_LABEL = "Create event"

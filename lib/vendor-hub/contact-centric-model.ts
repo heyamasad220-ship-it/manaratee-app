@@ -9,6 +9,7 @@
 
 export type VendorHubContactRef = {
   id: string
+  full_name?: string | null
   first_name?: string | null
   last_name?: string | null
   email?: string | null
@@ -34,13 +35,15 @@ export function formatContactDisplayName(contact?: VendorHubContactRef | null): 
   }
 
   const personName = [contact.first_name, contact.last_name].filter(Boolean).join(" ").trim()
+  const fullName = (contact.full_name || "").trim()
   const orgName = (contact.organization_name || contact.company_name || "").trim()
+  const email = (contact.email || "").trim()
 
   if (personName && orgName) {
     return `${personName} (${orgName})`
   }
 
-  return personName || orgName || "Unknown vendor"
+  return personName || fullName || orgName || email || "Unknown vendor"
 }
 
 export function resolveParticipantDisplayName(options: {

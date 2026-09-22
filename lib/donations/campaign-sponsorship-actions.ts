@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache"
 
 import { requireDonationStaffAccess } from "@/lib/donations/donation-action-auth"
-import { linkedCampaignIdFromConfig } from "@/lib/events/event-finance-types"
+import { linkedCampaignIdFromEvent } from "@/lib/events/event-campaign-id"
 import {
   CAMPAIGN_PROSPECT_SELECT,
   normalizeProspectAskType,
@@ -235,7 +235,7 @@ export async function listCampaignLinkedEventsAction(campaignId: string) {
     const writeClient = createServiceRoleClient()
     const { data, error } = await writeClient
       .from("internal_events")
-      .select("id, name, start_at, ticketing_config")
+      .select("id, name, start_at, ticketing_config, campaign_id")
       .eq("organization_id", access.orgId)
       .order("start_at", { ascending: false, nullsFirst: false })
       .limit(80)
@@ -249,9 +249,10 @@ export async function listCampaignLinkedEventsAction(campaignId: string) {
       name: (row.name as string) || "Untitled event",
       startAt: (row.start_at as string | null) ?? null,
       linkedToCampaign:
-        linkedCampaignIdFromConfig(
-          row.ticketing_config as { linkedCampaignId?: string | null } | null
-        ) === id,
+        linkedCampaignIdFromEvent({
+          campaign_id: (row as { campaign_id?: string | null }).campaign_id,
+          ticketing_config: row.ticketing_config as { linkedCampaignId?: string | null } | null,
+        }) === id,
     }))
 
     events.sort((a, b) => {

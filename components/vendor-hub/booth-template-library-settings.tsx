@@ -61,6 +61,8 @@ function emptyLine(index: number): TemplateLineForm {
     description: "",
     sort_order: index,
     attribute_slugs: [],
+    selection_fee: 0,
+    booth_numbers: [],
   }
 }
 
@@ -141,6 +143,8 @@ export function BoothTemplateLibrarySettings() {
         description: line.description ?? "",
         sort_order: line.sort_order ?? index,
         attribute_slugs: line.attribute_slugs,
+        selection_fee: line.selection_fee ?? 0,
+        booth_numbers: line.booth_numbers ?? [],
       })),
     })
     setError(null)
@@ -205,6 +209,8 @@ export function BoothTemplateLibrarySettings() {
             description: line.description || null,
             sort_order: line.sort_order ?? index,
             attribute_slugs: line.attribute_slugs ?? [],
+            selection_fee: line.selection_fee ?? 0,
+            booth_numbers: line.booth_numbers ?? [],
           })),
         })
         const rows = await fetchBoothSetupTemplates()
@@ -300,6 +306,9 @@ export function BoothTemplateLibrarySettings() {
                         <li key={line.id}>
                           {line.quantity}× {line.line_name}
                           {line.price ? ` · $${line.price}` : ""}
+                          {line.selection_fee
+                            ? ` + $${line.selection_fee} to pick a table`
+                            : ""}
                         </li>
                       ))}
                     </ul>
@@ -428,6 +437,34 @@ export function BoothTemplateLibrarySettings() {
                       onChange={(event) =>
                         updateLine(line.key, { price: Number(event.target.value || 0) })
                       }
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Label>Table selection extra</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={line.selection_fee ?? 0}
+                      onChange={(event) =>
+                        updateLine(line.key, {
+                          selection_fee: Math.max(0, Number(event.target.value || 0)),
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2 sm:col-span-2">
+                    <Label>Booth numbers</Label>
+                    <Input
+                      value={(line.booth_numbers ?? []).join(", ")}
+                      onChange={(event) =>
+                        updateLine(line.key, {
+                          booth_numbers: event.target.value
+                            .split(/[,;\n]+/)
+                            .map((entry) => entry.trim())
+                            .filter(Boolean),
+                        })
+                      }
+                      placeholder="T1, T2, T3"
                     />
                   </div>
                   <div className="flex flex-col gap-2">

@@ -6,15 +6,15 @@ import {
   AlertTriangle,
   Baby,
   Banknote,
-  ClipboardCheck,
+  CalendarClock,
   ClipboardList,
-  DollarSign,
-  HeartHandshake,
+  MapPin,
+  Repeat,
   Store,
-  UserCheck,
   Users,
   UsersRound,
 } from "lucide-react"
+import Link from "next/link"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -23,6 +23,7 @@ import {
   StatCardsRow,
   type StatCardTone,
 } from "@/components/ui/stat-card"
+import { eventManagementOrdersHref } from "@/lib/events/event-management-reports-path"
 import type { EventOverviewSummary } from "@/lib/events/event-overview-metrics"
 import {
   formatActivityWhen,
@@ -30,14 +31,12 @@ import {
 } from "@/lib/events/event-recent-activity"
 
 const KPI_STYLES: Record<string, { tone: StatCardTone; icon: LucideIcon }> = {
-  phase: { tone: "indigo", icon: ClipboardCheck },
-  "ticket-revenue": { tone: "blue", icon: DollarSign },
-  "ticket-donations": { tone: "rose", icon: HeartHandshake },
-  "checked-in": { tone: "emerald", icon: UserCheck },
-  youth: { tone: "violet", icon: Baby },
-  staff: { tone: "amber", icon: Users },
+  type: { tone: "indigo", icon: Repeat },
+  schedule: { tone: "blue", icon: CalendarClock },
+  location: { tone: "teal", icon: MapPin },
+  childcare: { tone: "violet", icon: Baby },
+  volunteers: { tone: "amber", icon: Users },
   vendors: { tone: "orange", icon: Store },
-  donations: { tone: "teal", icon: HeartHandshake },
 }
 
 function formatMoney(cents: number, currency: string) {
@@ -95,7 +94,7 @@ export function InternalEventOverviewKpis({
 export function InternalEventOverviewDashboard({
   overview,
   canManage,
-  eventId: _eventId,
+  eventId,
   coordinatorName,
   recentActivity = [],
   onNavigateTab,
@@ -147,14 +146,20 @@ export function InternalEventOverviewDashboard({
               >
                 <span>{alert.message}</span>
                 {alert.hrefTab && canManage ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onNavigateTab(alert.hrefTab!)}
-                  >
-                    Open
-                  </Button>
+                  alert.hrefTab === "attendees" ? (
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href={eventManagementOrdersHref(eventId)}>Open</Link>
+                    </Button>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onNavigateTab(alert.hrefTab!)}
+                    >
+                      Open
+                    </Button>
+                  )
                 ) : null}
               </div>
             ))}

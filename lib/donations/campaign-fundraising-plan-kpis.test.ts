@@ -18,6 +18,7 @@ function prospect(
     event_id: null,
     sponsorship_package_id: null,
     assigned_to_contact_id: null,
+    assigned_to_name: null,
     stage: "identified",
     priority: "medium",
     last_contacted_at: null,

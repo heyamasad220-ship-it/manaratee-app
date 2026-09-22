@@ -1,7 +1,16 @@
+import { Header } from "@/components/layout/header"
+import { TicketingSectionHeader } from "@/components/layout/ticketing-section-header"
+
 export default function EventManagementTicketingLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  return children
+  return (
+    <>
+      <Header title="Ticketing" />
+      <TicketingSectionHeader />
+      {children}
+    </>
+  )
 }

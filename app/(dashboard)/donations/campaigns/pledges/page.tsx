@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, ArrowUpDown } from "lucide-react";
+import { Plus, ArrowUpDown, Download } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { PledgeDonorSubline } from "@/components/donations/pledge-donor-subline";
 import { ContactProfileDialog } from "@/components/contacts/contact-profile-dialog";
@@ -33,9 +33,12 @@ import {
 import { formatPledgeReminderStatusLabel } from "@/lib/donations/pledge-reminder-types";
 import { pledgeDisplayStatus, type PledgeDisplayStatus } from "@/lib/donations/donation-status";
 import {
+  fetchPledgesExportAction,
   fetchPledgesPageAction,
   fetchPledgeSummaryMetricsAction,
 } from "@/lib/donations/donation-list-actions";
+import { downloadPledgesReportCsv } from "@/lib/donations/pledge-report-csv";
+import { getPledgeCollectionReportAction } from "@/lib/donations/pledge-reminder-actions";
 import { DONATIONS_PAGE_SIZE } from "@/lib/donations/donation-pagination";
 import {
   attachPledgeDonorContext,
@@ -212,8 +215,10 @@ export default function PledgesPage() {
     activePledgeCount: 0,
     pledgeCount: 0,
   });
+  const [overdueCount, setOverdueCount] = useState(0);
   const [pledges, setPledges] = useState<Pledge[]>([]);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [campaignOptions, setCampaignOptions] = useState<CampaignOption[]>([]);
   const [contactProfileId, setContactProfileId] = useState<string | null>(null);
   const [showContactProfile, setShowContactProfile] = useState(false);
@@ -295,6 +300,19 @@ export default function PledgesPage() {
     );
   }
 
+  function pledgeListFilters() {
+    const statusMap: Record<string, string> = {
+      Open: "open",
+      Fulfilled: "fulfilled",
+    };
+    const resolvedStatus = statusFilter === "Partial" ? "Open" : statusFilter;
+    return {
+      search: donorNameFilter || undefined,
+      status: resolvedStatus === "all" ? undefined : statusMap[resolvedStatus],
+      campaignId: campaignFilter === "all" ? undefined : campaignFilter,
+    };
+  }
+
   const fetchPledges = async (nextPage = page) => {
     setLoading(true);
 
@@ -311,26 +329,17 @@ export default function PledgesPage() {
     setOrganizationId(orgId);
     await loadCampaignOptions(orgId);
 
-    const statusMap: Record<string, string> = {
-      Open: "open",
-      Fulfilled: "fulfilled",
-    };
+    const filters = pledgeListFilters();
 
-    const resolvedStatus = statusFilter === "Partial" ? "Open" : statusFilter;
-
-    const pageResult = await fetchPledgesPageAction({
-      page: nextPage,
-      pageSize: DONATIONS_PAGE_SIZE,
-      search: donorNameFilter || undefined,
-      status: resolvedStatus === "all" ? undefined : statusMap[resolvedStatus],
-      campaignId: campaignFilter === "all" ? undefined : campaignFilter,
-    });
-
-    const metricsResult = await fetchPledgeSummaryMetricsAction({
-      search: donorNameFilter || undefined,
-      status: resolvedStatus === "all" ? undefined : statusMap[resolvedStatus],
-      campaignId: campaignFilter === "all" ? undefined : campaignFilter,
-    });
+    const [pageResult, metricsResult, collectionResult] = await Promise.all([
+      fetchPledgesPageAction({
+        page: nextPage,
+        pageSize: DONATIONS_PAGE_SIZE,
+        ...filters,
+      }),
+      fetchPledgeSummaryMetricsAction(filters),
+      getPledgeCollectionReportAction(),
+    ]);
 
     if (!pageResult.success) {
       console.error("Error loading donation pledges:", pageResult.error);
@@ -341,6 +350,9 @@ export default function PledgesPage() {
 
     if (metricsResult.success) {
       setSummaryMetrics(metricsResult.metrics);
+    }
+    if (collectionResult.success) {
+      setOverdueCount(collectionResult.report.overdueCount);
     }
 
     setTotalPledges(pageResult.total);
@@ -481,6 +493,21 @@ export default function PledgesPage() {
     setDetailsOpen(true);
   }
 
+  async function handleExport() {
+    setExporting(true);
+    const result = await fetchPledgesExportAction(pledgeListFilters());
+    setExporting(false);
+    if (!result.success) {
+      alert(result.error || "Could not export pledges.");
+      return;
+    }
+    if (result.pledges.length === 0) {
+      alert("No pledges to export for the current filters.");
+      return;
+    }
+    downloadPledgesReportCsv(result.pledges, new Date().toISOString());
+  }
+
   function closeDetails(open: boolean) {
     setDetailsOpen(open);
     if (!open) {
@@ -505,7 +532,11 @@ export default function PledgesPage() {
   return (
     <>
       <div className="flex h-[calc(100vh-11.75rem)] min-h-0 flex-col overflow-hidden p-6">
-        <div className="mb-4 flex shrink-0 justify-end">
+        <div className="mb-4 flex shrink-0 justify-end gap-2">
+          <Button variant="outline" onClick={() => void handleExport()} disabled={exporting}>
+            <Download className="mr-2 h-4 w-4" />
+            {exporting ? "Exporting..." : "Export CSV"}
+          </Button>
           <Button onClick={openAddPledge}>
             <Plus className="mr-2 h-4 w-4" />
             Add Pledge
@@ -515,6 +546,7 @@ export default function PledgesPage() {
         <PledgeSummaryMetricCards
           metrics={summaryMetrics}
           statusFilter={statusFilter === "Partial" ? "Open" : statusFilter}
+          overdueCount={overdueCount}
           className="mb-6 shrink-0"
         />
 

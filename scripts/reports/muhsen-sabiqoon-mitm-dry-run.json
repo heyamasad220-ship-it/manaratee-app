@@ -1,0 +1,692 @@
+{
+  "mode": "dry-run",
+  "muhsenProgram": "MUHSEN Sunday School 2026-2027",
+  "eventsPlanned": 15,
+  "eventsToInsert": 15,
+  "bySeries": {
+    "sabiqoon": 5,
+    "men-in-the-making": 10
+  },
+  "events": [
+    {
+      "importKey": "f0c79adc9f312f4a",
+      "seriesSlug": "sabiqoon",
+      "name": "Sabiqoon",
+      "departmentName": "Youth",
+      "eventTypeName": "Religious Program",
+      "venueNames": [
+        "Youth Lounge"
+      ],
+      "description": "Five-week Qur’an Tarbiya cohort for high school students on the earliest revelations. Open to the public, free, no registration.",
+      "dateKey": "2026-05-31",
+      "startClock": "11:00:00",
+      "endClock": "13:00:00",
+      "startAt": "2026-05-31T16:00:00.000Z",
+      "endAt": "2026-05-31T18:00:00.000Z",
+      "status": "completed",
+      "publish": true,
+      "audience": [
+        "Youth"
+      ],
+      "eventTags": [
+        "Youth",
+        "Education",
+        "Community"
+      ],
+      "estimatedAttendance": 20,
+      "coordinator": {
+        "name": "Aya Mustafa",
+        "email": "syc@masdfw.org",
+        "phone": "4142499048"
+      },
+      "recurrence": {
+        "enabled": true,
+        "frequency": "weekly",
+        "interval": 1,
+        "weekdays": [
+          0
+        ],
+        "endType": "date",
+        "endDate": "2026-06-28",
+        "seriesId": "8cd60a22-25ca-437c-fdb1-4e60b3f76b69"
+      },
+      "internalNotes": "Form had no clock time. Set to Sunday 11:00 AM–1:00 PM pending confirmation.\nMUHSEN_SABIQOON_MITM_V1:f0c79adc9f312f4a"
+    },
+    {
+      "importKey": "16c2976e6db49a13",
+      "seriesSlug": "sabiqoon",
+      "name": "Sabiqoon",
+      "departmentName": "Youth",
+      "eventTypeName": "Religious Program",
+      "venueNames": [
+        "Youth Lounge"
+      ],
+      "description": "Five-week Qur’an Tarbiya cohort for high school students on the earliest revelations. Open to the public, free, no registration.",
+      "dateKey": "2026-06-07",
+      "startClock": "11:00:00",
+      "endClock": "13:00:00",
+      "startAt": "2026-06-07T16:00:00.000Z",
+      "endAt": "2026-06-07T18:00:00.000Z",
+      "status": "completed",
+      "publish": true,
+      "audience": [
+        "Youth"
+      ],
+      "eventTags": [
+        "Youth",
+        "Education",
+        "Community"
+      ],
+      "estimatedAttendance": 20,
+      "coordinator": {
+        "name": "Aya Mustafa",
+        "email": "syc@masdfw.org",
+        "phone": "4142499048"
+      },
+      "recurrence": {
+        "enabled": true,
+        "frequency": "weekly",
+        "interval": 1,
+        "weekdays": [
+          0
+        ],
+        "endType": "date",
+        "endDate": "2026-06-28",
+        "seriesId": "8cd60a22-25ca-437c-fdb1-4e60b3f76b69"
+      },
+      "internalNotes": "Form had no clock time. Set to Sunday 11:00 AM–1:00 PM pending confirmation.\nMUHSEN_SABIQOON_MITM_V1:16c2976e6db49a13"
+    },
+    {
+      "importKey": "b7ece11c19c756a6",
+      "seriesSlug": "sabiqoon",
+      "name": "Sabiqoon",
+      "departmentName": "Youth",
+      "eventTypeName": "Religious Program",
+      "venueNames": [
+        "Youth Lounge"
+      ],
+      "description": "Five-week Qur’an Tarbiya cohort for high school students on the earliest revelations. Open to the public, free, no registration.",
+      "dateKey": "2026-06-14",
+      "startClock": "11:00:00",
+      "endClock": "13:00:00",
+      "startAt": "2026-06-14T16:00:00.000Z",
+      "endAt": "2026-06-14T18:00:00.000Z",
+      "status": "completed",
+      "publish": true,
+      "audience": [
+        "Youth"
+      ],
+      "eventTags": [
+        "Youth",
+        "Education",
+        "Community"
+      ],
+      "estimatedAttendance": 20,
+      "coordinator": {
+        "name": "Aya Mustafa",
+        "email": "syc@masdfw.org",
+        "phone": "4142499048"
+      },
+      "recurrence": {
+        "enabled": true,
+        "frequency": "weekly",
+        "interval": 1,
+        "weekdays": [
+          0
+        ],
+        "endType": "date",
+        "endDate": "2026-06-28",
+        "seriesId": "8cd60a22-25ca-437c-fdb1-4e60b3f76b69"
+      },
+      "internalNotes": "Form had no clock time. Set to Sunday 11:00 AM–1:00 PM pending confirmation.\nMUHSEN_SABIQOON_MITM_V1:b7ece11c19c756a6"
+    },
+    {
+      "importKey": "a0f2c3441facc55d",
+      "seriesSlug": "sabiqoon",
+      "name": "Sabiqoon",
+      "departmentName": "Youth",
+      "eventTypeName": "Religious Program",
+      "venueNames": [
+        "Youth Lounge"
+      ],
+      "description": "Five-week Qur’an Tarbiya cohort for high school students on the earliest revelations. Open to the public, free, no registration.",
+      "dateKey": "2026-06-21",
+      "startClock": "11:00:00",
+      "endClock": "13:00:00",
+      "startAt": "2026-06-21T16:00:00.000Z",
+      "endAt": "2026-06-21T18:00:00.000Z",
+      "status": "completed",
+      "publish": true,
+      "audience": [
+        "Youth"
+      ],
+      "eventTags": [
+        "Youth",
+        "Education",
+        "Community"
+      ],
+      "estimatedAttendance": 20,
+      "coordinator": {
+        "name": "Aya Mustafa",
+        "email": "syc@masdfw.org",
+        "phone": "4142499048"
+      },
+      "recurrence": {
+        "enabled": true,
+        "frequency": "weekly",
+        "interval": 1,
+        "weekdays": [
+          0
+        ],
+        "endType": "date",
+        "endDate": "2026-06-28",
+        "seriesId": "8cd60a22-25ca-437c-fdb1-4e60b3f76b69"
+      },
+      "internalNotes": "Form had no clock time. Set to Sunday 11:00 AM–1:00 PM pending confirmation.\nMUHSEN_SABIQOON_MITM_V1:a0f2c3441facc55d"
+    },
+    {
+      "importKey": "98d76b24c2751fab",
+      "seriesSlug": "sabiqoon",
+      "name": "Sabiqoon",
+      "departmentName": "Youth",
+      "eventTypeName": "Religious Program",
+      "venueNames": [
+        "Youth Lounge"
+      ],
+      "description": "Five-week Qur’an Tarbiya cohort for high school students on the earliest revelations. Open to the public, free, no registration.",
+      "dateKey": "2026-06-28",
+      "startClock": "11:00:00",
+      "endClock": "13:00:00",
+      "startAt": "2026-06-28T16:00:00.000Z",
+      "endAt": "2026-06-28T18:00:00.000Z",
+      "status": "completed",
+      "publish": true,
+      "audience": [
+        "Youth"
+      ],
+      "eventTags": [
+        "Youth",
+        "Education",
+        "Community"
+      ],
+      "estimatedAttendance": 20,
+      "coordinator": {
+        "name": "Aya Mustafa",
+        "email": "syc@masdfw.org",
+        "phone": "4142499048"
+      },
+      "recurrence": {
+        "enabled": true,
+        "frequency": "weekly",
+        "interval": 1,
+        "weekdays": [
+          0
+        ],
+        "endType": "date",
+        "endDate": "2026-06-28",
+        "seriesId": "8cd60a22-25ca-437c-fdb1-4e60b3f76b69"
+      },
+      "internalNotes": "Form had no clock time. Set to Sunday 11:00 AM–1:00 PM pending confirmation.\nMUHSEN_SABIQOON_MITM_V1:98d76b24c2751fab"
+    },
+    {
+      "importKey": "90863223ae904b7b",
+      "seriesSlug": "men-in-the-making",
+      "name": "Men in the Making",
+      "departmentName": "Youth",
+      "eventTypeName": "Community Event",
+      "venueNames": [
+        "Main Prayer Hall (MPH)",
+        "Pool Room (1st floor - main building)",
+        "Pool"
+      ],
+      "description": "Halaqah, soccer, and swimming. Open to the public, free, no registration.",
+      "dateKey": "2026-07-04",
+      "startClock": "12:00:00",
+      "endClock": "14:45:00",
+      "startAt": "2026-07-04T17:00:00.000Z",
+      "endAt": "2026-07-04T19:45:00.000Z",
+      "status": "completed",
+      "publish": true,
+      "audience": [
+        "Youth",
+        "Men"
+      ],
+      "eventTags": [
+        "Youth",
+        "Community"
+      ],
+      "estimatedAttendance": 50,
+      "coordinator": {
+        "name": "Yaman Khanshour",
+        "email": "yamansinnin@gmail.com",
+        "phone": "9452361576"
+      },
+      "recurrence": {
+        "enabled": true,
+        "frequency": "weekly",
+        "interval": 1,
+        "weekdays": [
+          6
+        ],
+        "endType": "date",
+        "endDate": "2026-07-25",
+        "seriesId": "5aceaf26-ed9f-170d-7eff-ce7360df9af8"
+      },
+      "internalNotes": "First form window Jul 4–Aug 8. Aug 1+ uses the later form (rooms/time changed).\nMUHSEN_SABIQOON_MITM_V1:90863223ae904b7b"
+    },
+    {
+      "importKey": "16e2ecc16daf678b",
+      "seriesSlug": "men-in-the-making",
+      "name": "Men in the Making",
+      "departmentName": "Youth",
+      "eventTypeName": "Community Event",
+      "venueNames": [
+        "Main Prayer Hall (MPH)",
+        "Pool Room (1st floor - main building)",
+        "Pool"
+      ],
+      "description": "Halaqah, soccer, and swimming. Open to the public, free, no registration.",
+      "dateKey": "2026-07-11",
+      "startClock": "12:00:00",
+      "endClock": "14:45:00",
+      "startAt": "2026-07-11T17:00:00.000Z",
+      "endAt": "2026-07-11T19:45:00.000Z",
+      "status": "completed",
+      "publish": true,
+      "audience": [
+        "Youth",
+        "Men"
+      ],
+      "eventTags": [
+        "Youth",
+        "Community"
+      ],
+      "estimatedAttendance": 50,
+      "coordinator": {
+        "name": "Yaman Khanshour",
+        "email": "yamansinnin@gmail.com",
+        "phone": "9452361576"
+      },
+      "recurrence": {
+        "enabled": true,
+        "frequency": "weekly",
+        "interval": 1,
+        "weekdays": [
+          6
+        ],
+        "endType": "date",
+        "endDate": "2026-07-25",
+        "seriesId": "5aceaf26-ed9f-170d-7eff-ce7360df9af8"
+      },
+      "internalNotes": "First form window Jul 4–Aug 8. Aug 1+ uses the later form (rooms/time changed).\nMUHSEN_SABIQOON_MITM_V1:16e2ecc16daf678b"
+    },
+    {
+      "importKey": "ca231b1d1a2fd2a3",
+      "seriesSlug": "men-in-the-making",
+      "name": "Men in the Making",
+      "departmentName": "Youth",
+      "eventTypeName": "Community Event",
+      "venueNames": [
+        "Main Prayer Hall (MPH)",
+        "Pool Room (1st floor - main building)",
+        "Pool"
+      ],
+      "description": "Halaqah, soccer, and swimming. Open to the public, free, no registration.",
+      "dateKey": "2026-07-18",
+      "startClock": "12:00:00",
+      "endClock": "14:45:00",
+      "startAt": "2026-07-18T17:00:00.000Z",
+      "endAt": "2026-07-18T19:45:00.000Z",
+      "status": "completed",
+      "publish": true,
+      "audience": [
+        "Youth",
+        "Men"
+      ],
+      "eventTags": [
+        "Youth",
+        "Community"
+      ],
+      "estimatedAttendance": 50,
+      "coordinator": {
+        "name": "Yaman Khanshour",
+        "email": "yamansinnin@gmail.com",
+        "phone": "9452361576"
+      },
+      "recurrence": {
+        "enabled": true,
+        "frequency": "weekly",
+        "interval": 1,
+        "weekdays": [
+          6
+        ],
+        "endType": "date",
+        "endDate": "2026-07-25",
+        "seriesId": "5aceaf26-ed9f-170d-7eff-ce7360df9af8"
+      },
+      "internalNotes": "First form window Jul 4–Aug 8. Aug 1+ uses the later form (rooms/time changed).\nMUHSEN_SABIQOON_MITM_V1:ca231b1d1a2fd2a3"
+    },
+    {
+      "importKey": "894dd537d4710e54",
+      "seriesSlug": "men-in-the-making",
+      "name": "Men in the Making",
+      "departmentName": "Youth",
+      "eventTypeName": "Community Event",
+      "venueNames": [
+        "Main Prayer Hall (MPH)",
+        "Pool Room (1st floor - main building)",
+        "Pool"
+      ],
+      "description": "Halaqah, soccer, and swimming. Open to the public, free, no registration.",
+      "dateKey": "2026-07-25",
+      "startClock": "12:00:00",
+      "endClock": "14:45:00",
+      "startAt": "2026-07-25T17:00:00.000Z",
+      "endAt": "2026-07-25T19:45:00.000Z",
+      "status": "completed",
+      "publish": true,
+      "audience": [
+        "Youth",
+        "Men"
+      ],
+      "eventTags": [
+        "Youth",
+        "Community"
+      ],
+      "estimatedAttendance": 50,
+      "coordinator": {
+        "name": "Yaman Khanshour",
+        "email": "yamansinnin@gmail.com",
+        "phone": "9452361576"
+      },
+      "recurrence": {
+        "enabled": true,
+        "frequency": "weekly",
+        "interval": 1,
+        "weekdays": [
+          6
+        ],
+        "endType": "date",
+        "endDate": "2026-07-25",
+        "seriesId": "5aceaf26-ed9f-170d-7eff-ce7360df9af8"
+      },
+      "internalNotes": "First form window Jul 4–Aug 8. Aug 1+ uses the later form (rooms/time changed).\nMUHSEN_SABIQOON_MITM_V1:894dd537d4710e54"
+    },
+    {
+      "importKey": "67bc236d153cebe0",
+      "seriesSlug": "men-in-the-making",
+      "name": "Men in the Making",
+      "departmentName": "Youth",
+      "eventTypeName": "Community Event",
+      "venueNames": [
+        "Main Prayer Hall (MPH)",
+        "Banquet Hall",
+        "Pool"
+      ],
+      "description": "Halaqah about Yawm al-Qiyamah, soccer, and swimming. Open to the public, free, no registration.",
+      "dateKey": "2026-08-01",
+      "startClock": "12:00:00",
+      "endClock": "15:00:00",
+      "startAt": "2026-08-01T17:00:00.000Z",
+      "endAt": "2026-08-01T20:00:00.000Z",
+      "status": "completed",
+      "publish": true,
+      "audience": [
+        "Youth",
+        "Men"
+      ],
+      "eventTags": [
+        "Youth",
+        "Community"
+      ],
+      "estimatedAttendance": 50,
+      "coordinator": {
+        "name": "Yaman Khanshour",
+        "email": "yamansinnin@gmail.com",
+        "phone": "9452361576"
+      },
+      "recurrence": {
+        "enabled": true,
+        "frequency": "weekly",
+        "interval": 1,
+        "weekdays": [
+          6
+        ],
+        "endType": "date",
+        "endDate": "2026-09-05",
+        "seriesId": "9346a174-3038-60d2-a69e-6c784e121361"
+      },
+      "internalNotes": "Second form window Aug 1–Sep 5, 12:00–3:00 PM.\nMUHSEN_SABIQOON_MITM_V1:67bc236d153cebe0"
+    },
+    {
+      "importKey": "64b3b044dc32755e",
+      "seriesSlug": "men-in-the-making",
+      "name": "Men in the Making",
+      "departmentName": "Youth",
+      "eventTypeName": "Community Event",
+      "venueNames": [
+        "Main Prayer Hall (MPH)",
+        "Banquet Hall",
+        "Pool"
+      ],
+      "description": "Halaqah about Yawm al-Qiyamah, soccer, and swimming. Open to the public, free, no registration.",
+      "dateKey": "2026-08-08",
+      "startClock": "12:00:00",
+      "endClock": "15:00:00",
+      "startAt": "2026-08-08T17:00:00.000Z",
+      "endAt": "2026-08-08T20:00:00.000Z",
+      "status": "completed",
+      "publish": true,
+      "audience": [
+        "Youth",
+        "Men"
+      ],
+      "eventTags": [
+        "Youth",
+        "Community"
+      ],
+      "estimatedAttendance": 50,
+      "coordinator": {
+        "name": "Yaman Khanshour",
+        "email": "yamansinnin@gmail.com",
+        "phone": "9452361576"
+      },
+      "recurrence": {
+        "enabled": true,
+        "frequency": "weekly",
+        "interval": 1,
+        "weekdays": [
+          6
+        ],
+        "endType": "date",
+        "endDate": "2026-09-05",
+        "seriesId": "9346a174-3038-60d2-a69e-6c784e121361"
+      },
+      "internalNotes": "Second form window Aug 1–Sep 5, 12:00–3:00 PM.\nMUHSEN_SABIQOON_MITM_V1:64b3b044dc32755e"
+    },
+    {
+      "importKey": "9d9be836befde7b5",
+      "seriesSlug": "men-in-the-making",
+      "name": "Men in the Making",
+      "departmentName": "Youth",
+      "eventTypeName": "Community Event",
+      "venueNames": [
+        "Main Prayer Hall (MPH)",
+        "Banquet Hall",
+        "Pool"
+      ],
+      "description": "Halaqah about Yawm al-Qiyamah, soccer, and swimming. Open to the public, free, no registration.",
+      "dateKey": "2026-08-15",
+      "startClock": "12:00:00",
+      "endClock": "15:00:00",
+      "startAt": "2026-08-15T17:00:00.000Z",
+      "endAt": "2026-08-15T20:00:00.000Z",
+      "status": "completed",
+      "publish": true,
+      "audience": [
+        "Youth",
+        "Men"
+      ],
+      "eventTags": [
+        "Youth",
+        "Community"
+      ],
+      "estimatedAttendance": 50,
+      "coordinator": {
+        "name": "Yaman Khanshour",
+        "email": "yamansinnin@gmail.com",
+        "phone": "9452361576"
+      },
+      "recurrence": {
+        "enabled": true,
+        "frequency": "weekly",
+        "interval": 1,
+        "weekdays": [
+          6
+        ],
+        "endType": "date",
+        "endDate": "2026-09-05",
+        "seriesId": "9346a174-3038-60d2-a69e-6c784e121361"
+      },
+      "internalNotes": "Second form window Aug 1–Sep 5, 12:00–3:00 PM.\nMUHSEN_SABIQOON_MITM_V1:9d9be836befde7b5"
+    },
+    {
+      "importKey": "b1d17b9135d1cea1",
+      "seriesSlug": "men-in-the-making",
+      "name": "Men in the Making",
+      "departmentName": "Youth",
+      "eventTypeName": "Community Event",
+      "venueNames": [
+        "Main Prayer Hall (MPH)",
+        "Banquet Hall",
+        "Pool"
+      ],
+      "description": "Halaqah about Yawm al-Qiyamah, soccer, and swimming. Open to the public, free, no registration.",
+      "dateKey": "2026-08-22",
+      "startClock": "12:00:00",
+      "endClock": "15:00:00",
+      "startAt": "2026-08-22T17:00:00.000Z",
+      "endAt": "2026-08-22T20:00:00.000Z",
+      "status": "completed",
+      "publish": true,
+      "audience": [
+        "Youth",
+        "Men"
+      ],
+      "eventTags": [
+        "Youth",
+        "Community"
+      ],
+      "estimatedAttendance": 50,
+      "coordinator": {
+        "name": "Yaman Khanshour",
+        "email": "yamansinnin@gmail.com",
+        "phone": "9452361576"
+      },
+      "recurrence": {
+        "enabled": true,
+        "frequency": "weekly",
+        "interval": 1,
+        "weekdays": [
+          6
+        ],
+        "endType": "date",
+        "endDate": "2026-09-05",
+        "seriesId": "9346a174-3038-60d2-a69e-6c784e121361"
+      },
+      "internalNotes": "Second form window Aug 1–Sep 5, 12:00–3:00 PM.\nMUHSEN_SABIQOON_MITM_V1:b1d17b9135d1cea1"
+    },
+    {
+      "importKey": "f5a582d754d363f3",
+      "seriesSlug": "men-in-the-making",
+      "name": "Men in the Making",
+      "departmentName": "Youth",
+      "eventTypeName": "Community Event",
+      "venueNames": [
+        "Main Prayer Hall (MPH)",
+        "Banquet Hall",
+        "Pool"
+      ],
+      "description": "Halaqah about Yawm al-Qiyamah, soccer, and swimming. Open to the public, free, no registration.",
+      "dateKey": "2026-08-29",
+      "startClock": "12:00:00",
+      "endClock": "15:00:00",
+      "startAt": "2026-08-29T17:00:00.000Z",
+      "endAt": "2026-08-29T20:00:00.000Z",
+      "status": "completed",
+      "publish": true,
+      "audience": [
+        "Youth",
+        "Men"
+      ],
+      "eventTags": [
+        "Youth",
+        "Community"
+      ],
+      "estimatedAttendance": 50,
+      "coordinator": {
+        "name": "Yaman Khanshour",
+        "email": "yamansinnin@gmail.com",
+        "phone": "9452361576"
+      },
+      "recurrence": {
+        "enabled": true,
+        "frequency": "weekly",
+        "interval": 1,
+        "weekdays": [
+          6
+        ],
+        "endType": "date",
+        "endDate": "2026-09-05",
+        "seriesId": "9346a174-3038-60d2-a69e-6c784e121361"
+      },
+      "internalNotes": "Second form window Aug 1–Sep 5, 12:00–3:00 PM.\nMUHSEN_SABIQOON_MITM_V1:f5a582d754d363f3"
+    },
+    {
+      "importKey": "b79a948a0855cfa4",
+      "seriesSlug": "men-in-the-making",
+      "name": "Men in the Making",
+      "departmentName": "Youth",
+      "eventTypeName": "Community Event",
+      "venueNames": [
+        "Main Prayer Hall (MPH)",
+        "Banquet Hall",
+        "Pool"
+      ],
+      "description": "Halaqah about Yawm al-Qiyamah, soccer, and swimming. Open to the public, free, no registration.",
+      "dateKey": "2026-09-05",
+      "startClock": "12:00:00",
+      "endClock": "15:00:00",
+      "startAt": "2026-09-05T17:00:00.000Z",
+      "endAt": "2026-09-05T20:00:00.000Z",
+      "status": "completed",
+      "publish": true,
+      "audience": [
+        "Youth",
+        "Men"
+      ],
+      "eventTags": [
+        "Youth",
+        "Community"
+      ],
+      "estimatedAttendance": 50,
+      "coordinator": {
+        "name": "Yaman Khanshour",
+        "email": "yamansinnin@gmail.com",
+        "phone": "9452361576"
+      },
+      "recurrence": {
+        "enabled": true,
+        "frequency": "weekly",
+        "interval": 1,
+        "weekdays": [
+          6
+        ],
+        "endType": "date",
+        "endDate": "2026-09-05",
+        "seriesId": "9346a174-3038-60d2-a69e-6c784e121361"
+      },
+      "internalNotes": "Second form window Aug 1–Sep 5, 12:00–3:00 PM.\nMUHSEN_SABIQOON_MITM_V1:b79a948a0855cfa4"
+    }
+  ]
+}

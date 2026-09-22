@@ -1,11 +1,14 @@
-import { Suspense } from "react"
+import { redirect } from "next/navigation"
 
-import { CampaignPerformanceReportPanel } from "@/components/donations/campaign-performance-report-panel"
-
-export default function DonationCampaignPerformancePage() {
-  return (
-    <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading report...</div>}>
-      <CampaignPerformanceReportPanel />
-    </Suspense>
-  )
+export default async function DonationCampaignPerformanceRedirectPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ view?: string }>
+}) {
+  const params = await searchParams
+  const view = params.view?.trim()
+  if (view === "groups" || view === "wishlist") {
+    redirect(`/donations/campaigns?view=${encodeURIComponent(view)}`)
+  }
+  redirect("/donations/campaigns")
 }

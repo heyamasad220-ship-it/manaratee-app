@@ -1,0 +1,32 @@
+{
+  "execute": false,
+  "linkRecurring": true,
+  "organizationId": "e057e00a-e4e3-4adf-9af5-f465db1894be",
+  "campaignId": "74fc4ba9-a7f1-4aec-af12-a62909e32afc",
+  "recurringCandidates": [
+    {
+      "name": "ALKHAWALDEH ABDERRAOOF",
+      "amount": 100,
+      "frequency": "monthly",
+      "totalPayments": null,
+      "notes": "Square MONTHLY donation"
+    },
+    {
+      "name": "ghabofarag",
+      "amount": 30,
+      "frequency": "monthly",
+      "totalPayments": null,
+      "notes": "Square MONTHLY donation"
+    },
+    {
+      "name": "Susan Almasri",
+      "amount": 50,
+      "frequency": "monthly",
+      "totalPayments": 12,
+      "notes": "50 monthly for one year"
+    }
+  ],
+  "recurringPlansCreated": 3,
+  "paymentsLinkedToPlans": 0,
+  "errors": []
+}

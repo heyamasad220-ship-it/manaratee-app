@@ -75,3 +75,12 @@ export function eventHasEnded(
   }
   return false
 }
+
+/** True when the event has a start time that has not begun yet. */
+export function eventHasNotStarted(
+  event: { start_at: string | null },
+  now = new Date()
+) {
+  if (!event.start_at) return false
+  return new Date(event.start_at) >= now
+}

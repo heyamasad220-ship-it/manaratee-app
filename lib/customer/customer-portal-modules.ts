@@ -62,6 +62,44 @@ export function showCustomerMyTransactionsNav(enabledSlugs: Set<string>): boolea
   )
 }
 
+/** Staff review volunteer/childcare applications in Administration (Programs or Event Management). */
+export const CUSTOMER_WORKFORCE_APPLICATION_MODULES = [
+  "programs",
+  "event-management",
+] as const
+
+/** Profile → Applications cards and the matching apply routes. */
+export const CUSTOMER_APPLICATION_TYPE_MODULES: Record<string, readonly string[]> = {
+  vendor: ["vendor-hub"],
+  volunteer: CUSTOMER_WORKFORCE_APPLICATION_MODULES,
+  childcare_provider: CUSTOMER_WORKFORCE_APPLICATION_MODULES,
+}
+
+export function toCustomerEnabledSlugSet(
+  enabledSlugs: Iterable<string> | Set<string>
+): Set<string> {
+  return enabledSlugs instanceof Set ? enabledSlugs : new Set(enabledSlugs)
+}
+
+export function isCustomerApplicationTypeEnabled(
+  enabledSlugs: Iterable<string> | Set<string>,
+  applicationTypeId: string
+): boolean {
+  const modules = CUSTOMER_APPLICATION_TYPE_MODULES[applicationTypeId]
+  if (!modules) return false
+  const enabled = toCustomerEnabledSlugSet(enabledSlugs)
+  return modules.some((slug) => isCustomerPortalModuleEnabled(enabled, slug))
+}
+
+/** Show Profile → Applications when any role application type is subscribed. */
+export function showCustomerApplicationsNav(
+  enabledSlugs: Iterable<string> | Set<string>
+): boolean {
+  return Object.keys(CUSTOMER_APPLICATION_TYPE_MODULES).some((applicationTypeId) =>
+    isCustomerApplicationTypeEnabled(enabledSlugs, applicationTypeId)
+  )
+}
+
 export function filterCustomerPortalNavItems(
   items: CustomerPortalNavItemConfig[],
   enabledSlugs: Set<string>

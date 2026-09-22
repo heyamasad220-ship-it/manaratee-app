@@ -1,0 +1,62 @@
+{
+  "mode": "dry-run",
+  "planned": 142,
+  "alreadyImported": 0,
+  "toInsert": 142,
+  "bySeries": {
+    "learn-love-live-quran": {
+      "count": 41,
+      "publish": true,
+      "first": "2026-08-19",
+      "last": "2027-05-26",
+      "sample": "Learn, Love, Live the Quran"
+    },
+    "thursday-halaqa-ladies": {
+      "count": 53,
+      "publish": true,
+      "first": "2026-05-28",
+      "last": "2027-05-27",
+      "sample": "Thursday Halaqa for Ladies"
+    },
+    "tuesday-night-live": {
+      "count": 37,
+      "publish": false,
+      "first": "2026-09-08",
+      "last": "2027-05-18",
+      "sample": "Tuesday Night Live"
+    },
+    "crochet-clique": {
+      "count": 4,
+      "publish": true,
+      "first": "2026-10-03",
+      "last": "2027-04-03",
+      "sample": "Crochet Clique"
+    },
+    "men-talk": {
+      "count": 7,
+      "publish": true,
+      "first": "2026-06-12",
+      "last": "2026-09-04",
+      "sample": "Men Talk"
+    }
+  },
+  "skipped": [
+    {
+      "name": "Her Space",
+      "reason": "not_on_spreadsheet",
+      "detail": "No dates in InternalEvents.xlsx. Add custom dates and re-run, or create them in Event Management."
+    }
+  ],
+  "potluckDates": [
+    "2026-08-26",
+    "2026-09-30",
+    "2026-10-28",
+    "2026-11-25",
+    "2026-12-30",
+    "2027-01-27",
+    "2027-02-24",
+    "2027-03-31",
+    "2027-04-28",
+    "2027-05-26"
+  ]
+}

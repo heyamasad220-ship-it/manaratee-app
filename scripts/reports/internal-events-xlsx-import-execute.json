@@ -1,0 +1,873 @@
+{
+  "mode": "execute",
+  "orgId": "e057e00a-e4e3-4adf-9af5-f465db1894be",
+  "source": "C:/Users/danan/Downloads/InternalEvents.xlsx",
+  "spreadsheetRows": 56,
+  "planned": 31,
+  "skipped": 25,
+  "skippedBreakdown": {
+    "recurring": 20,
+    "other_department": 5
+  },
+  "alreadyImported": 0,
+  "toInsert": 31,
+  "departmentsNeeded": [
+    "Youth",
+    "Center",
+    "Tarbiya",
+    "Education",
+    "CYP",
+    "Scouts",
+    "Dawah Outreach",
+    "Quran Institute for Ladies"
+  ],
+  "missingDepartments": [
+    "CYP",
+    "Scouts",
+    "Dawah Outreach"
+  ],
+  "venuesNeeded": [
+    "Main Prayer Hall (MPH)",
+    "Banquet Hall",
+    "Youth Lounge",
+    "Main Lobby",
+    "Pool Room (1st floor - main building)",
+    "New Youth Lounge (2nd floor - main building)",
+    "Conference room (2nd floor - main building)",
+    "Pool",
+    "Open space between the 2 buildings"
+  ],
+  "missingVenues": [
+    "Main Lobby",
+    "Pool Room (1st floor - main building)",
+    "New Youth Lounge (2nd floor - main building)",
+    "Conference room (2nd floor - main building)",
+    "Pool",
+    "Open space between the 2 buildings"
+  ],
+  "peopleCount": 17,
+  "overnight": [
+    "World Cup Mega Watch Party",
+    "Sister’s pool party",
+    "RSA Graduation",
+    "Private Boys All-Nighter",
+    "students night"
+  ],
+  "events": [
+    {
+      "name": "Bros Eid BBQ Soccer",
+      "department": "Youth",
+      "type": "Community Event",
+      "start": "2026-05-30T19:30:00.000Z",
+      "end": "2026-05-30T22:00:00.000Z",
+      "overnight": false,
+      "status": "completed",
+      "venues": [
+        "Main Prayer Hall (MPH)"
+      ],
+      "coordinator": "Zohair Memon <youthdirector@masdfw.org>",
+      "childcare": false,
+      "ticketing": false,
+      "vendors": true,
+      "attendance": 30
+    },
+    {
+      "name": "World Cup Mega Watch Party",
+      "department": "Youth",
+      "type": "Community Event",
+      "start": "2026-06-16T18:00:00.000Z",
+      "end": "2026-06-17T05:00:00.000Z",
+      "overnight": true,
+      "status": "completed",
+      "venues": [
+        "Banquet Hall",
+        "Youth Lounge"
+      ],
+      "coordinator": "Tasneem Aladra <612taladra@gmail.com>",
+      "childcare": false,
+      "ticketing": false,
+      "vendors": false,
+      "attendance": 80
+    },
+    {
+      "name": "MAS x SJP Family Night",
+      "department": "Center",
+      "type": "Community Event",
+      "start": "2026-07-03T23:30:00.000Z",
+      "end": "2026-07-04T03:00:00.000Z",
+      "overnight": false,
+      "status": "completed",
+      "venues": [
+        "Main Prayer Hall (MPH)",
+        "Main Lobby"
+      ],
+      "coordinator": "Yara Ismail <ismailyara2007@gmail.com>",
+      "childcare": false,
+      "ticketing": false,
+      "vendors": true,
+      "attendance": 100
+    },
+    {
+      "name": "Mentors Training",
+      "department": "Tarbiya",
+      "type": "Workshop",
+      "start": "2026-08-29T19:00:00.000Z",
+      "end": "2026-08-29T22:00:00.000Z",
+      "overnight": false,
+      "status": "completed",
+      "venues": [
+        "Banquet Hall",
+        "Youth Lounge"
+      ],
+      "coordinator": "Hedaia Hamdallah <tprograms@masdfw.org>",
+      "childcare": true,
+      "ticketing": false,
+      "vendors": false,
+      "attendance": 50
+    },
+    {
+      "name": "Mentors Training",
+      "department": "Tarbiya",
+      "type": "Workshop",
+      "start": "2026-11-07T20:00:00.000Z",
+      "end": "2026-11-07T23:00:00.000Z",
+      "overnight": false,
+      "status": "confirmed",
+      "venues": [
+        "Banquet Hall",
+        "Youth Lounge"
+      ],
+      "coordinator": "Hedaia Hamdallah <tprograms@masdfw.org>",
+      "childcare": true,
+      "ticketing": false,
+      "vendors": false,
+      "attendance": 50
+    },
+    {
+      "name": "Members Annual Workshop",
+      "department": "Tarbiya",
+      "type": "Workshop",
+      "start": "2026-11-21T20:00:00.000Z",
+      "end": "2026-11-21T23:00:00.000Z",
+      "overnight": false,
+      "status": "confirmed",
+      "venues": [
+        "Pool Room (1st floor - main building)",
+        "New Youth Lounge (2nd floor - main building)"
+      ],
+      "coordinator": "Hedaia Hamdallah <tprograms@masdfw.org>",
+      "childcare": true,
+      "ticketing": false,
+      "vendors": false,
+      "attendance": 65
+    },
+    {
+      "name": "High school intensive end of camp ceremony",
+      "department": "Tarbiya",
+      "type": "Community Event",
+      "start": "2026-06-26T15:30:00.000Z",
+      "end": "2026-06-26T18:30:00.000Z",
+      "overnight": false,
+      "status": "completed",
+      "venues": [
+        "Banquet Hall"
+      ],
+      "coordinator": "Tasneem Aladra <612taladra@gmail.com>",
+      "childcare": false,
+      "ticketing": false,
+      "vendors": false,
+      "attendance": 100
+    },
+    {
+      "name": "Welcome Summer Bash for Gaza family",
+      "department": "Center",
+      "type": "Community Event",
+      "start": "2026-07-05T21:00:00.000Z",
+      "end": "2026-07-06T00:00:00.000Z",
+      "overnight": false,
+      "status": "completed",
+      "venues": [
+        "Main Prayer Hall (MPH)",
+        "Main Lobby",
+        "Conference room (2nd floor - main building)"
+      ],
+      "coordinator": "Mohammed Ayachi <mohammedayachi297@gmail.com>",
+      "childcare": false,
+      "ticketing": false,
+      "vendors": false,
+      "attendance": 200
+    },
+    {
+      "name": "Crochet Club for Girls",
+      "department": "Youth",
+      "type": "Community Event",
+      "start": "2026-08-01T15:00:00.000Z",
+      "end": "2026-08-01T19:00:00.000Z",
+      "overnight": false,
+      "status": "completed",
+      "venues": [
+        "New Youth Lounge (2nd floor - main building)"
+      ],
+      "coordinator": "Sada Mohsin <sada.mohsin@gmail.com>",
+      "childcare": false,
+      "ticketing": true,
+      "vendors": true,
+      "attendance": 15
+    },
+    {
+      "name": "Hifdth journey for life",
+      "department": "Education",
+      "type": "Religious Program",
+      "start": "2026-08-01T16:30:00.000Z",
+      "end": "2026-08-01T21:30:00.000Z",
+      "overnight": false,
+      "status": "completed",
+      "venues": [
+        "Main Prayer Hall (MPH)",
+        "Main Lobby"
+      ],
+      "coordinator": "Hemat Elbadawe <hematelbadawe2003@gmail.com>",
+      "childcare": false,
+      "ticketing": true,
+      "vendors": false,
+      "attendance": 100
+    },
+    {
+      "name": "Private Donor Dinner",
+      "department": "Education",
+      "type": "Fundraiser",
+      "start": "2026-11-14T00:00:00.000Z",
+      "end": "2026-11-14T02:30:00.000Z",
+      "overnight": false,
+      "status": "confirmed",
+      "venues": [
+        "Banquet Hall"
+      ],
+      "coordinator": "Amaal Aref <education@masdfw.org>",
+      "childcare": true,
+      "ticketing": false,
+      "vendors": false,
+      "attendance": 100
+    },
+    {
+      "name": "Open House for Programs and Orientation for Istiqamah Institute",
+      "department": "Education",
+      "type": "Workshop",
+      "start": "2026-08-08T19:00:00.000Z",
+      "end": "2026-08-08T21:00:00.000Z",
+      "overnight": false,
+      "status": "completed",
+      "venues": [
+        "Main Prayer Hall (MPH)"
+      ],
+      "coordinator": "Amaal Aref <education@masdfw.org>",
+      "childcare": false,
+      "ticketing": false,
+      "vendors": false,
+      "attendance": 100
+    },
+    {
+      "name": "Mid year Social CYP",
+      "department": "CYP",
+      "type": "Community Event",
+      "start": "2026-07-31T23:00:00.000Z",
+      "end": "2026-08-01T03:00:00.000Z",
+      "overnight": false,
+      "status": "completed",
+      "venues": [
+        "Banquet Hall",
+        "Youth Lounge"
+      ],
+      "coordinator": "Hazem Tariq <hazemtariq25@gmail.com>",
+      "childcare": false,
+      "ticketing": false,
+      "vendors": false,
+      "attendance": 100
+    },
+    {
+      "name": "BOR meeting",
+      "department": "Scouts",
+      "type": "Meeting",
+      "start": "2026-07-12T14:00:00.000Z",
+      "end": "2026-07-12T17:00:00.000Z",
+      "overnight": false,
+      "status": "completed",
+      "venues": [
+        "Conference room (2nd floor - main building)",
+        "Pool Room (1st floor - main building)"
+      ],
+      "coordinator": "Gamal Mohed <gmohed@gmail.com>",
+      "childcare": false,
+      "ticketing": false,
+      "vendors": false,
+      "attendance": 5
+    },
+    {
+      "name": "EDU Staff PD",
+      "department": "Education",
+      "type": "Workshop",
+      "start": "2026-08-09T14:00:00.000Z",
+      "end": "2026-08-09T20:00:00.000Z",
+      "overnight": false,
+      "status": "completed",
+      "venues": [
+        "Youth Lounge"
+      ],
+      "coordinator": "Amaal Aref <education@masdfw.org>",
+      "childcare": false,
+      "ticketing": false,
+      "vendors": false,
+      "attendance": 40
+    },
+    {
+      "name": "Parent Orientation",
+      "department": "Education",
+      "type": "Workshop",
+      "start": "2026-08-23T14:00:00.000Z",
+      "end": "2026-08-23T18:30:00.000Z",
+      "overnight": false,
+      "status": "completed",
+      "venues": [
+        "Banquet Hall"
+      ],
+      "coordinator": "Amaal Aref <education@masdfw.org>",
+      "childcare": false,
+      "ticketing": false,
+      "vendors": false,
+      "attendance": 130
+    },
+    {
+      "name": "Sister’s pool party",
+      "department": "Youth",
+      "type": "Community Event",
+      "start": "2026-07-18T16:00:00.000Z",
+      "end": "2026-07-19T08:00:00.000Z",
+      "overnight": true,
+      "status": "completed",
+      "venues": [
+        "Pool"
+      ],
+      "coordinator": "Nurani Pathan <ummenuranilamimpathan@gmail.com>",
+      "childcare": false,
+      "ticketing": true,
+      "vendors": false,
+      "attendance": 15
+    },
+    {
+      "name": "RSA Graduation",
+      "department": "Education",
+      "type": "Community Event",
+      "start": "2027-05-26T13:00:00.000Z",
+      "end": "2027-05-27T06:00:00.000Z",
+      "overnight": true,
+      "status": "confirmed",
+      "venues": [
+        "Main Prayer Hall (MPH)"
+      ],
+      "coordinator": "Amaal Aref <education@masdfw.org>",
+      "childcare": false,
+      "ticketing": false,
+      "vendors": false,
+      "attendance": 200
+    },
+    {
+      "name": "RSA Open House",
+      "department": "Education",
+      "type": "Community Event",
+      "start": "2027-01-31T18:00:00.000Z",
+      "end": "2027-01-31T23:00:00.000Z",
+      "overnight": false,
+      "status": "confirmed",
+      "venues": [
+        "Banquet Hall"
+      ],
+      "coordinator": "Amaal Aref <education@masdfw.org>",
+      "childcare": false,
+      "ticketing": false,
+      "vendors": false,
+      "attendance": 100
+    },
+    {
+      "name": "RSA Culture Night",
+      "department": "Education",
+      "type": "Community Event",
+      "start": "2027-03-19T20:00:00.000Z",
+      "end": "2027-03-20T02:00:00.000Z",
+      "overnight": false,
+      "status": "confirmed",
+      "venues": [
+        "Banquet Hall"
+      ],
+      "coordinator": "Amaal Aref <education@masdfw.org>",
+      "childcare": false,
+      "ticketing": false,
+      "vendors": false,
+      "attendance": 250
+    },
+    {
+      "name": "معرض السيرة النبوية",
+      "department": "Youth",
+      "type": "Religious Program",
+      "start": "2026-09-11T23:00:00.000Z",
+      "end": "2026-09-12T02:00:00.000Z",
+      "overnight": false,
+      "status": "completed",
+      "venues": [
+        "Main Prayer Hall (MPH)"
+      ],
+      "coordinator": "ندى الغلاييني <nadajoyner@gmail.com>",
+      "childcare": true,
+      "ticketing": true,
+      "vendors": true,
+      "attendance": 100
+    },
+    {
+      "name": "Private Boys All-Nighter",
+      "department": "Youth",
+      "type": "Community Event",
+      "start": "2026-08-02T03:00:00.000Z",
+      "end": "2026-08-02T11:00:00.000Z",
+      "overnight": true,
+      "status": "completed",
+      "venues": [
+        "Main Prayer Hall (MPH)",
+        "Main Lobby",
+        "New Youth Lounge (2nd floor - main building)",
+        "Banquet Hall"
+      ],
+      "coordinator": "Zohair Memon <youthdirector@masdfw.org>",
+      "childcare": false,
+      "ticketing": false,
+      "vendors": false,
+      "attendance": 15
+    },
+    {
+      "name": "Middle Schhol girls back to school bash",
+      "department": "Youth",
+      "type": "Community Event",
+      "start": "2026-08-06T23:00:00.000Z",
+      "end": "2026-08-07T03:00:00.000Z",
+      "overnight": false,
+      "status": "completed",
+      "venues": [
+        "Pool",
+        "Open space between the 2 buildings"
+      ],
+      "coordinator": "Sada Mohsin <sada.mohsin@gmail.com>",
+      "childcare": false,
+      "ticketing": false,
+      "vendors": false,
+      "attendance": 40
+    },
+    {
+      "name": "The Art of Dawah",
+      "department": "Dawah Outreach",
+      "type": "Religious Program",
+      "start": "2026-08-29T01:30:00.000Z",
+      "end": "2026-08-29T02:45:00.000Z",
+      "overnight": false,
+      "status": "completed",
+      "venues": [
+        "Main Prayer Hall (MPH)",
+        "Pool Room (1st floor - main building)"
+      ],
+      "coordinator": "Sumeya Abdulbaki <outreachadmin@masdfw.org>",
+      "childcare": true,
+      "ticketing": false,
+      "vendors": false,
+      "attendance": 50
+    },
+    {
+      "name": "Sunday School Islamic Studies Project - Exhibit",
+      "department": "Education",
+      "type": "Community Event",
+      "start": "2027-04-18T14:00:00.000Z",
+      "end": "2027-04-18T21:00:00.000Z",
+      "overnight": false,
+      "status": "confirmed",
+      "venues": [
+        "Banquet Hall"
+      ],
+      "coordinator": "Mariam Yasin <lakiyou13@gmail.com>",
+      "childcare": false,
+      "ticketing": false,
+      "vendors": false,
+      "attendance": 100
+    },
+    {
+      "name": "SBOE Education Program",
+      "department": "Center",
+      "type": "Community Event",
+      "start": "2026-08-23T19:00:00.000Z",
+      "end": "2026-08-23T21:00:00.000Z",
+      "overnight": false,
+      "status": "completed",
+      "venues": [
+        "Main Prayer Hall (MPH)",
+        "Main Lobby"
+      ],
+      "coordinator": "Adil Hamid <adil.hamid@youngmuslims.com>",
+      "childcare": false,
+      "ticketing": false,
+      "vendors": false,
+      "attendance": 100
+    },
+    {
+      "name": "Youth usra orientation",
+      "department": "Tarbiya",
+      "type": "Workshop",
+      "start": "2026-09-06T19:00:00.000Z",
+      "end": "2026-09-06T21:00:00.000Z",
+      "overnight": false,
+      "status": "completed",
+      "venues": [
+        "Youth Lounge"
+      ],
+      "coordinator": "Khadiga Elhaddad <khadiga83@gmail.com>",
+      "childcare": false,
+      "ticketing": false,
+      "vendors": false,
+      "attendance": 70
+    },
+    {
+      "name": "students night",
+      "department": "Quran Institute for Ladies",
+      "type": "Community Event",
+      "start": "2026-10-30T23:30:00.000Z",
+      "end": "2026-10-31T13:30:00.000Z",
+      "overnight": true,
+      "status": "confirmed",
+      "venues": [
+        "Main Prayer Hall (MPH)",
+        "Banquet Hall"
+      ],
+      "coordinator": "fadia salameh <fadia110792@gmail.com>",
+      "childcare": true,
+      "ticketing": false,
+      "vendors": false,
+      "attendance": 30
+    },
+    {
+      "name": "High School Sisters Pool Party",
+      "department": "Youth",
+      "type": "Community Event",
+      "start": "2026-09-07T19:00:00.000Z",
+      "end": "2026-09-07T21:00:00.000Z",
+      "overnight": false,
+      "status": "completed",
+      "venues": [
+        "New Youth Lounge (2nd floor - main building)",
+        "Pool"
+      ],
+      "coordinator": "Tasneem Aladra <612taladra@gmail.com>",
+      "childcare": false,
+      "ticketing": false,
+      "vendors": false,
+      "attendance": 40
+    },
+    {
+      "name": "Board of review meeting",
+      "department": "Scouts",
+      "type": "Meeting",
+      "start": "2026-09-13T14:00:00.000Z",
+      "end": "2026-09-13T15:30:00.000Z",
+      "overnight": false,
+      "status": "completed",
+      "venues": [
+        "Conference room (2nd floor - main building)",
+        "Pool Room (1st floor - main building)"
+      ],
+      "coordinator": "Gamal Mohed <gmohed@gmail.com>",
+      "childcare": false,
+      "ticketing": false,
+      "vendors": false,
+      "attendance": 5
+    },
+    {
+      "name": "Safwa - High School Sisters Monthly Social",
+      "department": "Youth",
+      "type": "Community Event",
+      "start": "2026-09-19T23:30:00.000Z",
+      "end": "2026-09-20T01:00:00.000Z",
+      "overnight": false,
+      "status": "confirmed",
+      "venues": [
+        "New Youth Lounge (2nd floor - main building)"
+      ],
+      "coordinator": "Tasneem Aladra <612taladra@gmail.com>",
+      "childcare": false,
+      "ticketing": false,
+      "vendors": false,
+      "attendance": 20
+    }
+  ],
+  "skippedSample": [
+    {
+      "reason": "recurring",
+      "eventName": "Learn, Love, Live the Quran",
+      "department": "Tarbiya"
+    },
+    {
+      "reason": "recurring",
+      "eventName": "Sabiqoon",
+      "department": "Youth"
+    },
+    {
+      "reason": "recurring",
+      "eventName": "Men Talk",
+      "department": "CYP"
+    },
+    {
+      "reason": "other_department",
+      "eventName": "AIPAC Out Townhall",
+      "department": "Other"
+    },
+    {
+      "reason": "recurring",
+      "eventName": "Growing in Islam",
+      "department": "Other"
+    },
+    {
+      "reason": "recurring",
+      "eventName": "Men in the Making",
+      "department": "Youth"
+    },
+    {
+      "reason": "recurring",
+      "eventName": "Prophetic Masculinity: High School Boys Weekly Swim Meet and Halaqah",
+      "department": "Youth"
+    },
+    {
+      "reason": "recurring",
+      "eventName": "Men in the making",
+      "department": "Youth"
+    },
+    {
+      "reason": "recurring",
+      "eventName": "Veiled in Light: Outer Grace, Inner Strength, Divine Purpose.",
+      "department": "Youth"
+    },
+    {
+      "reason": "recurring",
+      "eventName": "Character Blueprint: Surah Al-Hujurat Intensive",
+      "department": "Youth"
+    },
+    {
+      "reason": "other_department",
+      "eventName": "Power of Your Vote",
+      "department": "Other"
+    },
+    {
+      "reason": "recurring",
+      "eventName": "SJP Bootcamp",
+      "department": "Other"
+    },
+    {
+      "reason": "recurring",
+      "eventName": "Thursday Seminar Series",
+      "department": "CYP"
+    },
+    {
+      "reason": "recurring",
+      "eventName": "Thursday Seminar Series",
+      "department": "CYP"
+    },
+    {
+      "reason": "recurring",
+      "eventName": "Men Talk with Sheikh Oduro",
+      "department": "CYP"
+    },
+    {
+      "reason": "recurring",
+      "eventName": "Men Talk with Doctor Omar Hussain",
+      "department": "CYP"
+    },
+    {
+      "reason": "recurring",
+      "eventName": "TNL",
+      "department": "Youth"
+    },
+    {
+      "reason": "recurring",
+      "eventName": "MUHSEN Sunday school",
+      "department": "Other"
+    },
+    {
+      "reason": "other_department",
+      "eventName": "Power of Your Vote",
+      "department": "Other"
+    },
+    {
+      "reason": "recurring",
+      "eventName": "Crochet clique",
+      "department": "Youth"
+    },
+    {
+      "reason": "other_department",
+      "eventName": "MAS-BEAM Venture Chapter Open House",
+      "department": "Other"
+    },
+    {
+      "reason": "recurring",
+      "eventName": "اسرة البيان",
+      "department": "Tarbiya"
+    },
+    {
+      "reason": "recurring",
+      "eventName": "Tarbiya Session with Dr. Marzouk",
+      "department": "RSA"
+    },
+    {
+      "reason": "other_department",
+      "eventName": "SJP committee-wide meeting",
+      "department": "Other"
+    },
+    {
+      "reason": "recurring",
+      "eventName": "BEAM Venture at MAS",
+      "department": "Other"
+    }
+  ],
+  "created": {
+    "departments": [
+      "CYP",
+      "Scouts",
+      "Dawah Outreach"
+    ],
+    "venues": [
+      "Main Lobby",
+      "Pool Room (1st floor - main building)",
+      "New Youth Lounge (2nd floor - main building)",
+      "Conference room (2nd floor - main building)",
+      "Pool",
+      "Open space between the 2 buildings"
+    ],
+    "events": [
+      {
+        "id": "f78a9892-d8c3-45e7-98bd-7648930d4635",
+        "name": "Bros Eid BBQ Soccer"
+      },
+      {
+        "id": "c47b1797-3ccf-4224-b501-0ce99b36dfe1",
+        "name": "World Cup Mega Watch Party"
+      },
+      {
+        "id": "6262fc14-c284-4d6a-9ca2-03269791fbd3",
+        "name": "MAS x SJP Family Night"
+      },
+      {
+        "id": "f2d804ad-cf5c-45e9-be5b-404052d1063b",
+        "name": "Mentors Training"
+      },
+      {
+        "id": "e2b29236-54fd-4c30-a113-08ff52bac2ec",
+        "name": "Mentors Training"
+      },
+      {
+        "id": "448eccd8-8a9e-4b5d-82cb-4f05683cef73",
+        "name": "Members Annual Workshop"
+      },
+      {
+        "id": "982474c5-c82e-4cd1-8f7f-72fc44335b26",
+        "name": "High school intensive end of camp ceremony"
+      },
+      {
+        "id": "8e9247bf-5ee8-4606-80cc-50f1b08b0550",
+        "name": "Welcome Summer Bash for Gaza family"
+      },
+      {
+        "id": "18c658e1-740a-4359-9f2b-53983ad3dd7f",
+        "name": "Crochet Club for Girls"
+      },
+      {
+        "id": "8d764a37-483a-412e-a552-a802a15cdb87",
+        "name": "Hifdth journey for life"
+      },
+      {
+        "id": "c1801334-ed56-41bb-a215-2a1e7e8e69d8",
+        "name": "Private Donor Dinner"
+      },
+      {
+        "id": "99729bca-5a09-4423-8a8d-59d221827203",
+        "name": "Open House for Programs and Orientation for Istiqamah Institute"
+      },
+      {
+        "id": "c74b16da-3383-44f8-8a14-a8b2577e1cc2",
+        "name": "Mid year Social CYP"
+      },
+      {
+        "id": "8280a6cb-d2df-4136-99d3-f613f865fa80",
+        "name": "BOR meeting"
+      },
+      {
+        "id": "b42ff1a6-121f-4ac8-b6bd-27714ced563a",
+        "name": "EDU Staff PD"
+      },
+      {
+        "id": "90c4ac40-2d5a-4959-aa6d-0f25c0d0da99",
+        "name": "Parent Orientation"
+      },
+      {
+        "id": "887201a6-4992-4c67-a5c0-08dc9a380a07",
+        "name": "Sister’s pool party"
+      },
+      {
+        "id": "ea841f99-6c1a-4ab2-9542-b797a7522aaa",
+        "name": "RSA Graduation"
+      },
+      {
+        "id": "f53da100-764b-43fe-99b4-897d068509b7",
+        "name": "RSA Open House"
+      },
+      {
+        "id": "51a9d69d-2014-4983-a512-2657544f8c9d",
+        "name": "RSA Culture Night"
+      },
+      {
+        "id": "56af8cb2-dc31-4320-8106-b836b6a5c943",
+        "name": "معرض السيرة النبوية"
+      },
+      {
+        "id": "27232b23-8bff-4be8-aa00-c6c46bdcfdec",
+        "name": "Private Boys All-Nighter"
+      },
+      {
+        "id": "5f2afc44-0295-440b-9a7d-74dff9e9fdcb",
+        "name": "Middle Schhol girls back to school bash"
+      },
+      {
+        "id": "a35c70f1-5d01-46fd-b484-47db8ae9fb60",
+        "name": "The Art of Dawah"
+      },
+      {
+        "id": "9e1a719d-4e99-481b-aba4-c6af6ad5e177",
+        "name": "Sunday School Islamic Studies Project - Exhibit"
+      },
+      {
+        "id": "72cd050e-d749-4076-a7db-176aa586dfce",
+        "name": "SBOE Education Program"
+      },
+      {
+        "id": "8e9feb9a-fae4-4248-93f7-2144502cd8bd",
+        "name": "Youth usra orientation"
+      },
+      {
+        "id": "5028465a-cd21-44fd-b031-c54a44f8963d",
+        "name": "students night"
+      },
+      {
+        "id": "080e854a-dd88-44b6-92f3-06deeb2d5ed1",
+        "name": "High School Sisters Pool Party"
+      },
+      {
+        "id": "267bfe1b-1804-401c-9601-a48307ebd012",
+        "name": "Board of review meeting"
+      },
+      {
+        "id": "232daa9e-784c-4df8-a933-c083b7b6e6e8",
+        "name": "Safwa - High School Sisters Monthly Social"
+      }
+    ],
+    "contacts": 17
+  }
+}

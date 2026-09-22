@@ -1,0 +1,94 @@
+{
+  "mode": "execute",
+  "muhsenProgram": "MUHSEN Sunday School 2026-2027",
+  "eventsPlanned": 15,
+  "eventsToInsert": 15,
+  "bySeries": {
+    "sabiqoon": 5,
+    "men-in-the-making": 10
+  },
+  "muhsen": {
+    "programId": "cb2d88ba-666a-44f3-9b74-a802606abe20",
+    "offeringId": "c81338c5-1395-49e7-a870-4cdd4dd91e59",
+    "created": false,
+    "leadId": "6edc38e9-fe4a-4503-8a58-0c0e12c79154"
+  },
+  "createdCount": 15,
+  "created": [
+    {
+      "id": "78e3a39b-6182-474e-bde8-5c075cac62c4",
+      "name": "Sabiqoon",
+      "date": "2026-05-31"
+    },
+    {
+      "id": "c79d8ac1-fc07-4b3e-84cb-5d09ca41b253",
+      "name": "Sabiqoon",
+      "date": "2026-06-07"
+    },
+    {
+      "id": "b7e847ba-98fc-471a-b218-deec544eae24",
+      "name": "Sabiqoon",
+      "date": "2026-06-14"
+    },
+    {
+      "id": "052f6124-3f0f-4f13-8dad-18c3e8f8d6b5",
+      "name": "Sabiqoon",
+      "date": "2026-06-21"
+    },
+    {
+      "id": "b5d2aaa3-75f2-4533-a169-2e4e96e9f303",
+      "name": "Sabiqoon",
+      "date": "2026-06-28"
+    },
+    {
+      "id": "d636508a-605a-4f9a-b764-5b189ce433cb",
+      "name": "Men in the Making",
+      "date": "2026-07-04"
+    },
+    {
+      "id": "dca0fb96-ff9b-49fd-b0aa-5a75b032084b",
+      "name": "Men in the Making",
+      "date": "2026-07-11"
+    },
+    {
+      "id": "05205a81-a526-4c99-9917-0e07fc9fdd1d",
+      "name": "Men in the Making",
+      "date": "2026-07-18"
+    },
+    {
+      "id": "5233a7bb-6775-428a-9da5-1feccd76a078",
+      "name": "Men in the Making",
+      "date": "2026-07-25"
+    },
+    {
+      "id": "173bf86a-1250-4962-b685-470e0092b7a7",
+      "name": "Men in the Making",
+      "date": "2026-08-01"
+    },
+    {
+      "id": "c9d110a8-74ac-475c-b459-167b5e59155b",
+      "name": "Men in the Making",
+      "date": "2026-08-08"
+    },
+    {
+      "id": "183caafa-fa03-4dd3-8706-86fb2a08e2ef",
+      "name": "Men in the Making",
+      "date": "2026-08-15"
+    },
+    {
+      "id": "5703511b-8099-4b6c-a567-ff945f370d52",
+      "name": "Men in the Making",
+      "date": "2026-08-22"
+    },
+    {
+      "id": "e19ec0bc-df3c-4c34-94e6-f53d9be53092",
+      "name": "Men in the Making",
+      "date": "2026-08-29"
+    },
+    {
+      "id": "b4e21db5-a943-4d02-b89b-c0d3233f60cd",
+      "name": "Men in the Making",
+      "date": "2026-09-05"
+    }
+  ]
+}

@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { hasEventCheckInPermission } from "@/lib/events/event-access"
 import { EVENT_MANAGEMENT_CHILDCARE_REPORTS_PATH } from "@/lib/events/event-management-reports-path"
-import { parseServiceRequirements } from "@/lib/events/event-service-requirements"
+import { ensureChildcareEventForSource } from "@/lib/service-participations/childcare-source-sync"
 import { hasMissingYouthForms } from "@/lib/child-care/youth-forms"
 import { getChildcareRegistrationsBundle } from "@/lib/child-care/childcare-registration-queries"
 import { hasAnyPermission, PERMISSIONS } from "@/lib/permissions/permissions"
@@ -114,30 +114,20 @@ export async function createChildcareEvent(input: ChildcareEventInput) {
     throw new Error("No organization selected")
   }
 
-  if (!input.name.trim()) {
-    throw new Error("Event name is required")
-  }
-
-  if (!input.event_date) {
-    throw new Error("Event date is required")
+  const sourceType = input.source_type
+  const sourceId = input.source_id?.trim() || null
+  if (!sourceType || !sourceId) {
+    throw new Error(
+      "Childcare belongs to an Event Management event. Open the event workspace and turn on Youth."
+    )
   }
 
   const supabase = await createClient()
-
-  const { error } = await supabase.from("childcare_events").insert({
-    organization_id: organizationId,
-    name: input.name.trim(),
-    event_date: input.event_date,
-    start_time: input.start_time?.trim() || null,
-    end_time: input.end_time?.trim() || null,
-    capacity: input.capacity && input.capacity > 0 ? input.capacity : 20,
-    notes: input.notes?.trim() || null,
-    is_active: true,
+  await ensureChildcareEventForSource(supabase, {
+    organizationId,
+    sourceType,
+    sourceId,
   })
-
-  if (error) {
-    throw new Error(error.message)
-  }
 
   revalidateChildcarePaths()
   return getChildcareRegistrationsBundle(organizationId)

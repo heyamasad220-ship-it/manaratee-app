@@ -1,5 +1,7 @@
-import { PledgePerformanceReportPanel } from "@/components/donations/pledge-performance-report-panel"
+import { redirect } from "next/navigation"
 
-export default function DonationPledgePerformancePage() {
-  return <PledgePerformanceReportPanel />
+import { DONATION_PLEDGES_PATH } from "@/lib/donations/donation-pledge-paths"
+
+export default function DonationPledgePerformanceRedirectPage() {
+  redirect(DONATION_PLEDGES_PATH)
 }

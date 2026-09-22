@@ -33,7 +33,7 @@ import { DONATIONS_PAGE_SIZE } from "@/lib/donations/donation-pagination"
 import { ListPagination } from "@/components/ui/list-pagination"
 import { PhoneText } from "@/components/ui/phone-text"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Dialog,
   DialogContent,
@@ -78,7 +78,7 @@ import {
   UsersRound,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { STAFF_BELOW_REPORTS_SUBNAV_STICKY_TOP_CLASS } from "@/lib/layout/staff-dashboard-chrome"
+import { STAFF_MAIN_CONTENT_STICKY_TOP_CLASS } from "@/lib/layout/staff-dashboard-chrome"
 
 const TAX_YEAR_OPTIONS = [0, 1, 2, 3, 4].map((offset) => new Date().getFullYear() - offset)
 
@@ -640,56 +640,108 @@ export function DonorsReportPanel() {
   const lastGiftHeader =
     dateRangeMode === "lifetime" ? "Last Gift" : "Last Gift (in period)"
   const exporting = exportingCsv || exportingPdf
+  const tableTitle =
+    reportView === "household"
+      ? "Household Giving"
+      : reportView === "group"
+        ? "Group Giving"
+        : "Individual Giving"
+
+  const periodControls = (
+    <div className="flex flex-wrap items-center gap-3">
+      <Select
+        value={dateRangeMode}
+        onValueChange={(value) => setDateRangeMode(value as DonorDateRangeMode)}
+      >
+        <SelectTrigger className="w-[180px]">
+          <SelectValue placeholder="Period" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="lifetime">Lifetime</SelectItem>
+          <SelectItem value="year">Calendar year</SelectItem>
+          <SelectItem value="custom">Custom range</SelectItem>
+        </SelectContent>
+      </Select>
+
+      {dateRangeMode === "year" ? (
+        <Select value={taxYear} onValueChange={setTaxYear}>
+          <SelectTrigger className="w-[120px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {TAX_YEAR_OPTIONS.map((year) => (
+              <SelectItem key={year} value={String(year)}>
+                {year}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      ) : null}
+
+      {dateRangeMode === "custom" ? (
+        <>
+          <Input
+            type="date"
+            value={customDateFrom}
+            onChange={(event) => setCustomDateFrom(event.target.value)}
+            className="w-[160px]"
+            aria-label="From date"
+          />
+          <span className="text-sm text-muted-foreground">to</span>
+          <Input
+            type="date"
+            value={customDateTo}
+            onChange={(event) => setCustomDateTo(event.target.value)}
+            className="w-[160px]"
+            aria-label="To date"
+          />
+        </>
+      ) : null}
+    </div>
+  )
 
   return (
     <div className="flex flex-col gap-6 p-6">
       <div
         className={cn(
           "sticky z-30 -mx-6 space-y-4 border-b border-border bg-background px-6 pb-4 pt-6",
-          STAFF_BELOW_REPORTS_SUBNAV_STICKY_TOP_CLASS
+          STAFF_MAIN_CONTENT_STICKY_TOP_CLASS
         )}
       >
-        <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
+        <div className="space-y-4">
           <h2 className="text-xl font-semibold">Donor Giving</h2>
-          {reportView === "group" ? null : (
-            <p className="text-sm text-muted-foreground">
-              Individual, household, and CRM group giving. Household totals combine gifts from families with two or more adult donors. Household and group totals are aggregations, not extra transactions. {periodLabel}.
-            </p>
-          )}
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant={reportView === "individual" ? "default" : "outline"}
+              onClick={() => setReportViewAndUrl("individual")}
+            >
+              <Users className="mr-2 h-4 w-4" />
+              Individual Giving
+            </Button>
+            <Button
+              variant={reportView === "household" ? "default" : "outline"}
+              onClick={() => setReportViewAndUrl("household")}
+            >
+              <Home className="mr-2 h-4 w-4" />
+              Household Giving
+            </Button>
+            <Button
+              variant={reportView === "group" ? "default" : "outline"}
+              onClick={() => setReportViewAndUrl("group")}
+            >
+              <UsersRound className="mr-2 h-4 w-4" />
+              Group Giving
+            </Button>
+            <Button variant="outline" disabled={exporting || loading} onClick={handleExportCsv}>
+              <Download className="mr-2 h-4 w-4" />
+              {exportingCsv ? "Exporting..." : "Export CSV"}
+            </Button>
+            <Button variant="outline" disabled={exporting || loading} onClick={handleExportPdf}>
+              <FileText className="mr-2 h-4 w-4" />
+              {exportingPdf ? "Exporting..." : "Export PDF"}
+            </Button>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant={reportView === "individual" ? "default" : "outline"}
-            onClick={() => setReportViewAndUrl("individual")}
-          >
-            <Users className="mr-2 h-4 w-4" />
-            Individual Giving
-          </Button>
-          <Button
-            variant={reportView === "household" ? "default" : "outline"}
-            onClick={() => setReportViewAndUrl("household")}
-          >
-            <Home className="mr-2 h-4 w-4" />
-            Household Giving
-          </Button>
-          <Button
-            variant={reportView === "group" ? "default" : "outline"}
-            onClick={() => setReportViewAndUrl("group")}
-          >
-            <UsersRound className="mr-2 h-4 w-4" />
-            Group Giving
-          </Button>
-          <Button variant="outline" disabled={exporting || loading} onClick={handleExportCsv}>
-            <Download className="mr-2 h-4 w-4" />
-            {exportingCsv ? "Exporting..." : "Export CSV"}
-          </Button>
-          <Button variant="outline" disabled={exporting || loading} onClick={handleExportPdf}>
-            <FileText className="mr-2 h-4 w-4" />
-            {exportingPdf ? "Exporting..." : "Export PDF"}
-          </Button>
-        </div>
-      </div>
 
       {summaryLoading ? (
         <p className="text-sm text-muted-foreground">Loading summary...</p>
@@ -714,26 +766,12 @@ export function DonorsReportPanel() {
             value={formatDonationCurrency(summary.totalGiven)}
             icon={DollarSign}
             accent="emerald"
-            description={
-              reportView === "household"
-                ? "Totals for households on this page"
-                : reportView === "group"
-                  ? "Combined group + attributed gifts on this page"
-                  : undefined
-            }
           />
           <DonationMetricCard
             title="Gifts"
             value={summary.giftCount}
             icon={Gift}
             accent="purple"
-            description={
-              reportView === "household"
-                ? "Gift count for households on this page"
-                : reportView === "group"
-                  ? "Gift count for groups on this page"
-                  : undefined
-            }
           />
         </DonationMetricCardGrid>
       )}
@@ -741,137 +779,24 @@ export function DonorsReportPanel() {
 
       <Card>
         <CardHeader className="space-y-3">
-          {reportView === "group" || reportView === "household" ? (
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-wrap items-center gap-3">
-                <CardTitle>
-                  {reportView === "group" ? "Group Giving" : "Household Giving"}
-                </CardTitle>
-                {reportView === "group" ? (
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      setAddGroupError("")
-                      setAddGroupOpen(true)
-                    }}
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Group
-                  </Button>
-                ) : null}
-              </div>
-              <div className="flex flex-wrap items-center gap-3">
-                <Select
-                  value={dateRangeMode}
-                  onValueChange={(value) => setDateRangeMode(value as DonorDateRangeMode)}
-                >
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Period" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="lifetime">Lifetime</SelectItem>
-                    <SelectItem value="year">Calendar year</SelectItem>
-                    <SelectItem value="custom">Custom range</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                {dateRangeMode === "year" ? (
-                  <Select value={taxYear} onValueChange={setTaxYear}>
-                    <SelectTrigger className="w-[120px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {TAX_YEAR_OPTIONS.map((year) => (
-                        <SelectItem key={year} value={String(year)}>
-                          {year}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : null}
-
-                {dateRangeMode === "custom" ? (
-                  <>
-                    <Input
-                      type="date"
-                      value={customDateFrom}
-                      onChange={(event) => setCustomDateFrom(event.target.value)}
-                      className="w-[160px]"
-                      aria-label="From date"
-                    />
-                    <span className="text-sm text-muted-foreground">to</span>
-                    <Input
-                      type="date"
-                      value={customDateTo}
-                      onChange={(event) => setCustomDateTo(event.target.value)}
-                      className="w-[160px]"
-                      aria-label="To date"
-                    />
-                  </>
-                ) : null}
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-1.5">
-              <CardTitle>Donor Giving</CardTitle>
-              <CardDescription>
-                Click a donor name to open their profile. Pledge details live under Pledges.
-              </CardDescription>
-            </div>
-          )}
-
-          {reportView === "individual" ? (
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-3">
-              <Select
-                value={dateRangeMode}
-                onValueChange={(value) => setDateRangeMode(value as DonorDateRangeMode)}
-              >
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Period" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="lifetime">Lifetime</SelectItem>
-                  <SelectItem value="year">Calendar year</SelectItem>
-                  <SelectItem value="custom">Custom range</SelectItem>
-                </SelectContent>
-              </Select>
-
-              {dateRangeMode === "year" ? (
-                <Select value={taxYear} onValueChange={setTaxYear}>
-                  <SelectTrigger className="w-[120px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TAX_YEAR_OPTIONS.map((year) => (
-                      <SelectItem key={year} value={String(year)}>
-                        {year}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : null}
-
-              {dateRangeMode === "custom" ? (
-                <>
-                  <Input
-                    type="date"
-                    value={customDateFrom}
-                    onChange={(event) => setCustomDateFrom(event.target.value)}
-                    className="w-[160px]"
-                    aria-label="From date"
-                  />
-                  <span className="text-sm text-muted-foreground">to</span>
-                  <Input
-                    type="date"
-                    value={customDateTo}
-                    onChange={(event) => setCustomDateTo(event.target.value)}
-                    className="w-[160px]"
-                    aria-label="To date"
-                  />
-                </>
+              <CardTitle>{tableTitle}</CardTitle>
+              {reportView === "group" ? (
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setAddGroupError("")
+                    setAddGroupOpen(true)
+                  }}
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Group
+                </Button>
               ) : null}
             </div>
-          ) : null}
+            {periodControls}
+          </div>
 
           <div className="flex flex-wrap items-center gap-3">
             {reportView === "household" ? (

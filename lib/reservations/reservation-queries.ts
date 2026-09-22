@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
+import { VENDOR_HUB_ROUTES } from "@/lib/vendor-hub/vendor-hub-routes"
 import { resolveOrganizationId } from "@/lib/organizations/resolve-organization-id"
 
 import { reservationStatusBlocksBooking, type ConflictCheckReservation } from "./reservation-conflict-rules"
@@ -7,6 +8,7 @@ import {
   combineDateAndTime,
   dayNameToIndex,
   getDayEnd,
+  getListRange,
   getWeekEnd,
   getWeekStart,
   rangesOverlap,
@@ -30,6 +32,7 @@ import {
 import {
   getSourceTypesForContext,
   RESERVATION_SOURCE_TYPES,
+  SOURCE_TYPE_LABELS,
 } from "./reservation-types"
 
 type ResourceReservationRow = {
@@ -62,14 +65,37 @@ type ProgramScheduleRow = {
   offering_start_date?: string | null
   offering_end_date?: string | null
   delivery_format?: string | null
+  instructor_name?: string | null
   programs?: { name: string } | null
 }
 
-function getRangeForView(view: CalendarViewMode, anchorDate: Date) {
+function uniqueIds(values: Array<string | null | undefined>) {
+  return Array.from(
+    new Set(values.filter((value): value is string => Boolean(value)))
+  )
+}
+
+function metadataString(
+  metadata: Record<string, unknown>,
+  key: string
+): string | null {
+  const value = metadata[key]
+  return typeof value === "string" && value.trim() ? value.trim() : null
+}
+
+function getRangeForView(
+  view: CalendarViewMode,
+  anchorDate: Date,
+  listEndDate?: Date | null
+) {
   if (view === "day") {
     const start = new Date(anchorDate)
     start.setHours(0, 0, 0, 0)
     return { start, end: getDayEnd(anchorDate) }
+  }
+
+  if (view === "list") {
+    return getListRange(anchorDate, listEndDate)
   }
 
   return { start: getWeekStart(anchorDate), end: getWeekEnd(anchorDate) }
@@ -114,6 +140,228 @@ function mapReservationRow(row: ResourceReservationRow): CalendarReservation {
     metadata: row.metadata ?? {},
     href: reservationHref(row.source_type, row.source_id, row.metadata),
   }
+}
+
+async function attachVendorHubReservationHrefs(
+  organizationId: string,
+  reservations: CalendarReservation[]
+): Promise<CalendarReservation[]> {
+  const internalIds = Array.from(
+    new Set(
+      reservations
+        .filter(
+          (row) =>
+            row.sourceType === RESERVATION_SOURCE_TYPES.internalEvent && Boolean(row.sourceId)
+        )
+        .map((row) => row.sourceId as string)
+    )
+  )
+  if (internalIds.length === 0) return reservations
+
+  const supabase = await createClient()
+  const [{ data: bazaars }, { data: holds }] = await Promise.all([
+    supabase
+      .from("vendor_hub_events")
+      .select("id, internal_event_id")
+      .eq("organization_id", organizationId)
+      .in("internal_event_id", internalIds),
+    supabase
+      .from("internal_events")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .eq("source_module", "vendor_hub")
+      .in("id", internalIds),
+  ])
+
+  const holdIds = new Set((holds || []).map((row) => row.id as string))
+  const bazaarByInternal = new Map<string, string>()
+  for (const row of bazaars || []) {
+    const internalId = row.internal_event_id as string | null
+    if (internalId && holdIds.has(internalId)) {
+      bazaarByInternal.set(internalId, row.id as string)
+    }
+  }
+  if (bazaarByInternal.size === 0) return reservations
+
+  return reservations.map((row) => {
+    const bazaarId = row.sourceId ? bazaarByInternal.get(row.sourceId) : null
+    if (!bazaarId) return row
+    return { ...row, href: VENDOR_HUB_ROUTES.events.detail(bazaarId) }
+  })
+}
+
+type BriefContactRow = {
+  source_type: string
+  source_id: string | null
+  reservation_id: string | null
+  primary_contact_name: string | null
+  primary_contact_phone: string | null
+  internal_coordinator_name: string | null
+  internal_coordinator_phone: string | null
+}
+
+function findBriefForReservation(
+  reservation: CalendarReservation,
+  briefs: BriefContactRow[]
+) {
+  const byReservation = briefs.find(
+    (brief) => brief.reservation_id === reservation.id
+  )
+  if (byReservation) return byReservation
+
+  const lookupId =
+    reservation.sourceType === RESERVATION_SOURCE_TYPES.venueRental
+      ? metadataString(reservation.metadata, "venue_rental_id")
+      : reservation.sourceType === RESERVATION_SOURCE_TYPES.programFacility
+        ? metadataString(reservation.metadata, "program_id")
+        : reservation.sourceId
+
+  if (!lookupId) return undefined
+  return briefs.find((brief) => brief.source_id === lookupId)
+}
+
+async function attachCalendarPeople(
+  organizationId: string,
+  reservations: CalendarReservation[]
+): Promise<CalendarReservation[]> {
+  if (reservations.length === 0) return reservations
+
+  const eventIds = uniqueIds(
+    reservations
+      .filter(
+        (reservation) =>
+          reservation.sourceType === RESERVATION_SOURCE_TYPES.internalEvent
+      )
+      .map((reservation) => reservation.sourceId)
+  )
+  const rentalIds = uniqueIds(
+    reservations.map((reservation) =>
+      metadataString(reservation.metadata, "venue_rental_id")
+    )
+  )
+  const programIds = uniqueIds(
+    reservations.map((reservation) =>
+      metadataString(reservation.metadata, "program_id")
+    )
+  )
+  const briefSourceIds = uniqueIds([...eventIds, ...rentalIds, ...programIds])
+
+  const supabase = await createClient()
+
+  const [eventsResult, rentalsResult, briefsResult] = await Promise.all([
+    eventIds.length > 0
+      ? supabase
+          .from("internal_events")
+          .select("id, coordinator_contact_id")
+          .eq("organization_id", organizationId)
+          .in("id", eventIds)
+      : Promise.resolve({ data: [] as Array<Record<string, unknown>> }),
+    rentalIds.length > 0
+      ? supabase
+          .from("venue_rentals")
+          .select("id, billing_contact_id")
+          .eq("organization_id", organizationId)
+          .in("id", rentalIds)
+      : Promise.resolve({ data: [] as Array<Record<string, unknown>> }),
+    briefSourceIds.length > 0
+      ? supabase
+          .from("operational_briefs")
+          .select(
+            "source_type, source_id, reservation_id, primary_contact_name, primary_contact_phone, internal_coordinator_name, internal_coordinator_phone"
+          )
+          .eq("organization_id", organizationId)
+          .in("source_id", briefSourceIds)
+      : Promise.resolve({ data: [] as BriefContactRow[] }),
+  ])
+
+  const coordinatorByEventId = new Map<string, string>()
+  for (const row of eventsResult.data || []) {
+    const id = row.id as string
+    const coordinatorId = row.coordinator_contact_id as string | null
+    if (id && coordinatorId) coordinatorByEventId.set(id, coordinatorId)
+  }
+
+  const billingByRentalId = new Map<string, string>()
+  for (const row of rentalsResult.data || []) {
+    const id = row.id as string
+    const billingId = row.billing_contact_id as string | null
+    if (id && billingId) billingByRentalId.set(id, billingId)
+  }
+
+  const contactIds = uniqueIds([
+    ...coordinatorByEventId.values(),
+    ...billingByRentalId.values(),
+  ])
+
+  const contactsById = new Map<
+    string,
+    { full_name: string | null; phone: string | null }
+  >()
+  if (contactIds.length > 0) {
+    const { data: contacts } = await supabase
+      .from("contacts")
+      .select("id, full_name, phone")
+      .eq("organization_id", organizationId)
+      .in("id", contactIds)
+    for (const row of contacts || []) {
+      contactsById.set(row.id as string, {
+        full_name: (row.full_name as string | null) ?? null,
+        phone: (row.phone as string | null) ?? null,
+      })
+    }
+  }
+
+  const briefs = (briefsResult.data || []) as BriefContactRow[]
+
+  return reservations.map((reservation) => {
+    const brief = findBriefForReservation(reservation, briefs)
+    let contactName: string | null = null
+    let contactPhone: string | null = null
+
+    if (
+      reservation.sourceType === RESERVATION_SOURCE_TYPES.internalEvent &&
+      reservation.sourceId
+    ) {
+      const contact = contactsById.get(
+        coordinatorByEventId.get(reservation.sourceId) || ""
+      )
+      contactName =
+        contact?.full_name || brief?.internal_coordinator_name || null
+      contactPhone =
+        contact?.phone || brief?.internal_coordinator_phone || null
+    } else if (reservation.sourceType === RESERVATION_SOURCE_TYPES.venueRental) {
+      const rentalId = metadataString(reservation.metadata, "venue_rental_id")
+      const contact = rentalId
+        ? contactsById.get(billingByRentalId.get(rentalId) || "")
+        : undefined
+      contactName = contact?.full_name || brief?.primary_contact_name || null
+      contactPhone = contact?.phone || brief?.primary_contact_phone || null
+    } else if (
+      reservation.sourceType === RESERVATION_SOURCE_TYPES.programFacility
+    ) {
+      contactName =
+        metadataString(reservation.metadata, "instructor_name") ||
+        brief?.internal_coordinator_name ||
+        brief?.primary_contact_name ||
+        null
+      contactPhone =
+        brief?.internal_coordinator_phone || brief?.primary_contact_phone || null
+    } else {
+      contactName =
+        brief?.internal_coordinator_name || brief?.primary_contact_name || null
+      contactPhone =
+        brief?.internal_coordinator_phone || brief?.primary_contact_phone || null
+    }
+
+    return {
+      ...reservation,
+      holderLabel: contactName
+        ? SOURCE_TYPE_LABELS[reservation.sourceType]
+        : "No holder",
+      contactName,
+      contactPhone,
+    }
+  })
 }
 
 function expandProgramScheduleRows(
@@ -181,6 +429,7 @@ function expandProgramScheduleRows(
           program_name: programName ?? null,
           schedule_title: row.title,
           venue_id: venueId,
+          instructor_name: row.instructor_name ?? null,
         },
         href: `/programs/${row.program_id}`,
       })
@@ -317,7 +566,10 @@ async function getStoredReservations(
     throw new Error("Failed to load reservations")
   }
 
-  return ((data || []) as ResourceReservationRow[]).map(mapReservationRow)
+  return attachVendorHubReservationHrefs(
+    organizationId,
+    ((data || []) as ResourceReservationRow[]).map(mapReservationRow)
+  )
 }
 
 async function getProgramFacilityReservations(
@@ -338,6 +590,7 @@ async function getProgramFacilityReservations(
       end_time,
       location,
       venue_id,
+      instructor_name,
       programs:program_id ( name ),
       program_offerings:offering_id ( start_date, end_date, delivery_format )
     `
@@ -405,6 +658,7 @@ async function getProgramFacilityReservations(
       offering_start_date: offering?.start_date ?? null,
       offering_end_date: offering?.end_date ?? null,
       delivery_format: offering?.delivery_format ?? null,
+      instructor_name: row.instructor_name ?? null,
       programs: row.programs,
     }
   })
@@ -419,6 +673,8 @@ export type GetCalendarDataOptions = {
    * Pass null/omit for the full Facilities calendar.
    */
   sourceTypes?: ReservationSourceType[] | null
+  /** Inclusive list-view end date. Defaults to 30 days from the start date. */
+  listEndDate?: Date | null
 }
 
 function resolveStoredSourceTypes(
@@ -460,7 +716,7 @@ export async function getCalendarData(
   options?: GetCalendarDataOptions
 ): Promise<CalendarData> {
   const organizationId = await resolveOrganizationId()
-  const { start, end } = getRangeForView(view, anchorDate)
+  const { start, end } = getRangeForView(view, anchorDate, options?.listEndDate)
   const sourceTypes = options?.sourceTypes
   const storedSourceTypes = resolveStoredSourceTypes(audience, sourceTypes)
 
@@ -487,10 +743,15 @@ export async function getCalendarData(
     (a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime()
   )
 
+  const reservationsWithPeople =
+    audience === "customer"
+      ? reservations
+      : await attachCalendarPeople(organizationId, reservations)
+
   return maskCalendarData(
     {
       venues,
-      reservations,
+      reservations: reservationsWithPeople,
       rangeStart: start.toISOString(),
       rangeEnd: end.toISOString(),
     },

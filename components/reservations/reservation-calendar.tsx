@@ -15,6 +15,7 @@ import {
 
 import { FacilityEventRequestDrawer } from "@/components/events/facility-event-request-drawer"
 import { Header } from "@/components/layout/header"
+import { ReservationCalendarList } from "@/components/reservations/reservation-calendar-list"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
@@ -43,9 +44,13 @@ import type { CalendarAudience } from "@/lib/reservations/calendar-audience"
 import { createReservationBlock } from "@/lib/reservations/reservation-actions"
 import { computeReservationConflicts } from "@/lib/reservations/reservation-conflicts"
 import {
+  addCalendarDays,
+  calendarDayCountInclusive,
+  defaultListEndDate,
   formatCalendarToolbarDate,
   formatHourLabel,
   formatTimeRange,
+  getListRange,
   getWeekStart,
   toDateParam,
 } from "@/lib/reservations/reservation-time"
@@ -68,12 +73,13 @@ const HOURS_END = 18
 const DAY_ROW_HEIGHT = 72
 const GRID_ROW_MIN_HEIGHT = 90
 const DAY_LABELS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"]
-const VIEW_MODES: CalendarViewMode[] = ["day", "grid"]
+const VIEW_MODES: CalendarViewMode[] = ["day", "grid", "list"]
 
 type ReservationCalendarProps = {
   audience: CalendarAudience
   initialData: CalendarData
   initialDate: string
+  initialEndDate?: string | null
   initialView: CalendarViewMode
   canManageBlocks: boolean
   canPlanEvents?: boolean
@@ -559,10 +565,67 @@ function GridView({
   )
 }
 
+function CalendarToolbarDateButton({
+  date,
+  open,
+  onOpenChange,
+  onSelect,
+  onToday,
+  disabled,
+  label,
+}: {
+  date: Date
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onSelect: (date: Date) => void
+  onToday: () => void
+  disabled?: boolean
+  label: string
+}) {
+  return (
+    <Popover open={open} onOpenChange={onOpenChange}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          disabled={disabled}
+          aria-label={label}
+          className="flex items-center gap-1.5 text-sm font-semibold tracking-wide text-foreground transition-colors hover:text-primary disabled:opacity-50"
+        >
+          {formatCalendarToolbarDate(date)}
+          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="start">
+        <Calendar
+          mode="single"
+          selected={date}
+          onSelect={(next) => {
+            if (next) onSelect(next)
+          }}
+          defaultMonth={date}
+          initialFocus
+        />
+        <div className="border-t border-border p-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="w-full"
+            onClick={onToday}
+          >
+            Today
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
 export function ReservationCalendar({
   audience,
   initialData,
   initialDate,
+  initialEndDate = null,
   initialView,
   canManageBlocks,
   canPlanEvents = false,
@@ -577,6 +640,8 @@ export function ReservationCalendar({
   const [isPending, startTransition] = useTransition()
   const [blockOpen, setBlockOpen] = useState(false)
   const [datePickerOpen, setDatePickerOpen] = useState(false)
+  const [listStartPickerOpen, setListStartPickerOpen] = useState(false)
+  const [listEndPickerOpen, setListEndPickerOpen] = useState(false)
   const [briefOpen, setBriefOpen] = useState(false)
   const [selectedReservation, setSelectedReservation] =
     useState<CalendarReservation | null>(null)
@@ -595,6 +660,12 @@ export function ReservationCalendar({
     () => new Date(`${initialDate}T12:00:00`),
     [initialDate]
   )
+  const listEndDate = useMemo(() => {
+    if (initialEndDate) {
+      return new Date(`${initialEndDate}T12:00:00`)
+    }
+    return defaultListEndDate(currentDate)
+  }, [initialEndDate, currentDate])
   const view = initialView
   const data = initialData
   const isOps = audience === "ops"
@@ -624,14 +695,13 @@ export function ReservationCalendar({
   const queryVenueId = searchParams.get("venueId")?.trim() || ""
   const queryStart = searchParams.get("start")?.trim() || ""
   const queryEnd = searchParams.get("end")?.trim() || ""
-  const shouldAutoOpen = searchParams.get("openNew") === "1"
 
   const prefilledDepartmentId =
     eventRequestDepartmentId || eventFormOptions?.defaults.departmentId || null
 
   useEffect(() => {
     if (!canPlanEvents || !eventFormOptions || autoOpenedRef.current) return
-    if (!shouldAutoOpen && !queryStart && !queryVenueId) return
+    if (!queryStart) return
 
     autoOpenedRef.current = true
     setEventSlot({
@@ -643,7 +713,6 @@ export function ReservationCalendar({
   }, [
     canPlanEvents,
     eventFormOptions,
-    shouldAutoOpen,
     queryStart,
     queryVenueId,
     queryEnd,
@@ -685,9 +754,18 @@ export function ReservationCalendar({
     [isOps, conflicts, eventFormOptions]
   )
 
-  function pushParams(next: { date?: string; view?: CalendarViewMode }) {
+  function pushParams(next: {
+    date?: string
+    endDate?: string | null
+    view?: CalendarViewMode
+  }) {
     const params = new URLSearchParams(searchParams.toString())
     if (next.date) params.set("date", next.date)
+    if (next.endDate) {
+      params.set("endDate", next.endDate)
+    } else if (next.endDate === null) {
+      params.delete("endDate")
+    }
     if (next.view) params.set("view", next.view)
     // Preserve ?sources= so module filtered calendars stay filtered.
     // Stay on the current route (e.g. /facilities/calendar vs filtered module calendars).
@@ -697,7 +775,25 @@ export function ReservationCalendar({
     })
   }
 
+  function applyListRange(start: Date, end: Date) {
+    const range = getListRange(start, end)
+    pushParams({
+      date: toDateParam(range.start),
+      endDate: toDateParam(range.end),
+      view: "list",
+    })
+  }
+
   function navigate(direction: -1 | 1) {
+    if (view === "list") {
+      const span = calendarDayCountInclusive(currentDate, listEndDate)
+      applyListRange(
+        addCalendarDays(currentDate, direction * span),
+        addCalendarDays(listEndDate, direction * span)
+      )
+      return
+    }
+
     const next = new Date(currentDate)
     if (view === "grid") {
       next.setDate(next.getDate() + direction * 7)
@@ -767,8 +863,27 @@ export function ReservationCalendar({
     setDatePickerOpen(false)
   }
 
+  function goToListStart(date: Date) {
+    applyListRange(date, date > listEndDate ? date : listEndDate)
+    setListStartPickerOpen(false)
+  }
+
+  function goToListEnd(date: Date) {
+    applyListRange(date < currentDate ? date : currentDate, date)
+    setListEndPickerOpen(false)
+  }
+
   function goToToday() {
+    if (view === "list") {
+      const today = new Date()
+      goToListStart(today)
+      return
+    }
     goToDate(new Date())
+  }
+
+  function goToTodayDayViewForCreate() {
+    pushParams({ date: toDateParam(new Date()), view: "day" })
   }
 
   async function handleCreateBlock(formData: FormData) {
@@ -822,7 +937,7 @@ export function ReservationCalendar({
 
           <div className="flex flex-wrap items-center gap-2">
             {canPlanEvents && eventFormOptions ? (
-              <Button size="sm" onClick={() => openEventDrawer(null)}>
+              <Button size="sm" onClick={goToTodayDayViewForCreate}>
                 <Plus className="mr-2 h-4 w-4" />
                 {CREATE_EVENT_CTA_LABEL}
               </Button>
@@ -844,7 +959,19 @@ export function ReservationCalendar({
                   <button
                     key={mode}
                     type="button"
-                    onClick={() => pushParams({ date: initialDate, view: mode })}
+                    onClick={() => {
+                      if (mode === "list") {
+                        pushParams({
+                          date: initialDate,
+                          endDate:
+                            initialEndDate ||
+                            toDateParam(defaultListEndDate(currentDate)),
+                          view: "list",
+                        })
+                        return
+                      }
+                      pushParams({ date: initialDate, view: mode })
+                    }}
                     disabled={isPending}
                     className={cn(
                       "px-3 py-1.5 text-sm font-medium capitalize transition-colors first:rounded-l-md last:rounded-r-md",
@@ -876,63 +1003,91 @@ export function ReservationCalendar({
                   <ChevronRight className="h-4 w-4" />
                 </Button>
 
-                <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
-                  <PopoverTrigger asChild>
-                    <button
-                      type="button"
+                {view === "list" ? (
+                  <>
+                    <CalendarToolbarDateButton
+                      date={currentDate}
+                      open={listStartPickerOpen}
+                      onOpenChange={setListStartPickerOpen}
+                      onSelect={goToListStart}
+                      onToday={() => goToListStart(new Date())}
                       disabled={isPending}
-                      className="flex items-center gap-1.5 text-sm font-semibold tracking-wide text-foreground transition-colors hover:text-primary disabled:opacity-50"
-                    >
-                      {toolbarDateLabel}
-                      <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={currentDate}
-                      onSelect={(date) => {
-                        if (date) {
-                          goToDate(date)
-                        }
-                      }}
-                      defaultMonth={currentDate}
-                      initialFocus
+                      label="Choose start date"
                     />
-                    <div className="border-t border-border p-2">
-                      <Button
+                    <span className="text-sm font-semibold tracking-wide text-muted-foreground">
+                      –
+                    </span>
+                    <CalendarToolbarDateButton
+                      date={listEndDate}
+                      open={listEndPickerOpen}
+                      onOpenChange={setListEndPickerOpen}
+                      onSelect={goToListEnd}
+                      onToday={() => goToListEnd(new Date())}
+                      disabled={isPending}
+                      label="Choose end date"
+                    />
+                  </>
+                ) : (
+                  <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+                    <PopoverTrigger asChild>
+                      <button
                         type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="w-full"
-                        onClick={goToToday}
+                        disabled={isPending}
+                        className="flex items-center gap-1.5 text-sm font-semibold tracking-wide text-foreground transition-colors hover:text-primary disabled:opacity-50"
                       >
-                        Today
-                      </Button>
-                    </div>
-                  </PopoverContent>
-                </Popover>
+                        {toolbarDateLabel}
+                        <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={currentDate}
+                        onSelect={(date) => {
+                          if (date) {
+                            goToDate(date)
+                          }
+                        }}
+                        defaultMonth={currentDate}
+                        initialFocus
+                      />
+                      <div className="border-t border-border p-2">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="w-full"
+                          onClick={goToToday}
+                        >
+                          Today
+                        </Button>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                )}
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => scrollSpaces(-1)}
-                aria-label="Scroll spaces left"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => scrollSpaces(1)}
-                aria-label="Scroll spaces right"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
+            {view !== "list" ? (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => scrollSpaces(-1)}
+                  aria-label="Scroll spaces left"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => scrollSpaces(1)}
+                  aria-label="Scroll spaces right"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : null}
           </div>
 
           {(isOps || isStaff) && sourceTypesInView.length > 0 ? (
@@ -988,6 +1143,12 @@ export function ReservationCalendar({
               canPlanEvents={canPlanEvents}
               renderContext={renderContext}
               onEmptySlotClick={handleEmptySlotClick}
+            />
+          ) : view === "list" ? (
+            <ReservationCalendarList
+              reservations={data.reservations}
+              conflictIds={conflicts.conflictIds}
+              onSelectReservation={renderContext.onSelectReservation}
             />
           ) : (
             <GridView

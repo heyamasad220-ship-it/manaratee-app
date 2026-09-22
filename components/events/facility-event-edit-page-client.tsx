@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
@@ -9,6 +9,10 @@ import { FacilityEventRequestDrawer } from "@/components/events/facility-event-r
 import { Button } from "@/components/ui/button"
 import type { RoomSetupStyle } from "@/lib/setup-styles/setup-style-types"
 import type { InternalEventFormDefaults } from "@/lib/events/internal-event-form-defaults"
+import {
+  buildEventManagementEventsHref,
+  DEFAULT_EVENT_MANAGEMENT_EVENTS_FILTERS,
+} from "@/lib/events/event-management-events-filters"
 
 type FacilityEventEditPageClientProps = {
   eventId: string
@@ -31,11 +35,12 @@ export function FacilityEventEditPageClient({
 }: FacilityEventEditPageClientProps) {
   const router = useRouter()
   const [open, setOpen] = useState(true)
+  const savedRef = useRef(false)
   const backHref = `/event-management/${eventId}`
 
   function handleOpenChange(nextOpen: boolean) {
     setOpen(nextOpen)
-    if (!nextOpen) {
+    if (!nextOpen && !savedRef.current) {
       router.push(backHref)
     }
   }
@@ -65,7 +70,17 @@ export function FacilityEventEditPageClient({
         setupStyles={setupStyles}
         defaults={defaults}
         editEventId={eventId}
-        onSubmitted={() => {
+        onSubmitted={(_eventId, extras) => {
+          savedRef.current = true
+          if (extras?.recurrenceChanged) {
+            router.push(
+              buildEventManagementEventsHref({
+                ...DEFAULT_EVENT_MANAGEMENT_EVENTS_FILTERS,
+                recurrence: extras.recurring ? "recurring" : "one_time",
+              })
+            )
+            return
+          }
           router.push(backHref)
           router.refresh()
         }}
