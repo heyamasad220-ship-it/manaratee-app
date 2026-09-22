@@ -11,6 +11,7 @@ import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-orga
 import { ROSTER_ENROLLMENT_STATUSES } from "@/lib/programs/enrollment-process"
 import { loadStaffVisibleOfferingsForPrograms } from "@/lib/programs/program-offering-queries"
 import { createClient } from "@/lib/supabase/server"
+import { excludeVendorHubOwnedEvents } from "@/lib/events/internal-event-source"
 
 export type DepartmentWorkspaceOverview = {
   studentsCount: number
@@ -120,12 +121,14 @@ export async function fetchDepartmentWorkspaceOverview(
   )
 
   let upcomingEventsCount = 0
-  const { data: events, error } = await supabase
-    .from("internal_events")
-    .select("id")
-    .eq("organization_id", organizationId)
-    .eq("department_id", departmentId)
-    .gte("start_at", `${todayIsoDate()}T00:00:00.000Z`)
+  const { data: events, error } = await excludeVendorHubOwnedEvents(
+    supabase
+      .from("internal_events")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .eq("department_id", departmentId)
+      .gte("start_at", `${todayIsoDate()}T00:00:00.000Z`)
+  )
 
   if (!error) {
     upcomingEventsCount = events?.length ?? 0

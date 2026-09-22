@@ -32,9 +32,6 @@ export function BazaarEventWorkspaceShell({
         <div className="flex flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-2xl font-semibold tracking-tight">{event.name}</h1>
-            {event.internal_event_id ? (
-              <Badge variant="secondary">Linked to Event Management</Badge>
-            ) : null}
             {event.status && event.status !== "draft" ? (
               <Badge variant="outline" className="capitalize">
                 {event.status}

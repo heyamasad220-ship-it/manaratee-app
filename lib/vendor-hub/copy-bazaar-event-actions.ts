@@ -8,6 +8,7 @@ import { requireVendorHubManage } from "@/lib/vendor-hub/vendor-hub-permissions"
 import { VENDOR_HUB_ROUTES } from "@/lib/vendor-hub/vendor-hub-routes"
 import { calendarStatusFromVisibility } from "@/lib/vendor-hub/calendar-visibility"
 import { createBazaarShareToken } from "@/lib/vendor-hub/bazaar-share-url"
+import { ensureBazaarInternalEvent } from "@/lib/vendor-hub/ensure-bazaar-internal-event"
 
 function boothNumberPrefix(name: string, sortOrder: number) {
   const slug = name
@@ -51,6 +52,24 @@ export async function copyBazaarEvent(input: CopyBazaarEventInput) {
   }
 
   const copyName = input.name?.trim() || `${source.name as string} (Copy)`
+  const calendarVisibility = "private" as const
+
+  const internalEventId = await ensureBazaarInternalEvent({
+    supabase,
+    organizationId,
+    identity: {
+      name: copyName,
+      description: (source.description as string | null) ?? null,
+      eventDate: input.eventDate ?? null,
+      startTime: (source.start_time as string | null) ?? null,
+      endTime: (source.end_time as string | null) ?? null,
+      location: (source.location as string | null) ?? null,
+      flyerUrl: (source.flyer_url as string | null) ?? null,
+      venueId: (source.venue_id as string | null) ?? null,
+      calendarVisibility,
+      coordinatorContactId: (source.organizer_contact_id as string | null) ?? null,
+    },
+  })
 
   const { data: newEvent, error: insertError } = await supabase
     .from("vendor_hub_events")
@@ -66,8 +85,8 @@ export async function copyBazaarEvent(input: CopyBazaarEventInput) {
       expected_attendees: source.expected_attendees ?? 0,
       total_booths: input.copyBoothSetup === false ? 0 : (source.total_booths ?? 0),
       status: "draft",
-      calendar_status: calendarStatusFromVisibility("private"),
-      internal_event_id: null,
+      calendar_status: calendarStatusFromVisibility(calendarVisibility),
+      internal_event_id: internalEventId,
       flyer_url: source.flyer_url,
       public_share_token: createBazaarShareToken(),
     })
@@ -135,12 +154,14 @@ export async function copyBazaarEvent(input: CopyBazaarEventInput) {
           name: boothType.name,
           size: boothType.size,
           price: boothType.price,
+          selection_fee: boothType.selection_fee ?? 0,
           color: boothType.color,
           description: boothType.description,
           capacity: boothType.capacity,
           location: boothType.location,
           is_active: boothType.is_active ?? true,
           sort_order: boothType.sort_order ?? index,
+          default_booth_numbers: boothType.default_booth_numbers ?? [],
         })
         .select("id")
         .single()
@@ -216,6 +237,8 @@ export async function copyBazaarEvent(input: CopyBazaarEventInput) {
   revalidatePath(VENDOR_HUB_ROUTES.events.list)
   revalidatePath(VENDOR_HUB_ROUTES.events.detail(newEventId))
   revalidatePath(VENDOR_HUB_ROUTES.events.booths(newEventId))
+  revalidatePath("/event-management")
+  revalidatePath(`/event-management/${internalEventId}`)
 
   return { id: newEventId, name: copyName }
 }

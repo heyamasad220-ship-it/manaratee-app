@@ -3,6 +3,8 @@ import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-orga
 import { createClient } from "@/lib/supabase/server"
 import { isVisibleOnCommunityCalendar } from "@/lib/community-calendar/calendar-visibility"
 import { canAccessCommunityCalendar } from "@/lib/community-calendar/access"
+import { VENDOR_HUB_ROUTES } from "@/lib/vendor-hub/vendor-hub-routes"
+import { getVendorHubEventIdsByInternalEventIds } from "@/lib/vendor-hub/vendor-hub-internal-event-queries"
 import {
   hasAnyPermission,
   PERMISSIONS,
@@ -58,54 +60,24 @@ export async function getCommunityCalendarPageData(): Promise<{
   }
 
   const enabledSlugs = await loadOrganizationEnabledModuleSlugs(organizationId)
-  const canVendor =
-    enabledSlugs.has("vendor-hub") &&
+  const canEvents =
+    (enabledSlugs.has("event-management") || enabledSlugs.has("vendor-hub")) &&
     (await hasAnyPermission(
+      PERMISSIONS.EVENTS_VIEW,
+      PERMISSIONS.EVENTS_MANAGE,
       PERMISSIONS.VENDOR_HUB_VIEW,
       PERMISSIONS.VENDOR_HUB_MANAGE,
       PERMISSIONS.APPLICATIONS_VIEW
     ))
-  const canEvents =
-    enabledSlugs.has("event-management") &&
-    (await hasAnyPermission(PERMISSIONS.EVENTS_VIEW, PERMISSIONS.EVENTS_MANAGE))
 
   const supabase = await createClient()
   const items: CommunityCalendarItem[] = []
-
-  if (canVendor) {
-    const { data, error } = await supabase
-      .from("vendor_hub_events")
-      .select("id, name, event_date, start_time, location, calendar_status, description")
-      .eq("organization_id", organizationId)
-      .order("event_date", { ascending: true, nullsFirst: false })
-
-    if (error) {
-      console.error("Community calendar bazaar load error:", error)
-    } else {
-      for (const row of data || []) {
-        if (!isVisibleOnCommunityCalendar(row.calendar_status as string | null)) {
-          continue
-        }
-        items.push({
-          id: `bazaar:${row.id}`,
-          source: "bazaar",
-          name: (row.name as string) || "Bazaar event",
-          eventDate: (row.event_date as string | null) ?? null,
-          startLabel: (row.start_time as string | null) ?? null,
-          location: (row.location as string | null) ?? null,
-          calendarStatus: (row.calendar_status as string | null) ?? null,
-          description: (row.description as string | null) ?? null,
-          href: `/vendor-hub/events/${row.id}`,
-        })
-      }
-    }
-  }
 
   if (canEvents) {
     const { data, error } = await supabase
       .from("internal_events")
       .select(
-        "id, name, start_at, location_label, location_address, community_calendar_status, description, venues:venue_id ( name )"
+        "id, name, start_at, location_label, location_address, community_calendar_status, description, source_module, venues:venue_id ( name )"
       )
       .eq("organization_id", organizationId)
       .order("start_at", { ascending: true, nullsFirst: false })
@@ -121,6 +93,12 @@ export async function getCommunityCalendarPageData(): Promise<{
     } else if (error) {
       console.error("Community calendar events load error:", error)
     } else {
+      const bazaarByInternal = await getVendorHubEventIdsByInternalEventIds(
+        organizationId,
+        (data || []).map((row) => row.id as string)
+      )
+      let includeBazaarItems = false
+
       for (const row of data || []) {
         const status = (row as { community_calendar_status?: string | null })
           .community_calendar_status
@@ -137,17 +115,39 @@ export async function getCommunityCalendarPageData(): Promise<{
           (row.location_address as string | null) ||
           null
 
+        const linkedBazaarId = bazaarByInternal.get(row.id as string)
+        const isBazaarHold =
+          (row as { source_module?: string | null }).source_module === "vendor_hub" &&
+          Boolean(linkedBazaarId)
+        const bazaarId = isBazaarHold ? linkedBazaarId : undefined
+        if (bazaarId) includeBazaarItems = true
+
         items.push({
-          id: `event:${row.id}`,
-          source: "event",
+          id: bazaarId ? `bazaar:${bazaarId}` : `event:${row.id}`,
+          source: bazaarId ? "bazaar" : "event",
           name: (row.name as string) || "Event",
           eventDate: toDateKey(row.start_at as string | null),
           startLabel: formatTimeLabel(row.start_at as string | null),
           location,
           calendarStatus: status ?? null,
           description: (row.description as string | null) ?? null,
-          href: `/event-management/${row.id}`,
+          href: bazaarId
+            ? VENDOR_HUB_ROUTES.events.detail(bazaarId)
+            : `/event-management/${row.id}`,
         })
+      }
+
+      items.sort((a, b) => {
+        const aDate = a.eventDate || "9999-99-99"
+        const bDate = b.eventDate || "9999-99-99"
+        if (aDate !== bDate) return aDate.localeCompare(bDate)
+        return a.name.localeCompare(b.name)
+      })
+
+      return {
+        items,
+        includeBazaar: includeBazaarItems,
+        includeEvents: canEvents,
       }
     }
   }
@@ -161,7 +161,7 @@ export async function getCommunityCalendarPageData(): Promise<{
 
   return {
     items,
-    includeBazaar: canVendor,
+    includeBazaar: items.some((item) => item.source === "bazaar"),
     includeEvents: canEvents,
   }
 }

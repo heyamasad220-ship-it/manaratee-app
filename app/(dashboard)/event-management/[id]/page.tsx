@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
 import { Suspense } from "react"
 
 import { InternalEventWorkspace } from "@/components/events/internal-event-workspace"
@@ -15,7 +15,10 @@ import { getEventTicketTypes } from "@/lib/tickets/ticket-type-actions"
 import { getEventAttendees } from "@/lib/tickets/ticket-order-queries"
 import { getEventStaffCandidates } from "@/lib/events/event-staff-assignment-queries"
 import { getVendorHubVendorTypes } from "@/lib/vendor-hub/vendor-type-queries"
-import { getVendorHubLinkForInternalEvent } from "@/lib/vendor-hub/vendor-hub-internal-event-queries"
+import {
+  getBazaarWorkspaceHrefForInternalEvent,
+  getVendorHubLinkForInternalEvent,
+} from "@/lib/vendor-hub/vendor-hub-internal-event-queries"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { getServiceRoleClient } from "@/lib/platform/require-platform-admin"
 import { listEventDocuments } from "@/lib/events/event-document-actions"
@@ -33,6 +36,10 @@ export default async function InternalEventWorkspacePage({
   searchParams: Promise<{ tab?: string }>
 }) {
   const { id } = await params
+  const bazaarHref = await getBazaarWorkspaceHrefForInternalEvent(id)
+  if (bazaarHref) {
+    redirect(bazaarHref)
+  }
   await requireInternalEventWorkspaceAccess(id)
   const { tab } = await searchParams
   const initialTab = resolveWorkspaceTabId(tab) ?? "overview"

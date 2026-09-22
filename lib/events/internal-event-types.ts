@@ -38,12 +38,14 @@ export interface InternalEvent {
   event_tags?: string[] | null
   /** Primary event coordinator (contacts). */
   coordinator_contact_id?: string | null
+  /** Fund Development campaign this event belongs to. */
+  campaign_id?: string | null
   /** Optional headcount estimate for open-public events. */
   estimated_attendance?: number | null
   /** Staff-only notes. */
   internal_notes?: string | null
-  /** Community Calendar visibility (private / published; legacy community_visible still readable). */
-  community_calendar_status?: string | null
+  /** Who owns this date/place row. vendor_hub = bazaar hold, not an EM workspace. */
+  source_module?: string | null
   /** object-position % for Community Calendar flyer crop (0–100). */
   flyer_focal_x?: number | null
   flyer_focal_y?: number | null
@@ -57,10 +59,18 @@ export interface InternalEvent {
   updated_at: string
 }
 
+export type InternalEventCoordinator = {
+  id: string
+  full_name: string | null
+  email: string | null
+  phone: string | null
+}
+
 export interface InternalEventWithRelations extends InternalEvent {
   departments: { id: string; name: string; color: string } | null
   event_types: { id: string; name: string } | null
   venues: { id: string; name: string } | null
+  coordinator?: InternalEventCoordinator | null
   internal_event_venues?: Array<{
     venue_id: string
     venues?: { id: string; name: string } | null

@@ -149,14 +149,14 @@ export async function getPublicCommunityCalendarBySlug(
   }
 
   const enabledSlugs = await loadOrganizationEnabledModuleSlugs(organization.id)
-  const includeBazaar = enabledSlugs.has("vendor-hub")
-  const includeEvents = enabledSlugs.has("event-management")
+  const includeEvents =
+    enabledSlugs.has("event-management") || enabledSlugs.has("vendor-hub")
   const includeCommunityVisible = options?.includeCommunityVisible === true
   const allowedStatuses = includeCommunityVisible
     ? ["published", "community_visible"]
     : ["published"]
 
-  if (!includeBazaar && !includeEvents) {
+  if (!includeEvents) {
     return { organization, eventTypes: [], events: [], featured: null }
   }
 
@@ -198,6 +198,7 @@ export async function getPublicCommunityCalendarBySlug(
         requires_ticketing,
         community_calendar_status,
         event_type_id,
+        source_module,
         event_types:event_type_id ( id, name ),
         venues:venue_id ( name )
       `
@@ -327,8 +328,12 @@ export async function getPublicCommunityCalendarBySlug(
           null
         const eventTypeName = (typeRow?.name as string | undefined) || null
 
-        const requiresTicketing = Boolean(row.requires_ticketing)
-        const ticketPrices = ticketsByEvent.get(row.id as string) || []
+        const isBazaarHold =
+          (row as { source_module?: string | null }).source_module === "vendor_hub"
+        const requiresTicketing = isBazaarHold ? false : Boolean(row.requires_ticketing)
+        const ticketPrices = isBazaarHold
+          ? []
+          : ticketsByEvent.get(row.id as string) || []
         const isClickable = ticketPrices.length > 0
         const startAt = (row.start_at as string | null) ?? null
         const eventDate = toDateKey(startAt)
@@ -337,7 +342,7 @@ export async function getPublicCommunityCalendarBySlug(
 
         events.push({
           id: row.id as string,
-          source: "event",
+          source: isBazaarHold ? "bazaar" : "event",
           name: (row.name as string) || "Event",
           eventDate,
           startAt,
@@ -366,64 +371,6 @@ export async function getPublicCommunityCalendarBySlug(
             : "Free",
           ticketPrices,
           sortAt: startAt ? new Date(startAt).getTime() : Number.MAX_SAFE_INTEGER,
-        })
-      }
-    }
-  }
-
-  if (includeBazaar) {
-    let bazaarQuery = admin
-      .from("vendor_hub_events")
-      .select(
-        "id, name, event_date, start_time, location, flyer_url, description, calendar_status"
-      )
-      .eq("organization_id", organization.id)
-      .order("event_date", { ascending: true, nullsFirst: false })
-
-    bazaarQuery = includeCommunityVisible
-      ? bazaarQuery.in("calendar_status", allowedStatuses)
-      : bazaarQuery.eq("calendar_status", "published")
-
-    const { data: bazaarRows, error } = await bazaarQuery
-
-    if (error) {
-      console.error("Public community calendar bazaars:", error.message)
-    } else {
-      for (const row of bazaarRows || []) {
-        const eventDate = (row.event_date as string | null) ?? null
-        const startLabel = (row.start_time as string | null) ?? null
-        const location = (row.location as string | null) ?? null
-        const sortAt = eventDate
-          ? new Date(`${eventDate}T${(startLabel || "12:00:00").slice(0, 8)}`).getTime()
-          : Number.MAX_SAFE_INTEGER
-
-        events.push({
-          id: row.id as string,
-          source: "bazaar",
-          name: (row.name as string) || "Bazaar",
-          eventDate,
-          startAt: null,
-          startLabel,
-          dateLabel: formatCommunityEventDateLabel({ eventDate, startAt: null }),
-          dayTimeLabel: formatCommunityEventDayTime({
-            eventDate,
-            startAt: null,
-            startLabel,
-          }),
-          location,
-          locationDetail: location,
-          flyerUrl: (row.flyer_url as string | null) ?? null,
-          flyerFocalX: 50,
-          flyerFocalY: 50,
-          description: (row.description as string | null) ?? null,
-          eventTypeId: null,
-          eventTypeName: null,
-          requiresTicketing: false,
-          isClickable: false,
-          href: null,
-          priceSummary: "Free",
-          ticketPrices: [],
-          sortAt: Number.isFinite(sortAt) ? sortAt : Number.MAX_SAFE_INTEGER,
         })
       }
     }

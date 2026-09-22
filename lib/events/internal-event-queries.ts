@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 
+import { excludeVendorHubOwnedEvents } from "./internal-event-source"
 import type {
   InternalEvent,
   InternalEventWithRelations,
@@ -47,6 +48,51 @@ export function mapInternalEventWithVenues(
   }
 }
 
+async function attachCoordinatorContacts(
+  events: InternalEventWithRelations[],
+  organizationId: string
+) {
+  const ids = Array.from(
+    new Set(
+      events
+        .map((event) => event.coordinator_contact_id)
+        .filter((id): id is string => Boolean(id))
+    )
+  )
+  if (ids.length === 0) return events
+
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from("contacts")
+    .select("id, full_name, email, phone")
+    .eq("organization_id", organizationId)
+    .in("id", ids)
+
+  if (error) {
+    console.error(error)
+    return events
+  }
+
+  const byId = new Map(
+    (data || []).map((row) => [
+      row.id as string,
+      {
+        id: row.id as string,
+        full_name: (row.full_name as string | null) ?? null,
+        email: (row.email as string | null) ?? null,
+        phone: (row.phone as string | null) ?? null,
+      },
+    ])
+  )
+
+  return events.map((event) => ({
+    ...event,
+    coordinator: event.coordinator_contact_id
+      ? byId.get(event.coordinator_contact_id) ?? null
+      : null,
+  }))
+}
+
 function isMissingVenueJunctionError(error: { message?: string; code?: string }) {
   return (
     error.message?.includes("internal_event_venues") ||
@@ -86,18 +132,22 @@ export async function getInternalEvents() {
     return []
   }
 
-  const primary = await supabase
-    .from("internal_events")
-    .select(EVENT_SELECT)
-    .eq("organization_id", organizationId)
+  const primary = await excludeVendorHubOwnedEvents(
+    supabase
+      .from("internal_events")
+      .select(EVENT_SELECT)
+      .eq("organization_id", organizationId)
+  )
     .order("start_at", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false })
 
   if (primary.error && isMissingVenueJunctionError(primary.error)) {
-    const fallback = await supabase
-      .from("internal_events")
-      .select(EVENT_SELECT_FALLBACK)
-      .eq("organization_id", organizationId)
+    const fallback = await excludeVendorHubOwnedEvents(
+      supabase
+        .from("internal_events")
+        .select(EVENT_SELECT_FALLBACK)
+        .eq("organization_id", organizationId)
+    )
       .order("start_at", { ascending: false, nullsFirst: false })
       .order("created_at", { ascending: false })
 
@@ -106,8 +156,11 @@ export async function getInternalEvents() {
       throw new Error("Failed to load events")
     }
 
-    return (fallback.data || []).map((row) =>
-      mapInternalEventWithVenues(row as Record<string, unknown>)
+    return attachCoordinatorContacts(
+      (fallback.data || []).map((row) =>
+        mapInternalEventWithVenues(row as Record<string, unknown>)
+      ),
+      organizationId
     )
   }
 
@@ -116,8 +169,11 @@ export async function getInternalEvents() {
     throw new Error("Failed to load events")
   }
 
-  return (primary.data || []).map((row) =>
-    mapInternalEventWithVenues(row as Record<string, unknown>)
+  return attachCoordinatorContacts(
+    (primary.data || []).map((row) =>
+      mapInternalEventWithVenues(row as Record<string, unknown>)
+    ),
+    organizationId
   )
 }
 
@@ -175,11 +231,13 @@ export async function getPendingInternalEventRequests() {
     return []
   }
 
-  const { data, error } = await supabase
-    .from("internal_events")
-    .select(EVENT_SELECT)
-    .eq("organization_id", organizationId)
-    .in("status", ["submitted", "awaiting_approval"])
+  const { data, error } = await excludeVendorHubOwnedEvents(
+    supabase
+      .from("internal_events")
+      .select(EVENT_SELECT)
+      .eq("organization_id", organizationId)
+      .in("status", ["submitted", "awaiting_approval"])
+  )
     .order("submitted_at", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: true })
 

@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server"
 import { getCustomerPortalSupabase } from "@/lib/auth/customer-portal-session"
 
 import { getInternalEventStatusLabel } from "./internal-event-status"
+import { excludeVendorHubOwnedEvents } from "./internal-event-source"
 import type { InternalEventWithRelations } from "./internal-event-types"
 
 export async function getMyInternalEventRequests(
@@ -10,18 +11,20 @@ export async function getMyInternalEventRequests(
 ): Promise<InternalEventWithRelations[]> {
   const { supabase } = await getCustomerPortalSupabase()
 
-  const { data, error } = await supabase
-    .from("internal_events")
-    .select(
-      `
+  const { data, error } = await excludeVendorHubOwnedEvents(
+    supabase
+      .from("internal_events")
+      .select(
+        `
       *,
       departments:department_id ( id, name, color ),
       event_types:event_type_id ( id, name ),
       venues:venue_id ( id, name )
     `
-    )
-    .eq("organization_id", organizationId)
-    .eq("created_by", userId)
+      )
+      .eq("organization_id", organizationId)
+      .eq("created_by", userId)
+  )
     .order("created_at", { ascending: false })
 
   if (error) {
