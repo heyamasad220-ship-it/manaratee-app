@@ -22,6 +22,7 @@ import {
   type InternalEventLocationType,
 } from "@/lib/events/internal-event-location"
 import {
+  calendarDateKey,
   normalizeEventRecurrenceConfig,
   type EventRecurrenceConfig,
 } from "@/lib/events/event-recurrence"
@@ -49,6 +50,7 @@ export type FacilityEventEditPayload = {
   setupStyle: string
   roomSetupNotes: string
   canEdit: boolean
+  seriesDateKeys: string[]
 }
 
 export async function getFacilityEventEditPayload(
@@ -97,6 +99,30 @@ export async function getFacilityEventEditPayload(
   const resolvedVenueIds =
     venueIds.length > 0 ? venueIds : event.venue_id ? [event.venue_id] : []
 
+  const recurrence = normalizeEventRecurrenceConfig(event.recurrence_config)
+  const seriesId = recurrence?.seriesId?.trim() || ""
+  const timeZone = event.timezone || "America/Chicago"
+  const seriesDateKeys = new Set<string>()
+  if (event.start_at) {
+    const key = calendarDateKey(event.start_at, timeZone)
+    if (key) seriesDateKeys.add(key)
+  }
+  for (const key of recurrence?.customDates || []) seriesDateKeys.add(key)
+  if (seriesId) {
+    const { data: siblings } = await supabase
+      .from("internal_events")
+      .select("start_at")
+      .eq("organization_id", organizationId)
+      .contains("recurrence_config", { seriesId })
+    for (const row of siblings || []) {
+      const key = calendarDateKey(
+        (row as { start_at?: string | null }).start_at,
+        timeZone
+      )
+      if (key) seriesDateKeys.add(key)
+    }
+  }
+
   const inferred = inferInternalEventLocationType(event)
   const locationType: InternalEventLocationType = isInternalEventLocationType(
     inferred
@@ -125,7 +151,8 @@ export async function getFacilityEventEditPayload(
     startAt: event.start_at,
     endAt: event.end_at,
     status: event.status,
-    recurrence: normalizeEventRecurrenceConfig(event.recurrence_config),
+    recurrence,
+    seriesDateKeys: [...seriesDateKeys].sort(),
     serviceRequirements: serviceRequirementsFormFromEvent(event),
     ticketing: ticketingFormFromEvent({
       requires_ticketing: event.requires_ticketing,

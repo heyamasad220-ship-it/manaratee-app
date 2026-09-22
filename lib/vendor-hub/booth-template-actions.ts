@@ -10,6 +10,7 @@ import type {
   VendorHubBoothSetupTemplateLine,
   VendorHubBoothSetupTemplateWithLines,
 } from "@/lib/vendor-hub/booth-catalog-types"
+import { parseBoothNumberList } from "@/lib/vendor-hub/booth-pricing"
 import { VENDOR_HUB_ROUTES } from "@/lib/vendor-hub/vendor-hub-routes"
 
 function slugify(value: string) {
@@ -62,6 +63,8 @@ function mapTemplateLineRow(row: Record<string, unknown>): VendorHubBoothSetupTe
     description: (row.description as string | null) ?? null,
     sort_order: Number(row.sort_order ?? 0),
     attribute_slugs: attributeSlugs,
+    selection_fee: Number(row.selection_fee ?? 0),
+    booth_numbers: parseBoothNumberList(row.booth_numbers),
   }
 }
 
@@ -138,6 +141,8 @@ export type BoothSetupTemplateLineInput = {
   description?: string | null
   sort_order?: number
   attribute_slugs?: string[]
+  selection_fee?: number | null
+  booth_numbers?: string[]
 }
 
 export type UpsertBoothSetupTemplateInput = {
@@ -232,6 +237,8 @@ export async function upsertBoothSetupTemplate(input: UpsertBoothSetupTemplateIn
     description: line.description?.trim() || null,
     sort_order: line.sort_order ?? index,
     attribute_slugs: line.attribute_slugs ?? [],
+    selection_fee: Math.max(0, Number(line.selection_fee ?? 0)),
+    booth_numbers: parseBoothNumberList(line.booth_numbers),
   }))
 
   const { error: lineInsertError } = await supabase
@@ -292,7 +299,7 @@ export async function saveEventBoothSetupAsTemplate(input: {
 
   const { data: boothTypes, error: typeError } = await supabase
     .from("vendor_hub_booth_types")
-    .select("id, name, size, price, color, capacity, location, description, sort_order")
+    .select("id, name, size, price, selection_fee, color, capacity, location, description, sort_order, default_booth_numbers")
     .eq("event_id", input.eventId)
     .order("sort_order", { ascending: true })
 
@@ -306,8 +313,8 @@ export async function saveEventBoothSetupAsTemplate(input: {
 
   const typeIds = boothTypes.map((row) => row.id as string)
 
-  const [{ data: boothCounts }, { data: typeAttributeLinks }] = await Promise.all([
-    supabase.from("vendor_hub_booths").select("booth_type_id").eq("event_id", input.eventId),
+  const [{ data: boothRows }, { data: typeAttributeLinks }] = await Promise.all([
+    supabase.from("vendor_hub_booths").select("booth_type_id, number").eq("event_id", input.eventId),
     supabase
       .from("vendor_hub_booth_type_attributes")
       .select("booth_type_id, attribute_id")
@@ -332,10 +339,17 @@ export async function saveEventBoothSetupAsTemplate(input: {
   )
 
   const countByType = new Map<string, number>()
-  for (const booth of boothCounts ?? []) {
+  const numbersByType = new Map<string, string[]>()
+  for (const booth of boothRows ?? []) {
     const typeId = booth.booth_type_id as string | null
     if (!typeId) continue
     countByType.set(typeId, (countByType.get(typeId) ?? 0) + 1)
+    const number = typeof booth.number === "string" ? booth.number.trim() : ""
+    if (number) {
+      const list = numbersByType.get(typeId) ?? []
+      list.push(number)
+      numbersByType.set(typeId, list)
+    }
   }
 
   const slugsByType = new Map<string, string[]>()
@@ -359,6 +373,10 @@ export async function saveEventBoothSetupAsTemplate(input: {
     description: (type.description as string | null) ?? null,
     sort_order: Number(type.sort_order ?? index),
     attribute_slugs: slugsByType.get(type.id as string) ?? [],
+    selection_fee: Number(type.selection_fee ?? 0),
+    booth_numbers:
+      numbersByType.get(type.id as string) ??
+      parseBoothNumberList(type.default_booth_numbers),
   }))
 
   await upsertBoothSetupTemplate({
@@ -420,15 +438,18 @@ export async function applyBoothSetupTemplate(input: {
       .from("vendor_hub_booth_types")
       .insert({
         event_id: input.eventId,
+        organization_id: organizationId,
         name: mappedLine.line_name,
         size: mappedLine.size,
         price: mappedLine.price ?? 0,
+        selection_fee: mappedLine.selection_fee ?? 0,
         color: mappedLine.color ?? "#2563eb",
         description: mappedLine.description,
         capacity: mappedLine.capacity ?? mappedLine.quantity,
         location: mappedLine.location,
         is_active: true,
         sort_order: mappedLine.sort_order ?? index,
+        default_booth_numbers: mappedLine.booth_numbers,
       })
       .select("id")
       .single()
@@ -451,17 +472,24 @@ export async function applyBoothSetupTemplate(input: {
       )
     }
 
-    totalBooths += mappedLine.quantity
+    const prefix = boothNumberPrefix(mappedLine.line_name, mappedLine.sort_order ?? index)
+    const numbers =
+      mappedLine.booth_numbers.length > 0
+        ? mappedLine.booth_numbers
+        : Array.from({ length: mappedLine.quantity }, (_, boothIndex) =>
+            `${prefix}-${String(boothIndex + 1).padStart(2, "0")}`
+          )
+
+    totalBooths += numbers.length
 
     if (!generateBoothInventory) {
       continue
     }
 
-    const prefix = boothNumberPrefix(mappedLine.line_name, mappedLine.sort_order ?? index)
-    const boothRows = Array.from({ length: mappedLine.quantity }, (_, boothIndex) => ({
+    const boothRows = numbers.map((number) => ({
       event_id: input.eventId,
       booth_type_id: boothType.id,
-      number: `${prefix}-${String(boothIndex + 1).padStart(2, "0")}`,
+      number,
       location: mappedLine.location,
       status: "available",
       vendor_name: null,

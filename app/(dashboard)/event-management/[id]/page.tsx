@@ -1,12 +1,14 @@
-import { notFound } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
 import { Suspense } from "react"
 
 import { InternalEventWorkspace } from "@/components/events/internal-event-workspace"
 import { getChildcareForInternalEvent } from "@/lib/child-care/childcare-registration-queries"
 import { listEventExpenses } from "@/lib/events/event-expense-actions"
 import { getLinkedCampaignSummary, listActiveCampaignsForEvent } from "@/lib/events/event-finance-queries"
-import { linkedCampaignIdFromConfig } from "@/lib/events/event-finance-types"
+import { linkedCampaignIdFromEvent } from "@/lib/events/event-campaign-id"
+import { eventManagementOrdersHref } from "@/lib/events/event-management-reports-path"
 import { getEventOverviewSummary } from "@/lib/events/event-overview-metrics"
+import { loadInternalEventCreateFormOptions } from "@/lib/events/internal-event-form-options"
 import { getInternalEventDeleteBlockers } from "@/lib/events/internal-event-actions"
 import { getInternalEventById } from "@/lib/events/internal-event-queries"
 import { resolveWorkspaceTabId } from "@/lib/events/event-workspace-features"
@@ -15,7 +17,10 @@ import { getEventTicketTypes } from "@/lib/tickets/ticket-type-actions"
 import { getEventAttendees } from "@/lib/tickets/ticket-order-queries"
 import { getEventStaffCandidates } from "@/lib/events/event-staff-assignment-queries"
 import { getVendorHubVendorTypes } from "@/lib/vendor-hub/vendor-type-queries"
-import { getVendorHubLinkForInternalEvent } from "@/lib/vendor-hub/vendor-hub-internal-event-queries"
+import {
+  getBazaarWorkspaceHrefForInternalEvent,
+  getVendorHubLinkForInternalEvent,
+} from "@/lib/vendor-hub/vendor-hub-internal-event-queries"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { getServiceRoleClient } from "@/lib/platform/require-platform-admin"
 import { listEventDocuments } from "@/lib/events/event-document-actions"
@@ -33,8 +38,15 @@ export default async function InternalEventWorkspacePage({
   searchParams: Promise<{ tab?: string }>
 }) {
   const { id } = await params
+  const bazaarHref = await getBazaarWorkspaceHrefForInternalEvent(id)
+  if (bazaarHref) {
+    redirect(bazaarHref)
+  }
   await requireInternalEventWorkspaceAccess(id)
   const { tab } = await searchParams
+  if (tab === "orders" || tab === "attendees") {
+    redirect(eventManagementOrdersHref(id))
+  }
   const initialTab = resolveWorkspaceTabId(tab) ?? "overview"
 
   const [
@@ -78,7 +90,7 @@ export default async function InternalEventWorkspacePage({
       )?.full_name ?? null
     : null
 
-  const linkedCampaignId = linkedCampaignIdFromConfig(event.ticketing_config)
+  const linkedCampaignId = linkedCampaignIdFromEvent(event)
 
   const organizationId = await getSelectedOrganizationId()
   let organizationSlug: string | null = null
@@ -92,12 +104,13 @@ export default async function InternalEventWorkspacePage({
     organizationSlug = (org?.slug as string | undefined) ?? null
   }
 
-  const [linkedCampaignSummary, campaignOptions, vendorHubLink, eventDocuments] =
+  const [linkedCampaignSummary, campaignOptions, vendorHubLink, eventDocuments, eventFormOptions] =
     await Promise.all([
       getLinkedCampaignSummary(linkedCampaignId),
       listActiveCampaignsForEvent(),
       getVendorHubLinkForInternalEvent(id),
       listEventDocuments(id),
+      canManage ? loadInternalEventCreateFormOptions() : Promise.resolve(null),
     ])
 
   const overview = await getEventOverviewSummary({
@@ -142,6 +155,7 @@ export default async function InternalEventWorkspacePage({
         eventDocuments={eventDocuments}
         organizationSlug={organizationSlug}
         initialTab={initialTab}
+        eventFormOptions={eventFormOptions}
       />
     </Suspense>
   )

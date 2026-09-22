@@ -1,14 +1,22 @@
 "use client"
 
-import { createContext, Suspense, useContext, type ReactNode } from "react"
+import { createContext, useContext, type ReactNode } from "react"
+import { usePathname } from "next/navigation"
 
 import { Header } from "@/components/layout/header"
-import { DonationReportsNav } from "@/components/donations/donation-reports-nav"
+import { DONATION_REPORTS_DONORS_PATH } from "@/lib/donations/donation-payment-paths"
 
 const DonationReportsCanManageContext = createContext(false)
 
 export function useDonationReportsCanManage() {
   return useContext(DonationReportsCanManageContext)
+}
+
+function isDonorsPath(pathname: string) {
+  return (
+    pathname === DONATION_REPORTS_DONORS_PATH ||
+    pathname.startsWith(`${DONATION_REPORTS_DONORS_PATH}/`)
+  )
 }
 
 export function DonationReportsChrome({
@@ -18,19 +26,17 @@ export function DonationReportsChrome({
   children: ReactNode
   canManage?: boolean
 }) {
+  const pathname = usePathname()
+
   return (
     <DonationReportsCanManageContext.Provider value={canManage}>
-      <Header title="Reports" />
-      <Suspense fallback={null}>
-        <DonationReportsNav canManage={canManage} className="px-6" />
-      </Suspense>
+      {isDonorsPath(pathname) ? <Header title="Donors" /> : null}
       {children}
     </DonationReportsCanManageContext.Provider>
   )
 }
 
-/** @deprecated Report tabs now live in DonationReportsChrome. */
-export function DonationReportsTabs({ className }: { className?: string }) {
-  const canManage = useDonationReportsCanManage()
-  return <DonationReportsNav canManage={canManage} className={className} />
+/** @deprecated Report tabs retired — unique analytics live on each object home. */
+export function DonationReportsTabs(_props: { className?: string }) {
+  return null
 }

@@ -9,6 +9,8 @@ import {
 } from "@/lib/reservations/calendar-audience"
 import { getCalendarData } from "@/lib/reservations/reservation-queries"
 import {
+  defaultListEndDate,
+  getListRange,
   parseCalendarDate,
   toDateParam,
 } from "@/lib/reservations/reservation-time"
@@ -110,14 +112,30 @@ async function AudienceCalendarPageContent({
   const anchorDate = parseCalendarDate(dateParam)
   const viewParam = getSearchParam(resolved, "view")
   const view: CalendarViewMode =
-    viewParam === "grid" || viewParam === "week" ? "grid" : "day"
+    viewParam === "list"
+      ? "list"
+      : viewParam === "grid" || viewParam === "week"
+        ? "grid"
+        : "day"
+  const listEndDate =
+    view === "list"
+      ? parseCalendarDate(
+          getSearchParam(resolved, "endDate"),
+          defaultListEndDate(anchorDate)
+        )
+      : null
+  const listRange =
+    view === "list" ? getListRange(anchorDate, listEndDate) : null
   const sourceTypes =
     parseSourceTypesParam(getSearchParam(resolved, "sources")) ??
     defaultSourceTypes ??
     null
 
   const [data, canManageBlocks, canPlanEventsOrg] = await Promise.all([
-    getCalendarData(audience, anchorDate, view, { sourceTypes }),
+    getCalendarData(audience, anchorDate, view, {
+      sourceTypes,
+      listEndDate,
+    }),
     hasAnyPermission(
       PERMISSIONS.BOOKINGS_MANAGE,
       PERMISSIONS.SPACES_MANAGE,
@@ -148,6 +166,7 @@ async function AudienceCalendarPageContent({
       audience={audience}
       initialData={data}
       initialDate={dateParam || toDateParam(anchorDate)}
+      initialEndDate={listRange ? toDateParam(listRange.end) : null}
       initialView={view}
       canManageBlocks={canManageBlocks && audience === "ops" && !sourceTypes}
       canPlanEvents={planEvents}

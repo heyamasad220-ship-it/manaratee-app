@@ -57,8 +57,20 @@ export default async function CommunityCalendarPage() {
         <PublicCommunityCalendarView
           organization={organization}
           eventTypes={catalog.eventTypes}
-          events={catalog.events}
-          featured={catalog.featured}
+          events={catalog.events.map((event) => ({
+            ...event,
+            isClickable: true,
+            href: `/event-management/${event.id}`,
+          }))}
+          featured={
+            catalog.featured
+              ? {
+                  ...catalog.featured,
+                  isClickable: true,
+                  href: `/event-management/${catalog.featured.id}`,
+                }
+              : catalog.featured
+          }
           embedded
           showPlaceholdersWhenEmpty
           canEditFeaturedFlyer={canEditFeaturedFlyer}

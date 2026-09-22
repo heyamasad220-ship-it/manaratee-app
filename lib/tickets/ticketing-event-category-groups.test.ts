@@ -3,6 +3,8 @@ import { describe, it } from "node:test"
 
 import {
   summarizeTicketedEventsOverview,
+  getTicketedEventListStatus,
+  getTicketedEventListStatusLabel,
   type TicketedEventOverviewRow,
 } from "./ticketing-overview-types"
 import {
@@ -23,6 +25,7 @@ function event(
     locationLabel: null,
     startAt,
     endAt: startAt,
+    eventStatus: "confirmed",
     salesStatus: "published",
     ticketsIssued: 0,
     ticketsCapacity: null,
@@ -65,6 +68,20 @@ describe("ticketing event filters", () => {
     )
     assert.equal(active.length, 1)
     assert.equal(active[0]?.name, "Annual Fundraising Dinner")
+  })
+
+  it("labels ticketed events Draft, Active, or Past from the date", () => {
+    const now = new Date("2026-09-20T12:00:00Z")
+    const draft = event("d", "Draft dinner", "2026-10-01T18:00:00Z")
+    draft.eventStatus = "draft"
+    const active = event("a", "Live dinner", "2026-10-01T18:00:00Z")
+    const past = event("p", "Eid Prayer", "2026-05-27T13:00:00Z")
+    past.eventStatus = "draft"
+
+    assert.equal(getTicketedEventListStatus(draft, now), "draft")
+    assert.equal(getTicketedEventListStatus(active, now), "active")
+    assert.equal(getTicketedEventListStatus(past, now), "past")
+    assert.equal(getTicketedEventListStatusLabel(past, now), "Past")
   })
 
   it("summarizes totals for overview KPI cards", () => {

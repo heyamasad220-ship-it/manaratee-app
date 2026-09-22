@@ -45,6 +45,9 @@ export function maskCalendarReservation(
     description: null,
     href: null,
     metadata: {},
+    holderLabel: label,
+    contactName: null,
+    contactPhone: null,
   }
 }
 

@@ -48,7 +48,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
-  createChildcareEvent,
   createChildcareRegistration,
   deleteChildcareRegistration,
   updateChildcareRegistrationStatus,
@@ -101,7 +100,6 @@ export function ChildcareRegistrationsClient({
   const [eventFilter, setEventFilter] = React.useState("all")
   const [statusFilter, setStatusFilter] = React.useState("all")
   const [showAddDialog, setShowAddDialog] = React.useState(false)
-  const [showAddEventDialog, setShowAddEventDialog] = React.useState(false)
   const [logHoursEvent, setLogHoursEvent] = React.useState<ChildcareEventSummary | null>(
     null
   )
@@ -120,14 +118,6 @@ export function ChildcareRegistrationsClient({
     allergies: "",
     notes: "",
     status: "pending" as ChildcareRegistrationStatus,
-  })
-
-  const [eventForm, setEventForm] = React.useState({
-    name: "",
-    event_date: "",
-    start_time: "",
-    end_time: "",
-    capacity: "20",
   })
 
   React.useEffect(() => {
@@ -181,33 +171,6 @@ export function ChildcareRegistrationsClient({
       })
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save registration.")
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  async function handleCreateEvent() {
-    setIsSaving(true)
-    setError(null)
-    try {
-      const bundle = await createChildcareEvent({
-        name: eventForm.name,
-        event_date: eventForm.event_date,
-        start_time: eventForm.start_time || null,
-        end_time: eventForm.end_time || null,
-        capacity: Number.parseInt(eventForm.capacity, 10) || 20,
-      })
-      applyBundle(bundle)
-      setShowAddEventDialog(false)
-      setEventForm({
-        name: "",
-        event_date: "",
-        start_time: "",
-        end_time: "",
-        capacity: "20",
-      })
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save event.")
     } finally {
       setIsSaving(false)
     }
@@ -376,17 +339,16 @@ export function ChildcareRegistrationsClient({
           <CardHeader className="flex flex-row items-start justify-between gap-4">
             <div>
               <CardTitle>Upcoming Events with Childcare</CardTitle>
-              <CardDescription>Events offering childcare services</CardDescription>
+              <CardDescription>
+                Turn on Youth on an Event Management event to offer childcare.
+              </CardDescription>
             </div>
-            <Button variant="outline" size="sm" onClick={() => setShowAddEventDialog(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Event
-            </Button>
           </CardHeader>
           <CardContent>
             {events.length === 0 ? (
               <p className="py-6 text-center text-sm text-muted-foreground">
-                No upcoming childcare events yet. Add an event to start taking registrations.
+                No upcoming childcare events yet. Open Event Management, turn on Youth for the
+                event, and registrations will appear here.
               </p>
             ) : (
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -748,79 +710,6 @@ export function ChildcareRegistrationsClient({
             >
               {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Add Registration
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showAddEventDialog} onOpenChange={setShowAddEventDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add Childcare Event</DialogTitle>
-            <DialogDescription>
-              Create an event that offers childcare registration
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex flex-col gap-4 py-4">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="event-name">Event Name</Label>
-              <Input
-                id="event-name"
-                value={eventForm.name}
-                onChange={(e) => setEventForm({ ...eventForm, name: e.target.value })}
-                placeholder="Friday Prayer"
-              />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="event-date">Date</Label>
-              <Input
-                id="event-date"
-                type="date"
-                value={eventForm.event_date}
-                onChange={(e) => setEventForm({ ...eventForm, event_date: e.target.value })}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="start-time">Start Time</Label>
-                <Input
-                  id="start-time"
-                  value={eventForm.start_time}
-                  onChange={(e) => setEventForm({ ...eventForm, start_time: e.target.value })}
-                  placeholder="12:00 PM"
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="end-time">End Time</Label>
-                <Input
-                  id="end-time"
-                  value={eventForm.end_time}
-                  onChange={(e) => setEventForm({ ...eventForm, end_time: e.target.value })}
-                  placeholder="2:00 PM"
-                />
-              </div>
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="capacity">Capacity</Label>
-              <Input
-                id="capacity"
-                type="number"
-                min={1}
-                value={eventForm.capacity}
-                onChange={(e) => setEventForm({ ...eventForm, capacity: e.target.value })}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddEventDialog(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleCreateEvent}
-              disabled={isSaving || !eventForm.name.trim() || !eventForm.event_date}
-            >
-              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Add Event
             </Button>
           </DialogFooter>
         </DialogContent>

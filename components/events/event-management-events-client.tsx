@@ -2,14 +2,16 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { Archive, Columns3 } from "lucide-react"
+import { Archive, CalendarClock, Clock, Columns3, Repeat } from "lucide-react"
 
 import { InternalEventCardActions } from "@/components/events/internal-event-card-actions"
 import { InternalEventDbStatusBadge } from "@/components/events/internal-event-db-status-badge"
 import { EventCategorySelect } from "@/components/tickets/ticketing-event-sales-table"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { StatCard, StatCardsRow } from "@/components/ui/stat-card"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Dialog,
   DialogContent,
@@ -47,12 +49,17 @@ import {
 import {
   buildEventManagementEventsHref,
   DEFAULT_EVENT_MANAGEMENT_EVENTS_FILTERS,
+  EVENT_MANAGEMENT_EVENTS_RECURRENCE_FILTER_ITEMS,
   EVENT_MANAGEMENT_EVENTS_STATUS_FILTER_ITEMS,
   EVENT_MANAGEMENT_EVENTS_TICKETED_FILTER_ITEMS,
   filterEventManagementEvents,
+  getEventManagementSearchSeriesSummary,
+  listEventManagementRecurringSeries,
   type EventManagementEventsFilters,
+  type EventManagementEventsRecurrenceFilter,
   type EventManagementEventsStatusFilter,
   type EventManagementEventsTicketedFilter,
+  type EventManagementRecurringSeries,
 } from "@/lib/events/event-management-events-filters"
 import { formatEventDate, formatEventTimeRange } from "@/lib/events/internal-event-format"
 import {
@@ -66,6 +73,7 @@ import {
 } from "@/lib/tickets/ticketing-event-category-types"
 import type { TicketedEventOverviewRow } from "@/lib/tickets/ticketing-overview-types"
 import { formatTicketPrice } from "@/lib/tickets/ticket-types"
+import { formatPhoneDisplayOrDash } from "@/lib/ui/format-phone"
 
 function FilterSelect({
   label,
@@ -104,18 +112,31 @@ function eventIsTicketed(
   return event.requires_ticketing === true || sales != null
 }
 
+function seriesRemainingHint(series: EventManagementRecurringSeries) {
+  if (series.remainingCount > 0) {
+    return `${series.remainingCount.toLocaleString("en-US")} remaining`
+  }
+  return `${series.totalCount.toLocaleString("en-US")} ${
+    series.totalCount === 1 ? "meeting" : "meetings"
+  }`
+}
+
 function EventRow({
   event,
   sales,
   categories,
   canManage,
   visible,
+  schedule,
+  remainingHint,
 }: {
   event: InternalEventWithRelations
   sales: TicketedEventOverviewRow | undefined
   categories: TicketingEventCategory[]
   canManage: boolean
   visible: Set<EventManagementEventsColumnId>
+  schedule?: string
+  remainingHint?: string
 }) {
   const href = `/event-management/${event.id}`
   const ticketed = eventIsTicketed(event, sales)
@@ -127,12 +148,65 @@ function EventRow({
           <Link href={href} className="text-primary hover:underline">
             {event.name}
           </Link>
+          {remainingHint ? (
+            <p className="mt-0.5 text-xs font-normal text-muted-foreground">
+              {remainingHint}
+            </p>
+          ) : null}
         </TableCell>
       ) : null}
       {visible.has("department") ? (
         <TableCell className="text-muted-foreground">
           {event.departments?.name || "—"}
         </TableCell>
+      ) : null}
+      {visible.has("contact") ? (
+        <TableCell className="text-muted-foreground">
+          {event.coordinator?.id && event.coordinator.full_name ? (
+            <Link
+              href={`/contacts/${event.coordinator.id}`}
+              className="text-primary hover:underline"
+              onClick={(clickEvent) => clickEvent.stopPropagation()}
+            >
+              {event.coordinator.full_name}
+            </Link>
+          ) : (
+            event.coordinator?.full_name || "—"
+          )}
+        </TableCell>
+      ) : null}
+      {visible.has("phone") ? (
+        <TableCell className="text-muted-foreground">
+          {event.coordinator?.phone ? (
+            <a
+              href={`tel:${event.coordinator.phone}`}
+              className="hover:underline"
+              onClick={(clickEvent) => clickEvent.stopPropagation()}
+            >
+              {formatPhoneDisplayOrDash(event.coordinator.phone)}
+            </a>
+          ) : (
+            "—"
+          )}
+        </TableCell>
+      ) : null}
+      {visible.has("email") ? (
+        <TableCell className="text-muted-foreground">
+          {event.coordinator?.email ? (
+            <a
+              href={`mailto:${event.coordinator.email}`}
+              className="hover:underline"
+              onClick={(clickEvent) => clickEvent.stopPropagation()}
+            >
+              {event.coordinator.email}
+            </a>
+          ) : (
+            "—"
+          )}
+        </TableCell>
+      ) : null}
+      {schedule ? (
+        <TableCell className="text-muted-foreground">{schedule}</TableCell>
       ) : null}
       {visible.has("date") ? (
         <TableCell className="text-muted-foreground">
@@ -201,13 +275,18 @@ function EventRow({
         </TableCell>
       ) : null}
       {canManage && visible.has("actions") ? (
-        <TableCell className="text-right">
+        <TableCell
+          className="text-right"
+          onClick={(clickEvent) => clickEvent.stopPropagation()}
+        >
           <InternalEventCardActions
             eventId={event.id}
             eventName={event.name}
             compact
             showEdit={false}
-            showDelete={false}
+            showDelete
+            layout="menu"
+            redirectAfterDelete={null}
           />
         </TableCell>
       ) : null}
@@ -321,9 +400,26 @@ export function EventManagementEventsClient({
     )
   }
 
-  const filtered = filterEventManagementEvents(events, { ...filters, q: query })
+  const appliedFilters = { ...filters, q: query }
+  const isRecurringTab = filters.recurrence === "recurring"
+  const filtered = isRecurringTab
+    ? []
+    : filterEventManagementEvents(events, appliedFilters)
+  const seriesRows = isRecurringTab
+    ? listEventManagementRecurringSeries(events, appliedFilters)
+    : []
+  const seriesSummary =
+    isRecurringTab && query.trim()
+      ? getEventManagementSearchSeriesSummary(events, appliedFilters)
+      : null
+  const visibleRowCount = isRecurringTab ? seriesRows.length : filtered.length
   const noEventsExist = events.length === 0
-  const filtersHideResults = !noEventsExist && filtered.length === 0
+  const filtersHideResults = !noEventsExist && visibleRowCount === 0
+  const dateColumnLabel = isRecurringTab
+    ? filters.status === "past"
+      ? "Last date"
+      : "Next date"
+    : "Date"
   const showTicketFilters =
     events.some((event) => event.requires_ticketing === true) ||
     ticketSales.length > 0
@@ -331,79 +427,135 @@ export function EventManagementEventsClient({
   return (
     <div className="space-y-4">
       {!noEventsExist ? (
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="min-w-[14rem] flex-1">
-            <Input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search events..."
-              aria-label="Search events"
-              className="h-8 bg-background"
-            />
-          </div>
-          <FilterSelect
-            label="Department"
-            value={filters.department}
-            onValueChange={(value) => applyFilters({ department: value })}
-            items={[
-              { value: "all", label: "All Departments" },
-              ...departments.map((department) => ({
-                value: department.id,
-                label: department.name,
-              })),
-            ]}
-          />
-          <FilterSelect
-            label="Status"
-            value={filters.status}
+        <div className="space-y-3">
+          <Tabs
+            value={filters.recurrence}
             onValueChange={(value) =>
               applyFilters({
-                status: value as EventManagementEventsStatusFilter,
+                recurrence: value as EventManagementEventsRecurrenceFilter,
               })
             }
-            items={[...EVENT_MANAGEMENT_EVENTS_STATUS_FILTER_ITEMS]}
-          />
-          {showTicketFilters ? (
-            <>
-              <FilterSelect
-                label="Tickets"
-                value={filters.ticketed}
-                onValueChange={(value) =>
-                  applyFilters({
-                    ticketed: value as EventManagementEventsTicketedFilter,
-                  })
-                }
-                items={[...EVENT_MANAGEMENT_EVENTS_TICKETED_FILTER_ITEMS]}
-              />
-              <FilterSelect
-                label="Category"
-                value={filters.category}
-                onValueChange={(value) => applyFilters({ category: value })}
-                items={[
-                  { value: "all", label: "All categories" },
-                  {
-                    value: UNCATEGORIZED_TICKETING_CATEGORY_VALUE,
-                    label: "Uncategorized",
-                  },
-                  ...categories.map((category) => ({
-                    value: category.id,
-                    label: category.name,
-                  })),
-                ]}
-              />
-            </>
-          ) : null}
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-8"
-            onClick={() => setColumnsOpen(true)}
           >
-            <Columns3 className="mr-2 h-4 w-4" />
-            Columns
-          </Button>
+            <TabsList aria-label="Event type">
+              {EVENT_MANAGEMENT_EVENTS_RECURRENCE_FILTER_ITEMS.map((item) => (
+                <TabsTrigger key={item.value} value={item.value}>
+                  {item.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="min-w-[14rem] flex-1">
+              <Input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search events..."
+                aria-label="Search events"
+                className="h-8 bg-background"
+              />
+            </div>
+            <FilterSelect
+              label="Department"
+              value={filters.department}
+              onValueChange={(value) => applyFilters({ department: value })}
+              items={[
+                { value: "all", label: "All Departments" },
+                ...departments.map((department) => ({
+                  value: department.id,
+                  label: department.name,
+                })),
+              ]}
+            />
+            <FilterSelect
+              label="Status"
+              value={filters.status}
+              onValueChange={(value) =>
+                applyFilters({
+                  status: value as EventManagementEventsStatusFilter,
+                })
+              }
+              items={[...EVENT_MANAGEMENT_EVENTS_STATUS_FILTER_ITEMS]}
+            />
+            {showTicketFilters ? (
+              <>
+                <FilterSelect
+                  label="Tickets"
+                  value={filters.ticketed}
+                  onValueChange={(value) =>
+                    applyFilters({
+                      ticketed: value as EventManagementEventsTicketedFilter,
+                    })
+                  }
+                  items={[...EVENT_MANAGEMENT_EVENTS_TICKETED_FILTER_ITEMS]}
+                />
+                <FilterSelect
+                  label="Category"
+                  value={filters.category}
+                  onValueChange={(value) => applyFilters({ category: value })}
+                  items={[
+                    { value: "all", label: "All categories" },
+                    {
+                      value: UNCATEGORIZED_TICKETING_CATEGORY_VALUE,
+                      label: "Uncategorized",
+                    },
+                    ...categories.map((category) => ({
+                      value: category.id,
+                      label: category.name,
+                    })),
+                  ]}
+                />
+              </>
+            ) : null}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8"
+              onClick={() => setColumnsOpen(true)}
+            >
+              <Columns3 className="mr-2 h-4 w-4" />
+              Columns
+            </Button>
+          </div>
         </div>
+      ) : null}
+
+      {seriesSummary ? (
+        <StatCardsRow equal columns={3}>
+          <StatCard
+            fill
+            tone="blue"
+            layout="header"
+            icon={Repeat}
+            label="Recurrences"
+            value={seriesSummary.remainingCount.toLocaleString("en-US")}
+            hint={
+              seriesSummary.remainingCount === seriesSummary.totalCount
+                ? "Upcoming meetings"
+                : `of ${seriesSummary.totalCount} total`
+            }
+          />
+          <StatCard
+            fill
+            tone="violet"
+            layout="header"
+            icon={CalendarClock}
+            label="Recurring schedule"
+            value={seriesSummary.schedule}
+            valueClassName="text-xl font-semibold tracking-tight"
+            hint={seriesSummary.name}
+          />
+          <StatCard
+            fill
+            tone="teal"
+            layout="header"
+            icon={Clock}
+            label="Recurring time"
+            value={seriesSummary.time}
+            valueClassName="text-xl font-semibold tracking-tight tabular-nums"
+            hint="Each meeting"
+          />
+        </StatCardsRow>
       ) : null}
 
       {noEventsExist ? (
@@ -417,7 +569,9 @@ export function EventManagementEventsClient({
       ) : filtersHideResults ? (
         <div className="rounded-lg border bg-card px-6 py-12 text-center">
           <h2 className="text-base font-semibold">
-            No events match these filters.
+            {isRecurringTab
+              ? "No recurring events match these filters."
+              : "No events match these filters."}
           </h2>
           <Button
             type="button"
@@ -440,7 +594,15 @@ export function EventManagementEventsClient({
                     {visible.has("department") ? (
                       <TableHead>Department</TableHead>
                     ) : null}
-                    {visible.has("date") ? <TableHead>Date</TableHead> : null}
+                    {visible.has("contact") ? (
+                      <TableHead>Contact</TableHead>
+                    ) : null}
+                    {visible.has("phone") ? <TableHead>Phone</TableHead> : null}
+                    {visible.has("email") ? <TableHead>Email</TableHead> : null}
+                    {isRecurringTab ? <TableHead>Schedule</TableHead> : null}
+                    {visible.has("date") ? (
+                      <TableHead>{dateColumnLabel}</TableHead>
+                    ) : null}
                     {visible.has("time") ? <TableHead>Time</TableHead> : null}
                     {visible.has("location") ? (
                       <TableHead>Location</TableHead>
@@ -465,16 +627,29 @@ export function EventManagementEventsClient({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filtered.map((event) => (
-                    <EventRow
-                      key={event.id}
-                      event={event}
-                      sales={salesByEventId.get(event.id)}
-                      categories={categories}
-                      canManage={canManage}
-                      visible={visible}
-                    />
-                  ))}
+                  {isRecurringTab
+                    ? seriesRows.map((series) => (
+                        <EventRow
+                          key={series.key}
+                          event={series.event}
+                          sales={salesByEventId.get(series.event.id)}
+                          categories={categories}
+                          canManage={canManage}
+                          visible={visible}
+                          schedule={series.schedule}
+                          remainingHint={seriesRemainingHint(series)}
+                        />
+                      ))
+                    : filtered.map((event) => (
+                        <EventRow
+                          key={event.id}
+                          event={event}
+                          sales={salesByEventId.get(event.id)}
+                          categories={categories}
+                          canManage={canManage}
+                          visible={visible}
+                        />
+                      ))}
                 </TableBody>
               </Table>
             </div>

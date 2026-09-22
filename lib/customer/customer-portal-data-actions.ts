@@ -159,7 +159,7 @@ export async function loadCustomerDonationPortalData() {
       .order("payment_date", { ascending: false }),
     supabase
       .from("campaigns")
-      .select("id, name, description")
+      .select("id, name, description, status, goal_amount")
       .eq("organization_id", organizationId)
       .eq("status", "active")
       .order("name", { ascending: true }),
@@ -187,6 +187,68 @@ export async function loadCustomerDonationPortalData() {
     payments_made: paymentsMadeByPledgeId.get(row.id as string) || 0,
   }))
 
+  const raisedByCampaignId = new Map<string, number>()
+  let campaignMetricsLoaded = false
+  try {
+    const { createServiceRoleClient } = await import("@/lib/supabase/service-role")
+    const admin = createServiceRoleClient()
+    const { data: campaignMetrics, error: campaignMetricsError } = await admin.rpc(
+      "donation_campaign_metrics",
+      { p_org_id: organizationId }
+    )
+    if (campaignMetricsError) {
+      console.error(
+        "[customer-donation] campaign progress unavailable:",
+        campaignMetricsError.message
+      )
+    } else {
+      campaignMetricsLoaded = true
+      for (const row of (campaignMetrics || []) as Array<{
+        campaign_id: string
+        raised?: number | string | null
+      }>) {
+        raisedByCampaignId.set(row.campaign_id, Number(row.raised || 0))
+      }
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    console.error(`[customer-donation] campaign progress unavailable: ${message}`)
+  }
+
+  if (campaignsResult.error) {
+    console.error(
+      "[customer-donation] campaigns unavailable:",
+      campaignsResult.error.message
+    )
+  }
+
+  const campaigns = (
+    (campaignsResult.data || []) as Array<{
+      id: string
+      name: string
+      description?: string | null
+      status?: string | null
+      goal_amount?: number | string | null
+      flyer_url?: string | null
+    }>
+  ).map((campaign) => {
+    const goalRaw = campaign.goal_amount == null ? null : Number(campaign.goal_amount)
+    const goalAmount =
+      goalRaw != null && Number.isFinite(goalRaw) && goalRaw > 0 ? goalRaw : null
+
+    return {
+      id: campaign.id,
+      name: campaign.name,
+      description: campaign.description ?? null,
+      status: campaign.status ?? null,
+      imageUrl: campaign.flyer_url?.trim() || null,
+      goalAmount,
+      raisedAmount: campaignMetricsLoaded
+        ? raisedByCampaignId.get(campaign.id) ?? 0
+        : null,
+    }
+  })
+
   return {
     ok: true as const,
     isSupportSession: session.isSupportSession,
@@ -205,6 +267,6 @@ export async function loadCustomerDonationPortalData() {
     })),
     pledges,
     payments: paymentsResult.data || [],
-    campaigns: campaignsResult.data || [],
+    campaigns,
   }
 }

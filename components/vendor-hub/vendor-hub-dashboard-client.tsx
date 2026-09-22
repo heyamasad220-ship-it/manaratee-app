@@ -13,10 +13,10 @@ import {
   Plus,
   Store,
   Users,
+  Utensils,
 } from "lucide-react"
 
 import { CreateBazaarEventDrawer } from "@/components/bazaar/create-bazaar-event-drawer"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { StatCard, StatCardsRow, type StatCardTone } from "@/components/ui/stat-card"
@@ -38,6 +38,14 @@ function formatEventDate(value?: string | null) {
     day: "numeric",
     year: "numeric",
   })
+}
+
+function formatMoney(amount: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(amount || 0)
 }
 
 export function VendorHubDashboardClient({
@@ -73,17 +81,24 @@ export function VendorHubDashboardClient({
       href: VENDOR_HUB_ROUTES.network.vendors,
     },
     {
-      label: "Revenue collected",
-      value: `$${metrics.revenueCollected.toFixed(2)}`,
+      label: "Outstanding balance",
+      value: `$${metrics.outstandingBalance.toFixed(2)}`,
+      icon: AlertCircle,
+      tone: "rose",
+      href: VENDOR_HUB_ROUTES.reports,
+    },
+    {
+      label: "Total revenue",
+      value: formatMoney(reportsOverview.totalRevenue),
       icon: DollarSign,
       tone: "violet",
       href: VENDOR_HUB_ROUTES.reports,
     },
     {
-      label: "Outstanding balance",
-      value: `$${metrics.outstandingBalance.toFixed(2)}`,
-      icon: AlertCircle,
-      tone: "rose",
+      label: "Food category",
+      value: reportsOverview.foodVendors,
+      icon: Utensils,
+      tone: "amber",
       href: VENDOR_HUB_ROUTES.reports,
     },
   ]
@@ -137,7 +152,7 @@ export function VendorHubDashboardClient({
       </div>
 
       <div className="flex flex-col gap-6">
-        <StatCardsRow equal columns={4}>
+        <StatCardsRow equal columns={5} className="lg:grid-cols-5">
           {healthStats.map((stat) => (
             <Link key={stat.label} href={stat.href} className="min-w-0">
               <StatCard
@@ -153,7 +168,7 @@ export function VendorHubDashboardClient({
           ))}
         </StatCardsRow>
 
-        <VendorHubReportsOverviewPanels overview={reportsOverview} scopeLabel="All events" />
+        <VendorHubReportsOverviewPanels overview={reportsOverview} />
 
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
           <Card>
@@ -186,9 +201,6 @@ export function VendorHubDashboardClient({
                       <div className="min-w-0 space-y-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-medium text-foreground">{event.name}</span>
-                          {event.internal_event_id ? (
-                            <Badge variant="secondary">Linked</Badge>
-                          ) : null}
                         </div>
                         <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                           <span className="flex items-center gap-1.5">

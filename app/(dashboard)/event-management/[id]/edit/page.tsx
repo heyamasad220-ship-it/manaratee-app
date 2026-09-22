@@ -9,6 +9,7 @@ import { getInternalEventFormDefaults } from "@/lib/events/internal-event-form-d
 import { getActiveCalendarVenues } from "@/lib/bookings/venue-calendar-venues"
 import { getRoomSetupStyles } from "@/lib/setup-styles/setup-style-queries"
 import { canManageInternalEvent } from "@/lib/events/event-access"
+import { getBazaarWorkspaceHrefForInternalEvent } from "@/lib/vendor-hub/vendor-hub-internal-event-queries"
 
 export default async function EditInternalEventPage({
   params,
@@ -16,6 +17,10 @@ export default async function EditInternalEventPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
+  const bazaarHref = await getBazaarWorkspaceHrefForInternalEvent(id)
+  if (bazaarHref) {
+    redirect(bazaarHref)
+  }
   if (!(await canManageInternalEvent(id))) {
     redirect("/unauthorized")
   }

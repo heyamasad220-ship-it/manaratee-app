@@ -15,6 +15,13 @@ export const DONATIONS_SIDEBAR_CHILDREN: SubItem[] = [
     permissionKey: "donations.view",
   },
   {
+    label: "Donors",
+    href: "/donations/reports/donors",
+    matchPrefix: "/donations/reports/donors",
+    alsoMatchPrefixes: ["/donations/donors", "/donations/groups"],
+    permissionKey: "donations.view",
+  },
+  {
     label: "Pledges",
     href: "/donations/campaigns/pledges",
     matchPrefix: "/donations/campaigns/pledges",
@@ -26,13 +33,6 @@ export const DONATIONS_SIDEBAR_CHILDREN: SubItem[] = [
     href: "/donations/payments/transactions",
     matchPrefix: "/donations/payments",
     alsoMatchPrefixes: ["/donations/import", "/donations/reconcile", "/donations/recurring"],
-    permissionKey: "donations.view",
-  },
-  {
-    label: "Reports",
-    href: "/donations/reports",
-    matchPrefix: "/donations/reports",
-    alsoMatchPrefixes: ["/donations/donors", "/donations/groups"],
     permissionKey: "donations.view",
   },
   {

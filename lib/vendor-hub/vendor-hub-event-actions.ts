@@ -13,6 +13,7 @@ import { VENDOR_HUB_ROUTES } from "@/lib/vendor-hub/vendor-hub-routes"
 import { publishBazaarEventNotifications } from "@/lib/vendor-hub/bazaar-event-lifecycle-actions"
 import { createBazaarShareToken } from "@/lib/vendor-hub/bazaar-share-url"
 import { isVisibleOnCommunityCalendar } from "@/lib/vendor-hub/calendar-visibility"
+import { ensureBazaarInternalEvent } from "@/lib/vendor-hub/ensure-bazaar-internal-event"
 
 export type UpsertBazaarEventInput = {
   id?: string
@@ -26,18 +27,10 @@ export type UpsertBazaarEventInput = {
   expected_attendees?: number | null
   total_booths?: number | null
   calendar_visibility: BazaarCalendarVisibility
-  internal_event_id?: string | null
   flyer_url?: string | null
   organizer_contact_id?: string | null
   organizer_name?: string | null
   venue_id?: string | null
-}
-
-export type InternalEventLinkOption = {
-  id: string
-  name: string
-  start_at: string | null
-  status: string | null
 }
 
 export type BazaarVenueOption = {
@@ -45,38 +38,28 @@ export type BazaarVenueOption = {
   name: string
 }
 
-function revalidateVendorHubEventPaths(eventId?: string) {
+function friendlyBazaarLinkError(message: string | undefined) {
+  if (!message) return null
+  if (/vendor_hub_events_internal_event_unique|internal_event_id/i.test(message) && /unique|duplicate/i.test(message)) {
+    return "This bazaar could not be saved because its facility hold is already used. Try saving again."
+  }
+  return message
+}
+
+function revalidateVendorHubEventPaths(eventId?: string, internalEventId?: string) {
   revalidatePath(VENDOR_HUB_ROUTES.dashboard)
   revalidatePath(VENDOR_HUB_ROUTES.events.list)
   revalidatePath(VENDOR_HUB_ROUTES.communityCalendar)
+  revalidatePath("/community-calendar")
+  revalidatePath("/facilities/calendar")
+  revalidatePath("/event-management")
+  revalidatePath("/event-management/events")
   if (eventId) {
     revalidatePath(VENDOR_HUB_ROUTES.events.detail(eventId))
   }
-}
-
-export async function fetchInternalEventsForLinking(): Promise<InternalEventLinkOption[]> {
-  await requireVendorHubManage()
-
-  const supabase = await createClient()
-  const organizationId = await getSelectedOrganizationId()
-
-  if (!organizationId) {
-    return []
+  if (internalEventId) {
+    revalidatePath(`/event-management/${internalEventId}`)
   }
-
-  const { data, error } = await supabase
-    .from("internal_events")
-    .select("id, name, start_at, status")
-    .eq("organization_id", organizationId)
-    .order("start_at", { ascending: false, nullsFirst: false })
-    .limit(100)
-
-  if (error) {
-    console.error("fetchInternalEventsForLinking error:", error)
-    return []
-  }
-
-  return (data ?? []) as InternalEventLinkOption[]
 }
 
 export async function fetchVenuesForBazaarPicker(): Promise<BazaarVenueOption[]> {
@@ -121,26 +104,37 @@ export async function upsertBazaarEvent(input: UpsertBazaarEventInput) {
     throw new Error("Event name is required")
   }
 
-  const internalEventId =
-    input.internal_event_id && input.internal_event_id !== "none"
-      ? input.internal_event_id
-      : null
+  let existingInternalEventId: string | null = null
+  let existingBazaar:
+    | {
+        id: string
+        organization_id: string | null
+        calendar_status: string | null
+        status: string | null
+      }
+    | null = null
 
-  if (internalEventId) {
-    const { data: internalEvent, error: internalError } = await supabase
-      .from("internal_events")
-      .select("id")
-      .eq("id", internalEventId)
-      .eq("organization_id", organizationId)
+  if (input.id) {
+    const { data: existing, error: fetchError } = await supabase
+      .from("vendor_hub_events")
+      .select("id, organization_id, calendar_status, status, internal_event_id")
+      .eq("id", input.id)
       .maybeSingle()
 
-    if (internalError) {
-      throw new Error(internalError.message)
+    if (fetchError) {
+      throw new Error(fetchError.message)
     }
 
-    if (!internalEvent) {
-      throw new Error("Selected Event Management event was not found")
+    if (!existing) {
+      throw new Error("Bazaar event not found")
     }
+
+    if (existing.organization_id && existing.organization_id !== organizationId) {
+      throw new Error("Bazaar event not found")
+    }
+
+    existingBazaar = existing
+    existingInternalEventId = (existing.internal_event_id as string | null) || null
   }
 
   const organizerContactId = input.organizer_contact_id?.trim() || null
@@ -179,6 +173,26 @@ export async function upsertBazaarEvent(input: UpsertBazaarEventInput) {
     }
   }
 
+  const identity = {
+    name,
+    description: input.description?.trim() || null,
+    eventDate: input.event_date || null,
+    startTime: input.start_time || null,
+    endTime: input.end_time || null,
+    location: input.location?.trim() || null,
+    flyerUrl: input.flyer_url?.trim() || null,
+    venueId,
+    calendarVisibility: input.calendar_visibility,
+    coordinatorContactId: organizerContactId,
+  }
+
+  const internalEventId = await ensureBazaarInternalEvent({
+    supabase,
+    organizationId,
+    identity,
+    internalEventId: existingInternalEventId,
+  })
+
   const payload = {
     name,
     event_type: input.event_type?.trim() || null,
@@ -199,30 +213,12 @@ export async function upsertBazaarEvent(input: UpsertBazaarEventInput) {
     venue_id: venueId,
   }
 
-  if (input.id) {
-    const { data: existing, error: fetchError } = await supabase
-      .from("vendor_hub_events")
-      .select("id, organization_id, calendar_status, status")
-      .eq("id", input.id)
-      .maybeSingle()
-
-    if (fetchError) {
-      throw new Error(fetchError.message)
-    }
-
-    if (!existing) {
-      throw new Error("Bazaar event not found")
-    }
-
-    if (existing.organization_id && existing.organization_id !== organizationId) {
-      throw new Error("Bazaar event not found")
-    }
-
+  if (input.id && existingBazaar) {
     const { data, error } = await supabase
       .from("vendor_hub_events")
       .update({
         ...payload,
-        status: (existing.status as string | null) ?? "draft",
+        status: (existingBazaar.status as string | null) ?? "draft",
       })
       .eq("id", input.id)
       .select("id")
@@ -230,12 +226,12 @@ export async function upsertBazaarEvent(input: UpsertBazaarEventInput) {
 
     if (error) {
       console.error("upsertBazaarEvent update error:", error)
-      throw new Error(error.message || "Failed to update bazaar event")
+      throw new Error(friendlyBazaarLinkError(error.message) || "Failed to update bazaar event")
     }
 
-    revalidateVendorHubEventPaths(data.id)
+    revalidateVendorHubEventPaths(data.id, internalEventId)
 
-    const wasVisible = isVisibleOnCommunityCalendar(existing.calendar_status as string | null)
+    const wasVisible = isVisibleOnCommunityCalendar(existingBazaar.calendar_status as string | null)
     const nowVisible = isVisibleOnCommunityCalendar(payload.calendar_status as string)
     if (!wasVisible && nowVisible && organizationId) {
       try {
@@ -259,10 +255,10 @@ export async function upsertBazaarEvent(input: UpsertBazaarEventInput) {
 
   if (error) {
     console.error("upsertBazaarEvent insert error:", error)
-    throw new Error(error.message || "Failed to create bazaar event")
+    throw new Error(friendlyBazaarLinkError(error.message) || "Failed to create bazaar event")
   }
 
-  revalidateVendorHubEventPaths(data.id)
+  revalidateVendorHubEventPaths(data.id, internalEventId)
 
   if (isVisibleOnCommunityCalendar(payload.calendar_status as string) && organizationId) {
     try {
@@ -348,7 +344,7 @@ export async function deleteBazaarEvent(eventId: string) {
 
   const { data: existing, error: fetchError } = await supabase
     .from("vendor_hub_events")
-    .select("id, organization_id")
+    .select("id, organization_id, internal_event_id")
     .eq("id", trimmedId)
     .maybeSingle()
 
@@ -359,6 +355,8 @@ export async function deleteBazaarEvent(eventId: string) {
   if (!existing || existing.organization_id !== organizationId) {
     throw new Error("Bazaar event not found")
   }
+
+  const internalEventId = (existing.internal_event_id as string | null) || null
 
   const { error } = await supabase
     .from("vendor_hub_events")
@@ -371,6 +369,15 @@ export async function deleteBazaarEvent(eventId: string) {
     throw new Error(error.message || "Failed to delete bazaar event")
   }
 
-  revalidateVendorHubEventPaths(trimmedId)
+  if (internalEventId) {
+    await supabase
+      .from("internal_events")
+      .delete()
+      .eq("id", internalEventId)
+      .eq("organization_id", organizationId)
+      .eq("source_module", "vendor_hub")
+  }
+
+  revalidateVendorHubEventPaths(trimmedId, internalEventId ?? undefined)
   return { ok: true as const }
 }

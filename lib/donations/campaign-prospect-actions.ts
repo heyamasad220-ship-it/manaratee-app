@@ -38,6 +38,9 @@ function missingProspectSchemaError(message: string) {
   if (/campaign_prospects/i.test(message) || message.includes("42P01")) {
     return "Prospects are not available yet. Run scripts/262_campaign_prospects.sql in Supabase."
   }
+  if (/assigned_to_name/i.test(message)) {
+    return "Prospect assignee names are not available yet. Run scripts/299_campaign_prospect_assigned_to_name.sql in Supabase."
+  }
   if (
     /ask_type|sponsorship_package|campaign_prospect_activities|converted_sponsorship/i.test(
       message
@@ -62,6 +65,7 @@ function mapProspectRow(row: Record<string, unknown>): CampaignProspectRow {
     event_id: (row.event_id as string | null) ?? null,
     sponsorship_package_id: (row.sponsorship_package_id as string | null) ?? null,
     assigned_to_contact_id: (row.assigned_to_contact_id as string | null) ?? null,
+    assigned_to_name: ((row.assigned_to_name as string | null) ?? "").trim() || null,
     stage: displayCampaignProspectStage(row.stage as string),
     priority: normalizeProspectPriority(row.priority as string),
     last_contacted_at: (row.last_contacted_at as string | null) ?? null,
@@ -263,9 +267,11 @@ async function enrichProspects(
     ...row,
     contactName: contacts.get(row.contact_id)?.name || "Unknown contact",
     contactEmail: contacts.get(row.contact_id)?.email ?? null,
-    assignedToName: row.assigned_to_contact_id
-      ? contacts.get(row.assigned_to_contact_id)?.name || "Unknown"
-      : null,
+    assignedToName:
+      row.assigned_to_name ||
+      (row.assigned_to_contact_id
+        ? contacts.get(row.assigned_to_contact_id)?.name || "Unknown"
+        : null),
     askLevelAmount: row.ask_level_id ? askLevels.get(row.ask_level_id) ?? null : null,
     pledgeAmount: row.converted_pledge_id
       ? pledges.get(row.converted_pledge_id) ?? null
@@ -633,6 +639,7 @@ export async function createCampaignProspectAction(
         sponsorship_package_id:
           askType === "sponsorship" ? input.sponsorship_package_id || null : null,
         assigned_to_contact_id: input.assigned_to_contact_id || null,
+        assigned_to_name: input.assigned_to_name?.trim() || null,
         stage,
         priority: normalizeProspectPriority(input.priority),
         last_contacted_at: input.last_contacted_at || null,
@@ -727,6 +734,9 @@ export async function updateCampaignProspectAction(
     }
     if (input.assigned_to_contact_id !== undefined) {
       patch.assigned_to_contact_id = input.assigned_to_contact_id || null
+    }
+    if (input.assigned_to_name !== undefined) {
+      patch.assigned_to_name = input.assigned_to_name?.trim() || null
     }
     if (input.stage !== undefined) patch.stage = normalizeProspectStage(input.stage)
     if (input.priority !== undefined) {

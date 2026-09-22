@@ -1,8 +1,10 @@
 "use client"
 
+import { useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 
 import { Header } from "@/components/layout/header"
+import { FacilityEventRequestDrawer } from "@/components/events/facility-event-request-drawer"
 import { InternalEventCardActions } from "@/components/events/internal-event-card-actions"
 import { InternalEventChildcareTab } from "@/components/events/internal-event-childcare-tab"
 import { InternalEventFeaturesSettings } from "@/components/events/internal-event-features-settings"
@@ -58,6 +60,11 @@ import type { ServiceParticipationWithContact } from "@/lib/service-participatio
 import type { VendorHubVendorType } from "@/lib/vendor-hub/vendor-type-types"
 import type { VendorHubLinkForInternalEvent } from "@/lib/vendor-hub/vendor-hub-internal-event-queries"
 import type { EventDocument } from "@/lib/events/event-document-types"
+import type { InternalEventCreateFormOptions } from "@/lib/events/internal-event-form-options"
+import {
+  buildEventManagementEventsHref,
+  DEFAULT_EVENT_MANAGEMENT_EVENTS_FILTERS,
+} from "@/lib/events/event-management-events-filters"
 import { InternalEventDocumentsCard } from "@/components/events/internal-event-documents-card"
 import { STAFF_MAIN_CONTENT_STICKY_TOP_CLASS } from "@/lib/layout/staff-dashboard-chrome"
 import { cn } from "@/lib/utils"
@@ -85,6 +92,7 @@ export function InternalEventWorkspace({
   eventDocuments = [],
   organizationSlug = null,
   initialTab = "overview",
+  eventFormOptions = null,
 }: {
   event: InternalEventWithRelations
   canManage: boolean
@@ -108,9 +116,11 @@ export function InternalEventWorkspace({
   eventDocuments?: EventDocument[]
   organizationSlug?: string | null
   initialTab?: EventWorkspaceTabId
+  eventFormOptions?: InternalEventCreateFormOptions | null
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const [editOpen, setEditOpen] = useState(false)
   const tabParam = searchParams.get("tab")
   const resolvedFromUrl = resolveWorkspaceTabId(tabParam)
 
@@ -225,7 +235,17 @@ export function InternalEventWorkspace({
           <div>
             <p className="text-sm text-muted-foreground">Event workspace</p>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight">
-              {event.name}
+              {canManage && eventFormOptions ? (
+                <button
+                  type="button"
+                  className="text-left text-primary hover:underline"
+                  onClick={() => setEditOpen(true)}
+                >
+                  {event.name}
+                </button>
+              ) : (
+                event.name
+              )}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
               {departmentName} · {eventTypeName}
@@ -520,6 +540,33 @@ export function InternalEventWorkspace({
           </TabsContent>
         </Tabs>
       </div>
+      {canManage && eventFormOptions ? (
+        <FacilityEventRequestDrawer
+          open={editOpen}
+          onOpenChange={setEditOpen}
+          departments={eventFormOptions.departments}
+          eventTypes={eventFormOptions.eventTypes}
+          venues={eventFormOptions.venues}
+          setupStyles={eventFormOptions.setupStyles}
+          defaults={eventFormOptions.defaults}
+          approvalRequired={eventFormOptions.approvalRequired}
+          editEventId={event.id}
+          spaceMode="select"
+          onSubmitted={(_eventId, extras) => {
+            setEditOpen(false)
+            if (extras?.recurrenceChanged) {
+              router.push(
+                buildEventManagementEventsHref({
+                  ...DEFAULT_EVENT_MANAGEMENT_EVENTS_FILTERS,
+                  recurrence: extras.recurring ? "recurring" : "one_time",
+                })
+              )
+              return
+            }
+            router.refresh()
+          }}
+        />
+      ) : null}
     </>
   )
 }

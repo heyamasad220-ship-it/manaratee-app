@@ -51,8 +51,8 @@ export default async function EventManagementEventsPage({
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Events</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              View and manage every event. Ticketed rows show issued seats,
-              remaining capacity, revenue, and category.
+              One-time events list each date. Recurring series show one row,
+              with the next meeting and schedule.
             </p>
           </div>
           {canManage ? (

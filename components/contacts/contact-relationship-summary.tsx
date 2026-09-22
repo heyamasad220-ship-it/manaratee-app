@@ -204,7 +204,7 @@ export function ContactRelationshipSummaryCard({
       value: summary.ticketsCount,
       icon: Ticket,
       records: activity.ticketing,
-      href: "/event-management/reports/orders",
+      href: "/event-management/ticketing/orders",
       viewLabel: "View purchases",
       accent: "cyan",
     })

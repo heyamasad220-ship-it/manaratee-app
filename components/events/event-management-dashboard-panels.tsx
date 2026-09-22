@@ -2,14 +2,12 @@
 
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useTransition } from "react"
+import { useTransition, type ReactNode } from "react"
 import {
   CalendarCheck,
   Baby,
   Users,
   Truck,
-  Ticket,
-  DollarSign,
   ChevronRight,
   ClipboardCheck,
   MapPin,
@@ -19,6 +17,7 @@ import type { LucideIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import { CreateInternalEventButton } from "@/components/events/create-internal-event-button"
 import {
   Select,
@@ -27,14 +26,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 import { EVENT_MANAGEMENT_EVENTS_PATH } from "@/lib/events/event-management-section-path"
+import { formatEventDate, formatEventTimeRange } from "@/lib/events/internal-event-format"
 import type {
   DashboardAttentionItem,
   DashboardTimePeriod,
+  DashboardUpcomingEventRow,
   EventManagementDashboardData,
 } from "@/lib/events/internal-event-dashboard-types"
-import { formatTicketPrice } from "@/lib/tickets/ticket-types"
-import { StatCard, StatCardsRow } from "@/components/ui/stat-card"
 import { cn } from "@/lib/utils"
 
 const ATTENTION_ICONS: Record<DashboardAttentionItem["kind"], LucideIcon> = {
@@ -91,13 +98,15 @@ function AttentionCard({ item }: { item: DashboardAttentionItem }) {
 function KpiCard({
   icon: Icon,
   iconClassName,
-  count,
+  value,
   label,
+  hint,
 }: {
   icon: LucideIcon
   iconClassName: string
-  count: number
+  value: ReactNode
   label: string
+  hint?: string
 }) {
   return (
     <Card>
@@ -112,12 +121,133 @@ function KpiCard({
             <Icon className="h-5 w-5" />
           </div>
           <div className="min-w-0">
-            <p className="text-2xl font-bold text-foreground">{count}</p>
+            <p className="truncate text-2xl font-bold text-foreground">{value}</p>
             <p className="truncate text-xs text-muted-foreground">{label}</p>
+            {hint ? (
+              <p className="truncate text-xs text-muted-foreground">{hint}</p>
+            ) : null}
           </div>
         </div>
       </CardContent>
     </Card>
+  )
+}
+
+function NeedTag({
+  needed,
+  label,
+  className,
+}: {
+  needed: boolean
+  label: string
+  className: string
+}) {
+  if (!needed) {
+    return <span className="text-muted-foreground">—</span>
+  }
+
+  return (
+    <span
+      className={cn(
+        "inline-flex rounded-md px-2 py-0.5 text-xs font-medium",
+        className
+      )}
+    >
+      {label}
+    </span>
+  )
+}
+
+function ThisMonthUpcomingTable({
+  events,
+}: {
+  events: DashboardUpcomingEventRow[]
+}) {
+  const monthLabel = new Date().toLocaleDateString(undefined, {
+    month: "long",
+    year: "numeric",
+  })
+
+  return (
+    <section className="space-y-3">
+      <div>
+        <h2 className="text-base font-semibold">This month</h2>
+        <p className="text-sm text-muted-foreground">
+          Upcoming events in {monthLabel}.
+        </p>
+      </div>
+      <Card>
+        <CardContent className="p-0">
+          {events.length === 0 ? (
+            <p className="p-6 text-sm text-muted-foreground">
+              No upcoming events this month.
+            </p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead>Event</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Childcare</TableHead>
+                  <TableHead>Volunteers</TableHead>
+                  <TableHead>Vendors</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {events.map((event) => (
+                  <TableRow key={event.id}>
+                    <TableCell>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Link
+                          href={event.href}
+                          className="font-medium text-primary hover:underline"
+                        >
+                          {event.name}
+                        </Link>
+                        {event.ticketed ? (
+                          <Badge className="border-0 bg-violet-100 text-violet-700 hover:bg-violet-100">
+                            Ticketed
+                          </Badge>
+                        ) : null}
+                      </div>
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-foreground">
+                      <div>{formatEventDate(event.startAt)}</div>
+                      {event.startAt ? (
+                        <div className="text-xs text-muted-foreground">
+                          {formatEventTimeRange(event.startAt, event.endAt)}
+                        </div>
+                      ) : null}
+                    </TableCell>
+                    <TableCell>
+                      <NeedTag
+                        needed={event.needsChildcare}
+                        label="Needed"
+                        className="bg-pink-100 text-pink-700"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <NeedTag
+                        needed={event.needsVolunteers}
+                        label="Needed"
+                        className="bg-blue-100 text-blue-700"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <NeedTag
+                        needed={event.needsVendors}
+                        label="Needed"
+                        className="bg-orange-100 text-orange-700"
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+    </section>
   )
 }
 
@@ -156,7 +286,7 @@ export function EventManagementDashboardPanels({
     })
   }
 
-  const { kpis, ticketSales, attentionItems } = data
+  const { kpis, upcomingThisMonth, attentionItems } = data
 
   return (
     <div className="flex flex-col gap-4 sm:gap-6">
@@ -164,8 +294,7 @@ export function EventManagementDashboardPanels({
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Overview</h1>
           <p className="text-muted-foreground">
-            Operations for every event, plus ticket sales across ticketed
-            events.
+            Upcoming events and staffing needs.
           </p>
         </div>
 
@@ -193,68 +322,51 @@ export function EventManagementDashboardPanels({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-5">
-        <KpiCard
-          icon={CalendarCheck}
-          iconClassName="bg-emerald-100 text-emerald-700"
-          count={kpis.scheduledCount}
-          label="Scheduled Events"
-        />
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
+                <CalendarCheck className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-2xl font-bold text-foreground">
+                  {kpis.upcomingOneTimeCount.toLocaleString("en-US")}{" "}
+                  <span className="text-sm font-medium text-muted-foreground">
+                    one-time
+                  </span>
+                </p>
+                <p className="truncate text-2xl font-bold text-foreground">
+                  {kpis.upcomingRecurringCount.toLocaleString("en-US")}{" "}
+                  <span className="text-sm font-medium text-muted-foreground">
+                    recurring
+                  </span>
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
         <KpiCard
           icon={Baby}
           iconClassName="bg-pink-100 text-pink-700"
-          count={kpis.childcareRequired}
+          value={kpis.childcareRequired}
           label="Need Childcare"
         />
         <KpiCard
           icon={Users}
           iconClassName="bg-blue-100 text-blue-700"
-          count={kpis.volunteersRequired}
+          value={kpis.volunteersRequired}
           label="Need Volunteers"
         />
         <KpiCard
           icon={Truck}
           iconClassName="bg-orange-100 text-orange-700"
-          count={kpis.vendorsRequired}
+          value={kpis.vendorsRequired}
           label="Need Vendors"
-        />
-        <KpiCard
-          icon={Ticket}
-          iconClassName="bg-violet-100 text-violet-700"
-          count={kpis.ticketedEvents}
-          label="Ticketed Events"
         />
       </div>
 
-      <StatCardsRow equal columns={3}>
-        <StatCard
-          label="Active ticketed"
-          value={ticketSales.activeTicketedEvents.toLocaleString("en-US")}
-          icon={CalendarCheck}
-          hint={`${ticketSales.totalTicketedEvents.toLocaleString("en-US")} ticketed total`}
-          layout="compact"
-          fill
-          tone="emerald"
-        />
-        <StatCard
-          label="Tickets issued"
-          value={ticketSales.ticketsIssued.toLocaleString("en-US")}
-          icon={Ticket}
-          hint="All ticketed events"
-          layout="compact"
-          fill
-          tone="violet"
-        />
-        <StatCard
-          label="Revenue"
-          value={formatTicketPrice(ticketSales.revenueCents, ticketSales.currency)}
-          icon={DollarSign}
-          hint="Completed ticket sales"
-          layout="compact"
-          fill
-          tone="blue"
-        />
-      </StatCardsRow>
+      <ThisMonthUpcomingTable events={upcomingThisMonth} />
 
       <section id="attention-required" className="space-y-3">
         <div>

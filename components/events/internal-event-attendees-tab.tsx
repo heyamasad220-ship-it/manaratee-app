@@ -25,6 +25,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
+import { eventManagementOrdersHref } from "@/lib/events/event-management-reports-path"
 import { setEventTicketCheckIn, promoteWaitlistedTicket, resendEventTicketConfirmation, completePendingEventTicketOrder, refundEventTicketOrder } from "@/lib/tickets/ticket-order-actions"
 import type { EventAttendeeListItem } from "@/lib/tickets/ticket-order-queries"
 import type { EventTicketType } from "@/lib/tickets/ticket-types"
@@ -375,7 +376,7 @@ export function InternalEventAttendeesTab({
             ) : null}
             {canManage ? (
               <Button variant="outline" size="sm" asChild>
-                <Link href={`/event-management/reports/orders?event=${eventId}`}>
+                <Link href={eventManagementOrdersHref(eventId)}>
                   View orders
                 </Link>
               </Button>

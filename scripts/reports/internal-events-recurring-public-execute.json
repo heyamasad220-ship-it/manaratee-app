@@ -1,0 +1,775 @@
+{
+  "mode": "execute",
+  "planned": 142,
+  "alreadyImported": 0,
+  "toInsert": 142,
+  "bySeries": {
+    "learn-love-live-quran": {
+      "count": 41,
+      "publish": true,
+      "first": "2026-08-19",
+      "last": "2027-05-26",
+      "sample": "Learn, Love, Live the Quran"
+    },
+    "thursday-halaqa-ladies": {
+      "count": 53,
+      "publish": true,
+      "first": "2026-05-28",
+      "last": "2027-05-27",
+      "sample": "Thursday Halaqa for Ladies"
+    },
+    "tuesday-night-live": {
+      "count": 37,
+      "publish": false,
+      "first": "2026-09-08",
+      "last": "2027-05-18",
+      "sample": "Tuesday Night Live"
+    },
+    "crochet-clique": {
+      "count": 4,
+      "publish": true,
+      "first": "2026-10-03",
+      "last": "2027-04-03",
+      "sample": "Crochet Clique"
+    },
+    "men-talk": {
+      "count": 7,
+      "publish": true,
+      "first": "2026-06-12",
+      "last": "2026-09-04",
+      "sample": "Men Talk"
+    }
+  },
+  "skipped": [
+    {
+      "name": "Her Space",
+      "reason": "not_on_spreadsheet",
+      "detail": "No dates in InternalEvents.xlsx. Add custom dates and re-run, or create them in Event Management."
+    }
+  ],
+  "potluckDates": [
+    "2026-08-26",
+    "2026-09-30",
+    "2026-10-28",
+    "2026-11-25",
+    "2026-12-30",
+    "2027-01-27",
+    "2027-02-24",
+    "2027-03-31",
+    "2027-04-28",
+    "2027-05-26"
+  ],
+  "createdCount": 142,
+  "created": [
+    {
+      "id": "c526f322-2b4e-45d2-b86d-ef434ff52f99",
+      "name": "Learn, Love, Live the Quran",
+      "date": "2026-08-19"
+    },
+    {
+      "id": "8e512151-cd25-4207-8498-4167e634a125",
+      "name": "Learn, Love, Live the Quran (monthly potluck)",
+      "date": "2026-08-26"
+    },
+    {
+      "id": "0a212de5-27d8-4687-b343-da8e47dd319c",
+      "name": "Learn, Love, Live the Quran",
+      "date": "2026-09-02"
+    },
+    {
+      "id": "684f491c-5e8f-4ae2-9e80-ff0c43528408",
+      "name": "Learn, Love, Live the Quran",
+      "date": "2026-09-09"
+    },
+    {
+      "id": "303a6d06-0cf5-467c-b023-f78654730455",
+      "name": "Learn, Love, Live the Quran",
+      "date": "2026-09-16"
+    },
+    {
+      "id": "8024492e-7b0b-41c0-aede-ca88cedb6310",
+      "name": "Learn, Love, Live the Quran",
+      "date": "2026-09-23"
+    },
+    {
+      "id": "5f759229-57e0-4a77-bbe3-463cc790b7ad",
+      "name": "Learn, Love, Live the Quran (monthly potluck)",
+      "date": "2026-09-30"
+    },
+    {
+      "id": "7b726548-35fd-4c5b-a21f-0a432af65a3d",
+      "name": "Learn, Love, Live the Quran",
+      "date": "2026-10-07"
+    },
+    {
+      "id": "f033f399-aaf1-4fc8-b77b-0885606d83aa",
+      "name": "Learn, Love, Live the Quran",
+      "date": "2026-10-14"
+    },
+    {
+      "id": "b8143a64-1e74-4b05-a1cf-fdee68373bba",
+      "name": "Learn, Love, Live the Quran",
+      "date": "2026-10-21"
+    },
+    {
+      "id": "ab97b890-1c1e-41c5-916f-a1bc768b8190",
+      "name": "Learn, Love, Live the Quran (monthly potluck)",
+      "date": "2026-10-28"
+    },
+    {
+      "id": "514355db-8e39-4b89-a9ca-3f9245d5b0b1",
+      "name": "Learn, Love, Live the Quran",
+      "date": "2026-11-04"
+    },
+    {
+      "id": "1e527851-a573-4dea-a9a2-b12c4bd36e7a",
+      "name": "Learn, Love, Live the Quran",
+      "date": "2026-11-11"
+    },
+    {
+      "id": "edfbec4a-5de8-462d-ba71-66c69b3d1f82",
+      "name": "Learn, Love, Live the Quran",
+      "date": "2026-11-18"
+    },
+    {
+      "id": "34c62192-baec-4cdb-9c4d-042f94452908",
+      "name": "Learn, Love, Live the Quran (monthly potluck)",
+      "date": "2026-11-25"
+    },
+    {
+      "id": "d285109c-0bcc-47ed-9b42-e07e94b80b8c",
+      "name": "Learn, Love, Live the Quran",
+      "date": "2026-12-02"
+    },
+    {
+      "id": "e3fb325d-0adb-4850-82c1-899b7e77d07a",
+      "name": "Learn, Love, Live the Quran",
+      "date": "2026-12-09"
+    },
+    {
+      "id": "84dcca7d-1d18-468d-9c69-8a1338a1b69f",
+      "name": "Learn, Love, Live the Quran",
+      "date": "2026-12-16"
+    },
+    {
+      "id": "df9cacb0-13cb-4e79-83cc-658dc5386f87",
+      "name": "Learn, Love, Live the Quran",
+      "date": "2026-12-23"
+    },
+    {
+      "id": "6621933d-bf91-4f13-98ef-3bfcd3406bfd",
+      "name": "Learn, Love, Live the Quran (monthly potluck)",
+      "date": "2026-12-30"
+    },
+    {
+      "id": "c582034b-c853-457b-8f15-46a5da7885e2",
+      "name": "Learn, Love, Live the Quran",
+      "date": "2027-01-06"
+    },
+    {
+      "id": "da7a28ab-9c40-44a2-b47a-76de42f4f96e",
+      "name": "Learn, Love, Live the Quran",
+      "date": "2027-01-13"
+    },
+    {
+      "id": "6e1121f9-3abb-4ebc-9b6f-94ed878404d1",
+      "name": "Learn, Love, Live the Quran",
+      "date": "2027-01-20"
+    },
+    {
+      "id": "e1bbbf43-0511-45c3-8518-ec5b080fcb93",
+      "name": "Learn, Love, Live the Quran (monthly potluck)",
+      "date": "2027-01-27"
+    },
+    {
+      "id": "e9c2186f-5bd2-475e-b17f-1778ea591d89",
+      "name": "Learn, Love, Live the Quran",
+      "date": "2027-02-03"
+    },
+    {
+      "id": "9969417a-84b0-4b96-b4e4-5048a3c6ae58",
+      "name": "Learn, Love, Live the Quran",
+      "date": "2027-02-10"
+    },
+    {
+      "id": "9e067479-b53a-4244-bd58-c8223e646c93",
+      "name": "Learn, Love, Live the Quran",
+      "date": "2027-02-17"
+    },
+    {
+      "id": "b1350e05-4325-45a3-ac53-f795d6a27e66",
+      "name": "Learn, Love, Live the Quran (monthly potluck)",
+      "date": "2027-02-24"
+    },
+    {
+      "id": "a0e22656-2b1e-4163-8f80-1f26e1671fba",
+      "name": "Learn, Love, Live the Quran",
+      "date": "2027-03-03"
+    },
+    {
+      "id": "f37212d6-be73-456e-b4e0-68ba57880bc5",
+      "name": "Learn, Love, Live the Quran",
+      "date": "2027-03-10"
+    },
+    {
+      "id": "6e822eea-4c93-4deb-9148-be21433d667e",
+      "name": "Learn, Love, Live the Quran",
+      "date": "2027-03-17"
+    },
+    {
+      "id": "d1b3c3f3-cf55-496b-b1cb-7419a9872602",
+      "name": "Learn, Love, Live the Quran",
+      "date": "2027-03-24"
+    },
+    {
+      "id": "2d3fa5f2-cc5b-48cd-937d-e385e50debaf",
+      "name": "Learn, Love, Live the Quran (monthly potluck)",
+      "date": "2027-03-31"
+    },
+    {
+      "id": "574c1231-932e-46e9-9223-f59cb1dc7d9f",
+      "name": "Learn, Love, Live the Quran",
+      "date": "2027-04-07"
+    },
+    {
+      "id": "626a07a3-0063-405f-9590-a4ac48d9ae1c",
+      "name": "Learn, Love, Live the Quran",
+      "date": "2027-04-14"
+    },
+    {
+      "id": "e9d2c27f-7817-4f9f-b888-c3093fbaea80",
+      "name": "Learn, Love, Live the Quran",
+      "date": "2027-04-21"
+    },
+    {
+      "id": "e35cf663-1fbc-4c0d-b31d-eeb160dbfd94",
+      "name": "Learn, Love, Live the Quran (monthly potluck)",
+      "date": "2027-04-28"
+    },
+    {
+      "id": "c820c4c3-33d1-4ec9-98a3-28a23cc38a66",
+      "name": "Learn, Love, Live the Quran",
+      "date": "2027-05-05"
+    },
+    {
+      "id": "4cc2cded-f771-49aa-8ec3-6ae81a1cd919",
+      "name": "Learn, Love, Live the Quran",
+      "date": "2027-05-12"
+    },
+    {
+      "id": "1a10c235-f2a9-4b08-8773-3f8bc8bb1bd1",
+      "name": "Learn, Love, Live the Quran",
+      "date": "2027-05-19"
+    },
+    {
+      "id": "ea9ab2bc-802d-4f21-8811-5bf27f6bedd6",
+      "name": "Learn, Love, Live the Quran (monthly potluck)",
+      "date": "2027-05-26"
+    },
+    {
+      "id": "099d2ade-2be8-478e-ae81-79764cff9c3e",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2026-05-28"
+    },
+    {
+      "id": "a02b41aa-507d-474f-84bc-59674a9c3778",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2026-06-04"
+    },
+    {
+      "id": "2364e98d-100e-422f-aa32-0b01b1db66a7",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2026-06-11"
+    },
+    {
+      "id": "69569b16-ae75-4c59-844e-65d12aca5842",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2026-06-18"
+    },
+    {
+      "id": "ced3d10e-d71f-4bee-86b0-db6e14d0f24d",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2026-06-25"
+    },
+    {
+      "id": "e2aeadf0-1426-4b02-80c1-e49cf6c8848a",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2026-07-02"
+    },
+    {
+      "id": "1cd3aa2f-a3ba-492e-88ff-8d6b9764470b",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2026-07-09"
+    },
+    {
+      "id": "122c5ee7-1272-4fd3-9639-50a26f050a5a",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2026-07-16"
+    },
+    {
+      "id": "59e6471a-ed1a-46f3-b2c8-4b31d7582481",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2026-07-23"
+    },
+    {
+      "id": "88042361-0ca1-4a42-86f2-afcc8345e8ae",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2026-07-30"
+    },
+    {
+      "id": "499bb51a-553c-4f40-965a-abf0a75b1749",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2026-08-06"
+    },
+    {
+      "id": "234a5322-35bc-46c0-b2e1-1bad94f44a06",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2026-08-13"
+    },
+    {
+      "id": "98f71e91-86fe-4e96-b6af-a6e6c57e8b0c",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2026-08-20"
+    },
+    {
+      "id": "8a0a7933-ed3a-4e16-9f95-8bf66918baf9",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2026-08-27"
+    },
+    {
+      "id": "e6965b50-a9f4-493a-a96a-54afac4278f2",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2026-09-03"
+    },
+    {
+      "id": "71b68cc6-a8eb-4587-a17d-be2e53e9f1d6",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2026-09-10"
+    },
+    {
+      "id": "784eaf37-94ad-4af7-9cdb-2d3f8ffe878d",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2026-09-17"
+    },
+    {
+      "id": "99d5dcb7-0740-4d0d-8b4e-dbb5c208350a",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2026-09-24"
+    },
+    {
+      "id": "7e7ae307-cb94-4258-993f-9f4465f1fc80",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2026-10-01"
+    },
+    {
+      "id": "a0c833bc-16a8-4799-96e0-6cee8e607f23",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2026-10-08"
+    },
+    {
+      "id": "a3219946-1403-418a-a76d-709c9fd7a358",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2026-10-15"
+    },
+    {
+      "id": "7d27020b-59f8-4b1b-9732-82f28bffa82f",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2026-10-22"
+    },
+    {
+      "id": "4bcf3636-9c7e-42c0-b9a7-cedfc731ab5a",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2026-10-29"
+    },
+    {
+      "id": "a1b8a6a7-dfef-4d45-8429-b0dbdf40793d",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2026-11-05"
+    },
+    {
+      "id": "90fa15e0-9bd9-4e28-8c01-4b7e1988327a",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2026-11-12"
+    },
+    {
+      "id": "deb70f20-10fe-492d-acb7-c35fc57f87f3",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2026-11-19"
+    },
+    {
+      "id": "4af8cca3-a32f-43cf-b2d2-3f016a5087fe",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2026-11-26"
+    },
+    {
+      "id": "35d28410-89ce-4c4a-a957-3b5ee6597dc4",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2026-12-03"
+    },
+    {
+      "id": "119e9192-fcb9-4232-b1e2-928f3015c586",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2026-12-10"
+    },
+    {
+      "id": "baad8b88-44da-4d01-8727-ba0e937b1ca8",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2026-12-17"
+    },
+    {
+      "id": "81a30e89-d35b-46f1-924e-005a4f8b246e",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2026-12-24"
+    },
+    {
+      "id": "54e17ad4-c257-4180-b573-b85bb73b1252",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2026-12-31"
+    },
+    {
+      "id": "1fc11b31-602a-4405-989b-c91236ab7790",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2027-01-07"
+    },
+    {
+      "id": "ba638312-8dc3-44cc-9785-991474a31474",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2027-01-14"
+    },
+    {
+      "id": "9d0c3ecd-027d-4f7a-b8f2-cdffff9c49fe",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2027-01-21"
+    },
+    {
+      "id": "dc541075-6f88-45d8-a1b4-9e7873bb9a70",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2027-01-28"
+    },
+    {
+      "id": "da2aa676-97f8-4550-99bc-19490b4c6aca",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2027-02-04"
+    },
+    {
+      "id": "b6555fc5-d7d5-45d5-8bfc-5560aafde85f",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2027-02-11"
+    },
+    {
+      "id": "22a9deec-75cb-400a-ae43-49a8c28abe9f",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2027-02-18"
+    },
+    {
+      "id": "adcc67ec-8171-4faf-933e-a396b9db76be",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2027-02-25"
+    },
+    {
+      "id": "3daf417e-ef0e-401f-8854-d6213cf3cb02",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2027-03-04"
+    },
+    {
+      "id": "a36c9df9-9a7b-4aa1-a525-87c07b1bace0",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2027-03-11"
+    },
+    {
+      "id": "854ecd1f-2abd-4394-8ee5-e641d5ec89eb",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2027-03-18"
+    },
+    {
+      "id": "2b8b1486-7969-4fef-9ee8-c74011fcc2b2",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2027-03-25"
+    },
+    {
+      "id": "1f0bab7c-97fb-4eb0-99a7-a03e8eb5124c",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2027-04-01"
+    },
+    {
+      "id": "e9ddccad-26d3-4a19-9b02-6584e1fa7ad2",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2027-04-08"
+    },
+    {
+      "id": "0ec8b1fc-14c2-4371-abd5-401ad688be22",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2027-04-15"
+    },
+    {
+      "id": "7e23abad-3e0a-4234-bd27-bbb0db490b91",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2027-04-22"
+    },
+    {
+      "id": "a43f6bf1-6c4a-4208-a200-aef8e84c4b0c",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2027-04-29"
+    },
+    {
+      "id": "1a5adcb8-3689-4dbe-afd0-5a111235e7fe",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2027-05-06"
+    },
+    {
+      "id": "8bf6fa1b-6f1a-4e66-89fc-adc69e06c3ee",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2027-05-13"
+    },
+    {
+      "id": "d05cc76a-8d36-4375-83ad-053129d5bcc7",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2027-05-20"
+    },
+    {
+      "id": "77b0e336-4b1c-4353-bbc8-21d14fc1386a",
+      "name": "Thursday Halaqa for Ladies",
+      "date": "2027-05-27"
+    },
+    {
+      "id": "6baf85ee-aca6-4e52-872e-fe03bff319bf",
+      "name": "Tuesday Night Live",
+      "date": "2026-09-08"
+    },
+    {
+      "id": "2e86824e-7ac6-42a3-9e0a-905788b4c8c0",
+      "name": "Tuesday Night Live",
+      "date": "2026-09-15"
+    },
+    {
+      "id": "21844eb7-e877-41fb-81c6-540d7c0c2473",
+      "name": "Tuesday Night Live",
+      "date": "2026-09-22"
+    },
+    {
+      "id": "23e07533-4d24-4028-a883-bb7076463f46",
+      "name": "Tuesday Night Live",
+      "date": "2026-09-29"
+    },
+    {
+      "id": "63840c84-140d-40a5-9dd3-304cba414ae7",
+      "name": "Tuesday Night Live",
+      "date": "2026-10-06"
+    },
+    {
+      "id": "572f49f5-1acf-412a-8e68-cec75db2768b",
+      "name": "Tuesday Night Live",
+      "date": "2026-10-13"
+    },
+    {
+      "id": "196acdd1-57db-4fb7-ac6b-38c85588030b",
+      "name": "Tuesday Night Live",
+      "date": "2026-10-20"
+    },
+    {
+      "id": "c4b295a2-f3b4-4e96-bcaf-4a60851c19f2",
+      "name": "Tuesday Night Live",
+      "date": "2026-10-27"
+    },
+    {
+      "id": "aa0cc13a-79dc-4b65-b943-b9afea01d234",
+      "name": "Tuesday Night Live",
+      "date": "2026-11-03"
+    },
+    {
+      "id": "61ef0d59-0f70-445f-8b8c-8f4fd7f62c2b",
+      "name": "Tuesday Night Live",
+      "date": "2026-11-10"
+    },
+    {
+      "id": "88e10fae-720f-489c-a70d-9a95f756db32",
+      "name": "Tuesday Night Live",
+      "date": "2026-11-17"
+    },
+    {
+      "id": "505549ee-8437-4bc5-8859-d66f451b4607",
+      "name": "Tuesday Night Live",
+      "date": "2026-11-24"
+    },
+    {
+      "id": "9c96ba56-8e33-497f-b02f-4f08ffc3701b",
+      "name": "Tuesday Night Live",
+      "date": "2026-12-01"
+    },
+    {
+      "id": "15229a55-2a38-4b88-add6-06640d72581a",
+      "name": "Tuesday Night Live",
+      "date": "2026-12-08"
+    },
+    {
+      "id": "01b2cb91-0981-4e1f-8a3b-d4fd6d5cf677",
+      "name": "Tuesday Night Live",
+      "date": "2026-12-15"
+    },
+    {
+      "id": "55aa0c1a-8291-4a5a-82b0-734558c96a3d",
+      "name": "Tuesday Night Live",
+      "date": "2026-12-22"
+    },
+    {
+      "id": "2d44aecb-17e8-49bd-b6f8-a4606158ba62",
+      "name": "Tuesday Night Live",
+      "date": "2026-12-29"
+    },
+    {
+      "id": "a7ee0fa3-dcf9-4331-ac69-496c2d1b1770",
+      "name": "Tuesday Night Live",
+      "date": "2027-01-05"
+    },
+    {
+      "id": "9a3d03da-a076-4e16-a97f-f6b0a61ffc81",
+      "name": "Tuesday Night Live",
+      "date": "2027-01-12"
+    },
+    {
+      "id": "d60b0053-902d-4879-93c5-c45f0fcbce75",
+      "name": "Tuesday Night Live",
+      "date": "2027-01-19"
+    },
+    {
+      "id": "c380df48-7a93-4788-9d70-47abd9f01199",
+      "name": "Tuesday Night Live",
+      "date": "2027-01-26"
+    },
+    {
+      "id": "fc12eea9-7062-481a-af41-b83ac8109657",
+      "name": "Tuesday Night Live",
+      "date": "2027-02-02"
+    },
+    {
+      "id": "f2493371-6bea-4d20-9345-a8296161327b",
+      "name": "Tuesday Night Live",
+      "date": "2027-02-09"
+    },
+    {
+      "id": "60393563-6285-4dae-827c-a4be8eccdb38",
+      "name": "Tuesday Night Live",
+      "date": "2027-02-16"
+    },
+    {
+      "id": "e5880151-57e3-4310-b0f0-eb5212b1648e",
+      "name": "Tuesday Night Live",
+      "date": "2027-02-23"
+    },
+    {
+      "id": "461b60a0-6b5b-453c-ae62-bb4784b0b7a8",
+      "name": "Tuesday Night Live",
+      "date": "2027-03-02"
+    },
+    {
+      "id": "42c29a08-2e93-4367-b4a0-6434423d9a0b",
+      "name": "Tuesday Night Live",
+      "date": "2027-03-09"
+    },
+    {
+      "id": "71010058-d232-43dd-9cb5-10bd09d62c44",
+      "name": "Tuesday Night Live",
+      "date": "2027-03-16"
+    },
+    {
+      "id": "7712a714-bb67-4a97-ac2b-a816f6d2b8f6",
+      "name": "Tuesday Night Live",
+      "date": "2027-03-23"
+    },
+    {
+      "id": "7443bb21-ba35-4169-a4f5-b6aa1e17f770",
+      "name": "Tuesday Night Live",
+      "date": "2027-03-30"
+    },
+    {
+      "id": "12552bfd-b489-4723-a2da-bba8f0badb94",
+      "name": "Tuesday Night Live",
+      "date": "2027-04-06"
+    },
+    {
+      "id": "bc31dbeb-5f46-476a-a985-cbcb304ed0ea",
+      "name": "Tuesday Night Live",
+      "date": "2027-04-13"
+    },
+    {
+      "id": "49d3a1b8-4109-4ebf-ae23-e6aa27529ff4",
+      "name": "Tuesday Night Live",
+      "date": "2027-04-20"
+    },
+    {
+      "id": "904aed67-b126-46b9-8f96-5ff8e9f78b28",
+      "name": "Tuesday Night Live",
+      "date": "2027-04-27"
+    },
+    {
+      "id": "7cea201b-1656-4e18-87d6-0712dcc9971d",
+      "name": "Tuesday Night Live",
+      "date": "2027-05-04"
+    },
+    {
+      "id": "8f70b643-4f52-4e71-a200-413e1bf130cc",
+      "name": "Tuesday Night Live",
+      "date": "2027-05-11"
+    },
+    {
+      "id": "d01cd0c1-2bfb-4f48-a9f6-f777ea895df9",
+      "name": "Tuesday Night Live",
+      "date": "2027-05-18"
+    },
+    {
+      "id": "63a1b097-70d8-4d19-b8a1-4d1d5048332b",
+      "name": "Crochet Clique",
+      "date": "2026-10-03"
+    },
+    {
+      "id": "d556bb4b-934e-437b-8448-b51a514c0721",
+      "name": "Crochet Clique",
+      "date": "2026-12-05"
+    },
+    {
+      "id": "65f74682-1476-40e1-8493-29c7525f8a57",
+      "name": "Crochet Clique",
+      "date": "2027-02-06"
+    },
+    {
+      "id": "e6758d2c-76a0-4f52-8ecc-e1f49b0a3caa",
+      "name": "Crochet Clique",
+      "date": "2027-04-03"
+    },
+    {
+      "id": "c8a17acd-afb5-46df-9d15-ebc5507ec045",
+      "name": "Men Talk",
+      "date": "2026-06-12"
+    },
+    {
+      "id": "b8d1b511-bb8b-4825-a0f5-f74f8284f60a",
+      "name": "Men Talk",
+      "date": "2026-06-19"
+    },
+    {
+      "id": "93293d12-5a2a-47f9-8acc-3380aa8f379f",
+      "name": "Men Talk",
+      "date": "2026-06-26"
+    },
+    {
+      "id": "56c5dd3d-b19d-4625-be9b-c52969dabd3b",
+      "name": "Men Talk",
+      "date": "2026-07-03"
+    },
+    {
+      "id": "9ea892ee-575d-4def-80a6-01abe49cee37",
+      "name": "Men Talk",
+      "date": "2026-07-10"
+    },
+    {
+      "id": "59d20c1b-55df-4add-bc8e-072ff09e5429",
+      "name": "Men Talk with Doctor Omar Hussain",
+      "date": "2026-08-21"
+    },
+    {
+      "id": "8df337fc-8467-4fde-985b-6bf34d7fe7c7",
+      "name": "Men Talk with Sheikh Oduro",
+      "date": "2026-09-04"
+    }
+  ]
+}

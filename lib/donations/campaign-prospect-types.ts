@@ -129,6 +129,7 @@ export type CampaignProspectRow = {
   event_id: string | null
   sponsorship_package_id: string | null
   assigned_to_contact_id: string | null
+  assigned_to_name: string | null
   stage: CampaignProspectStage
   priority: CampaignProspectPriority
   last_contacted_at: string | null
@@ -159,6 +160,7 @@ export type CampaignProspectWriteInput = {
   event_id?: string | null
   sponsorship_package_id?: string | null
   assigned_to_contact_id?: string | null
+  assigned_to_name?: string | null
   stage?: CampaignProspectStage
   priority?: CampaignProspectPriority
   last_contacted_at?: string | null
@@ -204,7 +206,7 @@ export type CampaignProspectActivityWriteInput = {
 }
 
 export const CAMPAIGN_PROSPECT_SELECT =
-  "id, organization_id, campaign_id, contact_id, ask_type, ask_level_id, suggested_ask_amount, event_id, sponsorship_package_id, assigned_to_contact_id, stage, priority, last_contacted_at, next_follow_up_at, notes, converted_pledge_id, converted_sponsorship_id, created_at, updated_at"
+  "id, organization_id, campaign_id, contact_id, ask_type, ask_level_id, suggested_ask_amount, event_id, sponsorship_package_id, assigned_to_contact_id, assigned_to_name, stage, priority, last_contacted_at, next_follow_up_at, notes, converted_pledge_id, converted_sponsorship_id, created_at, updated_at"
 
 export const CAMPAIGN_PROSPECT_ACTIVITY_SELECT =
   "id, organization_id, campaign_id, prospect_id, activity_type, activity_date, notes, created_by, created_by_name, created_at, updated_at"

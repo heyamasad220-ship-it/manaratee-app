@@ -6,7 +6,7 @@ export default function DonationTransactionsPage() {
   return (
     <div className="flex flex-col gap-6 p-6">
       <Suspense fallback={<p className="text-sm text-muted-foreground">Loading transactions...</p>}>
-        <DonationPaymentsPanel embedded defaultRange="all" />
+        <DonationPaymentsPanel embedded showCharts defaultRange="all" />
       </Suspense>
     </div>
   )

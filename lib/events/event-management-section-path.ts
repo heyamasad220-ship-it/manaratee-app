@@ -3,7 +3,15 @@ import { MASTER_CALENDAR_LABEL } from "@/lib/events/facility-event-request-href"
 export const EVENT_MANAGEMENT_PATH = "/event-management"
 export const EVENT_MANAGEMENT_EVENTS_PATH = `${EVENT_MANAGEMENT_PATH}/events`
 export const EVENT_MANAGEMENT_CALENDAR_PATH = `${EVENT_MANAGEMENT_PATH}/calendar`
-export const EVENT_MANAGEMENT_CHECK_IN_PATH = `${EVENT_MANAGEMENT_PATH}/check-in`
+export const EVENT_MANAGEMENT_TICKETING_PATH = `${EVENT_MANAGEMENT_PATH}/ticketing`
+export const EVENT_MANAGEMENT_TICKETING_EVENTS_PATH = `${EVENT_MANAGEMENT_TICKETING_PATH}/events`
+export const EVENT_MANAGEMENT_TICKETING_ORDERS_PATH = `${EVENT_MANAGEMENT_TICKETING_PATH}/orders`
+export const EVENT_MANAGEMENT_TICKETING_CHECK_IN_PATH = `${EVENT_MANAGEMENT_TICKETING_PATH}/check-in`
+export const EVENT_MANAGEMENT_TICKETING_SETTINGS_PATH = `${EVENT_MANAGEMENT_TICKETING_PATH}/settings`
+export const EVENT_MANAGEMENT_CHECK_IN_LEGACY_PATH = `${EVENT_MANAGEMENT_PATH}/check-in`
+/** Canonical org-wide door desk: Ticketing → Check-in. */
+export const EVENT_MANAGEMENT_CHECK_IN_PATH =
+  EVENT_MANAGEMENT_TICKETING_CHECK_IN_PATH
 
 /** @deprecated Section tabs removed — Events and Master Calendar are sidebar items. */
 export type EventManagementSectionTabId = "overview" | "calendar"

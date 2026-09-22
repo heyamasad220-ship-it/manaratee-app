@@ -1,7 +1,26 @@
-import { redirect } from "next/navigation"
+import { TicketingCheckInClient } from "@/components/tickets/ticketing-check-in-client"
+import {
+  EVENT_CHECKIN_PERMISSIONS,
+  hasEventCheckInPermission,
+} from "@/lib/events/event-access"
+import { getTicketedEventsOverview } from "@/lib/tickets/ticketing-overview-queries"
+import { PERMISSIONS, requireAnyPermission } from "@/lib/permissions/permissions"
 
-import { EVENT_MANAGEMENT_CHECK_IN_PATH } from "@/lib/events/event-management-section-path"
+export default async function EventManagementTicketingCheckInPage() {
+  await requireAnyPermission(
+    ...EVENT_CHECKIN_PERMISSIONS,
+    PERMISSIONS.EVENTS_VIEW,
+    PERMISSIONS.PROGRAMS_VIEW
+  )
 
-export default function EventManagementTicketingCheckInPage() {
-  redirect(EVENT_MANAGEMENT_CHECK_IN_PATH)
+  const [events, canCheckIn] = await Promise.all([
+    getTicketedEventsOverview(),
+    hasEventCheckInPermission(),
+  ])
+
+  return (
+    <div className="p-6">
+      <TicketingCheckInClient events={events} canCheckIn={canCheckIn} />
+    </div>
+  )
 }

@@ -3,7 +3,6 @@
 import Link from "next/link"
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
-import { CheckCircle2 } from "lucide-react"
 
 import { Progress } from "@/components/ui/progress"
 import {
@@ -21,95 +20,30 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { setTicketedEventCategory } from "@/lib/tickets/ticketing-event-category-actions"
 import {
   UNCATEGORIZED_TICKETING_CATEGORY_VALUE,
   type TicketingEventCategory,
 } from "@/lib/tickets/ticketing-event-category-types"
-import { updateEventTicketingSalesStatus } from "@/lib/tickets/ticket-order-actions"
 import {
   formatEventSchedule,
+  getTicketedEventListStatus,
+  getTicketedEventListStatusLabel,
+  type TicketedEventListStatus,
   type TicketedEventOverviewRow,
 } from "@/lib/tickets/ticketing-overview-types"
-import {
-  TICKETING_SALES_STATUS_LABELS,
-  formatTicketPrice,
-  type TicketingSalesStatus,
-} from "@/lib/tickets/ticket-types"
+import { formatTicketPrice } from "@/lib/tickets/ticket-types"
 
-function salesStatusClass(status: TicketingSalesStatus) {
-  if (status === "published") {
+function listStatusClass(status: TicketedEventListStatus) {
+  if (status === "active") {
     return "border-emerald-200 bg-emerald-50 text-emerald-700"
   }
-  if (status === "sales_closed") {
+  if (status === "past") {
     return "border-slate-200 bg-slate-50 text-slate-700"
   }
   return "border-amber-200 bg-amber-50 text-amber-700"
-}
-
-function EventSalesStatusSelect({
-  eventId,
-  value,
-  disabled,
-}: {
-  eventId: string
-  value: TicketingSalesStatus
-  disabled?: boolean
-}) {
-  const router = useRouter()
-  const [isPending, startTransition] = useTransition()
-  const [error, setError] = useState<string | null>(null)
-
-  function handleChange(next: TicketingSalesStatus) {
-    setError(null)
-    startTransition(async () => {
-      try {
-        await updateEventTicketingSalesStatus(eventId, next)
-        router.refresh()
-      } catch (changeError) {
-        setError(
-          changeError instanceof Error
-            ? changeError.message
-            : "Could not update status."
-        )
-      }
-    })
-  }
-
-  return (
-    <div className="space-y-1">
-      <Select
-        value={value}
-        onValueChange={handleChange}
-        disabled={disabled || isPending}
-      >
-        <SelectTrigger
-          className={cn(
-            "h-8 w-[150px] border text-xs font-medium",
-            salesStatusClass(value)
-          )}
-        >
-          <div className="flex items-center gap-1.5">
-            {value === "published" ? (
-              <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-            ) : null}
-            <SelectValue />
-          </div>
-        </SelectTrigger>
-        <SelectContent>
-          {(
-            Object.keys(TICKETING_SALES_STATUS_LABELS) as TicketingSalesStatus[]
-          ).map((status) => (
-            <SelectItem key={status} value={status}>
-              {TICKETING_SALES_STATUS_LABELS[status]}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      {error ? <p className="text-xs text-red-600">{error}</p> : null}
-    </div>
-  )
 }
 
 export function EventCategorySelect({
@@ -259,11 +193,15 @@ export function TicketingEventSalesTable({
                     </TableCell>
                   ) : null}
                   <TableCell className="align-top">
-                    <EventSalesStatusSelect
-                      eventId={event.id}
-                      value={event.salesStatus}
-                      disabled={!canManage}
-                    />
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "font-medium",
+                        listStatusClass(getTicketedEventListStatus(event))
+                      )}
+                    >
+                      {getTicketedEventListStatusLabel(event)}
+                    </Badge>
                   </TableCell>
                   <TableCell className="align-top text-right font-medium">
                     <div className="space-y-2">

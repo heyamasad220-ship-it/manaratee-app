@@ -103,8 +103,8 @@ function ReserveBoothDialog({
         <DialogHeader>
           <DialogTitle>Reserve a booth</DialogTitle>
           <DialogDescription>
-            {event.name} · {event.organizationName}. You are already an approved vendor — pick an
-            available booth to hold your spot.
+            {event.name} · {event.organizationName}. Pick a numbered table. The price includes any
+            extra to choose that table.
           </DialogDescription>
         </DialogHeader>
 
@@ -130,12 +130,18 @@ function ReserveBoothDialog({
                   )}
                 >
                   <div>
-                    <p className="font-medium">Booth {booth.number}</p>
+                    <p className="font-medium">Table {booth.number}</p>
                     {booth.boothTypeName ? (
                       <p className="text-sm text-muted-foreground">{booth.boothTypeName}</p>
                     ) : null}
                     {booth.location ? (
                       <p className="mt-1 text-xs text-muted-foreground">{booth.location}</p>
+                    ) : null}
+                    {booth.selectionFee > 0 ? (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        ${booth.baseFee.toFixed(0)} + ${booth.selectionFee.toFixed(0)} to select
+                        this table
+                      </p>
                     ) : null}
                   </div>
                   <span className="text-sm font-medium">{formatCurrency(booth.feeAmount)}</span>

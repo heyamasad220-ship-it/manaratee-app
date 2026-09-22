@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { ChevronDown, Plus, Search } from "lucide-react"
+import { ChevronDown, ChevronLeft, ChevronRight, Plus, Search } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -16,12 +16,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
-  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
@@ -35,16 +37,23 @@ import {
 } from "@/components/ui/table"
 import { CreateTicketOrderDialog } from "@/components/tickets/create-ticket-order-dialog"
 import { TicketOrderDetailPanel } from "@/components/tickets/ticket-order-detail-panel"
-import {
-  isTicketedEventPast,
-  formatEventSchedule,
-} from "@/lib/tickets/ticketing-overview-types"
+import { formatEventSchedule } from "@/lib/tickets/ticketing-overview-types"
 import {
   type TicketOrderListItem,
   type TicketOrderStatus,
   type TicketedEventOption,
 } from "@/lib/tickets/ticket-order-queries"
 import { formatTicketPrice } from "@/lib/tickets/ticket-types"
+import {
+  clampPage,
+  getListPageCount,
+  getListPageRange,
+  getVisiblePageNumbers,
+  slicePageItems,
+} from "@/lib/ui/list-pagination"
+import { cn } from "@/lib/utils"
+
+const ORDERS_PAGE_SIZE = 50
 
 function ticketOrderStatusLabel(status: TicketOrderStatus) {
   if (status === "completed") return "Completed"
@@ -87,6 +96,32 @@ function formatEventDate(value: string | null) {
 
 function formatEventFilterLabel(event: TicketedEventOption) {
   return `${formatEventSchedule(event.startAt, event.endAt)}: ${event.name}`
+}
+
+function parseInitialSelectedEventIds(
+  value: string | undefined,
+  events: TicketedEventOption[]
+) {
+  if (!value || value === "all" || value === "active" || value === "past") {
+    return []
+  }
+  const known = new Set(events.map((event) => event.id))
+  return value
+    .split(",")
+    .map((id) => id.trim())
+    .filter((id) => known.has(id))
+}
+
+function eventFilterLabel(
+  selectedIds: string[],
+  events: TicketedEventOption[]
+) {
+  if (selectedIds.length === 0) return "All events"
+  if (selectedIds.length === 1) {
+    const selected = events.find((event) => event.id === selectedIds[0])
+    return selected ? formatEventFilterLabel(selected) : "1 event"
+  }
+  return `${selectedIds.length} events`
 }
 
 function exportOrdersCsv(orders: TicketOrderListItem[]) {
@@ -136,12 +171,14 @@ type TicketingOrdersClientProps = {
 export function TicketingOrdersClient({
   orders,
   events,
-  initialEventFilter = "active",
+  initialEventFilter,
   canManage,
 }: TicketingOrdersClientProps) {
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState("")
-  const [eventFilter, setEventFilter] = useState(initialEventFilter)
+  const [selectedEventIds, setSelectedEventIds] = useState<string[]>(() =>
+    parseInitialSelectedEventIds(initialEventFilter, events)
+  )
   const [statusFilter, setStatusFilter] = useState<TicketOrderStatus | "all">("all")
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
@@ -149,6 +186,8 @@ export function TicketingOrdersClient({
   const [selectedOrder, setSelectedOrder] = useState<TicketOrderListItem | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
+  const [page, setPage] = useState(1)
+  const [eventsOpen, setEventsOpen] = useState(false)
 
   useEffect(() => {
     if (!selectedOrder) return
@@ -162,31 +201,12 @@ export function TicketingOrdersClient({
   )
   const hasSelection = selectedIds.length > 0
 
-  const activeEvents = useMemo(
-    () => events.filter((event) => !isTicketedEventPast(event)),
-    [events]
-  )
-  const pastEvents = useMemo(
-    () => events.filter((event) => isTicketedEventPast(event)),
-    [events]
-  )
-
   const filtered = useMemo(() => {
     const search = searchQuery.trim().toLowerCase()
-    const activeEventIds = new Set(activeEvents.map((event) => event.id))
-    const pastEventIds = new Set(pastEvents.map((event) => event.id))
+    const eventIds = new Set(selectedEventIds)
 
     return orders.filter((order) => {
-      if (eventFilter === "active" && !activeEventIds.has(order.eventId)) return false
-      if (eventFilter === "past" && !pastEventIds.has(order.eventId)) return false
-      if (
-        eventFilter !== "all" &&
-        eventFilter !== "active" &&
-        eventFilter !== "past" &&
-        order.eventId !== eventFilter
-      ) {
-        return false
-      }
+      if (eventIds.size > 0 && !eventIds.has(order.eventId)) return false
       if (statusFilter !== "all" && order.status !== statusFilter) return false
 
       if (dateFrom) {
@@ -210,13 +230,34 @@ export function TicketingOrdersClient({
         order.ticketCodes.some((code) => code.toLowerCase().includes(search))
       )
     })
-  }, [activeEvents, dateFrom, dateTo, eventFilter, orders, pastEvents, searchQuery, statusFilter])
+  }, [dateFrom, dateTo, orders, searchQuery, selectedEventIds, statusFilter])
+
+  const totalPages = getListPageCount(filtered.length, ORDERS_PAGE_SIZE)
+  const currentPage = clampPage(page, totalPages)
+  const pageItems = slicePageItems(filtered, currentPage, ORDERS_PAGE_SIZE)
+  const range = getListPageRange(currentPage, ORDERS_PAGE_SIZE, filtered.length)
+  const pageNumbers = getVisiblePageNumbers(currentPage, totalPages)
+
+  useEffect(() => {
+    setPage(1)
+  }, [searchQuery, selectedEventIds, statusFilter, dateFrom, dateTo])
 
   const allSelected =
-    filtered.length > 0 && filtered.every((order) => selectedIds.includes(order.id))
+    pageItems.length > 0 && pageItems.every((order) => selectedIds.includes(order.id))
 
   function toggleAll(checked: boolean) {
-    setSelectedIds(checked ? filtered.map((order) => order.id) : [])
+    const pageIds = pageItems.map((order) => order.id)
+    if (!checked) {
+      setSelectedIds((current) => current.filter((id) => !pageIds.includes(id)))
+      return
+    }
+    setSelectedIds((current) => [...new Set([...current, ...pageIds])])
+  }
+
+  function toggleEvent(eventId: string, checked: boolean) {
+    setSelectedEventIds((current) =>
+      checked ? [...current, eventId] : current.filter((id) => id !== eventId)
+    )
   }
 
   function toggleOne(orderId: string, checked: boolean) {
@@ -261,42 +302,74 @@ export function TicketingOrdersClient({
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             <div className="space-y-2">
               <Label>Events</Label>
-              <Select value={eventFilter} onValueChange={setEventFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Active events" />
-                </SelectTrigger>
-                <SelectContent className="max-h-80">
-                  <SelectItem value="all">All events</SelectItem>
-                  <SelectItem value="active">Active events</SelectItem>
-                  <SelectItem value="past">Past events</SelectItem>
-                  {activeEvents.length > 0 ? (
-                    <>
-                      <SelectSeparator />
-                      <SelectGroup>
-                        <SelectLabel>Active events</SelectLabel>
-                        {activeEvents.map((event) => (
-                          <SelectItem key={event.id} value={event.id}>
-                            {formatEventFilterLabel(event)}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </>
+              <Popover open={eventsOpen} onOpenChange={setEventsOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={eventsOpen}
+                    className={cn(
+                      "h-10 w-full justify-between font-normal",
+                      selectedEventIds.length === 0 && "text-muted-foreground"
+                    )}
+                  >
+                    <span className="truncate">
+                      {eventFilterLabel(selectedEventIds, events)}
+                    </span>
+                    <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="w-[min(36rem,calc(100vw-2rem))] p-0"
+                  align="start"
+                >
+                  {selectedEventIds.length > 0 ? (
+                    <div className="flex items-center justify-between border-b px-3 py-2">
+                      <p className="text-sm text-muted-foreground">
+                        {selectedEventIds.length} selected
+                      </p>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 text-xs"
+                        onClick={() => setSelectedEventIds([])}
+                      >
+                        Clear
+                      </Button>
+                    </div>
                   ) : null}
-                  {pastEvents.length > 0 ? (
-                    <>
-                      <SelectSeparator />
-                      <SelectGroup>
-                        <SelectLabel>Past events</SelectLabel>
-                        {pastEvents.map((event) => (
-                          <SelectItem key={event.id} value={event.id}>
-                            {formatEventFilterLabel(event)}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </>
-                  ) : null}
-                </SelectContent>
-              </Select>
+                  <div className="max-h-80 overflow-y-auto p-2">
+                    {events.length === 0 ? (
+                      <p className="px-2 py-6 text-center text-sm text-muted-foreground">
+                        No ticketed events.
+                      </p>
+                    ) : (
+                      events.map((event) => {
+                        const checked = selectedEventIds.includes(event.id)
+                        return (
+                          <label
+                            key={event.id}
+                            className="flex cursor-pointer items-start gap-3 rounded-md px-2 py-2 hover:bg-muted"
+                          >
+                            <Checkbox
+                              className="mt-0.5"
+                              checked={checked}
+                              onCheckedChange={(next) =>
+                                toggleEvent(event.id, next === true)
+                              }
+                            />
+                            <span className="text-sm leading-5">
+                              {formatEventFilterLabel(event)}
+                            </span>
+                          </label>
+                        )
+                      })
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="space-y-2">
               <Label htmlFor="order-date-from">Order date from</Label>
@@ -363,10 +436,10 @@ export function TicketingOrdersClient({
       </div>
 
       <p className="text-sm text-muted-foreground">
-        {filtered.length.toLocaleString()} order{filtered.length === 1 ? "" : "s"}
-        {hasSelection
-          ? ` · ${selectedIds.length} selected`
-          : ""}
+        {filtered.length === 0
+          ? "0 orders"
+          : `Showing ${range.start.toLocaleString()}–${range.end.toLocaleString()} of ${filtered.length.toLocaleString()} order${filtered.length === 1 ? "" : "s"}`}
+        {hasSelection ? ` · ${selectedIds.length} selected` : ""}
       </p>
 
       <div className="overflow-hidden rounded-lg border bg-card">
@@ -390,7 +463,7 @@ export function TicketingOrdersClient({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.length === 0 ? (
+            {pageItems.length === 0 ? (
               <TableRow>
                 <TableCell
                   colSpan={canManage ? 7 : 6}
@@ -402,7 +475,7 @@ export function TicketingOrdersClient({
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map((order) => {
+              pageItems.map((order) => {
                 const eventDate = formatEventDate(order.eventStartAt)
                 return (
                   <TableRow
@@ -467,6 +540,50 @@ export function TicketingOrdersClient({
           </TableBody>
         </Table>
       </div>
+
+      {filtered.length > 0 ? (
+        <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-between">
+          <p className="text-sm text-muted-foreground">
+            Page {currentPage} of {totalPages}
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-1">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={currentPage <= 1}
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Previous
+            </Button>
+            {pageNumbers.map((pageNumber) => (
+              <Button
+                key={pageNumber}
+                type="button"
+                variant={pageNumber === currentPage ? "outline" : "ghost"}
+                size="sm"
+                className="min-w-9"
+                onClick={() => setPage(pageNumber)}
+              >
+                {pageNumber}
+              </Button>
+            ))}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={currentPage >= totalPages}
+              onClick={() =>
+                setPage((current) => Math.min(totalPages, current + 1))
+              }
+            >
+              Next
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       <CreateTicketOrderDialog
         open={createOpen}

@@ -14,6 +14,7 @@ import {
   type EventOperationalPhase,
 } from "@/lib/events/event-operational-status"
 import { parseServiceRequirements } from "@/lib/events/event-service-requirements"
+import { buildEventOverviewOpsKpis } from "@/lib/events/event-overview-ops"
 import type { EventAttendeeListItem } from "@/lib/tickets/ticket-order-queries"
 import type { ServiceParticipationWithContact } from "@/lib/service-participations/service-participation-types"
 import type { ChildcareRegistration } from "@/lib/child-care/childcare-registration-types"
@@ -89,9 +90,18 @@ const MODE_LABELS: Record<EventAttendanceMode, string> = {
 export async function getEventOverviewSummary(input: {
   eventId: string
   event: {
+    organization_id?: string | null
+    name?: string | null
     status?: string | null
     start_at?: string | null
     end_at?: string | null
+    timezone?: string | null
+    location_type?: string | null
+    location_label?: string | null
+    location_address?: string | null
+    venues?: { name: string } | null
+    venueNames?: string[] | null
+    recurrence_config?: Record<string, unknown> | null
     requires_ticketing?: boolean | null
     requires_volunteers?: boolean | null
     requires_childcare?: boolean | null
@@ -126,10 +136,16 @@ export async function getEventOverviewSummary(input: {
   const activeAttendees = input.attendees.filter(
     (row) => row.status === "valid" || row.status === "checked_in"
   )
-  const checkedIn = input.attendees.filter((row) => row.status === "checked_in")
   const registered = activeAttendees.length
 
-  const capacityFromTypes = await getTicketTypeCapacity(input.eventId)
+  const [capacityFromTypes, finance, seriesRows] = await Promise.all([
+    getTicketTypeCapacity(input.eventId),
+    getEventFinanceTotals(
+      input.eventId,
+      input.linkedCampaignRaisedCents ?? 0
+    ),
+    listOverviewSeriesSiblings(input.event),
+  ])
   const youthCapacity =
     (service.childcare?.groups || []).reduce(
       (sum, group) => sum + (group.capacity ?? 0),
@@ -158,77 +174,10 @@ export async function getEventOverviewSummary(input: {
     role.name.trim()
   ).length
 
-  const finance = await getEventFinanceTotals(
-    input.eventId,
-    input.linkedCampaignRaisedCents ?? 0
+  const kpis: EventOverviewKpi[] = buildEventOverviewOpsKpis(
+    input.event,
+    seriesRows
   )
-
-  const kpis: EventOverviewKpi[] = [
-    {
-      id: "phase",
-      label: "Status",
-      value: operationalPhaseLabel,
-    },
-  ]
-  if (features.registration || finance.ticketRevenueCents > 0 || finance.checkoutDonationCents > 0) {
-    if (finance.ticketRevenueCents > 0 || attendanceMode === "paid" || attendanceMode === "paid_and_free") {
-      kpis.push({
-        id: "ticket-revenue",
-        label: "Ticket revenue",
-        value: formatMoney(finance.ticketRevenueCents, finance.currency),
-      })
-    }
-    if (finance.checkoutDonationCents > 0) {
-      kpis.push({
-        id: "ticket-donations",
-        label: "Ticket donations",
-        value: formatMoney(finance.checkoutDonationCents, finance.currency),
-        hint: "Collected with ticket purchase",
-      })
-    }
-  }
-  if (checkedIn.length > 0 || attendanceMode !== "open_public") {
-    kpis.push({
-      id: "checked-in",
-      label: "Checked in",
-      value: String(checkedIn.length),
-    })
-  }
-  if (features.youth) {
-    kpis.push({
-      id: "youth",
-      label: "Youth registered",
-      value:
-        youthCapacity != null
-          ? `${youthRegistered} / ${youthCapacity}`
-          : String(youthRegistered),
-    })
-  }
-  if (features.staff || paidStaff.length + volunteers.length > 0) {
-    kpis.push({
-      id: "staff",
-      label: "Staff / Volunteers",
-      value: `${paidStaff.length} / ${volunteers.length}`,
-      hint: "Paid / volunteers",
-    })
-  }
-  if (features.vendors || vendors.length > 0) {
-    kpis.push({
-      id: "vendors",
-      label: "Vendors",
-      value: String(vendors.length),
-    })
-  }
-  if (features.finance || finance.expenseCents > 0 || finance.ticketRevenueCents > 0) {
-    if (finance.donationRevenueCents > 0) {
-      kpis.push({
-        id: "donations",
-        label: "Campaign gifts",
-        value: formatMoney(finance.donationRevenueCents, finance.currency),
-        hint: "Linked donations campaign",
-      })
-    }
-  }
 
   const alerts: EventOverviewAlert[] = []
   const incomplete = input.attendees.filter(
@@ -322,6 +271,29 @@ export async function getEventOverviewSummary(input: {
     vendors: { count: vendors.length },
     finance,
   }
+}
+
+async function listOverviewSeriesSiblings(event: {
+  organization_id?: string | null
+  name?: string | null
+}) {
+  const organizationId = event.organization_id?.trim()
+  const name = event.name?.trim()
+  if (!organizationId || !name) return []
+
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from("internal_events")
+    .select("name, start_at, end_at, timezone, recurrence_config")
+    .eq("organization_id", organizationId)
+    .eq("name", name)
+
+  if (error) {
+    console.error(error)
+    return []
+  }
+
+  return data || []
 }
 
 async function getTicketTypeCapacity(eventId: string): Promise<number | null> {

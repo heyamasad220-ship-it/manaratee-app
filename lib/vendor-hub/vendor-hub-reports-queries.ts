@@ -20,6 +20,7 @@ export type VendorHubReportOverview = {
     revenue: number
   }>
   topVendors: Array<{
+    id: string
     vendorName: string
     category: string
     feesPaid: number
@@ -66,6 +67,26 @@ function emptyOverview(): VendorHubReportOverview {
   }
 }
 
+const BOOTH_TYPE_ALIASES: Record<string, string> = {
+  "regular booth - main prayer hall": "Regular table",
+  "booth on the stage": "Stage table",
+  "corner booth - main prayer hall": "Corner table",
+  "booth in the entrance (lobby)": "Lobby table",
+  coffee: "Coffee (lobby or truck)",
+  "food vendors between the two buildings (hot meal)": "Hot meal (Outdoor)",
+  "hot meal (between buildings)": "Hot meal (Outdoor)",
+  "general merchandise (between buildings)": "General merchandise (Outdoor)",
+  "mocktail/ smoothie (outside)": "Mocktail / smoothie (truck or cart)",
+}
+
+function canonicalBoothTypeName(name: string, defaultNames: Set<string>) {
+  const trimmed = name.trim() || "Booth"
+  if (defaultNames.has(trimmed)) return trimmed
+  const alias = BOOTH_TYPE_ALIASES[trimmed.toLowerCase()]
+  if (alias) return alias
+  return trimmed
+}
+
 export async function getVendorHubReportsData(
   eventId?: string | null
 ): Promise<VendorHubReportsPayload> {
@@ -108,6 +129,7 @@ export async function getVendorHubReportsData(
     { data: payments },
     { data: booths },
     { data: boothTypes },
+    { data: defaultBoothTypes },
   ] = await Promise.all([
     supabase
       .from("vendor_hub_booth_assignments")
@@ -123,8 +145,15 @@ export async function getVendorHubReportsData(
       .in("event_id", eventIds),
     supabase
       .from("vendor_hub_booth_types")
-      .select("id, name, price")
+      .select("id, name, price, capacity, sort_order, event_id")
       .eq("organization_id", organizationId),
+    supabase
+      .from("vendor_hub_booth_types")
+      .select("id, name, capacity, sort_order")
+      .eq("organization_id", organizationId)
+      .is("event_id", null)
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true }),
   ])
 
   const assignmentRows = assignments || []
@@ -145,30 +174,36 @@ export async function getVendorHubReportsData(
   const contactsById = new Map<
     string,
     {
+      id: string
       full_name: string | null
       first_name: string | null
       last_name: string | null
       organization_name: string | null
       company_name: string | null
+      email: string | null
     }
   >()
 
   if (contactIds.length > 0) {
-    const { data: contacts } = await supabase
+    const { data: contacts, error: contactsError } = await supabase
       .from("contacts")
-      .select(
-        "id, full_name, first_name, last_name, organization_name, company_name"
-      )
+      .select("id, full_name, email")
       .eq("organization_id", organizationId)
       .in("id", contactIds)
 
+    if (contactsError) {
+      console.error("getVendorHubReportsData contacts:", contactsError.message)
+    }
+
     for (const contact of contacts || []) {
       contactsById.set(contact.id as string, {
+        id: contact.id as string,
         full_name: (contact.full_name as string | null) ?? null,
-        first_name: (contact.first_name as string | null) ?? null,
-        last_name: (contact.last_name as string | null) ?? null,
-        organization_name: (contact.organization_name as string | null) ?? null,
-        company_name: (contact.company_name as string | null) ?? null,
+        first_name: null,
+        last_name: null,
+        organization_name: null,
+        company_name: null,
+        email: (contact.email as string | null) ?? null,
       })
     }
   }
@@ -181,6 +216,15 @@ export async function getVendorHubReportsData(
         price: Number(row.price ?? 0),
       },
     ])
+  )
+
+  const defaultTypeRows = (defaultBoothTypes || []).filter((row) => Boolean(row.name))
+  const defaultNames = new Set(defaultTypeRows.map((row) => String(row.name)))
+  const scopedEventIds = new Set(eventIds)
+  const usesDefaultLayout = boothTypeRows.some(
+    (row) =>
+      scopedEventIds.has(row.event_id as string) &&
+      defaultNames.has(String(row.name || ""))
   )
 
   const boothById = new Map(
@@ -215,7 +259,7 @@ export async function getVendorHubReportsData(
   const vendorSales: VendorHubVendorSalesRow[] = []
   const topVendorMap = new Map<
     string,
-    { vendorName: string; category: string; feesPaid: number }
+    { id: string; vendorName: string; category: string; feesPaid: number }
   >()
 
   for (const assignment of assignmentRows) {
@@ -225,7 +269,8 @@ export async function getVendorHubReportsData(
     const boothType = booth?.boothTypeId
       ? boothTypeById.get(booth.boothTypeId)
       : null
-    const category = boothType?.name || "Uncategorized"
+    const rawTypeName = boothType?.name || "Uncategorized"
+    const category = canonicalBoothTypeName(rawTypeName, defaultNames)
     const contact = contactId ? contactsById.get(contactId) : null
     const vendorName = contact
       ? formatContactDisplayName(contact)
@@ -241,7 +286,7 @@ export async function getVendorHubReportsData(
     vendorSales.push({
       vendorName,
       category,
-      boothType: boothType?.name || "—",
+      boothType: category,
       status,
       boothFee: formatMoneyNumber(boothFee),
       paid: formatMoneyNumber(paid),
@@ -254,12 +299,13 @@ export async function getVendorHubReportsData(
     if (contactId) cat.vendors.add(contactId)
     cat.revenue += paid
 
-    const key = contactId || vendorName
+    const key = contactId || `assignment-${assignment.id}`
     const existing = topVendorMap.get(key)
     if (existing) {
       existing.feesPaid += paid
     } else {
       topVendorMap.set(key, {
+        id: key,
         vendorName,
         category,
         feesPaid: paid,
@@ -268,7 +314,7 @@ export async function getVendorHubReportsData(
   }
 
   const foodVendors = [...categoryStats.entries()]
-    .filter(([name]) => /food|truck|cuisine|halal/i.test(name))
+    .filter(([name]) => /food|truck|cuisine|halal|hot meal|ice cream|mocktail|smoothie/i.test(name))
     .reduce((sum, [, stats]) => sum + stats.vendors.size, 0)
 
   const expectedAttendance = scopedEvents.reduce(
@@ -283,16 +329,32 @@ export async function getVendorHubReportsData(
 
   const boothPerformanceMap = new Map<
     string,
-    { total: number; allocated: number; revenue: number }
+    { total: number; allocated: number; revenue: number; sortOrder: number }
   >()
+
+  if (usesDefaultLayout) {
+    for (const [index, type] of defaultTypeRows.entries()) {
+      const name = String(type.name)
+      boothPerformanceMap.set(name, {
+        total: 0,
+        allocated: 0,
+        revenue: 0,
+        sortOrder: Number(type.sort_order ?? index),
+      })
+    }
+  }
 
   for (const booth of boothRows) {
     const typeId = booth.booth_type_id as string | null
-    const typeName = typeId
-      ? boothTypeById.get(typeId)?.name || "Booth"
-      : "Unassigned type"
+    const rawName = typeId ? boothTypeById.get(typeId)?.name || "Booth" : "Unassigned type"
+    const typeName = canonicalBoothTypeName(rawName, defaultNames)
     if (!boothPerformanceMap.has(typeName)) {
-      boothPerformanceMap.set(typeName, { total: 0, allocated: 0, revenue: 0 })
+      boothPerformanceMap.set(typeName, {
+        total: 0,
+        allocated: 0,
+        revenue: 0,
+        sortOrder: 1000 + boothPerformanceMap.size,
+      })
     }
     const row = boothPerformanceMap.get(typeName)!
     row.total += 1
@@ -302,14 +364,32 @@ export async function getVendorHubReportsData(
     }
   }
 
+  if (usesDefaultLayout) {
+    for (const type of defaultTypeRows) {
+      const name = String(type.name)
+      const row = boothPerformanceMap.get(name)
+      if (!row) continue
+      const capacity = Number(type.capacity ?? 0)
+      if (row.total === 0 && capacity > 0) {
+        row.total = capacity
+      }
+    }
+  }
+
   for (const assignment of assignmentRows) {
     const boothId = assignment.booth_id as string | null
     const booth = boothId ? boothById.get(boothId) : null
-    const typeName = booth?.boothTypeId
+    const rawName = booth?.boothTypeId
       ? boothTypeById.get(booth.boothTypeId)?.name || "Booth"
       : "Unassigned type"
+    const typeName = canonicalBoothTypeName(rawName, defaultNames)
     if (!boothPerformanceMap.has(typeName)) {
-      boothPerformanceMap.set(typeName, { total: 0, allocated: 0, revenue: 0 })
+      boothPerformanceMap.set(typeName, {
+        total: 0,
+        allocated: 0,
+        revenue: 0,
+        sortOrder: 1000 + boothPerformanceMap.size,
+      })
     }
     const paid = assignment.id
       ? paidByAssignment.get(assignment.id as string) || 0
@@ -319,19 +399,23 @@ export async function getVendorHubReportsData(
 
   const boothPerformance: VendorHubBoothPerformanceRow[] = [
     ...boothPerformanceMap.entries(),
-  ].map(([boothType, stats]) => {
-    const available = Math.max(0, stats.total - stats.allocated)
-    const utilizationPercent =
-      stats.total > 0 ? Math.round((stats.allocated / stats.total) * 100) : 0
-    return {
-      boothType,
-      total: stats.total,
-      allocated: stats.allocated,
-      available,
-      utilizationPercent,
-      revenue: formatMoneyNumber(stats.revenue),
-    }
-  })
+  ]
+    .map(([boothType, stats]) => {
+      const available = Math.max(0, stats.total - stats.allocated)
+      const utilizationPercent =
+        stats.total > 0 ? Math.round((stats.allocated / stats.total) * 100) : 0
+      return {
+        boothType,
+        total: stats.total,
+        allocated: stats.allocated,
+        available,
+        utilizationPercent,
+        revenue: formatMoneyNumber(stats.revenue),
+        sortOrder: stats.sortOrder,
+      }
+    })
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.boothType.localeCompare(b.boothType))
+    .map(({ sortOrder: _sortOrder, ...row }) => row)
 
   const uniqueVendorContacts = new Set(
     assignmentRows
@@ -362,6 +446,6 @@ export async function getVendorHubReportsData(
         })),
     },
     vendorSales: vendorSales.sort((a, b) => b.paid - a.paid),
-    boothPerformance: boothPerformance.sort((a, b) => b.revenue - a.revenue),
+    boothPerformance,
   }
 }

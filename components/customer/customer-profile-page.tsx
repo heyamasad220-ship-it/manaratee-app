@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, type ElementType } from "react"
+import { useEffect, useRef, useState, type ElementType } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { format, parseISO } from "date-fns"
@@ -31,6 +31,10 @@ import {
   loadCustomerFamilyMembers,
   removeCustomerFamilyMember,
 } from "@/lib/customer/customer-family-actions"
+import {
+  DUPLICATE_FAMILY_MEMBER_ERROR,
+  isDuplicateCustomerFamilyMember,
+} from "@/lib/customer/customer-family-match"
 import { loadCustomerProfilePortalData } from "@/lib/customer/customer-portal-data-actions"
 import {
   createDefaultCustomerNotificationSettings,
@@ -52,6 +56,10 @@ import {
   type ApplicationStatus as DbApplicationStatus,
 } from "@/lib/applications/application-types"
 import { CUSTOMER_CHILDCARE_APPLY_PATH, CUSTOMER_VENDOR_APPLY_PATH, CUSTOMER_VOLUNTEER_APPLY_PATH } from "@/lib/applications/application-routes"
+import {
+  isCustomerApplicationTypeEnabled,
+  showCustomerApplicationsNav,
+} from "@/lib/customer/customer-portal-modules"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -284,6 +292,7 @@ export function CustomerProfilePage({ section }: CustomerProfilePageProps) {
 
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([])
   const [isAddFamilyDialogOpen, setIsAddFamilyDialogOpen] = useState(false)
+  const addingFamilyRef = useRef(false)
   const [newFamilyMember, setNewFamilyMember] = useState<Omit<FamilyMember, "id">>({
     firstName: "",
     lastName: "",
@@ -362,8 +371,18 @@ export function CustomerProfilePage({ section }: CustomerProfilePageProps) {
     loadProfile()
   }, [])
 
+  const enabledSlugSet = new Set(enabledModuleSlugs)
+  const applicationsEnabled = showCustomerApplicationsNav(enabledSlugSet)
+
+  useEffect(() => {
+    if (loading || section !== "applications") return
+    if (applicationsEnabled || userApplications.length > 0) return
+    router.replace("/customer/profile")
+  }, [applicationsEnabled, loading, router, section, userApplications.length])
+
   const availableApplicationTypes = applicationTypes.filter((appType) => {
     if (!appType.isActive) return false
+    if (!isCustomerApplicationTypeEnabled(enabledSlugSet, appType.id)) return false
     return !userApplications.some(
       (ua) =>
         ua.applicationTypeId === appType.id &&
@@ -500,12 +519,25 @@ export function CustomerProfilePage({ section }: CustomerProfilePageProps) {
   }
 
   async function handleAddFamilyMember() {
+    if (addingFamilyRef.current || saving) return
+
     if (!organizationId) {
       alert("Missing organization context. Please refresh and try again.")
       return
     }
 
+    if (
+      familyMembers.some((member) =>
+        isDuplicateCustomerFamilyMember(member, newFamilyMember)
+      )
+    ) {
+      alert(DUPLICATE_FAMILY_MEMBER_ERROR)
+      return
+    }
+
+    addingFamilyRef.current = true
     setSaving(true)
+    setIsAddFamilyDialogOpen(false)
 
     try {
       const activeParentPersonId = personId || (await refreshParentPersonId())
@@ -533,19 +565,20 @@ export function CustomerProfilePage({ section }: CustomerProfilePageProps) {
         dateOfBirth: "",
         relationship: "",
       })
-      setIsAddFamilyDialogOpen(false)
 
       const refreshedParentPersonId =
         (await refreshParentPersonId()) || activeParentPersonId
       await loadFamilyMembers(refreshedParentPersonId)
     } catch (error) {
       console.error("Family member create error:", error)
+      setIsAddFamilyDialogOpen(true)
       alert(
         error instanceof Error
           ? error.message
           : "Could not create family member."
       )
     } finally {
+      addingFamilyRef.current = false
       setSaving(false)
     }
   }
@@ -785,7 +818,7 @@ export function CustomerProfilePage({ section }: CustomerProfilePageProps) {
       </div>
       ) : null}
 
-      {section === "applications" ? (
+      {section === "applications" && (applicationsEnabled || userApplications.length > 0) ? (
       <div className="flex flex-col gap-6">
       <Card className="border border-border shadow-sm">
         <CardHeader><CardTitle className="flex items-center gap-2 text-base font-semibold"><Users className="h-4 w-4" />Applications</CardTitle><CardDescription>Apply to become a volunteer, childcare provider, or take on other community roles.</CardDescription></CardHeader>
@@ -819,20 +852,7 @@ export function CustomerProfilePage({ section }: CustomerProfilePageProps) {
             <div className="flex flex-col items-center justify-center py-6 text-center"><CheckCircle2 className="mb-2 h-8 w-8 text-emerald-500" /><p className="text-sm font-medium text-foreground">No applications available yet</p><p className="text-xs text-muted-foreground">Available applications will appear here once they are connected.</p></div>
           ) : (
             <p className="text-sm text-muted-foreground">
-              You already have active applications on file. Open an application type above to
-              check status, or visit{" "}
-              <Link href={CUSTOMER_VENDOR_APPLY_PATH} className="underline">
-                Vendor
-              </Link>{" "}
-              /{" "}
-              <Link href={CUSTOMER_VOLUNTEER_APPLY_PATH} className="underline">
-                Volunteer
-              </Link>{" "}
-              /{" "}
-              <Link href={CUSTOMER_CHILDCARE_APPLY_PATH} className="underline">
-                Childcare
-              </Link>
-              .
+              You already have active applications on file.
             </p>
           )}
         </CardContent>
@@ -947,7 +967,28 @@ export function CustomerProfilePage({ section }: CustomerProfilePageProps) {
               <div className="flex flex-col gap-2"><Label htmlFor="fm-relationship">Relationship</Label><Select value={newFamilyMember.relationship} onValueChange={(val) => setNewFamilyMember((prev) => ({ ...prev, relationship: val }))}><SelectTrigger id="fm-relationship"><SelectValue placeholder="Select relationship" /></SelectTrigger><SelectContent><SelectItem value="child">Child / Grandchild</SelectItem><SelectItem value="guardian">Guardian</SelectItem><SelectItem value="spouse">Spouse</SelectItem><SelectItem value="parent">Parent</SelectItem><SelectItem value="sibling">Sibling</SelectItem><SelectItem value="other">Other</SelectItem></SelectContent></Select></div>
             </div>
           </div>
-          <DialogFooter><Button variant="outline" onClick={() => setIsAddFamilyDialogOpen(false)}>Cancel</Button><Button onClick={handleAddFamilyMember} disabled={!newFamilyMember.firstName || !newFamilyMember.lastName || !newFamilyMember.dateOfBirth || !newFamilyMember.gender || !newFamilyMember.relationship}>Add Member</Button></DialogFooter>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsAddFamilyDialogOpen(false)}
+              disabled={saving}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => void handleAddFamilyMember()}
+              disabled={
+                saving ||
+                !newFamilyMember.firstName ||
+                !newFamilyMember.lastName ||
+                !newFamilyMember.dateOfBirth ||
+                !newFamilyMember.gender ||
+                !newFamilyMember.relationship
+              }
+            >
+              {saving ? "Adding..." : "Add Member"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

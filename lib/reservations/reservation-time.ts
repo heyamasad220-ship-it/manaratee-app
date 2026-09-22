@@ -63,6 +63,50 @@ export function getDayEnd(date: Date) {
   return end
 }
 
+export const CALENDAR_LIST_RANGE_DAYS = 30
+export const CALENDAR_LIST_MAX_DAYS = 366
+
+export function startOfCalendarDay(date: Date) {
+  const start = new Date(date)
+  start.setHours(0, 0, 0, 0)
+  return start
+}
+
+export function addCalendarDays(date: Date, amount: number) {
+  const next = startOfCalendarDay(date)
+  next.setDate(next.getDate() + amount)
+  return next
+}
+
+export function defaultListEndDate(anchorDate: Date) {
+  return addCalendarDays(anchorDate, CALENDAR_LIST_RANGE_DAYS - 1)
+}
+
+export function calendarDayCountInclusive(start: Date, end: Date) {
+  const startMs = startOfCalendarDay(start).getTime()
+  const endMs = startOfCalendarDay(end).getTime()
+  return Math.round((endMs - startMs) / 86_400_000) + 1
+}
+
+export function getListRange(anchorDate: Date, endDate?: Date | null) {
+  let start = startOfCalendarDay(anchorDate)
+  let end = startOfCalendarDay(endDate || defaultListEndDate(anchorDate))
+
+  if (end < start) {
+    const swapped = start
+    start = end
+    end = swapped
+  }
+
+  const maxEnd = addCalendarDays(start, CALENDAR_LIST_MAX_DAYS - 1)
+  if (end > maxEnd) {
+    end = maxEnd
+  }
+
+  end.setHours(23, 59, 59, 999)
+  return { start, end }
+}
+
 export function parseCalendarDate(value: string | undefined, fallback = new Date()) {
   if (!value) return new Date(fallback)
 

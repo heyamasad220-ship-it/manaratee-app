@@ -5,6 +5,7 @@ import { useState } from "react"
 import {
   ClipboardList,
   ExternalLink,
+  FolderOpen,
   MoreHorizontal,
   Plus,
   Smartphone,
@@ -13,6 +14,7 @@ import {
 
 import { CheckoutFormFieldsEditor } from "@/components/tickets/checkout-form-fields-editor"
 import { DiscountCodesPanel } from "@/components/tickets/discount-codes-panel"
+import { TicketingEventCategoriesManager } from "@/components/tickets/ticketing-event-categories-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -47,6 +49,7 @@ import {
   EVENTS_WITH_CUSTOM_CHECKOUT,
   ORGANIZATION_DISCOUNT_CODES,
 } from "@/lib/tickets/ticketing-checkout-ui-types"
+import type { TicketingEventCategory } from "@/lib/tickets/ticketing-event-category-types"
 
 const checkInUsers: {
   id: string
@@ -57,8 +60,23 @@ const checkInUsers: {
   status: string
 }[] = []
 
-export function TicketingSettingsClient() {
-  const [activeTab, setActiveTab] = useState("checkout-form")
+function parseTicketingSettingsSection(value?: string | null) {
+  if (value === "checkout" || value === "checkout-form") return "checkout-form"
+  if (value === "promos" || value === "discount-codes") return "discount-codes"
+  if (value === "check-in-users") return "check-in-users"
+  return "categories"
+}
+
+export function TicketingSettingsClient({
+  categories,
+  initialSection,
+}: {
+  categories: TicketingEventCategory[]
+  initialSection?: string | null
+}) {
+  const [activeTab, setActiveTab] = useState(
+    parseTicketingSettingsSection(initialSection)
+  )
   const [formFields, setFormFields] = useState(DEFAULT_ORG_CHECKOUT_FIELDS)
   const [showAddUser, setShowAddUser] = useState(false)
 
@@ -67,14 +85,18 @@ export function TicketingSettingsClient() {
       <div>
         <h2 className="text-lg font-semibold tracking-tight">Ticketing settings</h2>
         <p className="text-sm text-muted-foreground">
-          Organization defaults for buyer checkout fields, promo codes, and check-in access.
-          Per-ticket attendee questions (e.g. kids age / allergies) are configured on each
-          event&apos;s Ticketing tab.
+          Ticket categories, organization checkout defaults, promo codes, and
+          check-in access. Per-event ticket types stay on each event&apos;s
+          Settings → Tickets.
         </p>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
+          <TabsTrigger value="categories" className="gap-2">
+            <FolderOpen className="h-4 w-4" />
+            Categories
+          </TabsTrigger>
           <TabsTrigger value="checkout-form" className="gap-2">
             <ClipboardList className="h-4 w-4" />
             Default checkout
@@ -88,6 +110,22 @@ export function TicketingSettingsClient() {
             Check-in app users
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="categories" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Event categories</CardTitle>
+              <CardDescription>
+                Group ticketed events so staff can filter Ticketing → Events.
+                Add, rename, hide, or delete labels such as Fundraising Dinner
+                or Kids Workshop.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <TicketingEventCategoriesManager categories={categories} />
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="checkout-form" className="mt-6 space-y-6">
           <Card>

@@ -26,6 +26,7 @@ export type FundraisingPlanSaveInput = {
   contact_id: string
   suggested_ask_amount: number | null
   assigned_to_contact_id: string | null
+  assigned_to_name: string | null
   last_contacted_at: string | null
   next_follow_up_at: string | null
   notes: string | null
@@ -35,8 +36,7 @@ type FormState = {
   contactId: string
   contactLabel: string
   askAmount: string
-  assignedToContactId: string
-  assignedToLabel: string
+  assignedToName: string
   lastContactedAt: string
   nextFollowUpAt: string
   notes: string
@@ -47,8 +47,7 @@ function emptyForm(): FormState {
     contactId: "",
     contactLabel: "",
     askAmount: "",
-    assignedToContactId: "",
-    assignedToLabel: "",
+    assignedToName: "",
     lastContactedAt: "",
     nextFollowUpAt: "",
     notes: "",
@@ -73,8 +72,7 @@ function formFromProspect(prospect: CampaignProspectListItem): FormState {
     contactId: prospect.contact_id,
     contactLabel: prospect.contactName,
     askAmount: amount == null ? "" : String(amount),
-    assignedToContactId: prospect.assigned_to_contact_id || "",
-    assignedToLabel: prospect.assignedToName || "",
+    assignedToName: prospect.assignedToName || prospect.assigned_to_name || "",
     lastContactedAt: dateInputValue(prospect.last_contacted_at),
     nextFollowUpAt: dateInputValue(prospect.next_follow_up_at),
     notes: prospect.notes || "",
@@ -105,8 +103,8 @@ export function CampaignFundraisingPlanDialog({
   onRecordPledge: () => void
 }) {
   const [form, setForm] = useState<FormState>(emptyForm)
-  const [quickAddTarget, setQuickAddTarget] = useState<"prospect" | "assignee" | null>(null)
   const [quickAddQuery, setQuickAddQuery] = useState("")
+  const [showQuickAdd, setShowQuickAdd] = useState(false)
   const editing = Boolean(prospect)
   const readOnly = !canManage
   const askInvalid = form.askAmount.trim() !== "" && parseAskAmount(form.askAmount) == null
@@ -114,7 +112,7 @@ export function CampaignFundraisingPlanDialog({
   useEffect(() => {
     if (!open) return
     setForm(prospect ? formFromProspect(prospect) : emptyForm())
-    setQuickAddTarget(null)
+    setShowQuickAdd(false)
   }, [open, prospect])
 
   async function handleSave() {
@@ -122,7 +120,8 @@ export function CampaignFundraisingPlanDialog({
     const saved = await onSave({
       contact_id: form.contactId,
       suggested_ask_amount: parseAskAmount(form.askAmount),
-      assigned_to_contact_id: form.assignedToContactId || null,
+      assigned_to_contact_id: null,
+      assigned_to_name: form.assignedToName.trim() || null,
       last_contacted_at: form.lastContactedAt || null,
       next_follow_up_at: form.nextFollowUpAt || null,
       notes: form.notes.trim() || null,
@@ -146,7 +145,7 @@ export function CampaignFundraisingPlanDialog({
             <DialogDescription>
               {editing
                 ? "Update this outreach row, record a pledge, or remove it from the plan."
-                : "Search the donor, enter the ask, and assign a team member. Dates are optional."}
+                : "Search the donor, enter the ask, and type who is assigned. Dates are optional."}
             </DialogDescription>
           </DialogHeader>
 
@@ -167,7 +166,7 @@ export function CampaignFundraisingPlanDialog({
               onCreateClick={
                 readOnly || editing
                   ? undefined
-                  : () => setQuickAddTarget("prospect")
+                  : () => setShowQuickAdd(true)
               }
               createLabel="Create contact"
             />
@@ -196,26 +195,19 @@ export function CampaignFundraisingPlanDialog({
               ) : null}
             </div>
 
-            <PledgeContactPicker
-              organizationId={organizationId}
-              contactId={form.assignedToContactId}
-              contactLabel={form.assignedToLabel}
-              label="Assigned to"
-              inputId="plan-dialog-assignee"
-              allowClear
-              disabled={readOnly}
-              placeholder="Search a team member"
-              onQueryChange={setQuickAddQuery}
-              onCreateClick={readOnly ? undefined : () => setQuickAddTarget("assignee")}
-              createLabel="Create contact"
-              onChange={(contactId, label) =>
-                setForm((current) => ({
-                  ...current,
-                  assignedToContactId: contactId,
-                  assignedToLabel: label,
-                }))
-              }
-            />
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="plan-dialog-assignee">Assigned to</Label>
+              <Input
+                id="plan-dialog-assignee"
+                type="text"
+                disabled={readOnly}
+                value={form.assignedToName}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, assignedToName: event.target.value }))
+                }
+                placeholder="Type a name"
+              />
+            </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-2">
@@ -302,27 +294,17 @@ export function CampaignFundraisingPlanDialog({
       </Dialog>
 
       <QuickAddContactDialog
-        open={quickAddTarget != null}
-        onOpenChange={(open) => {
-          if (!open) setQuickAddTarget(null)
-        }}
+        open={showQuickAdd}
+        onOpenChange={setShowQuickAdd}
         searchHint={quickAddQuery}
         onCreated={(contact) => {
           const label = contact.full_name || contact.email || "New contact"
-          if (quickAddTarget === "assignee") {
-            setForm((current) => ({
-              ...current,
-              assignedToContactId: contact.contactId,
-              assignedToLabel: label,
-            }))
-          } else {
-            setForm((current) => ({
-              ...current,
-              contactId: contact.contactId,
-              contactLabel: label,
-            }))
-          }
-          setQuickAddTarget(null)
+          setForm((current) => ({
+            ...current,
+            contactId: contact.contactId,
+            contactLabel: label,
+          }))
+          setShowQuickAdd(false)
         }}
       />
     </>

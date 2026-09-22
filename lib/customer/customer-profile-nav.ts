@@ -1,3 +1,5 @@
+import { showCustomerApplicationsNav } from "@/lib/customer/customer-portal-modules"
+
 export type CustomerProfileSection =
   | "personal"
   | "family"
@@ -77,7 +79,14 @@ export function customerProfileSectionTitle(section: CustomerProfileSection): st
 
 export function filterCustomerProfileNavItems(
   items: CustomerProfileNavItem[],
-  isApprovedVendor: boolean
+  isApprovedVendor: boolean,
+  enabledModuleSlugs: Iterable<string> = []
 ) {
-  return items.filter((item) => !item.requiresApprovedVendor || isApprovedVendor)
+  return items.filter((item) => {
+    if (item.requiresApprovedVendor && !isApprovedVendor) return false
+    if (item.section === "applications" && !showCustomerApplicationsNav(enabledModuleSlugs)) {
+      return false
+    }
+    return true
+  })
 }

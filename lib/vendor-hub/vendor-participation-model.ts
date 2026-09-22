@@ -36,5 +36,7 @@ export type ReservableBooth = {
   location: string | null
   boothTypeId: string | null
   boothTypeName: string | null
+  baseFee: number
+  selectionFee: number
   feeAmount: number
 }

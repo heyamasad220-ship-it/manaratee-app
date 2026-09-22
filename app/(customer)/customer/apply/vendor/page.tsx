@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/card"
 import { fetchContactApplications } from "@/lib/applications/application-actions"
 import { resolveCustomerPortalSession } from "@/lib/auth/customer-portal-session"
+import { requireCustomerPortalModule } from "@/lib/customer/customer-portal-modules-server"
 import { getMyOrganizations } from "@/lib/organizations/get-my-organizations"
 import { getCustomerContactForUser } from "@/lib/programs/registration-contact-resolver"
 import { createClient } from "@/lib/supabase/server"
@@ -26,6 +27,7 @@ type CustomerOrganization = {
 }
 
 export default async function CustomerVendorApplyPage() {
+  await requireCustomerPortalModule("vendor-hub")
   const session = await resolveCustomerPortalSession()
   if (!session?.effectiveUserId) {
     return (

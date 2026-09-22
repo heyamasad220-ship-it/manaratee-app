@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 
 import type { InternalEventWithRelations } from "./internal-event-types"
+import { excludeVendorHubOwnedEvents } from "./internal-event-source"
 
 const EVENT_SELECT = `
   *,
@@ -47,16 +48,17 @@ export async function getInternalEventsForCalendar(options: {
     return []
   }
 
-  let query = supabase
-    .from("internal_events")
-    .select(EVENT_SELECT)
-    .eq("organization_id", organizationId)
-    .not("start_at", "is", null)
-    .gte("start_at", options.rangeStart)
-    .lt("start_at", options.rangeEnd)
-    .neq("status", "cancelled")
-    .neq("status", "declined")
-    .order("start_at", { ascending: true })
+  let query = excludeVendorHubOwnedEvents(
+    supabase
+      .from("internal_events")
+      .select(EVENT_SELECT)
+      .eq("organization_id", organizationId)
+      .not("start_at", "is", null)
+      .gte("start_at", options.rangeStart)
+      .lt("start_at", options.rangeEnd)
+      .neq("status", "cancelled")
+      .neq("status", "declined")
+  ).order("start_at", { ascending: true })
 
   if (options.departmentId) {
     query = query.eq("department_id", options.departmentId)
@@ -71,23 +73,24 @@ export async function getInternalEventsForCalendar(options: {
       error.code === "42703" ||
       error.code === "PGRST200"
     ) {
-      let fallback = supabase
-        .from("internal_events")
-        .select(
-          `
+      let fallback = excludeVendorHubOwnedEvents(
+        supabase
+          .from("internal_events")
+          .select(
+            `
           *,
           departments:department_id ( id, name, color ),
           event_types:event_type_id ( id, name ),
           venues:venue_id ( id, name )
         `
-        )
-        .eq("organization_id", organizationId)
-        .not("start_at", "is", null)
-        .gte("start_at", options.rangeStart)
-        .lt("start_at", options.rangeEnd)
-        .neq("status", "cancelled")
-        .neq("status", "declined")
-        .order("start_at", { ascending: true })
+          )
+          .eq("organization_id", organizationId)
+          .not("start_at", "is", null)
+          .gte("start_at", options.rangeStart)
+          .lt("start_at", options.rangeEnd)
+          .neq("status", "cancelled")
+          .neq("status", "declined")
+      ).order("start_at", { ascending: true })
 
       if (options.departmentId) {
         fallback = fallback.eq("department_id", options.departmentId)

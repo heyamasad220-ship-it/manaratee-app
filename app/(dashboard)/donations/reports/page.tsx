@@ -1,11 +1,17 @@
-import { Suspense } from "react"
+import { redirect } from "next/navigation"
 
-import { DonationReportsLanding } from "@/components/donations/donation-reports-landing"
+import { DONATION_TRANSACTIONS_PATH } from "@/lib/donations/donation-payment-paths"
 
-export default function DonationsReportsPage() {
-  return (
-    <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading reports...</div>}>
-      <DonationReportsLanding />
-    </Suspense>
+export default async function DonationsReportsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ range?: string }>
+}) {
+  const params = await searchParams
+  const range = params.range?.trim()
+  redirect(
+    range
+      ? `${DONATION_TRANSACTIONS_PATH}?range=${encodeURIComponent(range)}`
+      : DONATION_TRANSACTIONS_PATH
   )
 }

@@ -7,6 +7,7 @@ export type TicketedEventOverviewRow = {
   locationLabel: string | null
   startAt: string | null
   endAt: string | null
+  eventStatus: string | null
   salesStatus: TicketingSalesStatus
   ticketsIssued: number
   ticketsCapacity: number | null
@@ -15,6 +16,35 @@ export type TicketedEventOverviewRow = {
   currency: string
   ticketingCategoryId: string | null
   ticketingCategoryName: string | null
+}
+
+export type TicketedEventListStatus = "draft" | "active" | "past"
+
+export function getTicketedEventListStatus(
+  event: {
+    startAt: string | null
+    endAt: string | null
+    eventStatus?: string | null
+  },
+  now = new Date()
+): TicketedEventListStatus {
+  if (isTicketedEventPast(event, now)) return "past"
+  if (!event.eventStatus || event.eventStatus === "draft") return "draft"
+  return "active"
+}
+
+export function getTicketedEventListStatusLabel(
+  event: {
+    startAt: string | null
+    endAt: string | null
+    eventStatus?: string | null
+  },
+  now = new Date()
+): string {
+  const status = getTicketedEventListStatus(event, now)
+  if (status === "draft") return "Draft"
+  if (status === "past") return "Past"
+  return "Active"
 }
 
 export function formatEventSchedule(startAt: string | null, endAt: string | null) {

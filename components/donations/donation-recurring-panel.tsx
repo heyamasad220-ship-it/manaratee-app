@@ -9,7 +9,6 @@ import {
   DonationMetricCard,
   DonationMetricCardGrid,
 } from "@/components/donations/donation-metric-card"
-import { DonationReportsTabs } from "@/components/donations/donation-reports-chrome"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -238,15 +237,12 @@ function parseOptionalCountInput(value: string) {
 
 export function DonationRecurringPanel({
   embedded = false,
-  showReportsTabs = false,
   readOnly = false,
   donorId: scopedDonorId = null,
   onPlansCountChange,
   onUpdated,
 }: {
   embedded?: boolean
-  /** Show Fund Development report tabs below KPI cards (Reports → Recurring). */
-  showReportsTabs?: boolean
   /** Analytics view: hide plan create/pause/cancel/receive payment. */
   readOnly?: boolean
   /** When set, show only this donor’s plans (contact profile Payment Plans). */
@@ -764,8 +760,6 @@ export function DonationRecurringPanel({
             />
           </DonationMetricCardGrid>
         ) : null}
-
-        {showReportsTabs && !isDonorScoped ? <DonationReportsTabs /> : null}
 
         {loadError ? (
           <p className="text-sm text-destructive">{loadError}</p>

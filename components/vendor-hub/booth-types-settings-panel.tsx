@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState, useTransition } from "react"
-import { Copy, Loader2, Pencil, Plus, Trash2 } from "lucide-react"
+import { Copy, Layers, Loader2, Pencil, Plus, Trash2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 
 import { Badge } from "@/components/ui/badge"
@@ -39,10 +39,12 @@ import {
   setBoothTypeAttributes,
 } from "@/lib/vendor-hub/booth-attribute-actions"
 import type { VendorHubBoothAttribute } from "@/lib/vendor-hub/booth-catalog-types"
+import { parseBoothNumberList } from "@/lib/vendor-hub/booth-pricing"
 import {
   copyDefaultBoothTypesToEvent,
   fetchDefaultBoothTypes,
   fetchEventBoothTypes,
+  saveDefaultBoothTypesAsTemplate,
   type DefaultBoothTypeRow,
 } from "@/lib/vendor-hub/default-booth-type-actions"
 
@@ -50,24 +52,41 @@ type BoothTypeForm = {
   name: string
   size: string
   price: string
+  selection_fee: string
   color: string
   description: string
   is_active: string
   sort_order: string
   capacity: string
   location: string
+  default_booth_numbers: string
 }
 
 const emptyForm: BoothTypeForm = {
   name: "",
   size: "",
   price: "",
+  selection_fee: "0",
   color: "#2563eb",
   description: "",
   is_active: "true",
   sort_order: "0",
   capacity: "",
   location: "",
+  default_booth_numbers: "",
+}
+
+function formatBoothTypePrice(type: DefaultBoothTypeRow) {
+  const price = Number(type.price ?? 0)
+  const extra = Number(type.selection_fee ?? 0)
+  if (extra > 0) {
+    return `$${price} + $${extra} to pick a table`
+  }
+  return `$${price}`
+}
+
+function formatBoothNumbers(type: DefaultBoothTypeRow) {
+  return parseBoothNumberList(type.default_booth_numbers).join(", ")
 }
 
 export function BoothTypesSettingsPanel({
@@ -135,12 +154,17 @@ export function BoothTypesSettingsPanel({
       name: type.name ?? "",
       size: type.size ?? "",
       price: type.price === null || type.price === undefined ? "" : String(type.price),
+      selection_fee:
+        type.selection_fee === null || type.selection_fee === undefined
+          ? "0"
+          : String(type.selection_fee),
       color: type.color ?? "#2563eb",
       capacity: String(type.capacity ?? ""),
       location: type.location ?? "",
       description: type.description ?? "",
       is_active: type.is_active === false ? "false" : "true",
       sort_order: String(type.sort_order ?? 0),
+      default_booth_numbers: parseBoothNumberList(type.default_booth_numbers).join(", "),
     })
     if (showAttributes) {
       try {
@@ -172,18 +196,25 @@ export function BoothTypesSettingsPanel({
       return
     }
 
+    const boothNumbers = parseBoothNumberList(form.default_booth_numbers)
     const payload = {
       organization_id: organizationId,
       event_id: mode === "event" ? eventId! : null,
       name: form.name.trim(),
       size: form.size.trim() || null,
       price: form.price ? Number(form.price) : 0,
+      selection_fee: form.selection_fee ? Math.max(0, Number(form.selection_fee)) : 0,
       color: form.color || "#2563eb",
       description: form.description.trim() || null,
       is_active: form.is_active === "true",
       sort_order: Number(form.sort_order || 0),
-      capacity: form.capacity ? Number(form.capacity) : 0,
+      capacity: form.capacity
+        ? Number(form.capacity)
+        : boothNumbers.length > 0
+          ? boothNumbers.length
+          : 0,
       location: form.location.trim() || null,
+      default_booth_numbers: boothNumbers,
       updated_at: new Date().toISOString(),
     }
 
@@ -244,6 +275,28 @@ export function BoothTypesSettingsPanel({
     router.refresh()
   }
 
+  function handleSaveAsDefaultTemplate() {
+    if (
+      !window.confirm(
+        "Replace the Default bazaar layout template with these booth types, prices, table extras, and table numbers?"
+      )
+    ) {
+      return
+    }
+
+    startTransition(async () => {
+      try {
+        const result = await saveDefaultBoothTypesAsTemplate()
+        router.refresh()
+        alert(
+          `Saved Default bazaar layout with ${result.lineCount} booth type(s) and ${result.totalBooths} booths.`
+        )
+      } catch (saveError) {
+        alert(saveError instanceof Error ? saveError.message : "Could not save the default template.")
+      }
+    })
+  }
+
   function handleCopyFromDefaults() {
     if (!eventId) return
     const replace =
@@ -297,6 +350,21 @@ export function BoothTypesSettingsPanel({
                 Copy from defaults
               </Button>
             ) : null}
+            {mode === "defaults" && boothTypes.length > 0 ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleSaveAsDefaultTemplate}
+                disabled={isPending}
+              >
+                {isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Layers className="mr-2 h-4 w-4" />
+                )}
+                Save as default template
+              </Button>
+            ) : null}
             <Button type="button" onClick={startAdd}>
               <Plus className="mr-2 h-4 w-4" />
               Add Booth Type
@@ -335,8 +403,15 @@ export function BoothTypesSettingsPanel({
                       </Badge>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      {type.size || "No size"} · ${type.price ?? 0}
+                      {type.capacity ? `${type.capacity}× ` : ""}
+                      {formatBoothTypePrice(type)}
+                      {type.location ? ` · ${type.location}` : ""}
                     </p>
+                    {formatBoothNumbers(type) ? (
+                      <p className="text-sm text-muted-foreground">
+                        Tables: {formatBoothNumbers(type)}
+                      </p>
+                    ) : null}
                     {type.description ? (
                       <p className="mt-1 text-sm text-muted-foreground">{type.description}</p>
                     ) : null}
@@ -385,9 +460,35 @@ export function BoothTypesSettingsPanel({
                 <Label>Price</Label>
                 <Input
                   type="number"
+                  min={0}
                   value={form.price}
                   onChange={(event) => setForm({ ...form, price: event.target.value })}
                 />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label>Table selection extra</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={form.selection_fee}
+                  onChange={(event) => setForm({ ...form, selection_fee: event.target.value })}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Extra charged when a vendor picks a numbered table (for example $10 or $25).
+                </p>
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label>Default table numbers</Label>
+                <Input
+                  value={form.default_booth_numbers}
+                  onChange={(event) =>
+                    setForm({ ...form, default_booth_numbers: event.target.value })
+                  }
+                  placeholder="T1, T2, T3"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Comma-separated numbers used when saving the default template (for example T1, T15).
+                </p>
               </div>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">

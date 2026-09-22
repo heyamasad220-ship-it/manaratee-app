@@ -1,0 +1,737 @@
+{
+  "importTag": "QIL_2026_27_FINAL_V1",
+  "mode": "dry-run",
+  "generatedAt": "2026-09-15T19:19:38.754Z",
+  "file": "C:/Users/danan/OneDrive/QI-FinalList.xlsx",
+  "csv": "C:/Users/danan/OneDrive/QI-Payments0915.csv",
+  "summary": {
+    "rosterRows": 112,
+    "uniqueKeepContacts": 97,
+    "targets": 112,
+    "create": 47,
+    "update": 50,
+    "move": 15,
+    "cancel": 7,
+    "withdrawApplications": 27,
+    "createdContacts": 13,
+    "unmatchedStudents": 0,
+    "ambiguous": 0,
+    "unmappedCourses": 0,
+    "unmatchedPaymentMembers": 3,
+    "csvNet": 8050
+  },
+  "createdContacts": [
+    {
+      "name": "Yumna Alnuqli",
+      "email": ""
+    },
+    {
+      "name": "Noor Abushaaban",
+      "email": ""
+    },
+    {
+      "name": "Rajaa Isa",
+      "email": ""
+    },
+    {
+      "name": "Samiha Jaber",
+      "email": ""
+    },
+    {
+      "name": "Huda Abu Alhayja",
+      "email": ""
+    },
+    {
+      "name": "Razan Naffah",
+      "email": ""
+    },
+    {
+      "name": "Alia Taha",
+      "email": ""
+    },
+    {
+      "name": "Robina Choudhary",
+      "email": ""
+    },
+    {
+      "name": "Doaa Kabbani",
+      "email": ""
+    },
+    {
+      "name": "hassnae bellamine",
+      "email": "be_happy_0505@hotmail.com"
+    },
+    {
+      "name": "Maysa Hamdan",
+      "email": ""
+    },
+    {
+      "name": "Amani Abu Odeh",
+      "email": ""
+    },
+    {
+      "name": "Dalal Alkhatib",
+      "email": ""
+    }
+  ],
+  "keepExistingNotes": [
+    {
+      "name": "Sadia Shakeel",
+      "matched": "Sadia Shakeel",
+      "reason": "on list without a course — keeping current enrollment(s)"
+    }
+  ],
+  "unmatched": [],
+  "ambiguous": [],
+  "unmappedCourses": [],
+  "unmatchedPaymentMembers": [
+    {
+      "rowNumber": 49,
+      "memberName": "Anhar Ahmed",
+      "customerName": "Hanan Ahmed",
+      "amount": -175,
+      "reason": "Tajweed & Recitation",
+      "note": "paid but student is not on the final list"
+    },
+    {
+      "rowNumber": 50,
+      "memberName": "Anhar Ahmed",
+      "customerName": "Hanan Ahmed",
+      "amount": 175,
+      "reason": "Tajweed & Recitation",
+      "note": "paid but student is not on the final list"
+    },
+    {
+      "rowNumber": 57,
+      "memberName": "NoorElaine Abushaaban",
+      "customerName": "NoorElaine Abushaaban",
+      "amount": 400,
+      "reason": "Tajweed & Recitation",
+      "note": "paid but student is not on the final list"
+    }
+  ],
+  "create": [
+    {
+      "student": "Iman Alarja",
+      "matched": "Eman Alarja",
+      "offering": "Tajweed (Advanced)",
+      "teacher": "Abeer Abukawan",
+      "amountPaid": 0,
+      "assistedFee": 450
+    },
+    {
+      "student": "Ansam Izzat",
+      "matched": "Ansam Izzat",
+      "offering": "Tajweed (Advanced)",
+      "teacher": "Abeer Abukawan",
+      "amountPaid": 0,
+      "assistedFee": 450
+    },
+    {
+      "student": "Ruqayya Samir Aljenabi",
+      "matched": "Roqaiyah Sameer Janabee",
+      "offering": "Tajweed (Advanced)",
+      "teacher": "Abeer Abukawan",
+      "amountPaid": 0,
+      "assistedFee": 450
+    },
+    {
+      "student": "Sabreen Taha",
+      "matched": "Sabreen F I Taha",
+      "offering": "Tajweed (Advanced)",
+      "teacher": "Abeer Abukawan",
+      "amountPaid": 0,
+      "assistedFee": 450
+    },
+    {
+      "student": "Lubna Abdalla",
+      "matched": "Lubna Abdallah",
+      "offering": "Tajweed (Advanced)",
+      "teacher": "Abeer Abukawan",
+      "amountPaid": 0,
+      "assistedFee": 450
+    },
+    {
+      "student": "Walaa Abdelghani",
+      "matched": "Walaa Abdelghani",
+      "offering": "Tajweed (Advanced)",
+      "teacher": "Abeer Abukawan",
+      "amountPaid": 0,
+      "assistedFee": 450
+    },
+    {
+      "student": "Yusra Aldameri",
+      "matched": "Yousra Aldemeri",
+      "offering": "Tajweed (Advanced)",
+      "teacher": "Abeer Abukawan",
+      "amountPaid": 0,
+      "assistedFee": 450
+    },
+    {
+      "student": "Afnan Alaraj",
+      "matched": "Afnan Alaraj",
+      "offering": "Memorization (Surat Al-Omran)",
+      "teacher": "Abeer Abukawan",
+      "amountPaid": 0,
+      "assistedFee": 225
+    },
+    {
+      "student": "Rawand Shiblaq",
+      "matched": "Rawand Shiblaq",
+      "offering": "Memorization (Surat Al-Omran)",
+      "teacher": "Abeer Abukawan",
+      "amountPaid": 0,
+      "assistedFee": 225
+    },
+    {
+      "student": "Zohour Hawa",
+      "matched": "Zuhoor Hawwa",
+      "offering": "Memorization (Surat Al-Omran)",
+      "teacher": "Abeer Abukawan",
+      "amountPaid": 0,
+      "assistedFee": 225
+    },
+    {
+      "student": "Sarfraz Amin",
+      "matched": "Sarfraz Amin",
+      "offering": "Preparing for Ijaza",
+      "teacher": "Amneh Ismail",
+      "amountPaid": 400,
+      "assistedFee": 400
+    },
+    {
+      "student": "Rana Hamadmad",
+      "matched": "Rana Hamadmad",
+      "offering": "Recitation Improvement",
+      "teacher": "Amneh Ismail",
+      "amountPaid": 0,
+      "assistedFee": 450
+    },
+    {
+      "student": "Suhair Younus",
+      "matched": "SUHAIR YOUNES",
+      "offering": "Recitation Improvement",
+      "teacher": "Amneh Ismail",
+      "amountPaid": 0,
+      "assistedFee": 450
+    },
+    {
+      "student": "Madiha Ahmad",
+      "matched": "Madihah Ahmed",
+      "offering": "Recitation Improvement",
+      "teacher": "Amneh Ismail",
+      "amountPaid": 0,
+      "assistedFee": 450
+    },
+    {
+      "student": "Yumna Alnuqli",
+      "matched": "Yumna Alnuqli",
+      "offering": "Recitation Improvement",
+      "teacher": "Amneh Ismail",
+      "amountPaid": 0,
+      "assistedFee": 450
+    },
+    {
+      "student": "Aisha Diallo",
+      "matched": "Aisha Diallo",
+      "offering": "Recitation Improvement (Non-Arabic Speaking)",
+      "teacher": "Asmaa Salim",
+      "amountPaid": 0,
+      "assistedFee": 450
+    },
+    {
+      "student": "Noor Abushaaban",
+      "matched": "Noor Abushaaban",
+      "offering": "Recitation Improvement (Non-Arabic Speaking)",
+      "teacher": "Asmaa Salim",
+      "amountPaid": 0,
+      "assistedFee": 450
+    },
+    {
+      "student": "Selwaan Mahmoud",
+      "matched": "Selwaan Mahmoud",
+      "offering": "Recitation Improvement (Non-Arabic Speaking)",
+      "teacher": "Asmaa Salim",
+      "amountPaid": 0,
+      "assistedFee": 450
+    },
+    {
+      "student": "Rajaa Isa",
+      "matched": "Rajaa Isa",
+      "offering": "Recitation Improvement (Non-Arabic Speaking)",
+      "teacher": "Asmaa Salim",
+      "amountPaid": 0,
+      "assistedFee": 450
+    },
+    {
+      "student": "Lina Alkhateeb",
+      "matched": "Lena Alkhateeb",
+      "offering": "Recitation Improvement",
+      "teacher": "Fadia Salameh",
+      "amountPaid": 0,
+      "assistedFee": 450
+    },
+    {
+      "student": "Monaliza Alqadi",
+      "matched": "Monaliza Alqadi",
+      "offering": "Recitation Improvement",
+      "teacher": "Fadia Salameh",
+      "amountPaid": 0,
+      "assistedFee": 450
+    },
+    {
+      "student": "Nesreen Almaraghi",
+      "matched": "Nisreen Mohamed Almaraghi",
+      "offering": "Recitation Improvement",
+      "teacher": "Fadia Salameh",
+      "amountPaid": 0,
+      "assistedFee": 450
+    },
+    {
+      "student": "wafa yerrou",
+      "matched": "wafa yerrou",
+      "offering": "Recitation Improvement",
+      "teacher": "Fadia Salameh",
+      "amountPaid": 0,
+      "assistedFee": 450
+    },
+    {
+      "student": "Doaa Khdair",
+      "matched": "Doaa Khdair",
+      "offering": "Tajweed (Beginner)",
+      "teacher": "Fathieh Alladin",
+      "amountPaid": 0,
+      "assistedFee": 450
+    },
+    {
+      "student": "Rehab Alshamri",
+      "matched": "Rihab Alshamari",
+      "offering": "Tajweed (Beginner)",
+      "teacher": "Fathieh Alladin",
+      "amountPaid": 0,
+      "assistedFee": 450
+    },
+    {
+      "student": "Samiha Jaber",
+      "matched": "Samiha Jaber",
+      "offering": "Tajweed (Beginner)",
+      "teacher": "Fathieh Alladin",
+      "amountPaid": 0,
+      "assistedFee": 450
+    },
+    {
+      "student": "Huda Abu Alhayja",
+      "matched": "Huda Abu Alhayja",
+      "offering": "Tajweed (Beginner)",
+      "teacher": "Fathieh Alladin",
+      "amountPaid": 0,
+      "assistedFee": 450
+    },
+    {
+      "student": "Razan Naffah",
+      "matched": "Razan Naffah",
+      "offering": "Memorization (Surat Al-Baqara)",
+      "teacher": "Huda Elsiesy",
+      "amountPaid": 0,
+      "assistedFee": 225
+    },
+    {
+      "student": "Alia Taha",
+      "matched": "Alia Taha",
+      "offering": "Memorization (Surat Al-Baqara)",
+      "teacher": "Huda Elsiesy",
+      "amountPaid": 0,
+      "assistedFee": 225
+    },
+    {
+      "student": "Amber adnan",
+      "matched": "Amber adnan",
+      "offering": "Al Nouraniyyeh",
+      "teacher": "Rajaa Aljaber",
+      "amountPaid": 0,
+      "assistedFee": 450
+    },
+    {
+      "student": "Nahed Mahmoud",
+      "matched": "Nahid Mahmoud",
+      "offering": "Al Nouraniyyeh",
+      "teacher": "Rajaa Aljaber",
+      "amountPaid": 0,
+      "assistedFee": 450
+    },
+    {
+      "student": "Robina Choudhary",
+      "matched": "Robina Choudhary",
+      "offering": "Recitation Improvement",
+      "teacher": "Rajaa Aljaber",
+      "amountPaid": 0,
+      "assistedFee": 450
+    },
+    {
+      "student": "Doaa Kabbani",
+      "matched": "Doaa Kabbani",
+      "offering": "Recitation Improvement",
+      "teacher": "Rajaa Aljaber",
+      "amountPaid": 0,
+      "assistedFee": 450
+    },
+    {
+      "student": "hassnae bellamine",
+      "matched": "hassnae bellamine",
+      "offering": "Tajweed (Beginner)",
+      "teacher": "Souzan Ayoub",
+      "amountPaid": 50,
+      "assistedFee": 450
+    },
+    {
+      "student": "Maysa Hamdan",
+      "matched": "Maysa Hamdan",
+      "offering": "Tajweed (Beginner)",
+      "teacher": "Souzan Ayoub",
+      "amountPaid": 0,
+      "assistedFee": 450
+    },
+    {
+      "student": "Amani Abu Odeh",
+      "matched": "Amani Abu Odeh",
+      "offering": "Al-Ajurrumiyyah",
+      "teacher": "Wedad Atwan",
+      "amountPaid": 0,
+      "assistedFee": 0
+    },
+    {
+      "student": "Doaa Kabbani",
+      "matched": "Doaa Kabbani",
+      "offering": "Al-Ajurrumiyyah",
+      "teacher": "Wedad Atwan",
+      "amountPaid": 0,
+      "assistedFee": 0
+    },
+    {
+      "student": "Dalal Alkhatib",
+      "matched": "Dalal Alkhatib",
+      "offering": "Al-Ajurrumiyyah",
+      "teacher": "Wedad Atwan",
+      "amountPaid": 0,
+      "assistedFee": 0
+    },
+    {
+      "student": "Ghada Abofarag",
+      "matched": "Ghada Abofarag",
+      "offering": "Al-Ajurrumiyyah",
+      "teacher": "Wedad Atwan",
+      "amountPaid": 0,
+      "assistedFee": 0
+    },
+    {
+      "student": "NoorElaine Abushaaban",
+      "matched": "NoorElaine Abushaaban",
+      "offering": "Al-Ajurrumiyyah",
+      "teacher": "Wedad Atwan",
+      "amountPaid": 0,
+      "assistedFee": 0
+    },
+    {
+      "student": "Bandar Hijaz",
+      "matched": "Bandar Hijaz",
+      "offering": "Memorization (Yusif - Annahl)",
+      "teacher": "Wedad Atwan",
+      "amountPaid": 0,
+      "assistedFee": 450
+    },
+    {
+      "student": "Rula Sabri",
+      "matched": "Rula Hashim Sabri",
+      "offering": "Memorization (Yusif - Annahl)",
+      "teacher": "Wedad Atwan",
+      "amountPaid": 0,
+      "assistedFee": 450
+    },
+    {
+      "student": "Farah Dabbura",
+      "matched": "Farah Dabbura",
+      "offering": "Memorization (Yusif - Annahl)",
+      "teacher": "Wedad Atwan",
+      "amountPaid": 0,
+      "assistedFee": 450
+    },
+    {
+      "student": "Aya Waqqad",
+      "matched": "Ayah Wakkad",
+      "offering": "Tajweed (Osool)",
+      "teacher": "Wedad Atwan",
+      "amountPaid": 0,
+      "assistedFee": 450
+    },
+    {
+      "student": "Rasha Sami Alzeben",
+      "matched": "Rasha Alzaben",
+      "offering": "Tajweed (Osool)",
+      "teacher": "Wedad Atwan",
+      "amountPaid": 0,
+      "assistedFee": 450
+    },
+    {
+      "student": "Zahraa Adel Almadi",
+      "matched": "Zahraa Almadi",
+      "offering": "Tajweed (Osool)",
+      "teacher": "Wedad Atwan",
+      "amountPaid": 0,
+      "assistedFee": 450
+    },
+    {
+      "student": "Yasmeen Maligeli",
+      "matched": "Yasmeen Maligeli",
+      "offering": "Tajweed (Osool)",
+      "teacher": "Wedad Atwan",
+      "amountPaid": 0,
+      "assistedFee": 450
+    }
+  ],
+  "move": [
+    {
+      "student": "Narmeen Alfahal",
+      "from": "Recitation Improvement",
+      "to": "Tajweed (Advanced)",
+      "amountPaid": 50
+    },
+    {
+      "student": "Maha Abouradi",
+      "from": "Al-Ajurrumiyyah",
+      "to": "Recitation Improvement",
+      "amountPaid": 0
+    },
+    {
+      "student": "Bouthayna Alyan",
+      "from": "Al-Ajurrumiyyah",
+      "to": "Recitation Improvement",
+      "amountPaid": 0
+    },
+    {
+      "student": "Birlanti abdalhamid Alsawfta",
+      "from": "Recitation Improvement",
+      "to": "Recitation Improvement",
+      "amountPaid": 50
+    },
+    {
+      "student": "Soumia B Bouhlal",
+      "from": "Recitation Improvement",
+      "to": "Tajweed (Beginner)",
+      "amountPaid": 50
+    },
+    {
+      "student": "Meriem Douma",
+      "from": "Recitation Improvement",
+      "to": "Tajweed (Beginner)",
+      "amountPaid": 25
+    },
+    {
+      "student": "Beyza Sahin",
+      "from": "Recitation Improvement",
+      "to": "Recitation Improvement",
+      "amountPaid": 400
+    },
+    {
+      "student": "Leah Antoinette Sen",
+      "from": "Recitation Improvement",
+      "to": "Recitation Improvement",
+      "amountPaid": 50
+    },
+    {
+      "student": "Ozlem Yurttas",
+      "from": "Recitation Improvement",
+      "to": "Recitation Improvement",
+      "amountPaid": 50
+    },
+    {
+      "student": "Wafa Manasrah",
+      "from": "Recitation Improvement",
+      "to": "Recitation Improvement",
+      "amountPaid": 50
+    },
+    {
+      "student": "Hanan Dabaja",
+      "from": "Recitation Improvement",
+      "to": "Recitation Improvement",
+      "amountPaid": 50
+    },
+    {
+      "student": "Fatema Odeh",
+      "from": "Memorization (Surat Al-Omran)",
+      "to": "Tajweed (Beginner)",
+      "amountPaid": 25
+    },
+    {
+      "student": "Fatima Hamdan",
+      "from": "Al-Ajurrumiyyah",
+      "to": "Tajweed (Beginner)",
+      "amountPaid": 0
+    },
+    {
+      "student": "Suzan Qawouq",
+      "from": "Recitation Improvement",
+      "to": "Tajweed (Osool)",
+      "amountPaid": 400
+    },
+    {
+      "student": "Heba Hassan",
+      "from": "Memorization (Surat Al-Baqara)",
+      "to": "Tajweed (Osool)",
+      "amountPaid": 200
+    }
+  ],
+  "cancel": [
+    {
+      "name": "Ayah Zahra",
+      "offering": "Al-Ajurrumiyyah",
+      "onFinalList": false,
+      "paid": 0
+    },
+    {
+      "name": "Belqes Ali",
+      "offering": "Al-Ajurrumiyyah",
+      "onFinalList": false,
+      "paid": 0
+    },
+    {
+      "name": "Sahar Shqaidef",
+      "offering": "Al-Ajurrumiyyah",
+      "onFinalList": false,
+      "paid": 0
+    },
+    {
+      "name": "Marwa Taissir Elgamal",
+      "offering": "Al-Ajurrumiyyah",
+      "onFinalList": true,
+      "paid": 0
+    },
+    {
+      "name": "Meriem Douma",
+      "offering": "Al-Ajurrumiyyah",
+      "onFinalList": true,
+      "paid": 0
+    },
+    {
+      "name": "NoorElaine Abushaaban",
+      "offering": "Recitation Improvement (Non-Arabic Speaking)",
+      "onFinalList": true,
+      "paid": 400
+    },
+    {
+      "name": "Israa Alaomairi",
+      "offering": "Preparing for Ijaza",
+      "onFinalList": false,
+      "paid": 400
+    }
+  ],
+  "withdrawApplications": [
+    {
+      "name": "Maisa Hamdan",
+      "status": "submitted"
+    },
+    {
+      "name": "Maisa Hamdan",
+      "status": "submitted"
+    },
+    {
+      "name": "Fatima Sibaii",
+      "status": "approved"
+    },
+    {
+      "name": "Fatima Sibaii",
+      "status": "approved"
+    },
+    {
+      "name": "Raja Issa",
+      "status": "approved"
+    },
+    {
+      "name": "Safaa Mustafa",
+      "status": "approved"
+    },
+    {
+      "name": "Shahina Shaik",
+      "status": "approved"
+    },
+    {
+      "name": "Eman Emad Alharazna",
+      "status": "approved"
+    },
+    {
+      "name": "Insaf Odeh",
+      "status": "approved"
+    },
+    {
+      "name": "Raja Issa",
+      "status": "approved"
+    },
+    {
+      "name": "Zahraa Almadhi",
+      "status": "approved"
+    },
+    {
+      "name": "Zainab Alghwairi",
+      "status": "approved"
+    },
+    {
+      "name": "Suha Alsheikh",
+      "status": "approved"
+    },
+    {
+      "name": "Manar Almahameed",
+      "status": "approved"
+    },
+    {
+      "name": "Basma Ali",
+      "status": "approved"
+    },
+    {
+      "name": "Weam Mohamed Thabet",
+      "status": "approved"
+    },
+    {
+      "name": "Hebatullah Hasan",
+      "status": "approved"
+    },
+    {
+      "name": "Wesam Taha",
+      "status": "approved"
+    },
+    {
+      "name": "Yasmeen Ali",
+      "status": "approved"
+    },
+    {
+      "name": "Soha Musa",
+      "status": "approved"
+    },
+    {
+      "name": "Nour Daghstani",
+      "status": "approved"
+    },
+    {
+      "name": "Maram Alahlas",
+      "status": "approved"
+    },
+    {
+      "name": "Nada Mousa Abudaabes",
+      "status": "approved"
+    },
+    {
+      "name": "AMAL ALAHLAS",
+      "status": "approved"
+    },
+    {
+      "name": "Raghad Obeidat",
+      "status": "approved"
+    },
+    {
+      "name": "Raghad Obeidat",
+      "status": "approved"
+    },
+    {
+      "name": "Hadeel Salman",
+      "status": "approved"
+    }
+  ]
+}

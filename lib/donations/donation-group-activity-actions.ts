@@ -2,6 +2,7 @@
 
 import { requireContactsViewAccess } from "@/lib/contacts/group-member-access"
 import { normalizeGivingGroupKind } from "@/lib/donations/giving-group-kind"
+import { excludeVendorHubOwnedEvents } from "@/lib/events/internal-event-source"
 
 export type GroupActivityItem = {
   id: string
@@ -69,11 +70,13 @@ export async function fetchGroupActivityAction(
     null
 
   if (linkedDepartmentId && (kind === "department" || options?.departmentId)) {
-    const { data: events } = await access.supabase
-      .from("internal_events")
-      .select("id, name, start_at, status")
-      .eq("organization_id", access.organizationId)
-      .eq("department_id", linkedDepartmentId)
+    const { data: events } = await excludeVendorHubOwnedEvents(
+      access.supabase
+        .from("internal_events")
+        .select("id, name, start_at, status")
+        .eq("organization_id", access.organizationId)
+        .eq("department_id", linkedDepartmentId)
+    )
       .order("start_at", { ascending: false })
       .limit(40)
 
@@ -102,11 +105,13 @@ export async function fetchDepartmentActivityAction(departmentId: string) {
   const access = await requireContactsViewAccess()
   if (!access.ok) return { success: false as const, error: access.error }
 
-  const { data: events, error } = await access.supabase
-    .from("internal_events")
-    .select("id, name, start_at, status")
-    .eq("organization_id", access.organizationId)
-    .eq("department_id", departmentId)
+  const { data: events, error } = await excludeVendorHubOwnedEvents(
+    access.supabase
+      .from("internal_events")
+      .select("id, name, start_at, status")
+      .eq("organization_id", access.organizationId)
+      .eq("department_id", departmentId)
+  )
     .order("start_at", { ascending: false })
     .limit(40)
 

@@ -12,11 +12,6 @@ const settingsTabs = [
     matchPrefix: "/event-management/settings/general",
   },
   {
-    label: "Categories",
-    href: "/event-management/settings/categories",
-    matchPrefix: "/event-management/settings/categories",
-  },
-  {
     label: "Notifications",
     href: "/event-management/settings/notifications",
     matchPrefix: "/event-management/settings/notifications",

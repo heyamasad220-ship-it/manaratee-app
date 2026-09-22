@@ -8,12 +8,15 @@ import {
 } from "./event-management-events-columns"
 
 describe("event management events columns", () => {
-  it("uses Event, Department, Date, Time, Location, Space, Status, then Actions", () => {
+  it("includes Contact, Phone, and Email columns", () => {
     assert.deepEqual(
       [...EVENT_MANAGEMENT_EVENTS_COLUMN_IDS],
       [
         "event",
         "department",
+        "contact",
+        "phone",
+        "email",
         "date",
         "time",
         "location",

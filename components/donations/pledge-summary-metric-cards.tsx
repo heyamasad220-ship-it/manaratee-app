@@ -18,6 +18,7 @@ type PledgeSummaryMetricCardsProps = {
   metrics: PledgeSummaryMetrics
   className?: string
   statusFilter?: string
+  overdueCount?: number
 }
 
 function getPledgeCountLabel(statusFilter?: string) {
@@ -46,11 +47,16 @@ export function PledgeSummaryMetricCards({
   metrics,
   className,
   statusFilter = "all",
+  overdueCount,
 }: PledgeSummaryMetricCardsProps) {
   const { totalPledged, totalCollected, outstandingBalance, activePledgeCount, pledgeCount } =
     metrics
   const activeCard = getActivePledgeCardLabels(statusFilter === "all" ? undefined : statusFilter)
   const pledgeLabel = getPledgeCountLabel(statusFilter === "all" ? undefined : statusFilter)
+  const remainingDescription =
+    overdueCount != null && overdueCount > 0
+      ? `${overdueCount} overdue`
+      : "Yet to be collected"
 
   return (
     <DonationMetricCardGrid colorful className={className}>
@@ -78,7 +84,7 @@ export function PledgeSummaryMetricCards({
         value={formatDonationCurrency(outstandingBalance)}
         icon={AlertCircle}
         accent="amber"
-        description="Yet to be collected"
+        description={remainingDescription}
       />
       <DonationMetricCard
         title={activeCard.title}

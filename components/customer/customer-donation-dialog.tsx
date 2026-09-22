@@ -382,7 +382,7 @@ export function CustomerDonationDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>
             {donationSuccessType === "recurring"
@@ -435,48 +435,50 @@ export function CustomerDonationDialog({
         ) : (
           <>
             <div className="flex flex-col gap-4 py-4">
-              <div className="flex flex-col gap-2">
-                <Label>Frequency</Label>
-                <Select
-                  value={donationForm.frequency}
-                  onValueChange={(value) =>
-                    setDonationForm({
-                      ...donationForm,
-                      frequency: value as DonationFrequency,
-                    })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {DONATION_FREQUENCY_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <Label>Donation Amount</Label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                    $
-                  </span>
-                  <Input
-                    type="number"
-                    value={donationForm.amount}
-                    onChange={(event) =>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="flex flex-col gap-2">
+                  <Label>Frequency</Label>
+                  <Select
+                    value={donationForm.frequency}
+                    onValueChange={(value) =>
                       setDonationForm({
                         ...donationForm,
-                        amount: event.target.value,
+                        frequency: value as DonationFrequency,
                       })
                     }
-                    className="pl-7"
-                    placeholder="0.00"
-                  />
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DONATION_FREQUENCY_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <Label>Donation Amount</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                      $
+                    </span>
+                    <Input
+                      type="number"
+                      value={donationForm.amount}
+                      onChange={(event) =>
+                        setDonationForm({
+                          ...donationForm,
+                          amount: event.target.value,
+                        })
+                      }
+                      className="pl-7"
+                      placeholder="0.00"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -507,56 +509,74 @@ export function CustomerDonationDialog({
                 </div>
               ) : null}
 
-              <div className="flex flex-col gap-2">
-                <Label>Donation Category</Label>
-                <Select
-                  value={donationForm.category}
-                  onValueChange={(value) =>
-                    setDonationForm({
-                      ...donationForm,
-                      category: value,
-                      fund: "",
-                    })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {donationCategories.map((category) => (
-                      <SelectItem key={category.id} value={category.id}>
-                        {category.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {donationForm.category && selectedCategoryRequiresFund ? (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="flex flex-col gap-2">
-                  <Label>Specific Fund</Label>
+                  <Label>Donation Category</Label>
                   <Select
-                    value={donationForm.fund}
-                    onValueChange={(value) =>
+                    value={donationForm.category}
+                    onValueChange={(value) => {
+                      const category = donationCategories.find((item) => item.id === value)
                       setDonationForm({
                         ...donationForm,
-                        fund: value,
+                        category: value,
+                        fund: category?.funds.length === 1 ? category.funds[0].id : "",
                       })
-                    }
+                    }}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select fund" />
+                      <SelectValue placeholder="Select category" />
                     </SelectTrigger>
                     <SelectContent>
-                      {selectedDonationCategory?.funds.map((fund) => (
-                        <SelectItem key={fund.id} value={fund.id}>
-                          {fund.name}
+                      {donationCategories.map((category) => (
+                        <SelectItem key={category.id} value={category.id}>
+                          {category.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-              ) : null}
+
+                <div className="flex flex-col gap-2">
+                  <Label>Fund</Label>
+                  <Select
+                    value={
+                      selectedCategoryRequiresFund
+                        ? donationForm.fund || undefined
+                        : "none"
+                    }
+                    onValueChange={(value) =>
+                      setDonationForm({
+                        ...donationForm,
+                        fund: value === "none" ? "" : value,
+                      })
+                    }
+                    disabled={!donationForm.category || !selectedCategoryRequiresFund}
+                  >
+                    <SelectTrigger>
+                      <SelectValue
+                        placeholder={
+                          !donationForm.category
+                            ? "Select a category first"
+                            : selectedCategoryRequiresFund
+                              ? "Select fund"
+                              : "No funds"
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {!selectedCategoryRequiresFund ? (
+                        <SelectItem value="none">No funds</SelectItem>
+                      ) : (
+                        selectedDonationCategory?.funds.map((fund) => (
+                          <SelectItem key={fund.id} value={fund.id}>
+                            {fund.name}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
 
               {isOneTimeDonation ? (
                 contact ? (

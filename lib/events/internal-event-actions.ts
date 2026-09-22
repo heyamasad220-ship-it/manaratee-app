@@ -26,7 +26,7 @@ import {
   canManageDepartmentEvents,
   canManageInternalEvent,
 } from "@/lib/events/event-access"
-import { linkedCampaignIdFromConfig } from "@/lib/events/event-finance-types"
+import { linkedCampaignIdFromEvent, withLinkedCampaignConfig } from "@/lib/events/event-campaign-id"
 import { getEventManagementSettings } from "@/lib/events/event-management-settings"
 import { getConflictingReservations } from "@/lib/reservations/reservation-queries"
 import { fireModuleNotifications } from "@/lib/notifications/dispatch-module-notification"
@@ -54,8 +54,11 @@ import {
   getInternalEventVenueIds,
 } from "./internal-event-queries"
 import {
+  calendarDateKey,
   expandEventOccurrences,
+  isCustomEventRecurrence,
   normalizeEventRecurrenceConfig,
+  resolveEventRecurrenceSave,
   type EventRecurrenceConfig,
 } from "./event-recurrence"
 import {
@@ -1020,7 +1023,12 @@ export async function updateInternalEvent(input: UpdateInternalEventInput) {
     throw new Error("Select where this event takes place.")
   }
 
-  const { venue_ids: venueIds, recurrence_config: _recurrence, ...eventPayload } = payload
+  const recurrenceProvided = Object.prototype.hasOwnProperty.call(
+    input,
+    "recurrence_config"
+  )
+  const { venue_ids: venueIds, recurrence_config: nextRecurrence, ...eventPayload } =
+    payload
 
   await assertDepartmentInOrg(supabase, organizationId, eventPayload.department_id)
   await assertEventTypeInOrg(supabase, organizationId, eventPayload.event_type_id)
@@ -1036,8 +1044,79 @@ export async function updateInternalEvent(input: UpdateInternalEventInput) {
     ...(eventPayload.ticketing_config as Record<string, unknown>),
   }
 
-  // Keep existing recurrence series metadata; occurrence edits don't rebuild the series.
-  delete (eventPayload as { recurrence_config?: unknown }).recurrence_config
+  const recurrenceSave = resolveEventRecurrenceSave({
+    existingConfig: existingEvent.recurrence_config,
+    nextConfig: nextRecurrence,
+    nextConfigProvided: recurrenceProvided,
+  })
+  let storedRecurrence = recurrenceSave.storedRecurrence
+  if (storedRecurrence && recurrenceSave.needsSeriesId) {
+    storedRecurrence = { ...storedRecurrence, seriesId: crypto.randomUUID() }
+  }
+  if (recurrenceProvided) {
+    eventPayload.recurrence_config = storedRecurrence
+  } else {
+    delete (eventPayload as { recurrence_config?: unknown }).recurrence_config
+  }
+
+  const extraOccurrences: Array<{ startAt: Date; endAt: Date }> = []
+  if (
+    recurrenceProvided &&
+    storedRecurrence &&
+    eventPayload.start_at &&
+    eventPayload.end_at
+  ) {
+    const desired = expandEventOccurrences(
+      new Date(eventPayload.start_at),
+      new Date(eventPayload.end_at),
+      storedRecurrence
+    )
+    const timeZone = eventPayload.timezone || existingEvent.timezone || "America/Chicago"
+    if (isCustomEventRecurrence(storedRecurrence)) {
+      const existingKeys = new Set<string>()
+      const thisKey = calendarDateKey(eventPayload.start_at, timeZone)
+      if (thisKey) existingKeys.add(thisKey)
+      const seriesId = storedRecurrence.seriesId?.trim() || ""
+      if (seriesId) {
+        const { data: siblings } = await supabase
+          .from("internal_events")
+          .select("id, start_at")
+          .eq("organization_id", organizationId)
+          .contains("recurrence_config", { seriesId })
+        for (const row of siblings || []) {
+          if ((row as { id?: string }).id === input.id) continue
+          const key = calendarDateKey(
+            (row as { start_at?: string | null }).start_at,
+            timeZone
+          )
+          if (key) existingKeys.add(key)
+        }
+      }
+      extraOccurrences.push(
+        ...desired.filter((occurrence) => {
+          const key = calendarDateKey(occurrence.startAt, timeZone)
+          return Boolean(key) && !existingKeys.has(key)
+        })
+      )
+    } else if (recurrenceSave.createExtraOccurrences) {
+      extraOccurrences.push(...desired.slice(1))
+    }
+  }
+
+  if (
+    extraOccurrences.length > 0 &&
+    eventPayload.location_type === INTERNAL_EVENT_LOCATION_TYPES.facility &&
+    venueIds.length > 0
+  ) {
+    for (const occurrence of extraOccurrences) {
+      await assertInternalEventSpacesAvailable({
+        organizationId,
+        venueIds,
+        startAt: occurrence.startAt.toISOString(),
+        endAt: occurrence.endAt.toISOString(),
+      })
+    }
+  }
 
   // Pending owner edits keep awaiting approval; managers keep existing status unless changed via status tools.
   if (!canManage && isPendingOwner) {
@@ -1074,6 +1153,62 @@ export async function updateInternalEvent(input: UpdateInternalEventInput) {
 
   if (modulesProvided) {
     await syncTicketingForEvent(input.id, input)
+  }
+
+  for (const occurrence of extraOccurrences) {
+    const { data: extraRow, error: extraError } = await supabase
+      .from("internal_events")
+      .insert({
+        organization_id: organizationId,
+        ...eventPayload,
+        start_at: occurrence.startAt.toISOString(),
+        end_at: occurrence.endAt.toISOString(),
+        recurrence_config: storedRecurrence,
+        coordinator_contact_id: existingEvent.coordinator_contact_id ?? null,
+        campaign_id: existingEvent.campaign_id ?? null,
+        community_calendar_status:
+          existingEvent.community_calendar_status ?? null,
+        audience: existingEvent.audience ?? null,
+        event_tags: existingEvent.event_tags ?? null,
+        workspace_features: existingEvent.workspace_features ?? null,
+        estimated_attendance: existingEvent.estimated_attendance ?? null,
+        internal_notes: existingEvent.internal_notes ?? null,
+        setup_minutes: existingEvent.setup_minutes ?? null,
+        cleanup_minutes: existingEvent.cleanup_minutes ?? null,
+        created_by: existingEvent.created_by,
+        submitted_at: existingEvent.submitted_at,
+        approved_at: existingEvent.approved_at,
+      })
+      .select("id")
+      .single()
+
+    if (extraError || !extraRow) {
+      console.error(extraError)
+      throw new Error(
+        "Saved this meeting, but could not add the extra recurring dates. Try again."
+      )
+    }
+
+    const extraId = extraRow.id as string
+    if (
+      eventPayload.location_type === INTERNAL_EVENT_LOCATION_TYPES.facility &&
+      venueIds.length > 0
+    ) {
+      await replaceInternalEventVenues({
+        supabase,
+        organizationId,
+        eventId: extraId,
+        venueIds,
+      })
+    }
+
+    await syncOperationalBriefForInternalEvent(extraId, organizationId, {
+      operationalSetup:
+        eventPayload.location_type === INTERNAL_EVENT_LOCATION_TYPES.facility
+          ? input.operationalSetup
+          : emptyFacilityOperationalSetup(),
+    })
+    revalidateInternalEventPaths(extraId)
   }
 
   fireModuleNotifications([
@@ -1235,7 +1370,7 @@ export async function getInternalEventDeleteBlockers(
 
   const supabase = await createClient()
 
-  const [ordersResult, ticketsResult, participationsResult, childcareEventResult] =
+  const [ordersResult, ticketsResult, participationsResult, childcareEventResult, bazaarResult] =
     await Promise.all([
       supabase
         .from("ticket_orders")
@@ -1259,6 +1394,12 @@ export async function getInternalEventDeleteBlockers(
         .eq("organization_id", orgId)
         .eq("source_type", "internal_event")
         .eq("source_id", eventId)
+        .maybeSingle(),
+      supabase
+        .from("vendor_hub_events")
+        .select("id")
+        .eq("organization_id", orgId)
+        .eq("internal_event_id", eventId)
         .maybeSingle(),
     ])
 
@@ -1287,6 +1428,10 @@ export async function getInternalEventDeleteBlockers(
     if (!error && (count || 0) > 0) {
       reasons.push("youth / childcare registrations")
     }
+  }
+
+  if (!bazaarResult.error && bazaarResult.data?.id) {
+    reasons.push("a Vendor Hub bazaar")
   }
 
   if (reasons.length === 0) return null
@@ -1760,9 +1905,10 @@ export async function updateEventLinkedCampaign(input: {
       return { success: false, error: "Event not found." }
     }
 
-    const previousCampaignId = linkedCampaignIdFromConfig(
-      existingEvent.ticketing_config as EventTicketingConfig | null
-    )
+    const previousCampaignId = linkedCampaignIdFromEvent({
+      campaign_id: existingEvent.campaign_id,
+      ticketing_config: existingEvent.ticketing_config as EventTicketingConfig | null,
+    })
 
     const linkedCampaignId =
       typeof input.linkedCampaignId === "string" && input.linkedCampaignId.trim()
@@ -1788,10 +1934,8 @@ export async function updateEventLinkedCampaign(input: {
     const { error } = await supabase
       .from("internal_events")
       .update({
-        ticketing_config: {
-          ...ticketingConfig,
-          linkedCampaignId,
-        },
+        campaign_id: linkedCampaignId,
+        ticketing_config: withLinkedCampaignConfig(ticketingConfig, linkedCampaignId),
       })
       .eq("id", input.eventId)
       .eq("organization_id", organizationId)

@@ -5,6 +5,10 @@ import { revalidatePath } from "next/cache"
 import { ensureContactForPerson } from "@/lib/contacts/contact-actions"
 import { normalizeDateOfBirth } from "@/lib/dates/date-input-utils"
 import { getCustomerPortalClients } from "@/lib/auth/customer-portal-session"
+import {
+  DUPLICATE_FAMILY_MEMBER_ERROR,
+  isDuplicateCustomerFamilyMember,
+} from "@/lib/customer/customer-family-match"
 import { createClient } from "@/lib/supabase/server"
 
 export type CustomerFamilyMemberRow = {
@@ -184,6 +188,25 @@ export async function addCustomerFamilyMember(input: AddCustomerFamilyMemberInpu
 
   if (resolvedParentPersonId !== parentPersonId) {
     throw new Error("Family members can only be added to your own profile.")
+  }
+
+  const existingMembers = await loadCustomerFamilyMembers({
+    organizationId,
+    parentPersonId: resolvedParentPersonId,
+  })
+  const incomingMember = {
+    firstName,
+    lastName,
+    gender: input.gender?.trim() || "",
+    dateOfBirth,
+    relationship,
+  }
+  if (
+    existingMembers.some((member) =>
+      isDuplicateCustomerFamilyMember(member, incomingMember)
+    )
+  ) {
+    throw new Error(DUPLICATE_FAMILY_MEMBER_ERROR)
   }
 
   const { data: createdPerson, error: personError } = await supabase

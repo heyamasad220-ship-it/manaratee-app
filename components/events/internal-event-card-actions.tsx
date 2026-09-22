@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Copy, Loader2, Pencil, Trash2 } from "lucide-react"
+import { Copy, Loader2, MoreHorizontal, Pencil, Trash2 } from "lucide-react"
 
 import {
   AlertDialog,
@@ -17,6 +17,12 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import {
   Tooltip,
   TooltipContent,
@@ -84,6 +90,7 @@ export function InternalEventCardActions({
   compact = false,
   showEdit = true,
   showDelete = true,
+  layout = "icons",
   deleteBlockedReason = null,
   redirectAfterDelete = "/event-management/events",
 }: {
@@ -92,18 +99,21 @@ export function InternalEventCardActions({
   compact?: boolean
   /** When false, hide the edit pencil (e.g. workspace edits via Event details). */
   showEdit?: boolean
-  /** When false, hide delete (e.g. Events list — delete from the event workspace). */
+  /** When false, hide delete. */
   showDelete?: boolean
+  /** `menu` is a three-dot overflow with Copy / Delete. */
+  layout?: "icons" | "menu"
   /** When set, delete is disabled and this reason is shown. */
   deleteBlockedReason?: string | null
-  /** Where to go after a successful delete (workspace should leave the event page). */
-  redirectAfterDelete?: string
+  /** Where to go after a successful delete. `null` stays on this page. */
+  redirectAfterDelete?: string | null
 }) {
   const router = useRouter()
   const [pendingAction, setPendingAction] = React.useState<"copy" | "delete" | null>(
     null
   )
   const [feedback, setFeedback] = React.useState<string | null>(null)
+  const [deleteOpen, setDeleteOpen] = React.useState(false)
   const deleteDisabled = Boolean(deleteBlockedReason)
 
   function showFeedback(message: string) {
@@ -146,13 +156,96 @@ export function InternalEventCardActions({
         return
       }
 
-      router.push(redirectAfterDelete)
+      if (redirectAfterDelete) {
+        router.push(redirectAfterDelete)
+      }
       router.refresh()
     } catch {
       showFeedback("Failed to delete event.")
     } finally {
       setPendingAction(null)
     }
+  }
+
+  const deleteDialog = (
+    <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete {eventName}?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This permanently removes the event and its calendar reservation.
+            Events with financial activity or registrations cannot be deleted.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            onClick={() => void handleDeleteEvent()}
+          >
+            Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  )
+
+  if (layout === "menu") {
+    return (
+      <div className={compact ? "" : "space-y-2"}>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              aria-label={`Actions for ${eventName}`}
+              disabled={pendingAction != null}
+            >
+              {pendingAction ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <MoreHorizontal className="h-4 w-4" />
+              )}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              onSelect={() => {
+                void handleCopyEvent()
+              }}
+            >
+              <Copy className="h-4 w-4" />
+              Copy
+            </DropdownMenuItem>
+            {showDelete ? (
+              <DropdownMenuItem
+                variant="destructive"
+                disabled={deleteDisabled}
+                onSelect={(event) => {
+                  if (deleteDisabled) {
+                    event.preventDefault()
+                    return
+                  }
+                  setDeleteOpen(true)
+                }}
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete
+              </DropdownMenuItem>
+            ) : null}
+          </DropdownMenuContent>
+        </DropdownMenu>
+        {deleteDialog}
+        {feedback ? (
+          <p className="text-xs text-destructive">{feedback}</p>
+        ) : null}
+        {deleteDisabled && showDelete ? (
+          <p className="sr-only">{deleteBlockedReason}</p>
+        ) : null}
+      </div>
+    )
   }
 
   return (

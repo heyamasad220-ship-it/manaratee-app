@@ -37,7 +37,7 @@ export function TicketingOverviewTable({
           department. Ticketed events appear here.
         </p>
         <Button className="mt-4" asChild>
-          <Link href="/event-management/events">Go to Events</Link>
+          <Link href="/event-management/ticketing/events">Go to ticketed events</Link>
         </Button>
       </div>
     )
@@ -88,14 +88,14 @@ export function TicketingOverviewTable({
         <div className="flex items-center justify-between gap-3">
           <p className="text-sm font-medium">Active events</p>
           <Button asChild size="sm" variant="outline">
-            <Link href="/event-management/events">View all events</Link>
+            <Link href="/event-management/ticketing/events">View ticketed events</Link>
           </Button>
         </div>
         {activeEvents.length === 0 ? (
           <div className="rounded-lg border bg-card p-10 text-center text-sm text-muted-foreground">
             No active ticketed events.{" "}
             <Link
-              href="/event-management/events"
+              href="/event-management/ticketing/events"
               className="font-medium text-primary hover:underline"
             >
               View all events

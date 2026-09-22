@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { CALENDAR_VISIBILITY_LABELS } from "@/lib/community-calendar/calendar-visibility"
 import type { CommunityCalendarItem } from "@/lib/community-calendar/queries"
-import { VENDOR_HUB_ROUTES } from "@/lib/vendor-hub/vendor-hub-routes"
 import { cn } from "@/lib/utils"
 
 function sourceLabel(source: CommunityCalendarItem["source"]) {
@@ -34,25 +33,15 @@ export function CommunityCalendarClient({
   }, [items, sourceFilter])
 
   const emptyHint = (() => {
-    if (includeBazaar && includeEvents) {
+    if (includeEvents) {
       return (
         <>
-          Mark a bazaar as Public from{" "}
-          <Link href={VENDOR_HUB_ROUTES.events.list} className="text-primary hover:underline">
-            Bazaar Events
-          </Link>
-          , or publish an Event Management event from its Overview tab.
-        </>
-      )
-    }
-    if (includeBazaar) {
-      return (
-        <>
-          Mark an event as Public from{" "}
-          <Link href={VENDOR_HUB_ROUTES.events.list} className="text-primary hover:underline">
-            Bazaar Events
-          </Link>
-          .
+          Publish an event from{" "}
+          <Link href="/event-management" className="text-primary hover:underline">
+            Event Management
+          </Link>{" "}
+          → Settings → General → Community Calendar. Bazaars appear when their Event Management
+          event is Public.
         </>
       )
     }
@@ -73,13 +62,8 @@ export function CommunityCalendarClient({
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Community Calendar</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Public events for your organization
-            {includeBazaar && includeEvents
-              ? " — bazaars and Event Management events."
-              : includeBazaar
-                ? " — Vendor Hub bazaars."
-                : " — Event Management events."}{" "}
-            Cross-organization federation is planned for a later release.
+            Public events for the community. Bazaar cards open Vendor Hub; other events open
+            Event Management.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -127,8 +111,8 @@ export function CommunityCalendarClient({
       <Card className="border-dashed">
         <CardContent className="p-4 text-sm text-muted-foreground">
           <strong className="text-foreground">Visibility:</strong> Private (hidden), Community
-          Visible (shown here), Public (shown with public badge). Set visibility when creating a
-          bazaar or on an event&apos;s Overview tab.
+          Visible (shown here), Public (shown with public badge). Set visibility on the
+          event&apos;s Settings → General → Community Calendar card.
         </CardContent>
       </Card>
 

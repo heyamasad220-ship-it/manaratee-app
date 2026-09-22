@@ -2,11 +2,9 @@
 
 import { useEffect, useState } from "react"
 import {
-  fetchInternalEventsForLinking,
   fetchVenuesForBazaarPicker,
   upsertBazaarEvent,
   type BazaarVenueOption,
-  type InternalEventLinkOption,
 } from "@/lib/vendor-hub/vendor-hub-event-actions"
 import {
   applyBoothSetupTemplate,
@@ -62,7 +60,6 @@ import {
   CreditCard,
   Globe,
   FileText,
-  Link2,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -79,7 +76,6 @@ interface CreateBazaarEventDrawerProps {
     location?: string | null
     description?: string | null
     calendar_status?: string | null
-    internal_event_id?: string | null
     organizer_contact_id?: string | null
     organizer_name?: string | null
     venue_id?: string | null
@@ -128,8 +124,6 @@ export function CreateBazaarEventDrawer({
   const isEditing = !!eventData
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
-  const [internalEvents, setInternalEvents] = useState<InternalEventLinkOption[]>([])
-  const [loadingInternalEvents, setLoadingInternalEvents] = useState(false)
   const [venues, setVenues] = useState<BazaarVenueOption[]>([])
   const [loadingVenues, setLoadingVenues] = useState(false)
   const [boothTemplates, setBoothTemplates] = useState<VendorHubBoothSetupTemplate[]>([])
@@ -143,7 +137,6 @@ export function CreateBazaarEventDrawer({
   const [publicInfoSection, setPublicInfoSection] = useState(false)
   const [calendarSection, setCalendarSection] = useState(false)
   const [internalNotesSection, setInternalNotesSection] = useState(false)
-  const [integrationsSection, setIntegrationsSection] = useState(false)
 
   // Toggle states for features
   const [enableVendorApps, setEnableVendorApps] = useState(false)
@@ -154,7 +147,6 @@ export function CreateBazaarEventDrawer({
   const [customPricing, setCustomPricing] = useState(false)
   const [requirePaymentBeforeApproval, setRequirePaymentBeforeApproval] = useState(false)
   const [autoAssignBooths, setAutoAssignBooths] = useState(false)
-  const [enableTicketing, setEnableTicketing] = useState(false)
 
   // Form data
   const [eventName, setEventName] = useState("")
@@ -162,7 +154,6 @@ export function CreateBazaarEventDrawer({
   const [startDate, setStartDate] = useState("")
   const [location, setLocation] = useState("")
   const [description, setDescription] = useState("")
-  const [internalEventId, setInternalEventId] = useState<string>("none")
   const [endDate, setEndDate] = useState("")
   const [startTime, setStartTime] = useState("")
   const [endTime, setEndTime] = useState("")
@@ -203,12 +194,8 @@ export function CreateBazaarEventDrawer({
     }
 
     setSaveError(null)
-    setLoadingInternalEvents(true)
     setLoadingBoothTemplates(true)
     setLoadingVenues(true)
-    void fetchInternalEventsForLinking()
-      .then(setInternalEvents)
-      .finally(() => setLoadingInternalEvents(false))
     void fetchActiveBoothSetupTemplatesForPicker()
       .then(setBoothTemplates)
       .catch(() => setBoothTemplates([]))
@@ -230,7 +217,6 @@ export function CreateBazaarEventDrawer({
       setLocation(eventData.location ?? "")
       setDescription(eventData.description ?? "")
       setCalendarVisibility(visibilityFromCalendarStatus(eventData.calendar_status))
-      setInternalEventId(eventData.internal_event_id ?? "none")
       setOrganizerName(eventData.organizer_name ?? "")
       setLinkedSpace(eventData.venue_id ?? "")
 
@@ -261,7 +247,6 @@ export function CreateBazaarEventDrawer({
     setLocation("")
     setDescription("")
     setCalendarVisibility("private")
-    setInternalEventId("none")
     setStartTime("")
     setEndTime("")
     setSelectedBoothTemplateId("none")
@@ -325,7 +310,6 @@ export function CreateBazaarEventDrawer({
           ? 0
           : boothTypes.reduce((total, booth) => total + Number(booth.quantity || 0), 0),
         calendar_visibility: calendarVisibility,
-        internal_event_id: internalEventId,
         organizer_contact_id: primaryContactId,
         organizer_name: organizerName.trim() || null,
         venue_id: linkedSpace || null,
@@ -465,12 +449,12 @@ export function CreateBazaarEventDrawer({
                 <div>
                   <FacilityVenueSelect
                     id="linkedSpace"
-                    label="Link to Space (optional)"
+                    label="On-site space (optional)"
                     value={linkedSpace}
                     venues={venues}
                     disabled={loadingVenues}
                     allowNone
-                    noneLabel="No facility linked"
+                    noneLabel="Off-site — no facility hold"
                     onChange={(venueId, venueName) => {
                       setLinkedSpace(venueId)
                       if (venueName && !location.trim()) {
@@ -478,6 +462,10 @@ export function CreateBazaarEventDrawer({
                       }
                     }}
                   />
+                  <p className="mt-1.5 text-xs text-muted-foreground">
+                    If this bazaar is at your facility, pick a space so Facilities can hold it on
+                    the calendar. Leave empty if it is off-site.
+                  </p>
                 </div>
               </div>
             </section>
@@ -1041,97 +1029,6 @@ export function CreateBazaarEventDrawer({
                       className="mt-1.5"
                       rows={3}
                     />
-                  </div>
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-
-            {/* SECTION 9: Integrations */}
-            <Collapsible open={integrationsSection} onOpenChange={setIntegrationsSection}>
-              <CollapsibleTrigger asChild>
-                <button className="flex w-full items-center justify-between rounded-lg py-2 text-left hover:bg-muted/50">
-                  <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                    <Link2 className="h-4 w-4 text-muted-foreground" />
-                    Integrations
-                  </h3>
-                  {integrationsSection ? (
-                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  )}
-                </button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="pt-2">
-                <div className="flex flex-col gap-4 pl-6">
-                  <div>
-                    <Label htmlFor="linkInternalEvent">Link to Event Management (optional)</Label>
-                    <Select
-                      value={internalEventId}
-                      onValueChange={setInternalEventId}
-                      disabled={loadingInternalEvents}
-                    >
-                      <SelectTrigger id="linkInternalEvent" className="mt-1.5">
-                        <SelectValue
-                          placeholder={
-                            loadingInternalEvents ? "Loading events..." : "Select internal event"
-                          }
-                        />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">None</SelectItem>
-                        {internalEvents.map((event) => (
-                          <SelectItem key={event.id} value={event.id}>
-                            {event.name}
-                            {event.start_at
-                              ? ` — ${new Date(event.start_at).toLocaleDateString()}`
-                              : ""}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="mt-1.5 text-xs text-muted-foreground">
-                      Connect this bazaar to an Event Management record without duplicating event
-                      data.
-                    </p>
-                  </div>
-                  <div>
-                    <Label htmlFor="linkBooking">Link to Booking</Label>
-                    <Select>
-                      <SelectTrigger className="mt-1.5">
-                        <SelectValue placeholder="Select existing or create later" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">None</SelectItem>
-                        <SelectItem value="create">Create New Booking</SelectItem>
-                        <SelectItem value="existing">Link to Existing...</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label htmlFor="enableTicketing" className="cursor-pointer">
-                        Enable Ticketing
-                      </Label>
-                      <p className="text-xs text-muted-foreground">
-                        Sell tickets for this event
-                      </p>
-                    </div>
-                    <Switch
-                      id="enableTicketing"
-                      checked={enableTicketing}
-                      onCheckedChange={setEnableTicketing}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="linkProgram">Link to Program (optional)</Label>
-                    <Select>
-                      <SelectTrigger className="mt-1.5">
-                        <SelectValue placeholder="Select program" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">None</SelectItem>
-                      </SelectContent>
-                    </Select>
                   </div>
                 </div>
               </CollapsibleContent>

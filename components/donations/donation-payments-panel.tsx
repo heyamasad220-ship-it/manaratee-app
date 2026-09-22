@@ -71,7 +71,6 @@ import { ensureDonorExtensionForContact } from "@/lib/donations/donor-contact-br
 import { ensureGroupMembershipForDonationAction } from "@/lib/contacts/group-giving-actions";
 import { DonationGroupPicker } from "@/components/donations/donation-group-picker";
 import { DONATIONS_PAGE_SIZE } from "@/lib/donations/donation-pagination";
-import { STAFF_BELOW_REPORTS_SUBNAV_STICKY_TOP_CLASS } from "@/lib/layout/staff-dashboard-chrome";
 import {
   Pagination,
   PaginationContent,
@@ -705,34 +704,12 @@ export function DonationPaymentsPanel({
       {!embedded ? <Header title="Payments" /> : null}
 
       <div className={embedded ? "space-y-6" : "p-6 space-y-6"}>
-        <div
-          className={
-            showCharts
-              ? cn(
-                  "sticky z-30 -mx-6 space-y-4 border-b border-border bg-background px-6 pb-4 pt-6",
-                  STAFF_BELOW_REPORTS_SUBNAV_STICKY_TOP_CLASS
-                )
-              : "contents"
-          }
-        >
-        {showCharts ? (
-          <div>
-            <h2 className="text-xl font-semibold text-foreground">Giving Summary</h2>
-            <p className="text-sm text-muted-foreground">
-              Successful received payments for this organization. Open a row to view the transaction;
-              receive, import, and receipt actions live under Donations.
-            </p>
-          </div>
-        ) : null}
-
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-lg font-semibold">
-              {readOnly ? "Gifts" : "Donation Transactions"}
-            </h2>
+            <h2 className="text-lg font-semibold">Donation Transactions</h2>
             <p className="text-sm text-muted-foreground">
               {readOnly
-                ? "Read-only payment register for this report. Drill into a transaction for details."
+                ? "Received payments for this organization. Open a row for details."
                 : "View and manage recorded fundraising payments for this organization."}
             </p>
           </div>
@@ -764,7 +741,6 @@ export function DonationPaymentsPanel({
         </div>
 
         <DonationOneTimeOverviewCards loading={summaryLoading} summary={summary} />
-        </div>
 
         {showCharts ? <DonationGivingCharts loading={summaryLoading} breakdown={breakdown} /> : null}
 

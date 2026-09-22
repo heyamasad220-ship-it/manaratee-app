@@ -13,6 +13,8 @@ import {
 } from "@/components/ui/card"
 import { fetchContactApplications } from "@/lib/applications/application-actions"
 import { resolveCustomerPortalSession } from "@/lib/auth/customer-portal-session"
+import { CUSTOMER_WORKFORCE_APPLICATION_MODULES } from "@/lib/customer/customer-portal-modules"
+import { requireCustomerPortalAnyModule } from "@/lib/customer/customer-portal-modules-server"
 import { getMyOrganizations } from "@/lib/organizations/get-my-organizations"
 import { getCustomerContactForUser } from "@/lib/programs/registration-contact-resolver"
 import { createClient } from "@/lib/supabase/server"
@@ -24,6 +26,7 @@ type CustomerOrganization = {
 }
 
 export default async function CustomerChildcareApplyPage() {
+  await requireCustomerPortalAnyModule([...CUSTOMER_WORKFORCE_APPLICATION_MODULES])
   const session = await resolveCustomerPortalSession()
   if (!session?.effectiveUserId) {
     return (

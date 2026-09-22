@@ -206,7 +206,8 @@ export function CustomerNav({
                 <div className="ml-4 flex flex-col gap-0.5 border-l border-border pl-3">
                   {filterCustomerProfileNavItems(
                     CUSTOMER_PROFILE_NAV_ITEMS,
-                    isApprovedVendor
+                    isApprovedVendor,
+                    enabledSlugSet
                   ).map((item) => {
                     const isActive = isCustomerProfileNavItemActive(item.href, pathname)
 

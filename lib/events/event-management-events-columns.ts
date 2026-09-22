@@ -1,6 +1,9 @@
 export const EVENT_MANAGEMENT_EVENTS_COLUMN_IDS = [
   "event",
   "department",
+  "contact",
+  "phone",
+  "email",
   "date",
   "time",
   "location",
@@ -26,6 +29,9 @@ export const EVENT_MANAGEMENT_EVENTS_COLUMN_DEFINITIONS: EventManagementEventsCo
   [
     { id: "event", label: "Event", defaultVisible: true },
     { id: "department", label: "Department", defaultVisible: true },
+    { id: "contact", label: "Contact", defaultVisible: true },
+    { id: "phone", label: "Phone", defaultVisible: true },
+    { id: "email", label: "Email", defaultVisible: true },
     { id: "date", label: "Date", defaultVisible: true },
     { id: "time", label: "Time", defaultVisible: true },
     { id: "location", label: "Location", defaultVisible: true },
@@ -47,7 +53,7 @@ export const LOCKED_EVENT_MANAGEMENT_EVENTS_COLUMNS: EventManagementEventsColumn
   ["event"]
 
 export const EVENT_MANAGEMENT_EVENTS_COLUMNS_STORAGE_KEY =
-  "manaratee:event-management-events-columns:v1"
+  "manaratee:event-management-events-columns:v2"
 
 function isColumnId(value: string): value is EventManagementEventsColumnId {
   return (EVENT_MANAGEMENT_EVENTS_COLUMN_IDS as readonly string[]).includes(
