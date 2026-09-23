@@ -21,6 +21,7 @@ import {
 } from "@/components/events/internal-event-overview-dashboard"
 import { InternalEventRegistrationWorkspace } from "@/components/events/internal-event-registration-workspace"
 import { InternalEventReportsTab } from "@/components/events/internal-event-reports-tab"
+import { EventVolunteersPanel } from "@/components/events/event-volunteers-panel"
 import {
   getEventTaskDefinitionsFromRequirements,
   getEventTaskNamesFromRequirements,
@@ -126,11 +127,8 @@ export function InternalEventWorkspace({
 
   const features = resolveEventWorkspaceFeatures(event)
   const attendanceMode = resolveAttendanceMode(event)
-  const hasStaffAssignments = participations.some(
-    (row) =>
-      (row.participation_type === "staff" ||
-        row.participation_type === "volunteer") &&
-      row.status !== "cancelled"
+  const hasPaidStaff = participations.some(
+    (row) => row.participation_type === "staff" && row.status !== "cancelled"
   )
   const hasFinancialActivity =
     overview.finance.ticketRevenueCents > 0 ||
@@ -141,7 +139,8 @@ export function InternalEventWorkspace({
     features,
     attendanceMode,
     hasAttendees: attendees.length > 0,
-    hasStaffAssignments,
+    hasStaffAssignments: hasPaidStaff,
+    needsVolunteers: event.requires_volunteers === true,
     hasFinancialActivity,
   })
 
@@ -349,25 +348,23 @@ export function InternalEventWorkspace({
           </TabsContent>
 
           <TabsContent value="staff" className="mt-0">
-            <div className="space-y-6">
-              {canManage ? (
-                <InternalEventModuleSetupPanel
-                  event={event}
-                  module="volunteers"
-                  staffMode
-                  title="Tasks & volunteer sign-ups"
-                  description="Create roles/tasks for assignments and optionally open volunteer sign-ups."
-                />
-              ) : null}
-              <InternalEventStaffAssignments
-                eventId={event.id}
-                tasks={staffTasks}
-                taskDefinitions={staffTaskDefinitions}
-                participations={participations}
-                candidates={staffCandidates}
-                canManage={canManage}
-              />
-            </div>
+            <InternalEventStaffAssignments
+              eventId={event.id}
+              tasks={staffTasks}
+              taskDefinitions={staffTaskDefinitions}
+              participations={participations}
+              candidates={staffCandidates}
+              canManage={canManage}
+              showVolunteers={false}
+            />
+          </TabsContent>
+
+          <TabsContent value="volunteers" className="mt-0">
+            <EventVolunteersPanel
+              event={event}
+              participations={participations}
+              canManage={canManage}
+            />
           </TabsContent>
 
           <TabsContent value="youth" className="mt-0">

@@ -34,6 +34,7 @@ export type EventWorkspaceTabId =
   | "overview"
   | "attendees"
   | "staff"
+  | "volunteers"
   | "youth"
   | "vendors"
   | "finance"
@@ -50,7 +51,8 @@ export type EventWorkspaceTabDef = {
 const ALL_TABS: EventWorkspaceTabDef[] = [
   { value: "overview", label: "Overview" },
   { value: "attendees", label: "Orders" },
-  { value: "staff", label: "Staff & Volunteers" },
+  { value: "staff", label: "Staff" },
+  { value: "volunteers", label: "Volunteers" },
   { value: "youth", label: "Youth" },
   { value: "vendors", label: "Vendors" },
   { value: "finance", label: "Finance" },
@@ -114,7 +116,7 @@ export function resolveEventWorkspaceFeatures(input: {
     registration:
       stored.registration ??
       (input.requires_ticketing === true || registrationFromMode),
-    staff: stored.staff ?? input.requires_volunteers === true,
+    staff: stored.staff ?? false,
     youth: stored.youth ?? input.requires_childcare === true,
     vendors: stored.vendors ?? input.requires_vendors === true,
     finance: stored.finance ?? false,
@@ -129,8 +131,10 @@ export type WorkspaceVisibilityContext = {
   hasFinancialActivity?: boolean
   /** True when there is at least one attendee seat. */
   hasAttendees?: boolean
-  /** True when staff/volunteer participations exist. */
+  /** True when paid staff assignments exist. */
   hasStaffAssignments?: boolean
+  /** True when this event is open for volunteer sign-ups. */
+  needsVolunteers?: boolean
 }
 
 /** Progressive disclosure: which tabs appear in the workspace chrome. */
@@ -139,6 +143,7 @@ export function getVisibleWorkspaceTabs(
 ): EventWorkspaceTabDef[] {
   const { features } = ctx
   const showStaff = features.staff || Boolean(ctx.hasStaffAssignments)
+  const showVolunteers = Boolean(ctx.needsVolunteers)
   const showYouth = features.youth
   const showVendors = features.vendors
   const showFinance = features.finance || Boolean(ctx.hasFinancialActivity)
@@ -153,6 +158,8 @@ export function getVisibleWorkspaceTabs(
         return false
       case "staff":
         return showStaff
+      case "volunteers":
+        return showVolunteers
       case "youth":
         return showYouth
       case "vendors":
@@ -196,7 +203,6 @@ export function resolveWorkspaceTabId(
   if (isLegacyTicketsTab(value)) return "settings"
   if (value === "orders") return "attendees"
   if (value === "childcare") return "youth"
-  if (value === "volunteers") return "staff"
   if (ALL_TABS.some((tab) => tab.value === value)) {
     return value as EventWorkspaceTabId
   }

@@ -223,7 +223,7 @@ export async function getParticipationsForSource(input: {
   const { data, error } = await supabase
     .from("service_participations")
     .select(
-      "id, organization_id, source_type, source_id, contact_id, participation_type, volunteer_role, notes, assignment_meta, status, created_at, updated_at, contacts ( full_name, email )"
+      "id, organization_id, source_type, source_id, contact_id, participation_type, volunteer_role, notes, assignment_meta, status, created_at, updated_at, contacts ( full_name, email, phone )"
     )
     .eq("organization_id", organizationId)
     .eq("source_type", input.sourceType)
@@ -239,7 +239,7 @@ export async function getParticipationsForSource(input: {
       const legacy = await supabase
         .from("service_participations")
         .select(
-          "id, organization_id, source_type, source_id, contact_id, participation_type, volunteer_role, notes, status, created_at, updated_at, contacts ( full_name, email )"
+          "id, organization_id, source_type, source_id, contact_id, participation_type, volunteer_role, notes, status, created_at, updated_at, contacts ( full_name, email, phone )"
         )
         .eq("organization_id", organizationId)
         .eq("source_type", input.sourceType)
@@ -262,7 +262,11 @@ export async function getParticipationsForSource(input: {
 }
 
 function mapParticipationRow(row: Record<string, unknown>): ServiceParticipationWithContact {
-  const contact = row.contacts as { full_name?: string; email?: string | null } | null
+  const contact = row.contacts as {
+    full_name?: string
+    email?: string | null
+    phone?: string | null
+  } | null
   return {
     id: row.id as string,
     organization_id: row.organization_id as string,
@@ -278,5 +282,6 @@ function mapParticipationRow(row: Record<string, unknown>): ServiceParticipation
     updated_at: row.updated_at as string,
     contact_name: contact?.full_name || "Unknown",
     contact_email: contact?.email ?? null,
+    contact_phone: contact?.phone?.trim() || null,
   }
 }

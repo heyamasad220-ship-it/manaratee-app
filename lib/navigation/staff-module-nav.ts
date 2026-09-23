@@ -160,6 +160,45 @@ export function buildProgramsChildren(
   ]
 }
 
+/** Staff who can open Event Management or Vendor Hub can open Sign Ups. */
+export const SIGN_UPS_NAV_PERMISSION_KEYS = [
+  "events.view",
+  "events.manage",
+  "vendor_hub.view",
+  "vendor_hub.manage",
+] as const
+
+export function buildSignUpsChildren(): SubItem[] {
+  const permissionKeys = [...SIGN_UPS_NAV_PERMISSION_KEYS]
+  return [
+    {
+      label: "Overview",
+      href: "/sign-ups/overview",
+      matchPrefix: "/sign-ups/overview",
+      exact: true,
+      permissionKeys,
+    },
+    {
+      label: "Notifications",
+      href: "/sign-ups/notifications",
+      matchPrefix: "/sign-ups/notifications",
+      permissionKeys,
+    },
+    {
+      label: "Reports",
+      href: "/sign-ups/reports",
+      matchPrefix: "/sign-ups/reports",
+      permissionKeys,
+    },
+    {
+      label: "Settings",
+      href: "/sign-ups/settings",
+      matchPrefix: "/sign-ups/settings",
+      permissionKeys,
+    },
+  ]
+}
+
 export function buildEventManagementChildren(): SubItem[] {
   return [
     {

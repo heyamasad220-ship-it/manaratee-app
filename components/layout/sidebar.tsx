@@ -46,7 +46,9 @@ import {
   buildEventManagementChildren,
   buildFinanceChildren,
   buildProgramsChildren,
+  buildSignUpsChildren,
   isHiddenTopLevelStaffModule,
+  SIGN_UPS_NAV_PERMISSION_KEYS,
 } from "@/lib/navigation/staff-module-nav"
 import { normalizeModuleSlug } from "@/lib/modules/module-catalog"
 import {
@@ -371,7 +373,7 @@ const moduleChildren: Record<string, SubItem[]> = {
   "vendor-hub": [
     { label: "Overview", href: "/vendor-hub", matchPrefix: "/vendor-hub", exact: true, permissionKey: "vendor_hub.view" },
     { label: "Vendor Network", href: "/vendor-hub/network/vendors", matchPrefix: "/vendor-hub/network", permissionKey: "vendor_hub.view" },
-    { label: "Bazaar Events", href: "/vendor-hub/events", matchPrefix: "/vendor-hub/events", permissionKey: "vendor_hub.manage" },
+    { label: "Events", href: "/vendor-hub/events", matchPrefix: "/vendor-hub/events", permissionKey: "vendor_hub.manage" },
     { label: "Reports", href: "/vendor-hub/reports", matchPrefix: "/vendor-hub/reports", permissionKey: "reports.view" },
     { label: "Settings", href: "/vendor-hub/settings", matchPrefix: "/vendor-hub/settings", permissionKey: "vendor_hub.manage" },
   ],
@@ -585,6 +587,60 @@ function injectCommunityCalendarNavItem(
   } else {
     const dashboardIndex = result.findIndex((item) => item.label === "Dashboard")
     result.splice(dashboardIndex >= 0 ? dashboardIndex + 1 : 0, 0, calendarItem)
+  }
+
+  return result
+}
+
+/** Sign Ups — top-level when Vendor Hub and/or Event Management is enabled. */
+function injectSignUpsNavItem(
+  items: NavItem[],
+  rows: SidebarModuleRow[]
+): NavItem[] {
+  const enabledSlugs = new Set(
+    rows.map((row) => normalizeModuleSlug(row.slug))
+  )
+  const hasVendorHub = enabledSlugs.has("vendor-hub")
+  const hasEvents = enabledSlugs.has("event-management")
+  if (!hasVendorHub && !hasEvents) {
+    return items
+  }
+
+  if (items.some((item) => item.matchPrefix === "/sign-ups")) {
+    return items
+  }
+
+  const children = buildSignUpsChildren()
+  const signUpsItem: NavItem = {
+    label: "Sign Ups",
+    href: children[0]?.href || "/sign-ups/overview",
+    icon: ClipboardList,
+    matchPrefix: "/sign-ups",
+    permissionKeys: [...SIGN_UPS_NAV_PERMISSION_KEYS],
+    children,
+  }
+
+  const result = [...items]
+  let insertAt = -1
+  for (let i = 0; i < result.length; i++) {
+    const slug = result[i].moduleSlug
+      ? normalizeModuleSlug(result[i].moduleSlug || "")
+      : ""
+    if (
+      slug === "vendor-hub" ||
+      slug === "programs" ||
+      slug === "event-management" ||
+      result[i].matchPrefix === "/community-calendar"
+    ) {
+      insertAt = i
+    }
+  }
+
+  if (insertAt >= 0) {
+    result.splice(insertAt + 1, 0, signUpsItem)
+  } else {
+    const dashboardIndex = result.findIndex((item) => item.label === "Dashboard")
+    result.splice(dashboardIndex >= 0 ? dashboardIndex + 1 : 0, 0, signUpsItem)
   }
 
   return result
@@ -856,8 +912,11 @@ function buildNavItems(
   ]
 
   return filterNavItemsByPermissions(
-    injectCommunityCalendarNavItem(
-      injectAdministrationNavItem(allItems, availableSlugs),
+    injectSignUpsNavItem(
+      injectCommunityCalendarNavItem(
+        injectAdministrationNavItem(allItems, availableSlugs),
+        rows
+      ),
       rows
     ),
     permissionContext

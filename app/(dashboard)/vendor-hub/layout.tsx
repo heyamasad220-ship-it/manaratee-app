@@ -1,3 +1,4 @@
+import { VendorHubChrome } from "@/components/vendor-hub/vendor-hub-chrome"
 import { VendorHubEventProvider } from "@/components/vendor-hub/vendor-hub-event-provider"
 import { getVendorHubEvents } from "@/lib/vendor-hub/vendor-hub-event-queries"
 import { requireOrganizationModule } from "@/lib/modules/dashboard-module-access-server"
@@ -14,6 +15,8 @@ export default async function VendorHubLayout({
   const events = await getVendorHubEvents()
 
   return (
-    <VendorHubEventProvider initialEvents={events}>{children}</VendorHubEventProvider>
+    <VendorHubEventProvider initialEvents={events}>
+      <VendorHubChrome>{children}</VendorHubChrome>
+    </VendorHubEventProvider>
   )
 }

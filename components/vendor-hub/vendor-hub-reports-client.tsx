@@ -1,9 +1,10 @@
 "use client"
 
-import { useMemo, useTransition } from "react"
+import { useTransition } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Download } from "lucide-react"
 
+import { BoothOrdersTable } from "@/components/vendor-hub/booth-orders-table"
 import { ParticipationHistoryClient } from "@/components/vendor-hub/network/participation-history-client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -22,13 +23,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import type { BoothOrderRow } from "@/lib/vendor-hub/booth-orders"
 import type { ParticipationHistoryRow } from "@/lib/vendor-hub/participation-history-queries"
 import type { VendorHubReportsPayload } from "@/lib/vendor-hub/vendor-hub-reports-queries"
 import type { VendorHubReportsTabId } from "@/lib/vendor-hub/vendor-hub-routes"
 import { cn } from "@/lib/utils"
 
 const reportsTabs: Array<{ id: VendorHubReportsTabId; label: string }> = [
-  { id: "vendor-sales", label: "Vendor Sales" },
+  { id: "vendor-sales", label: "Orders" },
   { id: "booth-performance", label: "Booth Performance" },
   { id: "history", label: "Participation History" },
 ]
@@ -63,11 +65,13 @@ export function VendorHubReportsClient({
   initialEventId,
   historyRows,
   contactIdFilter,
+  boothOrders,
 }: {
   initialData: VendorHubReportsPayload
   initialEventId: string
   historyRows: ParticipationHistoryRow[]
   contactIdFilter?: string | null
+  boothOrders: BoothOrderRow[]
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -78,11 +82,10 @@ export function VendorHubReportsClient({
   const data = initialData
   const hasEvents = data.events.length > 0
   const showEventFilter = activeTab !== "history"
-
-  const selectedLabel = useMemo(() => {
-    if (eventFilter === "all") return "All events"
-    return data.events.find((event) => event.id === eventFilter)?.name || "Selected event"
-  }, [data.events, eventFilter])
+  const selectedEventName =
+    eventFilter === "all"
+      ? null
+      : data.events.find((event) => event.id === eventFilter)?.name || "this bazaar"
 
   function replaceParams(next: { tab?: VendorHubReportsTabId; eventId?: string }) {
     const params = new URLSearchParams(searchParams.toString())
@@ -104,42 +107,26 @@ export function VendorHubReportsClient({
     })
   }
 
-  function exportCsv() {
-    const rows =
-      activeTab === "vendor-sales"
-        ? [
-            ["Vendor", "Category", "Booth Type", "Status", "Booth Fee", "Paid"],
-            ...data.vendorSales.map((row) => [
-              row.vendorName,
-              row.category,
-              row.boothType,
-              row.status,
-              String(row.boothFee),
-              String(row.paid),
-            ]),
-          ]
-        : [
-            ["Booth Type", "Total", "Allocated", "Available", "Utilization %", "Revenue"],
-            ...data.boothPerformance.map((row) => [
-              row.boothType,
-              String(row.total),
-              String(row.allocated),
-              String(row.available),
-              String(row.utilizationPercent),
-              String(row.revenue),
-            ]),
-          ]
-
-    const csv = rows
-      .map((row) =>
-        row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")
-      )
+  function exportBoothPerformanceCsv() {
+    const csvRows = [
+      ["Booth Type", "Total", "Allocated", "Available", "Utilization %", "Revenue"],
+      ...data.boothPerformance.map((row) => [
+        row.boothType,
+        String(row.total),
+        String(row.allocated),
+        String(row.available),
+        String(row.utilizationPercent),
+        String(row.revenue),
+      ]),
+    ]
+    const csv = csvRows
+      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
       .join("\n")
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" })
     const url = URL.createObjectURL(blob)
     const link = document.createElement("a")
     link.href = url
-    link.download = `vendor-hub-${activeTab}.csv`
+    link.download = "vendor-hub-booth-performance.csv"
     link.click()
     URL.revokeObjectURL(url)
   }
@@ -187,10 +174,17 @@ export function VendorHubReportsClient({
                 ))}
               </SelectContent>
             </Select>
-            <Button type="button" variant="outline" onClick={exportCsv} disabled={!hasEvents}>
-              <Download className="mr-2 h-4 w-4" />
-              Export
-            </Button>
+            {activeTab === "booth-performance" ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={exportBoothPerformanceCsv}
+                disabled={!hasEvents}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Export
+              </Button>
+            ) : null}
           </div>
         ) : null}
       </div>
@@ -209,44 +203,17 @@ export function VendorHubReportsClient({
       ) : null}
 
       {hasEvents && activeTab === "vendor-sales" ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Vendor Sales Report</CardTitle>
-            <CardDescription>
-              Booth assignments with fees and payments for {selectedLabel.toLowerCase()}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Vendor</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Booth Type</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Booth Fee</TableHead>
-                  <TableHead className="text-right">Paid</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.vendorSales.length === 0 ? (
-                  <EmptyTableMessage message="No booth assignments for this scope." />
-                ) : (
-                  data.vendorSales.map((row, index) => (
-                    <TableRow key={`${row.vendorName}-${row.boothType}-${index}`}>
-                      <TableCell className="font-medium">{row.vendorName}</TableCell>
-                      <TableCell>{row.category}</TableCell>
-                      <TableCell>{row.boothType}</TableCell>
-                      <TableCell className="capitalize">{row.status.replace(/_/g, " ")}</TableCell>
-                      <TableCell className="text-right">{formatMoney(row.boothFee)}</TableCell>
-                      <TableCell className="text-right">{formatMoney(row.paid)}</TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+        <BoothOrdersTable
+          rows={boothOrders}
+          scope="reports"
+          emptyMessage="No orders for this scope."
+          exportFileName={
+            selectedEventName
+              ? `${selectedEventName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-orders.csv`
+              : "orders.csv"
+          }
+          linkVendors
+        />
       ) : null}
 
       {hasEvents && activeTab === "booth-performance" ? (

@@ -44,6 +44,11 @@ import {
 import type { EventStaffCandidate } from "@/lib/events/event-staff-assignment-queries"
 import type { ServiceParticipationWithContact } from "@/lib/service-participations/service-participation-types"
 import { parseServiceRequirements } from "@/lib/events/event-service-requirements"
+import {
+  formatVolunteerWindowLabel,
+  storedWindowsFromForm,
+  volunteerWindowsFromStored,
+} from "@/lib/events/volunteer-windows"
 
 type Compensation = "paid" | "volunteer"
 
@@ -58,6 +63,7 @@ export function InternalEventStaffAssignments({
   participations,
   candidates,
   canManage,
+  showVolunteers = true,
 }: {
   eventId: string
   tasks: string[]
@@ -65,6 +71,8 @@ export function InternalEventStaffAssignments({
   participations: ServiceParticipationWithContact[]
   candidates: EventStaffCandidate[]
   canManage: boolean
+  /** Paid staff tab hides the volunteer assignment list. */
+  showVolunteers?: boolean
 }) {
   const definitions = useMemo(() => {
     if (taskDefinitions?.length) return taskDefinitions
@@ -104,11 +112,13 @@ export function InternalEventStaffAssignments({
   )
 
   const summary = useMemo(() => {
-    const all = [...paidAssignments, ...volunteerAssignments]
+    const counted = showVolunteers
+      ? [...paidAssignments, ...volunteerAssignments]
+      : paidAssignments
     let plannedHours = 0
     let actualHours = 0
     let payrollEstimate = 0
-    for (const row of all) {
+    for (const row of counted) {
       const meta = row.assignment_meta || {}
       const planned = meta.hours ?? 0
       const actual = meta.actualHours ?? meta.hours ?? 0
@@ -118,8 +128,10 @@ export function InternalEventStaffAssignments({
         payrollEstimate += (meta.hourlyRate || 0) * actual
       }
     }
-    const needed = definitions.reduce((sum, task) => sum + (task.slots || 0), 0)
-    const filled = all.length
+    const needed = definitions
+      .filter((task) => (showVolunteers ? task.volunteerAllowed || task.staffAllowed : task.staffAllowed))
+      .reduce((sum, task) => sum + (task.slots || 0), 0)
+    const filled = counted.length
     return {
       paidCount: paidAssignments.length,
       volunteerCount: volunteerAssignments.length,
@@ -128,13 +140,15 @@ export function InternalEventStaffAssignments({
       actualHours,
       payrollEstimate,
     }
-  }, [definitions, paidAssignments, volunteerAssignments])
+  }, [definitions, paidAssignments, showVolunteers, volunteerAssignments])
 
   return (
     <div className="space-y-6">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <SummaryCard label="Paid staff" value={String(summary.paidCount)} />
-        <SummaryCard label="Volunteers" value={String(summary.volunteerCount)} />
+        {showVolunteers ? (
+          <SummaryCard label="Volunteers" value={String(summary.volunteerCount)} />
+        ) : null}
         <SummaryCard
           label="Open assignments"
           value={String(summary.openAssignments)}
@@ -155,7 +169,7 @@ export function InternalEventStaffAssignments({
 
       <StaffAssignmentSection
         title="Paid staff"
-        description="Assign paid workers to tasks and shifts. Enter hours and press Enter or Tab to add another row. Select rows to mark as paid."
+        description="Assign paid workers. Enter hours and press Enter or Tab to add another row. Select rows to mark as paid."
         compensation="paid"
         eventId={eventId}
         definitions={definitions.filter((task) => task.staffAllowed)}
@@ -163,9 +177,10 @@ export function InternalEventStaffAssignments({
         people={people}
         canManage={canManage}
       />
+      {showVolunteers ? (
       <StaffAssignmentSection
         title="Volunteers"
-        description="Assign volunteers to tasks and shifts. Enter hours and press Enter or Tab to add another row. Select rows to send certificates."
+        description="Assign volunteers to a time and slot. Enter hours and press Enter or Tab to add another row. Select rows to send certificates."
         compensation="volunteer"
         eventId={eventId}
         definitions={definitions.filter((task) => task.volunteerAllowed)}
@@ -173,6 +188,7 @@ export function InternalEventStaffAssignments({
         people={people}
         canManage={canManage}
       />
+      ) : null}
     </div>
   )
 }
@@ -216,6 +232,7 @@ function StaffAssignmentSection({
   const [error, setError] = useState<string | null>(null)
   const [contactId, setContactId] = useState("")
   const [task, setTask] = useState("")
+  const [windowId, setWindowId] = useState("")
   const [shiftId, setShiftId] = useState("")
   const [hourlyRate, setHourlyRate] = useState("")
   const [hours, setHours] = useState("")
@@ -227,15 +244,43 @@ function StaffAssignmentSection({
   const tasks = definitions.map((row) => row.name)
   const selectedTask = definitions.find((row) => row.name === task)
   const shifts = selectedTask?.shifts || []
+  const sheetWindows = useMemo(() => {
+    const order: string[] = []
+    const map = new Map<
+      string,
+      { id: string; label: string; slots: EventTaskDefinition[] }
+    >()
+    for (const definition of definitions) {
+      if (!definition.windowId || !definition.slotId) continue
+      let window = map.get(definition.windowId)
+      if (!window) {
+        window = {
+          id: definition.windowId,
+          label: definition.windowLabel || "Time not set",
+          slots: [],
+        }
+        map.set(definition.windowId, window)
+        order.push(definition.windowId)
+      }
+      window.slots.push(definition)
+    }
+    return order
+      .map((id) => map.get(id))
+      .filter((window): window is NonNullable<typeof window> => Boolean(window))
+  }, [definitions])
+  const useSheet = sheetWindows.length > 0
+  const selectedWindow = sheetWindows.find((window) => window.id === windowId)
 
   useEffect(() => {
+    if (useSheet) return
     if (tasks.length > 0 && !tasks.includes(task)) {
       setTask(tasks[0])
       setShiftId("")
     }
-  }, [tasks, task])
+  }, [useSheet, tasks, task])
 
   useEffect(() => {
+    if (useSheet) return
     if (shifts.length === 0) {
       setShiftId("")
       return
@@ -243,7 +288,22 @@ function StaffAssignmentSection({
     if (!shifts.some((shift) => shift.id === shiftId)) {
       setShiftId(shifts[0].id)
     }
-  }, [shifts, shiftId])
+  }, [useSheet, shifts, shiftId])
+
+  useEffect(() => {
+    if (!useSheet) return
+    if (!sheetWindows.some((window) => window.id === windowId)) {
+      setWindowId(sheetWindows[0]?.id || "")
+    }
+  }, [useSheet, sheetWindows, windowId])
+
+  useEffect(() => {
+    if (!useSheet) return
+    const slots = selectedWindow?.slots || []
+    if (!slots.some((slot) => slot.slotId === shiftId)) {
+      setShiftId(slots[0]?.slotId || "")
+    }
+  }, [useSheet, selectedWindow, shiftId])
 
   useEffect(() => {
     const valid = new Set(assignments.map((row) => row.id))
@@ -272,15 +332,34 @@ function StaffAssignmentSection({
 
   function handleAssign() {
     setError(null)
-    if (!tasks.length) {
-      setError("Add tasks above first, then assign people here.")
-      return
-    }
-    if (!contactId || !task) {
-      setError("Select a person and task before adding the assignment.")
-      return
+    const sheetSlot = useSheet
+      ? selectedWindow?.slots.find((slot) => slot.slotId === shiftId)
+      : null
+    if (useSheet) {
+      if (!sheetWindows.length) {
+        setError("Add times and slots above first, then assign people here.")
+        return
+      }
+      if (!contactId || !sheetSlot || !selectedWindow) {
+        setError("Select a person, time, and slot before adding the assignment.")
+        return
+      }
+    } else {
+      if (!tasks.length) {
+        setError("Add tasks above first, then assign people here.")
+        return
+      }
+      if (!contactId || !task) {
+        setError("Select a person and task before adding the assignment.")
+        return
+      }
     }
     const shift = shifts.find((row) => row.id === shiftId)
+    const assignedTask = sheetSlot?.name || task
+    const assignedShiftId = sheetSlot?.slotId || shift?.id || null
+    const assignedShiftLabel = sheetSlot
+      ? selectedWindow?.label || null
+      : shift?.label || null
     startTransition(async () => {
       const rate =
         hourlyRate.trim() === "" ? null : Number.parseFloat(hourlyRate)
@@ -290,14 +369,14 @@ function StaffAssignmentSection({
         eventId,
         contactId,
         compensation,
-        task,
+        task: assignedTask,
         hourlyRate:
           compensation === "paid" && rate != null && Number.isFinite(rate)
             ? rate
             : null,
         hours: loggedHours != null && Number.isFinite(loggedHours) ? loggedHours : null,
-        shiftId: shift?.id || null,
-        shiftLabel: shift?.label || null,
+        shiftId: assignedShiftId,
+        shiftLabel: assignedShiftLabel,
       })
       if (!result.success) {
         setError(result.error)
@@ -313,7 +392,7 @@ function StaffAssignmentSection({
   function handleHoursCommit(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key !== "Enter" && event.key !== "Tab") return
     if (event.key === "Tab" && event.shiftKey) return
-    if (isPending || !contactId || !task) return
+    if (isPending || !contactId || (useSheet ? !shiftId : !task)) return
 
     event.preventDefault()
     handleAssign()
@@ -402,6 +481,52 @@ function StaffAssignmentSection({
                 </SelectContent>
               </Select>
             </div>
+            {useSheet ? (
+              <>
+                <div className="space-y-2">
+                  <Label>Time</Label>
+                  <Select
+                    value={windowId || undefined}
+                    onValueChange={(next) => {
+                      setWindowId(next)
+                      setShiftId("")
+                    }}
+                    disabled={sheetWindows.length === 0}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select time" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {sheetWindows.map((window) => (
+                        <SelectItem key={window.id} value={window.id}>
+                          {window.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Slot</Label>
+                  <Select
+                    value={shiftId || undefined}
+                    onValueChange={setShiftId}
+                    disabled={(selectedWindow?.slots.length || 0) === 0}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select slot" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(selectedWindow?.slots || []).map((slot) => (
+                        <SelectItem key={slot.slotId} value={slot.slotId || slot.name}>
+                          {slot.name} ({slot.slots})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            ) : (
+              <>
             <div className="space-y-2">
               <Label>Task</Label>
               <Select
@@ -457,6 +582,8 @@ function StaffAssignmentSection({
                 </SelectContent>
               </Select>
             </div>
+              </>
+            )}
             {compensation === "paid" ? (
               <div className="space-y-2">
                 <Label>Hourly rate</Label>
@@ -538,8 +665,8 @@ function StaffAssignmentSection({
                     </TableHead>
                   ) : null}
                   <TableHead>Person</TableHead>
-                  <TableHead>Task</TableHead>
-                  <TableHead>Shift</TableHead>
+                  <TableHead>{useSheet ? "Slot" : "Task"}</TableHead>
+                  <TableHead>{useSheet ? "Time" : "Shift"}</TableHead>
                   {compensation === "paid" ? (
                     <TableHead>Hourly rate</TableHead>
                   ) : null}
@@ -833,6 +960,9 @@ export type EventTaskDefinition = {
   description: string | null
   staffAllowed: boolean
   volunteerAllowed: boolean
+  windowId?: string
+  windowLabel?: string
+  slotId?: string
   shifts: Array<{
     id: string
     start: string
@@ -846,6 +976,34 @@ export function getEventTaskDefinitionsFromRequirements(
   serviceRequirements: unknown
 ): EventTaskDefinition[] {
   const parsed = parseServiceRequirements(serviceRequirements)
+  const windows = storedWindowsFromForm(
+    volunteerWindowsFromStored(parsed.volunteers)
+  )
+  if (windows.length > 0) {
+    return windows.flatMap((window) => {
+      const windowLabel = formatVolunteerWindowLabel(window.start, window.end)
+      return window.slots.map((slot) => ({
+        name: slot.name,
+        slots: slot.openings,
+        description: null,
+        staffAllowed: true,
+        volunteerAllowed: true,
+        windowId: window.id,
+        windowLabel,
+        slotId: slot.id,
+        shifts: [
+          {
+            id: slot.id,
+            start: window.start,
+            end: window.end,
+            location: null,
+            label: windowLabel,
+          },
+        ],
+      }))
+    })
+  }
+
   return (parsed.volunteers?.roles || [])
     .map((role) => {
       const name = role.name.trim()

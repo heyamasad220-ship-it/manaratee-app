@@ -7,9 +7,5 @@ export default async function BazaarEventsListPage() {
 
   const events = await getVendorHubEvents()
 
-  return (
-    <div className="p-6">
-      <BazaarEventsListClient events={events} />
-    </div>
-  )
+  return <BazaarEventsListClient events={events} />
 }

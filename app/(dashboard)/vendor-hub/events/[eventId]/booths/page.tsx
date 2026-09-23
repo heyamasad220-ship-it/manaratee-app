@@ -2,7 +2,7 @@ import { notFound } from "next/navigation"
 
 import { BazaarEventWorkspaceShell } from "@/components/vendor-hub/bazaar-event-workspace-shell"
 import { BazaarEventVendorsClient } from "@/components/vendor-hub/events/bazaar-event-vendors-client"
-import { getEventParticipatingVendors } from "@/lib/vendor-hub/event-participating-vendors-queries"
+import { getBoothOrders } from "@/lib/vendor-hub/booth-orders-queries"
 import { getVendorHubEventById } from "@/lib/vendor-hub/vendor-hub-event-queries"
 import { requireVendorHubManage } from "@/lib/vendor-hub/vendor-hub-permissions"
 import { getVendorHubVendorTypes } from "@/lib/vendor-hub/vendor-type-queries"
@@ -24,8 +24,8 @@ export default async function BazaarEventVendorsPage({
   }
 
   const supabase = await createClient()
-  const [vendors, vendorTypes, boothResult] = await Promise.all([
-    getEventParticipatingVendors(eventId),
+  const [orders, vendorTypes, boothResult] = await Promise.all([
+    getBoothOrders(eventId),
     getVendorHubVendorTypes({ activeOnly: false }),
     supabase
       .from("vendor_hub_booths")
@@ -45,7 +45,7 @@ export default async function BazaarEventVendorsPage({
     <BazaarEventWorkspaceShell event={event}>
       <BazaarEventVendorsClient
         eventId={eventId}
-        vendors={vendors}
+        orders={orders}
         vendorTypes={vendorTypes}
         booths={booths}
       />

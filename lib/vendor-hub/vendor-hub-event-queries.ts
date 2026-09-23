@@ -1,10 +1,8 @@
 import { createClient } from "@/lib/supabase/server"
 import { countPendingEventEvaluations } from "@/lib/vendor-hub/vendor-evaluation-queries"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
-import {
-  countActiveVendorNetworkContacts,
-  countVendorNetworkContacts,
-} from "@/lib/vendor-hub/vendor-network-sync-actions"
+import { countVendorNetworkContacts } from "@/lib/vendor-hub/vendor-network-sync-actions"
+import { countBoothRequests } from "@/lib/vendor-hub/vendor-hub-overview"
 
 import type {
   VendorHubDashboardMetrics,
@@ -133,7 +131,7 @@ async function enrichEventsWithInternal(
 
   let query = supabase
     .from("internal_events")
-    .select("id, name, start_at, end_at, location_label, status")
+    .select("id, name, start_at, end_at, location_label, status, requires_volunteers")
     .in("id", internalEventIds)
 
   if (organizationId) {
@@ -348,14 +346,14 @@ function todayIsoDate() {
   return `${year}-${month}-${day}`
 }
 
-/** Org-level Vendor Hub dashboard: network KPIs + upcoming events. */
+/** Org-level Vendor Hub dashboard: attention queues + upcoming events. */
 export async function getVendorHubOrgDashboard(): Promise<VendorHubOrgDashboardData> {
   const empty: VendorHubOrgDashboardData = {
     metrics: {
       onboardingPending: 0,
-      activeVendors: 0,
-      revenueCollected: 0,
-      outstandingBalance: 0,
+      boothRequestsPending: 0,
+      currentEventId: null,
+      currentEventName: null,
     },
     upcomingEvents: [],
   }
@@ -365,7 +363,6 @@ export async function getVendorHubOrgDashboard(): Promise<VendorHubOrgDashboardD
 
   const supabase = await createClient()
   const events = await getVendorHubEvents()
-  const eventIds = events.map((event) => event.id)
   const today = todayIsoDate()
 
   const upcomingEvents = events
@@ -381,6 +378,8 @@ export async function getVendorHubOrgDashboard(): Promise<VendorHubOrgDashboardD
       return (a.name || "").localeCompare(b.name || "")
     })
 
+  const currentEvent = upcomingEvents[0] ?? null
+
   const pendingResult = await supabase
     .from("applications")
     .select("id", { count: "exact", head: true })
@@ -389,45 +388,25 @@ export async function getVendorHubOrgDashboard(): Promise<VendorHubOrgDashboardD
     .eq("application_type", "vendor")
     .in("status", ["submitted", "pending_review"])
 
-  const activeVendors = await countActiveVendorNetworkContacts(organizationId)
+  let boothRequestsPending = 0
+  if (currentEvent) {
+    const { data: participants } = await supabase
+      .from("vendor_hub_participant_status")
+      .select("lifecycle_status")
+      .eq("organization_id", organizationId)
+      .eq("vendor_hub_event_id", currentEvent.id)
 
-  let revenueCollected = 0
-  let feeTotal = 0
-
-  if (eventIds.length > 0) {
-    const [{ data: payments }, { data: assignments }] = await Promise.all([
-      supabase
-        .from("vendor_hub_payments")
-        .select("amount, payment_type")
-        .in("event_id", eventIds),
-      supabase
-        .from("vendor_hub_booth_assignments")
-        .select("fee_amount")
-        .in("event_id", eventIds),
-    ])
-
-    for (const payment of payments || []) {
-      const amount = Number(payment.amount ?? 0)
-      if (!Number.isFinite(amount)) continue
-      if (((payment.payment_type as string | null) || "").toLowerCase() === "refund") {
-        revenueCollected -= amount
-      } else {
-        revenueCollected += amount
-      }
-    }
-
-    feeTotal = (assignments || []).reduce((sum, row) => {
-      const fee = Number(row.fee_amount ?? 0)
-      return sum + (Number.isFinite(fee) ? fee : 0)
-    }, 0)
+    boothRequestsPending = countBoothRequests(
+      (participants || []).map((row) => row.lifecycle_status as string | null)
+    )
   }
 
   return {
     metrics: {
       onboardingPending: pendingResult.count ?? 0,
-      activeVendors,
-      revenueCollected: Math.max(0, revenueCollected),
-      outstandingBalance: Math.max(0, feeTotal - revenueCollected),
+      boothRequestsPending,
+      currentEventId: currentEvent?.id ?? null,
+      currentEventName: currentEvent?.name ?? null,
     },
     upcomingEvents,
   }

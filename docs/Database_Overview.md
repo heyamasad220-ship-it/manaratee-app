@@ -698,7 +698,7 @@ rental_payments.venue_rental_id → venue_rentals.id
 
 * vendors
 * vendor_categories
-* vendor_hub_events — includes `organizer_contact_id`, `organizer_name`, `venue_id` (`scripts/227_vendor_hub_event_organizer_venue.sql`). **`internal_event_id` required (`300`):** points at a date/place hold on `internal_events` (`source_module = vendor_hub` after **`305`**, `ON DELETE RESTRICT`). That hold is for Facilities and Community Calendar, not an Event Management workspace. Identity still writes through (name/date/location) so calendars stay in sync.
+* vendor_hub_events — includes `organizer_contact_id`, `organizer_name` (set to the tenant organization name on bazaar save), `venue_id` (`scripts/227_vendor_hub_event_organizer_venue.sql`). **`internal_event_id` required (`300`):** points at a date/place hold on `internal_events` (`source_module = vendor_hub` after **`305`**, `ON DELETE RESTRICT`). That hold is for Facilities and Community Calendar, not an Event Management workspace. Identity still writes through (name/date/location) so calendars stay in sync. Multiple on-site spaces are stored on that hold’s `internal_event_venues` rows; `venue_id` is the first selected space.
 * vendor_hub_vendors
 * vendor_hub_booths
 * vendor_hub_booth_types — org defaults when `event_id` is null + `organization_id` set (`scripts/234_vendor_hub_default_booth_types.sql`); event-scoped types keep `event_id`. **`selection_fee` (`301`):** extra charged when a vendor picks a numbered table (regular $10, corner $25). **`default_booth_numbers` (`302`):** suggested table numbers (T1, T15) used when saving the default template. Self-serve `reserve_vendor_booth` stores price + selection_fee. MAS Dallas seed: default types (stage, corner, regular, open/no clothing, lobby, coffee, ice cream, **mocktail/smoothie truck or cart $175** (`304`), hot food truck, hot meal, henna, face painting, general merch).
@@ -707,7 +707,9 @@ rental_payments.venue_rental_id → venue_rentals.id
 * vendor_hub_payments
 * vendor_hub_announcements / vendor_hub_announcement_recipients — RLS helpers in `scripts/228_vendor_hub_announcements_rls_fix.sql` (avoids 42P17 recursion)
 * vendor_hub_events vendor SELECT — `scripts/229_vendor_hub_events_rls_perf.sql` (avoids statement timeouts after large imports)
-* Customer vendor profile — vendors may UPDATE own `applications` (vendor_hub/vendor) and SELECT org `vendor_hub_vendor_types` (`scripts/231_customer_vendor_profile_rls.sql`)
+* Vendor application / payment / type policies — `scripts/307_vendor_hub_application_rls_perf.sql`. Vendor checks use `auth_user_contact_ids()` (and `auth_user_contact_organization_ids()` for vendor types) so they do not scan `contacts` under contacts RLS. That scan was canceling vendor-type saves and slowing Vendor Network profile loads (`canceling statement due to statement timeout`). Partial index `applications_vendor_contact_created_idx` covers the newest vendor application lookup.
+* Customer vendor profile — vendors may UPDATE own `applications` (vendor_hub/vendor) and SELECT org `vendor_hub_vendor_types` (`scripts/231_customer_vendor_profile_rls.sql`, performance follow-up `307`)
+* vendor_hub_vendor_types — what the vendor sells (Coffee, Hot Food, Ice Cream, and so on), stored on `applications.form_data.vendor_type_id`. **Ice Cream** added in `scripts/306_ice_cream_vendor_type.sql`.
 * Vendor role backfill from approved applications — `scripts/232_backfill_vendor_roles_from_applications.sql`
 * Vendor inactive after 2 years of no activity — `scripts/233_vendor_inactive_after_two_years.sql`
 * Vendor import application cleanup — `scripts/235_fix_vendor_import_application_dates.sql` (submitted_at = earliest payment/event date; clear import notes/tags; clear fake reviewed_at)

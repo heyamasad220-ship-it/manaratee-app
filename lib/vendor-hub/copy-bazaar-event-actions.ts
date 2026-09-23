@@ -53,6 +53,24 @@ export async function copyBazaarEvent(input: CopyBazaarEventInput) {
 
   const copyName = input.name?.trim() || `${source.name as string} (Copy)`
   const calendarVisibility = "private" as const
+  const sourceInternalEventId = (source.internal_event_id as string | null) || null
+  let sourceVenueIds: string[] = []
+
+  if (sourceInternalEventId) {
+    const { data: venueLinks } = await supabase
+      .from("internal_event_venues")
+      .select("venue_id")
+      .eq("organization_id", organizationId)
+      .eq("internal_event_id", sourceInternalEventId)
+
+    sourceVenueIds = (venueLinks || [])
+      .map((row) => row.venue_id as string)
+      .filter((id) => id.trim().length > 0)
+  }
+
+  if (sourceVenueIds.length === 0 && source.venue_id) {
+    sourceVenueIds = [source.venue_id as string]
+  }
 
   const internalEventId = await ensureBazaarInternalEvent({
     supabase,
@@ -65,7 +83,8 @@ export async function copyBazaarEvent(input: CopyBazaarEventInput) {
       endTime: (source.end_time as string | null) ?? null,
       location: (source.location as string | null) ?? null,
       flyerUrl: (source.flyer_url as string | null) ?? null,
-      venueId: (source.venue_id as string | null) ?? null,
+      venueId: sourceVenueIds[0] ?? (source.venue_id as string | null) ?? null,
+      venueIds: sourceVenueIds,
       calendarVisibility,
       coordinatorContactId: (source.organizer_contact_id as string | null) ?? null,
     },
@@ -88,6 +107,7 @@ export async function copyBazaarEvent(input: CopyBazaarEventInput) {
       calendar_status: calendarStatusFromVisibility(calendarVisibility),
       internal_event_id: internalEventId,
       flyer_url: source.flyer_url,
+      venue_id: sourceVenueIds[0] ?? null,
       public_share_token: createBazaarShareToken(),
     })
     .select("id")

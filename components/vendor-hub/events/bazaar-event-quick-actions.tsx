@@ -76,7 +76,7 @@ export function BazaarEventQuickActions({
     <>
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Quick actions</CardTitle>
+          <CardTitle className="text-base">Manage event</CardTitle>
           <CardDescription>Copy, cancel, or delete this bazaar event.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-2">

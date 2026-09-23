@@ -2,6 +2,7 @@ import { redirect } from "next/navigation"
 import { Suspense } from "react"
 
 import { VendorHubReportsClient } from "@/components/vendor-hub/vendor-hub-reports-client"
+import { getBoothOrders } from "@/lib/vendor-hub/booth-orders-queries"
 import { getParticipationHistory } from "@/lib/vendor-hub/participation-history-queries"
 import { getVendorHubReportsData } from "@/lib/vendor-hub/vendor-hub-reports-queries"
 import { VENDOR_HUB_ROUTES } from "@/lib/vendor-hub/vendor-hub-routes"
@@ -22,9 +23,11 @@ export default async function BazaarReportsPage({
 
   const eventId = params.eventId?.trim() || "all"
   const contact = params.contact?.trim() || null
-  const [data, historyRows] = await Promise.all([
-    getVendorHubReportsData(eventId === "all" ? null : eventId),
+  const scopedEventId = eventId === "all" ? null : eventId
+  const [data, historyRows, boothOrders] = await Promise.all([
+    getVendorHubReportsData(scopedEventId),
     getParticipationHistory(contact),
+    getBoothOrders(scopedEventId),
   ])
 
   return (
@@ -34,6 +37,7 @@ export default async function BazaarReportsPage({
         initialEventId={eventId}
         historyRows={historyRows}
         contactIdFilter={contact}
+        boothOrders={boothOrders}
       />
     </Suspense>
   )

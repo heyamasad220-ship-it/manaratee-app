@@ -14,7 +14,10 @@ export type BazaarInternalEventIdentity = {
   endTime: string | null
   location: string | null
   flyerUrl: string | null
+  /** Primary space. Used when `venueIds` is omitted. */
   venueId: string | null
+  /** Every on-site space. Empty means off-site. */
+  venueIds?: string[] | null
   calendarVisibility: CommunityCalendarVisibility
   coordinatorContactId?: string | null
 }
@@ -117,26 +120,47 @@ function isReusableBazaarHold(row: {
   )
 }
 
-async function syncPrimaryVenue(options: {
+function venueIdsFromIdentity(identity: BazaarInternalEventIdentity) {
+  const fromList = (identity.venueIds || [])
+    .map((id) => id.trim())
+    .filter((id) => id.length > 0)
+  if (fromList.length > 0) return [...new Set(fromList)]
+  const single = identity.venueId?.trim()
+  return single ? [single] : []
+}
+
+async function syncVenues(options: {
   supabase: SupabaseClient
   organizationId: string
   eventId: string
-  venueId: string | null
+  venueIds: string[]
 }) {
-  const { supabase, organizationId, eventId, venueId } = options
+  const { supabase, organizationId, eventId, venueIds } = options
   await supabase
     .from("internal_event_venues")
     .delete()
     .eq("organization_id", organizationId)
     .eq("internal_event_id", eventId)
 
-  if (!venueId) return
+  if (venueIds.length > 0) {
+    const { error } = await supabase.from("internal_event_venues").insert(
+      venueIds.map((venueId) => ({
+        organization_id: organizationId,
+        internal_event_id: eventId,
+        venue_id: venueId,
+      }))
+    )
+    if (error) throw new Error(error.message)
+  }
 
-  await supabase.from("internal_event_venues").insert({
-    organization_id: organizationId,
-    internal_event_id: eventId,
-    venue_id: venueId,
-  })
+  // Calendar sync reads the junction from the internal_events trigger.
+  const { error: touchError } = await supabase
+    .from("internal_events")
+    .update({ updated_at: new Date().toISOString() })
+    .eq("id", eventId)
+    .eq("organization_id", organizationId)
+
+  if (touchError) throw new Error(touchError.message)
 }
 
 async function applyIdentityToInternalEvent(options: {
@@ -150,7 +174,8 @@ async function applyIdentityToInternalEvent(options: {
   const communityCalendarStatus = calendarStatusFromVisibility(
     options.identity.calendarVisibility
   )
-  const venueId = options.identity.venueId?.trim() || null
+  const venueIds = venueIdsFromIdentity(options.identity)
+  const venueId = venueIds[0] || null
 
   const { error } = await options.supabase
     .from("internal_events")
@@ -177,11 +202,11 @@ async function applyIdentityToInternalEvent(options: {
 
   if (error) throw new Error(error.message)
 
-  await syncPrimaryVenue({
+  await syncVenues({
     supabase: options.supabase,
     organizationId: options.organizationId,
     eventId: options.eventId,
-    venueId,
+    venueIds,
   })
 }
 
@@ -229,7 +254,8 @@ export async function ensureBazaarInternalEvent(options: {
     options.organizationId
   )
   const { startAt, endAt } = identityTimestamps(options.identity)
-  const venueId = options.identity.venueId?.trim() || null
+  const venueIds = venueIdsFromIdentity(options.identity)
+  const venueId = venueIds[0] || null
 
   const { data, error } = await options.supabase
     .from("internal_events")
@@ -264,11 +290,11 @@ export async function ensureBazaarInternalEvent(options: {
     throw new Error(error?.message || "Failed to create the bazaar facility hold.")
   }
 
-  await syncPrimaryVenue({
+  await syncVenues({
     supabase: options.supabase,
     organizationId: options.organizationId,
     eventId: data.id as string,
-    venueId,
+    venueIds,
   })
 
   return data.id as string

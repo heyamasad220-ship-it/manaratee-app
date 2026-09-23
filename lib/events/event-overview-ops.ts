@@ -132,7 +132,7 @@ export function buildEventOverviewOpsKpis(
     {
       id: "volunteers",
       label: "Volunteers",
-      value: neededLabel(features.staff),
+      value: neededLabel(event.requires_volunteers === true),
     },
     {
       id: "vendors",

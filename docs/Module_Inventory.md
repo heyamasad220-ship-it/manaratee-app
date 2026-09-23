@@ -27,7 +27,7 @@ Features:
 * Organization membership
 * Active organization switching
 * Dashboard org branding: logo preview uses the image aspect ratio (`object-contain`) instead of a cropped square; Change Logo is edit-mode only; Edit / Cancel / Save Changes sit at the bottom of the page
-* Dashboard **Subscribed Modules** lists enabled product modules from the same source as the staff sidebar (Event Management, Programs, Vendor Hub, Venue Rentals, Fund Development, Membership). Workforce, Finance, Facilities, and Community Calendar are not subscription SKUs; Facilities is implied by operations modules, and Community Calendar is implied by Vendor Hub or Event Management.
+* Dashboard **Subscribed Modules** lists enabled product modules from the same source as the staff sidebar (Event Management, Programs, Vendor Hub, Venue Rentals, Fund Development, Membership). Workforce, Finance, Facilities, Community Calendar, and Sign Ups are not subscription SKUs; Facilities is implied by operations modules, and Community Calendar and Sign Ups appear when Vendor Hub or Event Management is on.
 * **Module-based pricing (August 2026):** Super Admin Modules page sets monthly prices, included capabilities, and multi-module discounts. Add and Edit open the same dialog. The Super Admin main column and organization detail sheet scroll so the catalog, SQL 274/275 reminder, and discount card stay reachable. Organization Modules tab saves selected SKUs and billed cents. Plans are no longer required. Run SQL **`274`** then **`275`**.
 * Horizon Community Foundation demo: staff header user menu shows **Admin** instead of the email username
 
@@ -205,7 +205,7 @@ Features:
 * Subscription filtering
 * Permission filtering
 * Dynamic visibility
-* Module order: Dashboard → Directory → **Administration** (Programs or Event Management only) → Membership → Fund Development → Programs → Event Management → …
+* Module order: Dashboard → Directory → **Administration** (Programs or Event Management only) → Membership → Fund Development → Programs → Event Management → Vendor Hub → **Community Calendar** and **Sign Ups** (both appear when Vendor Hub or Event Management is on; neither is a subscription SKU) → …
 
 * Pinned footer: Billing (super admin SaaS subscription) → Settings
 
@@ -507,6 +507,20 @@ Key file: `components/hr/hr-reports-client.tsx` (`HrOverviewDashboard`)
 
 ---
 
+## Sign Ups
+
+Status: In progress (Overview and Reports)
+
+* Staff rail: **Sign Ups** when Vendor Hub or Event Management is enabled. Not a subscription SKU.
+* Flyout: **Overview** · **Notifications** · **Reports** · **Settings**
+* Overview (`/sign-ups/overview`) is a report of events that need volunteers (`internal_events.requires_volunteers`). Event Management rows open `/event-management/[id]`. Vendor Hub rows open `/vendor-hub/events/[id]`. Cancelled and declined events are omitted. Default filter is Upcoming.
+* Volunteers column: people already assigned on the event (`service_participations`, type volunteer) over open slots from Service Needs.
+* Reports (`/sign-ups/reports`) lists pending and confirmed volunteer sign-ups across events. Columns: event name, volunteer name, email, phone number, slot, time.
+* The same list for one event is the **Volunteers** tab on that event or bazaar (no event-name column). It also holds times and slots.
+* Event Management: Service Needs → Volunteers shows the tab. Vendor Hub bazaars always show **Sign-ups**. Both use **Slots** and **Volunteers**, with one Save and no sign-up toggle. Saving a time window sets `requires_volunteers` and lists the event on Sign Ups → Overview. An empty slot list stays off the overview until slots are saved.
+* Notifications and Settings are not built yet.
+* Key files: `lib/sign-ups/sign-up-overview-queries.ts`, `lib/sign-ups/sign-up-reports-queries.ts`, `components/events/event-volunteers-panel.tsx`, `components/sign-ups/reports/sign-ups-reports-client.tsx`, `components/layout/sidebar.tsx`
+
 ## Community Calendar
 
 Status: Working (shared)
@@ -524,11 +538,11 @@ Status: Working (shared)
 
 Status: Working
 
-* Staff flyout: **Overview** (`/vendor-hub`, exact) · **Vendor Network** · **Bazaar Events** · **Reports** · **Settings**
-* Overview KPI row: Onboarding pending, Active vendors, Outstanding balance, Total revenue, Food category. Then Revenue by Category, Top Performing Vendors, upcoming events, and Quick Actions
-* Reports tabs: **Vendor Sales** · **Booth Performance** · **Participation History** (`?tab=history`). Legacy `/vendor-hub/network/history` redirects
-* Vendor Network tabs: Vendors, Onboarding, Documents, Invitations
-* **Bazaars live in Vendor Hub (September 2026):** Create/edit only in Vendor Hub. No Event Management picker, ticketing, or program link. A date/place hold on `internal_events` (`source_module = vendor_hub`, SQL **`305`**) is for Facilities (on-site space) and Community Calendar only — hidden from Event Management lists. Old `/event-management/[id]` bazaar URLs redirect to Vendor Hub. `vendor_hub_events.internal_event_id` stays required for that hold (SQL **`300`**).
+* Staff flyout: **Overview** (`/vendor-hub`, exact) · **Vendor Network** · **Events** (`/vendor-hub/events`) · **Reports** · **Settings**. The Events page title and its one KPI row (Events, Upcoming, Next, On the calendar) stay fixed while the table scrolls.
+* Overview matches the Fund Development dashboard: colored KPI cards (active events, onboarding pending, booth requests, booths still open), **Action Required**, **Active events**, and blue **Quick Actions**. The logo header and breadcrumbs stay fixed on every Vendor Hub page. Vendor Network title and tabs stay fixed while that section scrolls. Booths-by-type and recent orders are on the bazaar workspace and Reports.
+* Reports tabs: **Orders** (`?tab=vendor-sales`) · **Booth Performance** · **Participation History** (`?tab=history`). Orders is purchased booths for all events (or `?eventId=`). Type = selling category; Booth type = physical space. Columns popup + CSV. Event **Orders** tab is the same report filtered to that bazaar. Legacy `/vendor-hub/network/history` redirects
+* Vendor Network tabs: Vendors, Onboarding, Documents, Invitations. The Vendor Network title and those tabs stay fixed while the list scrolls. Vendor columns: Business Name, Vendor Type, Primary Contact, Phone, Email, Last Activity, Status. A vendor **row click** opens the profile in a dialog; closing it stays on the Vendors list. The Vendors **Vendor Type** column is the catalog dropdown (not the booth), every dropdown is the same width, and it saves on the vendor profile. The column filter uses checkboxes so several types can be selected at once, then **Apply** saves the selection and closes the list. **Export CSV** downloads the vendors that match the current filters, including the selected types. Catalog includes **Ice Cream** (`scripts/306_ice_cream_vendor_type.sql`). Vendor-type saves and profile loads use the faster vendor policies in `scripts/307_vendor_hub_application_rls_perf.sql` (avoids statement timeouts).
+* **Bazaars live in Vendor Hub (September 2026):** Create/edit only in Vendor Hub. No Event Management picker, ticketing, or program link. A date/place hold on `internal_events` (`source_module = vendor_hub`, SQL **`305`**) is for Facilities (one or more on-site spaces via `internal_event_venues`) and Community Calendar only — hidden from Event Management lists. Old `/event-management/[id]` bazaar URLs redirect to Vendor Hub. `vendor_hub_events.internal_event_id` stays required for that hold (SQL **`300`**). Bazaar **Volunteers** is always on (times, slots, and signups). Saving slots lists the bazaar on Sign Ups → Overview.
 * **MAS Fall Bazaar Oct 10 2026:** Imported 25 Eventbrite booth orders (`FallBazaar101026.csv`) as Vendor Hub payments/assignments (not Ticketing). Script: `scripts/import-fall-bazaar-101026.mjs`.
 * **Table selection (September 2026):** Vendors pick a numbered table in My Bazaars. Price is base + selection extra (hall regular/blue/stage **+$10**, corners **+$25**). Org default booth types plus template **Default bazaar layout** in Vendor Hub → Settings → Booths, including **Mocktail / smoothie (truck or cart)** at **$175**. SQL **`301`** + **`302`** + **`304`**. MAS Fall Bazaar Oct 10 inventory remapped onto those types (SQL **`303`**).
 

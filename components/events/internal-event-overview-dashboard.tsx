@@ -110,8 +110,7 @@ export function InternalEventOverviewDashboard({
     overview
 
   const showYouth = features.youth
-  const showStaff =
-    features.staff || staff.paidCount + staff.volunteerCount > 0
+  const showStaff = features.staff || staff.paidCount > 0
   const showVendors = features.vendors
   const showFinance =
     features.finance ||

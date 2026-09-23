@@ -1,15 +1,5 @@
-"use client"
+import { redirect } from "next/navigation"
 
-import { Header } from "@/components/layout/header"
-import { SignUpsTabNav } from "@/components/layout/sign-ups-tab-nav"
-import { UpcomingSignUpsTable } from "@/components/sign-ups/upcoming/upcoming-sign-ups-table"
-
-export default function SignUpsUpcomingPage() {
-  return (
-    <>
-      <Header title="Sign-Ups" />
-      <SignUpsTabNav />
-      <UpcomingSignUpsTable />
-    </>
-  )
+export default function SignUpsUpcomingRedirectPage() {
+  redirect("/sign-ups/overview")
 }

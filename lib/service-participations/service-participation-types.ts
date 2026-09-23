@@ -47,6 +47,7 @@ export type EventStaffAssignmentMeta = {
 export type ServiceParticipationWithContact = ServiceParticipation & {
   contact_name: string
   contact_email: string | null
+  contact_phone: string | null
 }
 
 export type ServiceOpportunity = {

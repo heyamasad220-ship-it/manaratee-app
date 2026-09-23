@@ -3,7 +3,17 @@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
-import { Copy, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react"
+import {
+  CalendarClock,
+  CalendarDays,
+  Copy,
+  Flag,
+  Megaphone,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Trash2,
+} from "lucide-react"
 
 import { CreateBazaarEventDrawer } from "@/components/bazaar/create-bazaar-event-drawer"
 import { CopyBazaarEventDialog } from "@/components/vendor-hub/events/copy-bazaar-event-dialog"
@@ -19,6 +29,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { StatCard } from "@/components/ui/stat-card"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,9 +45,55 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { STAFF_MAIN_CONTENT_STICKY_TOP_CLASS } from "@/lib/layout/staff-dashboard-chrome"
 import { deleteBazaarEvent } from "@/lib/vendor-hub/vendor-hub-event-actions"
 import { VENDOR_HUB_ROUTES } from "@/lib/vendor-hub/vendor-hub-routes"
 import type { VendorHubEventWithInternal } from "@/lib/vendor-hub/vendor-hub-types"
+import { cn } from "@/lib/utils"
+
+const SHORT_MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+] as const
+
+function todayIso() {
+  const now = new Date()
+  const month = String(now.getMonth() + 1).padStart(2, "0")
+  const day = String(now.getDate()).padStart(2, "0")
+  return `${now.getFullYear()}-${month}-${day}`
+}
+
+function shortDate(iso: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso)
+  if (!match) return iso
+  const month = Number(match[2])
+  const day = Number(match[3])
+  if (month < 1 || month > 12) return iso
+  return `${SHORT_MONTHS[month - 1]} ${day}`
+}
+
+function daysUntil(iso: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso)
+  if (!match) return null
+  const target = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return Math.round((target.getTime() - today.getTime()) / 86_400_000)
+}
+
+function isOnCalendar(event: VendorHubEventWithInternal) {
+  return event.calendar_status === "published" || event.calendar_status === "community_visible"
+}
 
 function venueLabel(event: VendorHubEventWithInternal) {
   return event.venue_name?.trim() || event.location?.trim() || "—"
@@ -86,26 +143,91 @@ export function BazaarEventsListClient({
     })
   }
 
+  const today = todayIso()
+  const upcoming = events
+    .filter((event) => event.event_date && event.event_date >= today)
+    .sort((a, b) => (a.event_date || "").localeCompare(b.event_date || ""))
+  const nextEvent = upcoming[0] ?? null
+  const nextDays = nextEvent?.event_date ? daysUntil(nextEvent.event_date) : null
+  const onCalendar = events.filter(isOnCalendar).length
+  const nextHint = !nextEvent
+    ? "Nothing scheduled"
+    : nextDays === 0
+      ? `${nextEvent.name} · today`
+      : nextDays === 1
+        ? `${nextEvent.name} · tomorrow`
+        : nextDays != null && nextDays > 1
+          ? `${nextEvent.name} · in ${nextDays} days`
+          : nextEvent.name
+
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Bazaar Events</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Manage booth reservations, assignments, and payments for each bazaar, market, or
-            festival. Vendors apply once at the organization level.
-          </p>
+    <div>
+      <div
+        className={cn(
+          "sticky z-40 border-b border-border bg-background px-6 pt-6 pb-4",
+          STAFF_MAIN_CONTENT_STICKY_TOP_CLASS
+        )}
+      >
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Events</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Manage booth reservations, assignments, and payments for each bazaar, market, or
+              festival. Vendors apply once at the organization level.
+            </p>
+          </div>
+          <Button onClick={openCreate}>
+            <Plus className="mr-2 h-4 w-4" />
+            Create event
+          </Button>
         </div>
-        <Button onClick={openCreate}>
-          <Plus className="mr-2 h-4 w-4" />
-          Create Bazaar Event
-        </Button>
+
+        <div className="mt-4 grid grid-cols-4 gap-3">
+          <StatCard
+            fill
+            layout="header"
+            tone="blue"
+            icon={CalendarDays}
+            label="Events"
+            value={events.length}
+            hint="On this list"
+          />
+          <StatCard
+            fill
+            layout="header"
+            tone="emerald"
+            icon={CalendarClock}
+            label="Upcoming"
+            value={upcoming.length}
+            hint="Today or later"
+          />
+          <StatCard
+            fill
+            layout="header"
+            tone="amber"
+            icon={Flag}
+            label="Next"
+            value={nextEvent?.event_date ? shortDate(nextEvent.event_date) : "—"}
+            hint={nextHint}
+            valueClassName="text-xl"
+          />
+          <StatCard
+            fill
+            layout="header"
+            tone="violet"
+            icon={Megaphone}
+            label="On the calendar"
+            value={onCalendar}
+            hint="Published for the community"
+          />
+        </div>
       </div>
 
+      <div className="px-6 py-6">
       {events.length === 0 ? (
         <Card>
           <CardContent className="p-6 text-sm text-muted-foreground">
-            No bazaar events yet. Create one, publish it to the calendar, and approved vendors can
+            No events yet. Create one, publish it to the calendar, and approved vendors can
             reserve booths.
           </CardContent>
         </Card>
@@ -187,6 +309,7 @@ export function BazaarEventsListClient({
           </CardContent>
         </Card>
       )}
+      </div>
 
       <CreateBazaarEventDrawer
         open={createOpen}

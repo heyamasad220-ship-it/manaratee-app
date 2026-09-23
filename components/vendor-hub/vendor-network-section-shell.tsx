@@ -1,6 +1,8 @@
 import { ModuleTabNav, type ModuleTabNavItem } from "@/components/layout/module-tab-nav"
 import { PageBreadcrumbs } from "@/components/navigation/page-breadcrumbs"
+import { STAFF_MAIN_CONTENT_STICKY_TOP_CLASS } from "@/lib/layout/staff-dashboard-chrome"
 import { VENDOR_HUB_ROUTES } from "@/lib/vendor-hub/vendor-hub-routes"
+import { cn } from "@/lib/utils"
 
 export function VendorNetworkSectionShell({
   title,
@@ -30,7 +32,12 @@ export function VendorNetworkSectionShell({
 
   return (
     <>
-      <div className="border-b border-border bg-card px-6 pt-6">
+      <div
+        className={cn(
+          "sticky z-40 border-b border-border bg-card px-6 pt-6",
+          STAFF_MAIN_CONTENT_STICKY_TOP_CLASS
+        )}
+      >
         <PageBreadcrumbs className="mb-2" items={items} />
 
         <div>

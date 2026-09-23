@@ -151,6 +151,8 @@ All customer pages must respect the active organization.
 
 ## Current Focus
 
+**Sign Ups (September 2026)** — Top-level **Sign Ups** menu (Overview, Notifications, Reports, Settings) when Vendor Hub or Event Management is on. Overview lists events that need volunteers. Reports lists every signup. Each event and bazaar has a **Volunteers** tab (times, slots, and that event’s signups). Bazaar Volunteers is always available; the bazaar is listed on Overview after slots are saved. Notifications and Settings are next.
+
 **Ticketing under Event Management (September 2026)** — Flyout item **Ticketing** with tabs Overview, Events (ticketed only), Orders, Check-in, Settings. Categories and checkout defaults live on Ticketing Settings. Event workspace has no Orders tab. Check-in is only under Ticketing.
 **Event workspace Overview (September 2026)** — Event name is a blue link that opens the create/edit booking form on the same page. Overview KPIs: Type, Schedule, Location, Childcare, Volunteers, Vendors (Needed / Not needed).
 **Facilities Calendar list view (September 2026)** — `/facilities/calendar` has Day, Grid, and List. List is an agenda grouped by date with time, space, holder, title, and PoC. Click the start date and end date separately to choose a custom range (`?endDate=`). **Create event** on this calendar goes to today’s Day view; click an empty slot to open the form.
@@ -188,7 +190,7 @@ User Invitations
 
 **Community Calendar (August 2026 / September 2026)** — Shared top-level `/community-calendar` lists **Public** `internal_events` (`community_calendar_status`). Published bazaars appear from their Vendor Hub date/place hold; staff bazaar cards open Vendor Hub. Included automatically with **Vendor Hub** or **Event Management** (not a separate SKU). Distinct from Facilities Calendar and Events Master Calendar. SQL **`300`** + **`305`**.
 
-**Vendor Hub Overview (August 2026)** — Sidebar **Overview** at `/vendor-hub` shows one KPI row (Onboarding pending, Active vendors, Outstanding balance, Total revenue, Food category) plus Revenue by Category and Top Performing Vendors. Reports tabs are Vendor Sales, Booth Performance, and Participation History (`/vendor-hub/reports?tab=history`). `/vendor-hub/network/history` redirects.
+**Vendor Hub Overview (August 2026 / September 2026)** — `/vendor-hub` uses the Fund Development layout: colored KPI cards, **Action Required**, **Active events**, and blue Quick Actions. The logo header and breadcrumbs stay fixed on every Vendor Hub page. On Vendor Network, the section title and tabs stay fixed while the list scrolls, and a vendor row opens the profile in a dialog. Lifetime sales stay on Reports. Reports tabs are **Orders** (`?tab=vendor-sales`; Type vs Booth type, column picker, CSV), Booth Performance, and Participation History (`/vendor-hub/reports?tab=history`). The bazaar **Orders** tab is the same report for that event. `/vendor-hub/network/history` redirects.
 
 **Public Program Catalog (August 2026)** — No-login browse at `/o/[orgSlug]/programs` (programs with `visibility = public` only). Offering cards/filters match the customer catalog; staff Programs → Offerings is a separate admin table over the same records. Register via `/join/[orgSlug]?next=…`.
 

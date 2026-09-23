@@ -1,8 +1,8 @@
 import { ModuleTabNav } from "@/components/layout/module-tab-nav"
-import { PageBreadcrumbs } from "@/components/navigation/page-breadcrumbs"
 import { Badge } from "@/components/ui/badge"
+import { BazaarEventNameButton } from "@/components/vendor-hub/events/bazaar-event-name-button"
+import { VendorHubBreadcrumbLabel } from "@/components/vendor-hub/vendor-hub-chrome"
 import { bazaarEventTabs } from "@/lib/vendor-hub/vendor-hub-nav"
-import { VENDOR_HUB_ROUTES } from "@/lib/vendor-hub/vendor-hub-routes"
 import type { VendorHubEventWithInternal } from "@/lib/vendor-hub/vendor-hub-types"
 
 export function BazaarEventWorkspaceShell({
@@ -20,18 +20,10 @@ export function BazaarEventWorkspaceShell({
   return (
     <>
       <div className="border-b border-border bg-card px-6 pt-6">
-        <PageBreadcrumbs
-          className="mb-2"
-          items={[
-            { label: "Vendor Hub", href: "/vendor-hub" },
-            { label: "Bazaar Events", href: VENDOR_HUB_ROUTES.events.list },
-            { label: event.name },
-          ]}
-        />
-
+        <VendorHubBreadcrumbLabel label={event.name} />
         <div className="flex flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight">{event.name}</h1>
+            <BazaarEventNameButton event={event} />
             {event.status && event.status !== "draft" ? (
               <Badge variant="outline" className="capitalize">
                 {event.status}
@@ -47,7 +39,9 @@ export function BazaarEventWorkspaceShell({
         </div>
 
         <div className="mt-4">
-          <ModuleTabNav tabs={bazaarEventTabs(event.id)} />
+          <ModuleTabNav
+            tabs={bazaarEventTabs(event.id)}
+          />
         </div>
       </div>
 

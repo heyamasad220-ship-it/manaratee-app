@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { Header } from "@/components/layout/header"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -92,8 +91,6 @@ export default function FoodTrucksPage() {
 
   return (
     <>
-      <Header title="Food Trucks" />
-
       <div className="p-6">
         <div className="flex flex-col gap-6">
           <div className="grid gap-4 sm:grid-cols-4">

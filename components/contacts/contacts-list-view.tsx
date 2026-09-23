@@ -14,7 +14,7 @@ import { createClient } from "@/lib/supabase/client"
 import { getCurrentOrganizationId } from "@/lib/current-organization"
 import { addContactWithRoles } from "@/lib/contacts/contact-actions"
 import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
-import { VENDOR_HUB_ROUTES } from "@/lib/vendor-hub/vendor-hub-routes"
+import { setVendorNetworkTypeAction } from "@/lib/vendor-hub/vendor-profile-actions"
 import {
   fetchAllTeamMembershipsForFilter,
   fetchHrTeamPositions,
@@ -84,6 +84,7 @@ import {
 import { DEFAULT_LIST_PAGE_SIZE } from "@/lib/ui/list-pagination"
 import { cn } from "@/lib/utils"
 import { CreateVendorDialog } from "@/components/vendor-hub/events/create-vendor-dialog"
+import { VendorProfileDialog } from "@/components/vendor-hub/network/vendor-profile-dialog"
 import type { VendorHubVendorType } from "@/lib/vendor-hub/vendor-type-types"
 import {
   isVendorInactiveByLastActivity,
@@ -100,7 +101,10 @@ import {
   Pencil,
   Trash2,
   Filter,
+  Download,
 } from "lucide-react"
+
+const VENDOR_TYPE_CONTROL_CLASS = "h-8 w-[17rem]"
 
 const LAST_ACTIVITY_SORT_OPTIONS = [
   { value: "desc", label: "Newest first" },
@@ -149,71 +153,6 @@ export type ContactsListViewProps = {
   embedded?: boolean
   /** Only fetch contacts when the user searches (avoids loading the full list on open). */
   searchToLoad?: boolean
-}
-
-function parseVendorCategoryFromNotes(notes: string | null | undefined) {
-  if (!notes) return null
-  const match = String(notes).match(/(?:^|\n)category=([^\n]*)/i)
-  const value = match?.[1]?.trim()
-  return value || null
-}
-
-async function loadVendorTypesByContact(
-  supabase: ReturnType<typeof createClient>,
-  contactIds: string[]
-) {
-  const typeByContact = new Map<string, string>()
-  if (contactIds.length === 0) return typeByContact
-
-  const chunkSize = 200
-  for (let i = 0; i < contactIds.length; i += chunkSize) {
-    const chunk = contactIds.slice(i, i + chunkSize)
-    const { data, error } = await supabase
-      .from("vendor_hub_payments")
-      .select("contact_id, payment_date, notes")
-      .in("contact_id", chunk)
-      .order("payment_date", { ascending: false })
-
-    if (error) {
-      console.error(
-        "loadVendorTypesByContact payments:",
-        error.message || error.code || error
-      )
-    } else {
-      for (const row of data || []) {
-        const contactId = row.contact_id as string | null
-        if (!contactId || typeByContact.has(contactId)) continue
-        const category = parseVendorCategoryFromNotes(row.notes as string | null)
-        if (category) typeByContact.set(contactId, category)
-      }
-    }
-
-    const missing = chunk.filter((id) => !typeByContact.has(id))
-    if (missing.length === 0) continue
-
-    const { data: participants, error: participantError } = await supabase
-      .from("vendor_hub_participant_status")
-      .select("contact_id, updated_at, notes")
-      .in("contact_id", missing)
-      .order("updated_at", { ascending: false })
-
-    if (participantError) {
-      console.error(
-        "loadVendorTypesByContact participants:",
-        participantError.message || participantError.code || participantError
-      )
-      continue
-    }
-
-    for (const row of participants || []) {
-      const contactId = row.contact_id as string | null
-      if (!contactId || typeByContact.has(contactId)) continue
-      const category = parseVendorCategoryFromNotes(row.notes as string | null)
-      if (category) typeByContact.set(contactId, category)
-    }
-  }
-
-  return typeByContact
 }
 
 function businessNameFromFormData(formData: unknown) {
@@ -270,7 +209,7 @@ async function loadVendorBusinessNamesByContact(
           typeof formData?.vendor_type_id === "string"
             ? formData.vendor_type_id.trim()
             : ""
-        if (typeId) vendorTypeIdByContact.set(contactId, typeId)
+        vendorTypeIdByContact.set(contactId, typeId)
       }
     }
 
@@ -308,6 +247,68 @@ function formatDate(value?: string) {
   return date.toLocaleDateString()
 }
 
+function VendorNetworkTypeSelect({
+  contactId,
+  vendorTypeId,
+  options,
+  onChange,
+}: {
+  contactId: string
+  vendorTypeId: string | null
+  options: VendorHubVendorType[]
+  onChange: (vendorTypeId: string | null, vendorType: string | null) => void
+}) {
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const choices = options.filter((type) => type.is_active || type.id === vendorTypeId)
+
+  async function handleChange(next: string) {
+    const nextId = next === "__none__" ? null : next
+    const previousId = vendorTypeId
+    const previousName = options.find((type) => type.id === previousId)?.name || null
+    const nextName = nextId ? options.find((type) => type.id === nextId)?.name || null : null
+    onChange(nextId, nextName)
+    setSaving(true)
+    setError(null)
+    const result = await setVendorNetworkTypeAction({
+      contactId,
+      vendorTypeId: nextId,
+    })
+    setSaving(false)
+    if (!result.success) {
+      onChange(previousId, previousName)
+      setError(result.error)
+    }
+  }
+
+  return (
+    <div
+      className="shrink-0"
+      onClick={(event) => event.stopPropagation()}
+      onPointerDown={(event) => event.stopPropagation()}
+    >
+      <Select
+        value={vendorTypeId || "__none__"}
+        onValueChange={(next) => void handleChange(next)}
+        disabled={saving}
+      >
+        <SelectTrigger className={VENDOR_TYPE_CONTROL_CLASS} aria-label="Vendor type">
+          <SelectValue placeholder="None" />
+        </SelectTrigger>
+        <SelectContent className="w-[17rem]">
+          <SelectItem value="__none__">None</SelectItem>
+          {choices.map((type) => (
+            <SelectItem key={type.id} value={type.id}>
+              {type.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {error ? <p className="mt-1 text-xs text-destructive">{error}</p> : null}
+    </div>
+  )
+}
+
 function RoleCheckboxGroup({
   selected,
   onChange,
@@ -342,6 +343,58 @@ function RoleCheckboxGroup({
         </label>
       ))}
     </div>
+  )
+}
+
+function VendorTextColumnFilter({
+  label,
+  placeholder,
+  input,
+  applied,
+  onInput,
+  onApply,
+  onClear,
+}: {
+  label: string
+  placeholder: string
+  input: string
+  applied: string
+  onInput: (value: string) => void
+  onApply: () => void
+  onClear: () => void
+}) {
+  return (
+    <TableColumnHeaderFilter label={label} active={Boolean(applied)}>
+      {({ close }) => (
+        <div className="space-y-2">
+          <Input
+            placeholder={placeholder}
+            value={input}
+            onChange={(event) => onInput(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                onApply()
+                close()
+              }
+            }}
+          />
+          {applied ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="w-full"
+              onClick={() => {
+                onClear()
+                close()
+              }}
+            >
+              Clear
+            </Button>
+          ) : null}
+        </div>
+      )}
+    </TableColumnHeaderFilter>
   )
 }
 
@@ -392,10 +445,16 @@ export function ContactsListView({
   // Vendor Network column filters (debounced text filters)
   const [contactColumnFilterInput, setContactColumnFilterInput] = useState("")
   const [contactColumnFilter, setContactColumnFilter] = useState("")
+  const [emailFilterInput, setEmailFilterInput] = useState("")
+  const [emailFilter, setEmailFilter] = useState("")
+  const [phoneFilterInput, setPhoneFilterInput] = useState("")
+  const [phoneFilter, setPhoneFilter] = useState("")
   const [businessNameFilterInput, setBusinessNameFilterInput] = useState("")
   const [businessNameFilter, setBusinessNameFilter] = useState("")
-  const [vendorTypeFilter, setVendorTypeFilter] = useState<string>("all")
+  const [vendorTypeFilters, setVendorTypeFilters] = useState<string[]>([])
+  const [vendorTypeDraft, setVendorTypeDraft] = useState<string[]>([])
   const [vendorTypeOptions, setVendorTypeOptions] = useState<VendorHubVendorType[]>([])
+  const [vendorNetworkMatches, setVendorNetworkMatches] = useState<ContactListItem[]>([])
   const [lastActivitySort, setLastActivitySort] = useState<LastActivitySort>("desc")
 
   const [teamOptions, setTeamOptions] = useState<{ id: string; name: string }[]>([])
@@ -404,6 +463,7 @@ export function ContactsListView({
 
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [profileContactId, setProfileContactId] = useState<string | null>(null)
   const [selectedContact, setSelectedContact] = useState<ContactListItem | null>(null)
 
   const [contactName, setContactName] = useState("")
@@ -497,13 +557,17 @@ export function ContactsListView({
     const orgId = await getCurrentOrganizationId()
     if (!orgId) {
       setContacts([])
+      setVendorNetworkMatches([])
       setListTotal(0)
       setLoading(false)
       return
     }
 
-    const trimmedContact = contactColumnFilter.trim()
+    const trimmedContact = contactColumnFilter.trim().toLowerCase()
     const trimmedBusiness = businessNameFilter.trim().toLowerCase()
+    const trimmedEmail = emailFilter.trim().toLowerCase()
+    const trimmedPhone = phoneFilter.trim().toLowerCase()
+    const phoneDigits = trimmedPhone.replace(/\D/g, "")
 
     let allRows: any[] = []
     let from = 0
@@ -518,15 +582,7 @@ export function ContactsListView({
         .order("full_name", { ascending: true })
         .range(from, from + pageSize - 1)
 
-      // Status Active/Inactive is applied from Last Activity after load (not DB status alone).
-
-      if (trimmedContact) {
-        const escapedSearch = trimmedContact.replace(/[%_\\,]/g, "\\$&")
-        const pattern = `%${escapedSearch}%`
-        query = query.or(
-          `full_name.ilike.${pattern},email.ilike.${pattern},phone.ilike.${pattern}`
-        )
-      }
+      // Name, email, phone, and status filters run after load.
 
       const { data, error } = await query
 
@@ -536,6 +592,7 @@ export function ContactsListView({
           error.message || error.code || error
         )
         setContacts([])
+        setVendorNetworkMatches([])
         setListTotal(0)
         setErrorMessage(error.message || "Could not load vendors.")
         setLoading(false)
@@ -563,12 +620,11 @@ export function ContactsListView({
     })
 
     const contactIds = mapped.map((c) => c.id)
-    const [boothTypeByContact, businessMeta] = await Promise.all([
-      loadVendorTypesByContact(supabase, contactIds),
-      loadVendorBusinessNamesByContact(supabase, orgId, contactIds),
-    ])
+    const businessMeta = await loadVendorBusinessNamesByContact(supabase, orgId, contactIds)
 
-    const catalogTypeIds = [...businessMeta.vendorTypeIdByContact.values()]
+    const catalogTypeIds = [...businessMeta.vendorTypeIdByContact.values()].filter(
+      (id) => id.trim().length > 0
+    )
     const catalogNameById = new Map<string, string>()
     if (catalogTypeIds.length > 0) {
       const { data: catalogTypes } = await supabase
@@ -581,14 +637,14 @@ export function ContactsListView({
     }
 
     let enriched = mapped.map((c) => {
-      const catalogTypeId = businessMeta.vendorTypeIdByContact.get(c.id) || null
+      const catalogTypeId = businessMeta.vendorTypeIdByContact.get(c.id)?.trim() || null
       const catalogTypeName = catalogTypeId
         ? catalogNameById.get(catalogTypeId) || null
         : null
       return {
         ...c,
         vendorTypeId: catalogTypeId,
-        vendorType: catalogTypeName || boothTypeByContact.get(c.id) || null,
+        vendorType: catalogTypeName,
         businessName: businessMeta.nameByContact.get(c.id) || c.name || null,
       }
     })
@@ -605,16 +661,27 @@ export function ContactsListView({
       )
     }
 
-    if (vendorTypeFilter !== "all") {
-      if (vendorTypeFilter === "__none__") {
-        enriched = enriched.filter((c) => !c.vendorTypeId && !c.vendorType)
-      } else {
-        enriched = enriched.filter(
-          (c) =>
-            c.vendorTypeId === vendorTypeFilter ||
-            c.vendorType === vendorTypeFilter
-        )
-      }
+    if (trimmedContact) {
+      enriched = enriched.filter((c) => c.name.toLowerCase().includes(trimmedContact))
+    }
+
+    if (trimmedEmail) {
+      enriched = enriched.filter((c) => (c.email || "").toLowerCase().includes(trimmedEmail))
+    }
+
+    if (trimmedPhone) {
+      enriched = enriched.filter((c) => {
+        const phone = (c.phone || "").toLowerCase()
+        if (phone.includes(trimmedPhone)) return true
+        return phoneDigits.length > 0 && phone.replace(/\D/g, "").includes(phoneDigits)
+      })
+    }
+
+    if (vendorTypeFilters.length > 0) {
+      const selected = new Set(vendorTypeFilters)
+      enriched = enriched.filter((c) =>
+        c.vendorTypeId ? selected.has(c.vendorTypeId) : selected.has("__none__")
+      )
     }
 
     enriched = [...enriched].sort((a, b) => {
@@ -629,6 +696,7 @@ export function ContactsListView({
     })
 
     setListTotal(enriched.length)
+    setVendorNetworkMatches(enriched)
 
     const start = (Math.max(1, listPage) - 1) * Math.max(1, listPageSize)
     const pageRows = enriched.slice(start, start + Math.max(1, listPageSize))
@@ -637,6 +705,8 @@ export function ContactsListView({
   }, [
     businessNameFilter,
     contactColumnFilter,
+    emailFilter,
+    phoneFilter,
     lastActivitySort,
     listPage,
     listPageSize,
@@ -644,7 +714,7 @@ export function ContactsListView({
     requiredRole,
     statusFilter,
     supabase,
-    vendorTypeFilter,
+    vendorTypeFilters,
   ])
 
   const loadContacts = useCallback(
@@ -755,8 +825,10 @@ export function ContactsListView({
     setListPage(1)
   }, [
     contactColumnFilter,
+    emailFilter,
+    phoneFilter,
     businessNameFilter,
-    vendorTypeFilter,
+    vendorTypeFilters,
     statusFilter,
     lastActivitySort,
     vendorNetworkLayout,
@@ -770,7 +842,7 @@ export function ContactsListView({
     loadVendorNetworkPage,
     contactColumnFilter,
     businessNameFilter,
-    vendorTypeFilter,
+    vendorTypeFilters,
     listPage,
     listPageSize,
     statusFilter,
@@ -785,6 +857,18 @@ export function ContactsListView({
     )
     return () => window.clearTimeout(timer)
   }, [contactColumnFilterInput, vendorNetworkLayout])
+
+  useEffect(() => {
+    if (!vendorNetworkLayout) return
+    const timer = window.setTimeout(() => setEmailFilter(emailFilterInput.trim()), 350)
+    return () => window.clearTimeout(timer)
+  }, [emailFilterInput, vendorNetworkLayout])
+
+  useEffect(() => {
+    if (!vendorNetworkLayout) return
+    const timer = window.setTimeout(() => setPhoneFilter(phoneFilterInput.trim()), 350)
+    return () => window.clearTimeout(timer)
+  }, [phoneFilterInput, vendorNetworkLayout])
 
   useEffect(() => {
     if (!vendorNetworkLayout) return
@@ -857,6 +941,47 @@ export function ContactsListView({
 
     void loadTeamFilterData()
   }, [showTeamFilters])
+
+  function exportVendorNetworkCsv() {
+    const header = [
+      "Business Name",
+      "Vendor Type",
+      "Primary Contact",
+      "Phone",
+      "Email",
+      "Last Activity",
+      "Status",
+    ]
+    const lines = [
+      header,
+      ...vendorNetworkMatches.map((contact) => [
+        contact.businessName || "",
+        contact.vendorType || "",
+        contact.name || "",
+        contact.phone || "",
+        contact.email || "",
+        formatDate(contact.lastActivity || contact.createdAt),
+        contact.status || "",
+      ]),
+    ]
+    const csv = lines
+      .map((row) =>
+        row
+          .map((cell) => {
+            const value = String(cell ?? "")
+            return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value
+          })
+          .join(",")
+      )
+      .join("\n")
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = "vendor-network.csv"
+    link.click()
+    URL.revokeObjectURL(url)
+  }
 
   const membershipsByContact = useMemo(() => {
     const map = new Map<string, HrTeamMembership[]>()
@@ -1165,9 +1290,22 @@ export function ContactsListView({
           )}
 
           {headerAction}
+          {vendorNetworkLayout ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="ml-auto shrink-0"
+              disabled={loading || vendorNetworkMatches.length === 0}
+              onClick={exportVendorNetworkCsv}
+            >
+              <Download className="mr-1.5 h-4 w-4" />
+              Export CSV
+            </Button>
+          ) : null}
           <Button
             size="sm"
-            className={vendorNetworkLayout ? "ml-auto shrink-0" : "shrink-0"}
+            className={vendorNetworkLayout ? "shrink-0" : "shrink-0"}
             onClick={() => {
               if (vendorNetworkLayout) {
                 setShowAddDialog(true)
@@ -1244,43 +1382,18 @@ export function ContactsListView({
               <TableRow>
                 <TableHead>
                   {vendorNetworkLayout ? (
-                    <TableColumnHeaderFilter
-                      label="Contact"
-                      active={Boolean(contactColumnFilter)}
-                    >
-                      {({ close }) => (
-                        <div className="space-y-2">
-                          <Input
-                            placeholder="Filter by name, email, or phone..."
-                            value={contactColumnFilterInput}
-                            onChange={(event) =>
-                              setContactColumnFilterInput(event.target.value)
-                            }
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter") {
-                                setContactColumnFilter(contactColumnFilterInput.trim())
-                                close()
-                              }
-                            }}
-                          />
-                          {contactColumnFilter ? (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="w-full"
-                              onClick={() => {
-                                setContactColumnFilterInput("")
-                                setContactColumnFilter("")
-                                close()
-                              }}
-                            >
-                              Clear
-                            </Button>
-                          ) : null}
-                        </div>
-                      )}
-                    </TableColumnHeaderFilter>
+                    <VendorTextColumnFilter
+                      label="Business Name"
+                      placeholder="Filter by business name..."
+                      input={businessNameFilterInput}
+                      applied={businessNameFilter}
+                      onInput={setBusinessNameFilterInput}
+                      onApply={() => setBusinessNameFilter(businessNameFilterInput.trim())}
+                      onClear={() => {
+                        setBusinessNameFilterInput("")
+                        setBusinessNameFilter("")
+                      }}
+                    />
                   ) : (
                     "Contact"
                   )}
@@ -1289,73 +1402,129 @@ export function ContactsListView({
                   <>
                     <TableHead>
                       <TableColumnHeaderFilter
-                        label="Business Name"
-                        active={Boolean(businessNameFilter)}
+                        label="Vendor Type"
+                        active={vendorTypeFilters.length > 0}
+                        contentClassName="w-72"
+                        onOpenChange={(open) => {
+                          if (open) setVendorTypeDraft(vendorTypeFilters)
+                        }}
                       >
                         {({ close }) => (
-                          <div className="space-y-2">
-                            <Input
-                              placeholder="Filter by business name..."
-                              value={businessNameFilterInput}
-                              onChange={(event) =>
-                                setBusinessNameFilterInput(event.target.value)
-                              }
-                              onKeyDown={(event) => {
-                                if (event.key === "Enter") {
-                                  setBusinessNameFilter(businessNameFilterInput.trim())
-                                  close()
-                                }
+                          <div className="space-y-3">
+                            <div className="max-h-80 space-y-2 overflow-y-auto">
+                              <label className="flex cursor-pointer items-center gap-2 text-sm">
+                                <Checkbox
+                                  checked={vendorTypeDraft.length === 0}
+                                  onCheckedChange={(checked) => {
+                                    if (checked) setVendorTypeDraft([])
+                                  }}
+                                />
+                                All types
+                              </label>
+                              <label className="flex cursor-pointer items-center gap-2 text-sm">
+                                <Checkbox
+                                  checked={vendorTypeDraft.includes("__none__")}
+                                  onCheckedChange={(checked) => {
+                                    setVendorTypeDraft((current) =>
+                                      checked === true
+                                        ? Array.from(new Set([...current, "__none__"]))
+                                        : current.filter((value) => value !== "__none__")
+                                    )
+                                  }}
+                                />
+                                No type
+                              </label>
+                              {vendorTypeOptions
+                                .filter((type) => type.is_active)
+                                .map((type) => (
+                                  <label
+                                    key={type.id}
+                                    className="flex cursor-pointer items-center gap-2 text-sm"
+                                  >
+                                    <Checkbox
+                                      checked={vendorTypeDraft.includes(type.id)}
+                                      onCheckedChange={(checked) => {
+                                        setVendorTypeDraft((current) =>
+                                          checked === true
+                                            ? Array.from(new Set([...current, type.id]))
+                                            : current.filter((value) => value !== type.id)
+                                        )
+                                      }}
+                                    />
+                                    {type.name}
+                                  </label>
+                                ))}
+                            </div>
+                            <Button
+                              type="button"
+                              size="sm"
+                              className="w-full"
+                              onClick={() => {
+                                setVendorTypeFilters(vendorTypeDraft)
+                                close()
                               }}
-                            />
-                            {businessNameFilter ? (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="w-full"
-                                onClick={() => {
-                                  setBusinessNameFilterInput("")
-                                  setBusinessNameFilter("")
-                                  close()
-                                }}
-                              >
-                                Clear
-                              </Button>
-                            ) : null}
+                            >
+                              Apply
+                            </Button>
                           </div>
                         )}
                       </TableColumnHeaderFilter>
                     </TableHead>
                     <TableHead>
-                      <TableColumnHeaderFilter
-                        label="Vendor Type"
-                        active={vendorTypeFilter !== "all"}
-                      >
-                        {({ close }) => (
-                          <Select
-                            value={vendorTypeFilter}
-                            onValueChange={(value) => {
-                              setVendorTypeFilter(value)
-                              close()
-                            }}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="All types" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="all">All types</SelectItem>
-                              <SelectItem value="__none__">No type</SelectItem>
-                              {vendorTypeOptions
-                                .filter((type) => type.is_active)
-                                .map((type) => (
-                                  <SelectItem key={type.id} value={type.id}>
-                                    {type.name}
-                                  </SelectItem>
-                                ))}
-                            </SelectContent>
-                          </Select>
-                        )}
-                      </TableColumnHeaderFilter>
+                      <VendorTextColumnFilter
+                        label="Primary Contact"
+                        placeholder="Filter by name..."
+                        input={contactColumnFilterInput}
+                        applied={contactColumnFilter}
+                        onInput={setContactColumnFilterInput}
+                        onApply={() => setContactColumnFilter(contactColumnFilterInput.trim())}
+                        onClear={() => {
+                          setContactColumnFilterInput("")
+                          setContactColumnFilter("")
+                        }}
+                      />
+                    </TableHead>
+                    <TableHead>
+                      <VendorTextColumnFilter
+                        label="Phone"
+                        placeholder="Filter by phone..."
+                        input={phoneFilterInput}
+                        applied={phoneFilter}
+                        onInput={setPhoneFilterInput}
+                        onApply={() => setPhoneFilter(phoneFilterInput.trim())}
+                        onClear={() => {
+                          setPhoneFilterInput("")
+                          setPhoneFilter("")
+                        }}
+                      />
+                    </TableHead>
+                    <TableHead>
+                      <VendorTextColumnFilter
+                        label="Email"
+                        placeholder="Filter by email..."
+                        input={emailFilterInput}
+                        applied={emailFilter}
+                        onInput={setEmailFilterInput}
+                        onApply={() => setEmailFilter(emailFilterInput.trim())}
+                        onClear={() => {
+                          setEmailFilterInput("")
+                          setEmailFilter("")
+                        }}
+                      />
+                    </TableHead>
+                    <TableHead>
+                      <div className="flex items-center gap-1">
+                        <span className="font-medium">Last Activity</span>
+                        <TableColumnHeaderSort
+                          label="Last Activity"
+                          value={lastActivitySort}
+                          active
+                          options={[...LAST_ACTIVITY_SORT_OPTIONS]}
+                          onChange={(value) =>
+                            setLastActivitySort(value as LastActivitySort)
+                          }
+                        />
+                      </div>
                     </TableHead>
                   </>
                 ) : (
@@ -1397,24 +1566,9 @@ export function ContactsListView({
                     "Status"
                   )}
                 </TableHead>
-                <TableHead className="hidden sm:table-cell">
-                  {vendorNetworkLayout ? (
-                    <div className="flex items-center gap-1">
-                      <span className="font-medium">Last Activity</span>
-                      <TableColumnHeaderSort
-                        label="Last Activity"
-                        value={lastActivitySort}
-                        active
-                        options={[...LAST_ACTIVITY_SORT_OPTIONS]}
-                        onChange={(value) =>
-                          setLastActivitySort(value as LastActivitySort)
-                        }
-                      />
-                    </div>
-                  ) : (
-                    "Last Activity"
-                  )}
-                </TableHead>
+                {!vendorNetworkLayout && (
+                  <TableHead className="hidden sm:table-cell">Last Activity</TableHead>
+                )}
                 {!vendorNetworkLayout && (
                   <TableHead className="w-[80px] text-right">Actions</TableHead>
                 )}
@@ -1425,7 +1579,7 @@ export function ContactsListView({
               {loading ? (
                 <TableRow>
                   <TableCell
-                    colSpan={vendorNetworkLayout ? 5 : 7}
+                    colSpan={vendorNetworkLayout ? 7 : 7}
                     className="h-24 text-center text-muted-foreground"
                   >
                     <div className="flex items-center justify-center gap-2">
@@ -1437,7 +1591,7 @@ export function ContactsListView({
               ) : filteredContacts.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={vendorNetworkLayout ? 5 : 7}
+                    colSpan={vendorNetworkLayout ? 7 : 7}
                     className="h-24 text-center text-muted-foreground"
                   >
                     {searchToLoad && !searchQuery.trim()
@@ -1448,8 +1602,10 @@ export function ContactsListView({
                           : statusFilter === "Inactive"
                             ? "No inactive vendors match."
                             : contactColumnFilter ||
+                                emailFilter ||
+                                phoneFilter ||
                                 businessNameFilter ||
-                                vendorTypeFilter !== "all"
+                                vendorTypeFilters.length > 0
                               ? "No vendors match the current filters."
                               : emptyMessage || "No vendors yet."
                         : emptyMessage ||
@@ -1462,28 +1618,28 @@ export function ContactsListView({
                 filteredContacts.map((contact) => (
                   <TableRow
                     key={contact.id}
-                    onClick={() =>
-                      router.push(
-                        vendorNetworkLayout
-                          ? VENDOR_HUB_ROUTES.network.vendor(contact.id)
-                          : contactProfileHref(contact.id)
-                      )
-                    }
+                    onClick={() => {
+                      if (vendorNetworkLayout) {
+                        setProfileContactId(contact.id)
+                        return
+                      }
+                      router.push(contactProfileHref(contact.id))
+                    }}
                     className="cursor-pointer hover:bg-muted/50"
                   >
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-9 w-9">
-                          <AvatarFallback className="bg-primary/10 text-primary text-sm">
-                            {getInitials(contact.name)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex flex-col gap-0.5">
-                          {vendorNetworkLayout ? (
-                            <span className="font-semibold text-foreground">
-                              {contact.name}
-                            </span>
-                          ) : (
+                    {vendorNetworkLayout ? (
+                      <TableCell className="text-sm">
+                        {contact.businessName || "—"}
+                      </TableCell>
+                    ) : (
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-9 w-9">
+                            <AvatarFallback className="bg-primary/10 text-primary text-sm">
+                              {getInitials(contact.name)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex flex-col gap-0.5">
                             <Link
                               href={contactProfileHref(contact.id)}
                               className="font-medium text-primary hover:underline"
@@ -1491,27 +1647,44 @@ export function ContactsListView({
                             >
                               {contact.name}
                             </Link>
-                          )}
-                          <span className="text-sm text-muted-foreground">
-                            {contact.email || "-"}
-                          </span>
-                          {vendorNetworkLayout && (
-                            <span className="flex items-center gap-1 text-sm text-muted-foreground">
-                              <Phone className="h-3 w-3" />
-                              <PhoneText value={contact.phone} empty="-" />
+                            <span className="text-sm text-muted-foreground">
+                              {contact.email || "-"}
                             </span>
-                          )}
+                          </div>
                         </div>
-                      </div>
-                    </TableCell>
+                      </TableCell>
+                    )}
 
                     {vendorNetworkLayout ? (
                       <>
-                        <TableCell className="text-sm">
-                          {contact.businessName || "—"}
+                        <TableCell
+                          className="text-sm"
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          <VendorNetworkTypeSelect
+                            contactId={contact.id}
+                            vendorTypeId={contact.vendorTypeId || null}
+                            options={vendorTypeOptions}
+                            onChange={(vendorTypeId, vendorType) => {
+                              setContacts((rows) =>
+                                rows.map((row) =>
+                                  row.id === contact.id
+                                    ? { ...row, vendorTypeId, vendorType }
+                                    : row
+                                )
+                              )
+                            }}
+                          />
                         </TableCell>
-                        <TableCell className="text-sm">
-                          {contact.vendorType || "—"}
+                        <TableCell className="text-sm">{contact.name}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          <PhoneText value={contact.phone} empty="—" />
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {contact.email || "—"}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {formatDate(contact.lastActivity || contact.createdAt)}
                         </TableCell>
                       </>
                     ) : (
@@ -1554,14 +1727,22 @@ export function ContactsListView({
                     )}
 
                     <TableCell>
-                      <Badge variant="secondary" className={STATUS_COLORS[contact.status]}>
+                      <Badge
+                        variant="secondary"
+                        className={cn(
+                          STATUS_COLORS[contact.status],
+                          vendorNetworkLayout && "font-normal"
+                        )}
+                      >
                         {contact.status}
                       </Badge>
                     </TableCell>
 
-                    <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">
-                      {formatDate(contact.lastActivity || contact.createdAt)}
-                    </TableCell>
+                    {!vendorNetworkLayout && (
+                      <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">
+                        {formatDate(contact.lastActivity || contact.createdAt)}
+                      </TableCell>
+                    )}
 
                     {!vendorNetworkLayout && (
                       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
@@ -1721,6 +1902,30 @@ export function ContactsListView({
           vendorTypes={vendorTypeOptions}
           onCreated={() => {
             void loadVendorNetworkPage()
+          }}
+        />
+      ) : null}
+
+      {vendorNetworkLayout ? (
+        <VendorProfileDialog
+          contactId={profileContactId}
+          open={profileContactId != null}
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) setProfileContactId(null)
+          }}
+          onUpdated={(update) => {
+            const patch = {
+              name: update.contactName,
+              email: update.email,
+              phone: update.phone,
+              businessName: update.businessName,
+              vendorTypeId: update.vendorTypeId,
+              vendorType: update.vendorTypeName,
+            }
+            const apply = (rows: ContactListItem[]) =>
+              rows.map((row) => (row.id === update.contactId ? { ...row, ...patch } : row))
+            setContacts(apply)
+            setVendorNetworkMatches(apply)
           }}
         />
       ) : null}

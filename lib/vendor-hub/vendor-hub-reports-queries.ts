@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
+import { canonicalBoothTypeName } from "@/lib/vendor-hub/booth-type-names"
 import { formatContactDisplayName } from "@/lib/vendor-hub/contact-centric-model"
 import { getVendorHubEvents } from "@/lib/vendor-hub/vendor-hub-event-queries"
 
@@ -65,26 +66,6 @@ function emptyOverview(): VendorHubReportOverview {
     revenueByCategory: [],
     topVendors: [],
   }
-}
-
-const BOOTH_TYPE_ALIASES: Record<string, string> = {
-  "regular booth - main prayer hall": "Regular table",
-  "booth on the stage": "Stage table",
-  "corner booth - main prayer hall": "Corner table",
-  "booth in the entrance (lobby)": "Lobby table",
-  coffee: "Coffee (lobby or truck)",
-  "food vendors between the two buildings (hot meal)": "Hot meal (Outdoor)",
-  "hot meal (between buildings)": "Hot meal (Outdoor)",
-  "general merchandise (between buildings)": "General merchandise (Outdoor)",
-  "mocktail/ smoothie (outside)": "Mocktail / smoothie (truck or cart)",
-}
-
-function canonicalBoothTypeName(name: string, defaultNames: Set<string>) {
-  const trimmed = name.trim() || "Booth"
-  if (defaultNames.has(trimmed)) return trimmed
-  const alias = BOOTH_TYPE_ALIASES[trimmed.toLowerCase()]
-  if (alias) return alias
-  return trimmed
 }
 
 export async function getVendorHubReportsData(

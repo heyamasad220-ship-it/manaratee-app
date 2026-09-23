@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils"
 
 const tabs = [
   { label: "Overview", href: "/sign-ups/overview" },
-  { label: "Messages", href: "/sign-ups/messages" },
+  { label: "Notifications", href: "/sign-ups/notifications" },
 ]
 
 export function SignUpsTabNav() {

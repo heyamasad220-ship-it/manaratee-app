@@ -998,6 +998,7 @@ export function InternalEventForm(props: InternalEventFormProps) {
                 onChange={setServiceRequirements}
                 vendorTypes={props.vendorTypes}
                 canManageVendorTypes={props.canManageVendorTypes}
+                hideVolunteerDetails
               />
 
               {ticketingLoaded ? (
@@ -1025,6 +1026,7 @@ export function InternalEventForm(props: InternalEventFormProps) {
                 onChange={setServiceRequirements}
                 vendorTypes={props.vendorTypes}
                 canManageVendorTypes={props.canManageVendorTypes}
+                hideVolunteerDetails
               />
 
               {ticketingLoaded ? (

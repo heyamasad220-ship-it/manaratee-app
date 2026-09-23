@@ -65,6 +65,7 @@ export type VendorHubEventWithInternal = VendorHubEventRecord & {
     end_at: string | null
     location_label: string | null
     status: string
+    requires_volunteers?: boolean | null
   } | null
   organizer_contact?: VendorHubOrganizerContact | null
   venue_name?: string | null
@@ -85,12 +86,12 @@ export type VendorHubDashboardMetrics = {
   vendorsParticipated: number
 }
 
-/** Org-level Vendor Hub home metrics (not event-scoped). */
+/** Org-level Vendor Hub home metrics (attention for the next bazaar). */
 export type VendorHubOrgDashboardMetrics = {
   onboardingPending: number
-  activeVendors: number
-  revenueCollected: number
-  outstandingBalance: number
+  boothRequestsPending: number
+  currentEventId: string | null
+  currentEventName: string | null
 }
 
 export type VendorHubOrgDashboardData = {

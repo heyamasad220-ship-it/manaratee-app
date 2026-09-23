@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import type { KeyboardEvent } from "react"
+import { Fragment, type KeyboardEvent } from "react"
 import { Baby, Heart, Plus, Store, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -26,6 +26,14 @@ import {
   type EventYouthOffering,
   type YouthGroupFormRow,
 } from "@/lib/events/event-service-requirements"
+import {
+  addHoursToTime,
+  createEmptyVolunteerWindow,
+  createEmptyVolunteerWindowSlot,
+  formatVolunteerHourOption,
+  volunteerHourOptions,
+  type VolunteerWindowFormRow,
+} from "@/lib/events/volunteer-windows"
 import type { VendorHubVendorType } from "@/lib/vendor-hub/vendor-type-types"
 
 type EventServiceRequirementsFieldsProps = {
@@ -39,10 +47,17 @@ type EventServiceRequirementsFieldsProps = {
   /** Hide Enable switches and always show settings (parent owns enable/save). */
   hideEnableSwitch?: boolean
   /**
-   * Staff tab: always show task list; volunteer enable is optional and does not
-   * hide tasks. Labels use Task instead of Role.
+   * Staff tab: always show the time-and-slot sheet. Volunteer enable is optional
+   * and does not hide the sheet.
    */
   staffMode?: boolean
+  /**
+   * Event service needs: turn volunteers on here. Times and slots are edited on
+   * the Sign-ups tab so this save does not replace that sheet.
+   */
+  hideVolunteerDetails?: boolean
+  /** Bazaar Sign-ups → Slots: time windows only, with no enable switch or card. */
+  slotsOnly?: boolean
 }
 
 function childcareAgeGroupsFromYouth(groups: YouthGroupFormRow[]) {
@@ -51,6 +66,35 @@ function childcareAgeGroupsFromYouth(groups: YouthGroupFormRow[]) {
     ageRange: formatAgeRangeFromBounds(group.ageMin, group.ageMax),
     capacity: group.capacity,
   }))
+}
+
+function VolunteerHourSelect({
+  label,
+  value,
+  onValueChange,
+}: {
+  label: string
+  value: string
+  onValueChange: (value: string) => void
+}) {
+  const options = volunteerHourOptions(value)
+  return (
+    <div className="space-y-1">
+      <Label className="text-xs">{label}</Label>
+      <Select value={value || undefined} onValueChange={onValueChange}>
+        <SelectTrigger className="w-[120px]" aria-label={label}>
+          <SelectValue placeholder="Select time" />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((option) => (
+            <SelectItem key={option} value={option}>
+              {formatVolunteerHourOption(option)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  )
 }
 
 export function EventServiceRequirementsFields({
@@ -62,6 +106,8 @@ export function EventServiceRequirementsFields({
   hideHeader = false,
   hideEnableSwitch = false,
   staffMode = false,
+  hideVolunteerDetails = false,
+  slotsOnly = false,
 }: EventServiceRequirementsFieldsProps) {
   const showVolunteers = !visibleModules || visibleModules.includes("volunteers")
   const showChildcare = !visibleModules || visibleModules.includes("childcare")
@@ -76,6 +122,74 @@ export function EventServiceRequirementsFields({
       youthGroups,
       childcareAgeGroups: childcareAgeGroupsFromYouth(youthGroups),
     })
+  }
+
+  function commitWindows(next: VolunteerWindowFormRow[]) {
+    update({ volunteerWindows: next, volunteerWindowsExplicit: true })
+  }
+
+  function currentWindows() {
+    const windows = value.volunteerWindows || []
+    if (windows.length > 0) return windows
+    if (staffMode || slotsOnly) {
+      return [createEmptyVolunteerWindow({ id: "win-default" })]
+    }
+    return windows
+  }
+
+  function updateVolunteerWindow(
+    id: string,
+    patch: Partial<Pick<VolunteerWindowFormRow, "start" | "end">>
+  ) {
+    commitWindows(
+      currentWindows().map((window) =>
+        window.id === id ? { ...window, ...patch } : window
+      )
+    )
+  }
+
+  function addWindowSlot(windowId: string) {
+    commitWindows(
+      currentWindows().map((window) =>
+        window.id === windowId
+          ? {
+              ...window,
+              slots: [...window.slots, createEmptyVolunteerWindowSlot()],
+            }
+          : window
+      )
+    )
+  }
+
+  function updateWindowSlot(
+    windowId: string,
+    slotId: string,
+    patch: Partial<{ name: string; openings: string }>
+  ) {
+    commitWindows(
+      currentWindows().map((window) => {
+        if (window.id !== windowId) return window
+        return {
+          ...window,
+          slots: window.slots.map((slot) =>
+            slot.id === slotId ? { ...slot, ...patch } : slot
+          ),
+        }
+      })
+    )
+  }
+
+  function removeWindowSlot(windowId: string, slotId: string) {
+    commitWindows(
+      currentWindows().map((window) => {
+        if (window.id !== windowId) return window
+        const slots = window.slots.filter((slot) => slot.id !== slotId)
+        return {
+          ...window,
+          slots: slots.length > 0 ? slots : [createEmptyVolunteerWindowSlot()],
+        }
+      })
+    )
   }
 
   function addVolunteerRole() {
@@ -256,6 +370,118 @@ export function EventServiceRequirementsFields({
   const activeVendorTypes = vendorTypes.filter((type) => type.is_active)
 
   function renderVolunteerSettings() {
+    if (staffMode || slotsOnly) {
+      const windows = currentWindows()
+      return (
+        <div className={slotsOnly ? "space-y-4" : "space-y-4 border-t px-3 pb-3 pt-3"}>
+          <div>
+            <Label>Times and slots</Label>
+            <p className="text-xs text-muted-foreground">
+              Set the time, then name each job and how many people it needs.
+              Date and location stay on the event.
+            </p>
+          </div>
+          {windows.map((window) => (
+            <div
+              key={window.id}
+              className="grid grid-cols-[120px_120px_minmax(12rem,1fr)_6.5rem_auto] items-end gap-x-2 gap-y-2"
+            >
+              {window.slots.map((slot, index) => (
+                <Fragment key={slot.id}>
+                  {index === 0 ? (
+                    <>
+                      <VolunteerHourSelect
+                        label="Start"
+                        value={window.start}
+                        onValueChange={(start) => {
+                          const end =
+                            window.end.trim() ||
+                            (start ? addHoursToTime(start, 2) : "")
+                          updateVolunteerWindow(window.id, { start, end })
+                        }}
+                      />
+                      <VolunteerHourSelect
+                        label="End"
+                        value={window.end}
+                        onValueChange={(end) =>
+                          updateVolunteerWindow(window.id, { end })
+                        }
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <div aria-hidden />
+                      <div aria-hidden />
+                    </>
+                  )}
+                  <div className="min-w-[12rem] flex-1 space-y-1">
+                    {index === 0 ? <Label className="text-xs">Slot</Label> : null}
+                    <Input
+                      placeholder="Registration"
+                      value={slot.name}
+                      onChange={(event) =>
+                        updateWindowSlot(window.id, slot.id, {
+                          name: event.target.value,
+                        })
+                      }
+                      aria-label="Slot"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    {index === 0 ? (
+                      <Label className="text-xs">Open slots</Label>
+                    ) : null}
+                    <Input
+                      type="number"
+                      min={1}
+                      value={slot.openings}
+                      onChange={(event) =>
+                        updateWindowSlot(window.id, slot.id, {
+                          openings: event.target.value,
+                        })
+                      }
+                      className="w-[6.5rem]"
+                      aria-label="Open slots"
+                    />
+                  </div>
+                  {index === 0 ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => addWindowSlot(window.id)}
+                    >
+                      <Plus className="mr-1 h-4 w-4" />
+                      Add slot
+                    </Button>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removeWindowSlot(window.id, slot.id)}
+                      aria-label="Remove slot"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </Fragment>
+              ))}
+            </div>
+          ))}
+        </div>
+      )
+    }
+
+    if (hideVolunteerDetails) {
+      if (!value.requiresVolunteers) return null
+      return (
+        <p className="border-t px-3 py-3 text-xs text-muted-foreground">
+          Set times and volunteer slots on the Sign-ups tab.
+        </p>
+      )
+    }
+
     return (
       <div className="space-y-3 border-t px-3 pb-3 pt-3">
         <div className="space-y-3">
@@ -731,6 +957,10 @@ export function EventServiceRequirementsFields({
     )
   }
 
+  if (slotsOnly) {
+    return renderVolunteerSettings()
+  }
+
   return (
     <div className="space-y-4 rounded-lg border p-4">
       {hideHeader ? null : (
@@ -756,15 +986,30 @@ export function EventServiceRequirementsFields({
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {staffMode
-                    ? "Allow volunteers to sign up for open tasks"
-                    : "Recruit volunteers from your workforce roster"}
+                    ? "Open this event for volunteer sign-ups"
+                    : hideVolunteerDetails
+                      ? "Times and slots are set on the Sign-ups tab"
+                      : "Recruit volunteers from your workforce roster"}
                 </p>
               </div>
             </div>
             <Switch
               checked={value.requiresVolunteers}
               onCheckedChange={(checked) => {
-                if (checked && value.volunteerRoles.length === 0) {
+                if (checked && staffMode && (value.volunteerWindows || []).length === 0) {
+                  update({
+                    requiresVolunteers: true,
+                    volunteerWindowsExplicit: true,
+                    volunteerWindows: [createEmptyVolunteerWindow()],
+                  })
+                  return
+                }
+                if (
+                  checked &&
+                  !staffMode &&
+                  !hideVolunteerDetails &&
+                  value.volunteerRoles.length === 0
+                ) {
                   update({
                     requiresVolunteers: true,
                     volunteerRoles: [createEmptyVolunteerRole()],

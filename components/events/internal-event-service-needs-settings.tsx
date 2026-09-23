@@ -79,6 +79,7 @@ export function InternalEventServiceNeedsSettings({
           }}
           vendorTypes={vendorTypes}
           canManageVendorTypes={canManage && canManageVendorTypes}
+          hideVolunteerDetails
         />
         {canManage ? (
           <div className="flex justify-end">

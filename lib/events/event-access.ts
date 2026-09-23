@@ -5,12 +5,14 @@ import {
   canViewDepartment,
 } from "@/lib/departments/department-access"
 import { getInternalEventRecordById } from "@/lib/events/internal-event-queries"
+import { isVendorHubOwnedInternalEvent } from "@/lib/events/internal-event-source"
 import {
   hasAnyPermission,
   PERMISSIONS,
   requireAnyPermission,
   type PermissionKey,
 } from "@/lib/permissions/permissions"
+import { canManageVendorHub } from "@/lib/vendor-hub/vendor-hub-permissions"
 
 /** Open Event Management list and event workspace (read + check-in). */
 export const EVENT_WORKSPACE_VIEW_PERMISSIONS: PermissionKey[] = [
@@ -66,6 +68,13 @@ export async function canManageInternalEvent(eventId: string): Promise<boolean> 
     return true
   }
   const event = await getInternalEventRecordById(eventId)
+  if (
+    event &&
+    isVendorHubOwnedInternalEvent(event) &&
+    (await canManageVendorHub())
+  ) {
+    return true
+  }
   const departmentId = (event?.department_id as string | null | undefined) ?? null
   if (!departmentId) return false
   return canManageDepartment(departmentId)

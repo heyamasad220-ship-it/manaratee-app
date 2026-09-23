@@ -1,14 +1,15 @@
 "use client"
 
 import Link from "next/link"
-import { ClipboardList, DollarSign, LayoutGrid, Star } from "lucide-react"
+import { ClipboardList, DollarSign, Star } from "lucide-react"
 
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { StatCard, StatCardsRow, type StatCardTone } from "@/components/ui/stat-card"
-import { BazaarEventFlyerSharePanel } from "@/components/vendor-hub/events/bazaar-event-flyer-share-panel"
-import { BazaarEventQuickActions } from "@/components/vendor-hub/events/bazaar-event-quick-actions"
+import { VendorHubReportsOverviewPanels } from "@/components/vendor-hub/vendor-hub-reports-overview-panels"
 import { VENDOR_HUB_ROUTES } from "@/lib/vendor-hub/vendor-hub-routes"
+import type { OverviewRecentOrder } from "@/lib/vendor-hub/vendor-hub-overview"
+import type { VendorHubBoothPerformanceRow } from "@/lib/vendor-hub/vendor-hub-reports-queries"
 import type { VendorHubEventWithInternal } from "@/lib/vendor-hub/vendor-hub-types"
 import type { VendorHubDashboardMetrics } from "@/lib/vendor-hub/vendor-hub-types"
 
@@ -27,35 +28,33 @@ function isImportDescription(description: string | null | undefined) {
 export function BazaarEventOverviewClient({
   event,
   metrics,
-  deleteBlockedReason,
+  boothPerformance,
+  recentOrders,
 }: {
   event: VendorHubEventWithInternal
   metrics: VendorHubDashboardMetrics
-  deleteBlockedReason: string | null
+  boothPerformance: VendorHubBoothPerformanceRow[]
+  recentOrders: OverviewRecentOrder[]
 }) {
   const eventHasPassed = isPastEvent(event.event_date)
   const showEvaluationPrompt =
     eventHasPassed &&
     metrics.vendorsParticipated > 0 &&
     metrics.vendorsPendingEvaluation > 0
+  const remainingBooths = Math.max(0, metrics.boothsTotal - metrics.boothsAssigned)
 
   const stats: Array<{
     label: string
     value: string | number
-    icon: typeof LayoutGrid
+    hint?: string
+    icon: typeof ClipboardList
     tone: StatCardTone
     href?: string
   }> = [
     {
-      label: "Booth occupancy",
-      value: `${metrics.boothsAssigned}/${metrics.boothsTotal}`,
-      icon: LayoutGrid,
-      tone: "amber",
-      href: VENDOR_HUB_ROUTES.events.booths(event.id),
-    },
-    {
       label: "Booth registrations",
-      value: metrics.boothRegistrations,
+      value: `${metrics.boothsAssigned}/${metrics.boothsTotal}`,
+      hint: `${remainingBooths} remaining`,
       icon: ClipboardList,
       tone: "sky",
       href: VENDOR_HUB_ROUTES.events.booths(event.id),
@@ -97,7 +96,7 @@ export function BazaarEventOverviewClient({
         </Card>
       ) : null}
 
-      <StatCardsRow equal columns={4}>
+      <StatCardsRow equal columns={3}>
         {stats.map((stat) => {
           const card = (
             <StatCard
@@ -105,6 +104,7 @@ export function BazaarEventOverviewClient({
               layout="header"
               label={stat.label}
               value={stat.value}
+              hint={stat.hint}
               icon={stat.icon}
               tone={stat.tone}
               className={stat.href ? "h-full transition-shadow hover:shadow-sm" : "h-full"}
@@ -127,10 +127,13 @@ export function BazaarEventOverviewClient({
         })}
       </StatCardsRow>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
-        <BazaarEventFlyerSharePanel event={event} />
-        <BazaarEventQuickActions event={event} deleteBlockedReason={deleteBlockedReason} />
-      </div>
+      <VendorHubReportsOverviewPanels
+        currentEventId={event.id}
+        currentEventName={event.name}
+        boothPerformance={boothPerformance}
+        recentOrders={recentOrders}
+        viewAllOrdersHref={VENDOR_HUB_ROUTES.events.booths(event.id)}
+      />
 
       {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
     </div>

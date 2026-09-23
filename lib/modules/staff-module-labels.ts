@@ -21,7 +21,7 @@ const STAFF_MODULE_LABELS: Record<string, string> = {
   "community-calendar": "Community Calendar",
   ticketing: "Ticketing",
   "child-care": "Childcare",
-  "sign-ups": "Volunteer Sign-Ups",
+  "sign-ups": "Sign Ups",
   reports: "Reports",
   applications: "Applications",
 }

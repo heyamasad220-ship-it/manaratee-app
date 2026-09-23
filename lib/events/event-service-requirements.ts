@@ -1,3 +1,9 @@
+import {
+  storedWindowsFromForm,
+  volunteerWindowsFromStored,
+  type VolunteerWindowFormRow,
+} from "@/lib/events/volunteer-windows"
+
 export type EventVolunteerShift = {
   id: string
   /** HH:mm or datetime-local fragment */
@@ -79,9 +85,24 @@ export const YOUTH_GENDER_OPTIONS: Array<{
   { value: "female", label: "Girls" },
 ]
 
+export type EventVolunteerWindowSlot = {
+  id: string
+  name: string
+  openings: number
+}
+
+export type EventVolunteerWindow = {
+  id: string
+  start: string
+  end: string
+  slots: EventVolunteerWindowSlot[]
+}
+
 export type EventServiceRequirements = {
   volunteers?: {
     maxVolunteers?: number | null
+    /** Time windows with named slots. Source of truth for volunteer sign-ups. */
+    windows?: EventVolunteerWindow[]
     roles?: EventVolunteerRole[]
   }
   childcare?: {
@@ -155,6 +176,9 @@ export type EventServiceRequirementsFormState = {
       location: string
     }>
   }>
+  volunteerWindows: VolunteerWindowFormRow[]
+  /** True when times and slots were saved as windows, not derived from older roles. */
+  volunteerWindowsExplicit: boolean
   youthGroups: YouthGroupFormRow[]
   /** @deprecated Synced from youthGroups for older callers */
   childcareAgeGroups: ChildcareAgeGroupFormRow[]
@@ -225,6 +249,8 @@ export const DEFAULT_EVENT_SERVICE_REQUIREMENTS_FORM: EventServiceRequirementsFo
   requiresVendors: false,
   maxVolunteers: "",
   volunteerRoles: [],
+  volunteerWindows: [],
+  volunteerWindowsExplicit: false,
   youthGroups: [],
   childcareAgeGroups: [],
   childcareDeadline: "",
@@ -487,6 +513,10 @@ export function serviceRequirementsFormFromEvent(input: {
         location: shift.location || "",
       })),
     })),
+    volunteerWindows: volunteerWindowsFromStored(config.volunteers),
+    volunteerWindowsExplicit:
+      Array.isArray(config.volunteers?.windows) &&
+      config.volunteers.windows.length > 0,
     youthGroups,
     childcareAgeGroups: childcareAgeGroupsFromYouth(youthGroups),
     childcareDeadline:
@@ -510,30 +540,60 @@ export function buildServiceRequirementsPayload(
 } {
   const service_requirements: EventServiceRequirements = {}
 
-  if (form.requiresVolunteers || form.volunteerRoles.some((role) => role.name.trim())) {
+  const volunteerWindows = storedWindowsFromForm(form.volunteerWindows || [])
+  const useVolunteerWindows =
+    form.volunteerWindowsExplicit === true && volunteerWindows.length > 0
+
+  if (
+    form.requiresVolunteers ||
+    useVolunteerWindows ||
+    form.volunteerRoles.some((role) => role.name.trim())
+  ) {
     service_requirements.volunteers = {
       maxVolunteers: form.requiresVolunteers
         ? form.maxVolunteers
           ? Number.parseInt(form.maxVolunteers, 10)
           : null
         : null,
-      roles: form.volunteerRoles
-        .map((role) => ({
-          name: role.name.trim(),
-          slots: Number.parseInt(role.slots, 10) || 1,
-          description: role.description.trim() || null,
-          staffAllowed: role.staffAllowed !== false,
-          volunteerAllowed: role.volunteerAllowed !== false,
-          shifts: role.shifts
-            .filter((shift) => shift.start.trim() && shift.end.trim())
-            .map((shift) => ({
-              id: shift.id,
-              start: shift.start.trim(),
-              end: shift.end.trim(),
-              location: shift.location.trim() || null,
-            })),
-        }))
-        .filter((role) => role.name.length > 0),
+      ...(useVolunteerWindows ? { windows: volunteerWindows } : {}),
+      roles: useVolunteerWindows
+        ? volunteerWindows.flatMap((window) =>
+            window.slots.map((slot) => ({
+              name: slot.name,
+              slots: slot.openings,
+              description: null,
+              staffAllowed: true,
+              volunteerAllowed: true,
+              shifts:
+                window.start && window.end
+                  ? [
+                      {
+                        id: slot.id,
+                        start: window.start,
+                        end: window.end,
+                        location: null,
+                      },
+                    ]
+                  : [],
+            }))
+          )
+        : form.volunteerRoles
+            .map((role) => ({
+              name: role.name.trim(),
+              slots: Number.parseInt(role.slots, 10) || 1,
+              description: role.description.trim() || null,
+              staffAllowed: role.staffAllowed !== false,
+              volunteerAllowed: role.volunteerAllowed !== false,
+              shifts: role.shifts
+                .filter((shift) => shift.start.trim() && shift.end.trim())
+                .map((shift) => ({
+                  id: shift.id,
+                  start: shift.start.trim(),
+                  end: shift.end.trim(),
+                  location: shift.location.trim() || null,
+                })),
+            }))
+            .filter((role) => role.name.length > 0),
     }
   }
 
@@ -629,7 +689,7 @@ export function buildServiceRequirementsPayload(
   }
 
   return {
-    requires_volunteers: form.requiresVolunteers,
+    requires_volunteers: form.requiresVolunteers || useVolunteerWindows,
     requires_childcare: form.requiresChildcare,
     requires_vendors: form.requiresVendors,
     service_requirements,

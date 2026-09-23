@@ -5,7 +5,7 @@ export default function EventPublicPageSettings() {
     <VendorHubSectionPlaceholder
       title="Public Page"
       description="Each bazaar has its own share link with flyer, date, and vendor CTAs."
-      todo="Open a bazaar event → Overview → Flyer & share link to upload a flyer and copy the public URL."
+      todo="Open a bazaar event → Settings → General to upload a flyer and copy the public URL."
     />
   )
 }

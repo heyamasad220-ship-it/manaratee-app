@@ -29,6 +29,7 @@ export function FacilityVenueMultiSelect({
   venues,
   disabled,
   required,
+  emptyLabel = "Select venues",
   onChange,
 }: {
   id?: string
@@ -37,6 +38,7 @@ export function FacilityVenueMultiSelect({
   venues: FacilityVenueOption[]
   disabled?: boolean
   required?: boolean
+  emptyLabel?: string
   onChange: (venueIds: string[]) => void
 }) {
   const [open, setOpen] = useState(false)
@@ -52,7 +54,7 @@ export function FacilityVenueMultiSelect({
 
   const summary =
     selectedNames.length === 0
-      ? "Select venues"
+      ? emptyLabel
       : selectedNames.length <= 2
         ? selectedNames.join(", ")
         : `${selectedNames.slice(0, 2).join(", ")} +${selectedNames.length - 2}`

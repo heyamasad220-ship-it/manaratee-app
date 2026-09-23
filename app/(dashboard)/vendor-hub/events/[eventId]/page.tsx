@@ -4,7 +4,8 @@ import { BazaarEventWorkspaceShell } from "@/components/vendor-hub/bazaar-event-
 import { BazaarEventOverviewClient } from "@/components/vendor-hub/events/bazaar-event-overview-client"
 import { getVendorHubDashboardMetrics } from "@/lib/vendor-hub/vendor-hub-event-queries"
 import { getVendorHubEventById } from "@/lib/vendor-hub/vendor-hub-event-queries"
-import { getBazaarEventDeleteBlockers } from "@/lib/vendor-hub/vendor-hub-event-actions"
+import { getRecentVendorHubOrders } from "@/lib/vendor-hub/vendor-hub-overview-queries"
+import { getVendorHubReportsData } from "@/lib/vendor-hub/vendor-hub-reports-queries"
 import { requireVendorHubManage } from "@/lib/vendor-hub/vendor-hub-permissions"
 
 export default async function BazaarEventOverviewPage({
@@ -21,9 +22,10 @@ export default async function BazaarEventOverviewPage({
     notFound()
   }
 
-  const [metrics, deleteBlockedReason] = await Promise.all([
+  const [metrics, reports, recentOrders] = await Promise.all([
     getVendorHubDashboardMetrics(eventId),
-    getBazaarEventDeleteBlockers(eventId),
+    getVendorHubReportsData(eventId),
+    getRecentVendorHubOrders(eventId),
   ])
 
   return (
@@ -31,7 +33,8 @@ export default async function BazaarEventOverviewPage({
       <BazaarEventOverviewClient
         event={event}
         metrics={metrics}
-        deleteBlockedReason={deleteBlockedReason}
+        boothPerformance={reports.boothPerformance}
+        recentOrders={recentOrders}
       />
     </BazaarEventWorkspaceShell>
   )

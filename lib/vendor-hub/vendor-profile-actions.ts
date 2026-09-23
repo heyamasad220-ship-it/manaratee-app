@@ -12,6 +12,7 @@ import {
 } from "@/lib/vendor-hub/vendor-document-kinds"
 import { requireVendorHubManage } from "@/lib/vendor-hub/vendor-hub-permissions"
 import { VENDOR_HUB_ROUTES } from "@/lib/vendor-hub/vendor-hub-routes"
+import { getVendorProfile } from "@/lib/vendor-hub/vendor-profile-queries"
 import {
   VENDOR_ORG_APPLICATION_MODULE,
   VENDOR_ORG_APPLICATION_TYPE,
@@ -25,6 +26,15 @@ const ALLOWED_MIME = new Set([
   "image/jpeg",
   "image/webp",
 ])
+
+export async function getVendorProfileAction(contactId: string) {
+  await requireVendorHubManage()
+  const profile = await getVendorProfile(contactId)
+  if (!profile) {
+    return { success: false as const, error: "Vendor not found." }
+  }
+  return { success: true as const, profile }
+}
 
 function revalidateVendorPaths(contactId: string) {
   revalidatePath(VENDOR_HUB_ROUTES.network.vendor(contactId))
@@ -178,6 +188,63 @@ export async function updateVendorProfileAction(input: UpdateVendorProfileInput)
   }
 
   revalidateVendorPaths(input.contactId)
+  return { success: true as const }
+}
+
+export async function setVendorNetworkTypeAction(input: {
+  contactId: string
+  vendorTypeId: string | null
+}) {
+  await requireVendorHubManage()
+  const organizationId = await getSelectedOrganizationId()
+  if (!organizationId) {
+    return { success: false as const, error: "No organization selected." }
+  }
+
+  const contactId = input.contactId.trim()
+  const vendorTypeId = input.vendorTypeId?.trim() || null
+  if (!contactId) {
+    return { success: false as const, error: "Missing vendor." }
+  }
+
+  const supabase = await createClient()
+  if (vendorTypeId) {
+    const { data: vendorType, error: typeError } = await supabase
+      .from("vendor_hub_vendor_types")
+      .select("id")
+      .eq("id", vendorTypeId)
+      .eq("organization_id", organizationId)
+      .maybeSingle()
+
+    if (typeError) {
+      return { success: false as const, error: typeError.message }
+    }
+    if (!vendorType) {
+      return { success: false as const, error: "That vendor type is not available." }
+    }
+  }
+
+  const application = await ensureVendorApplication(supabase, organizationId, contactId)
+  const existingForm =
+    application.form_data && typeof application.form_data === "object"
+      ? { ...application.form_data }
+      : {}
+
+  const { error: appError } = await supabase
+    .from("applications")
+    .update({
+      form_data: {
+        ...existingForm,
+        vendor_type_id: vendorTypeId,
+      },
+    })
+    .eq("id", application.id)
+
+  if (appError) {
+    return { success: false as const, error: appError.message }
+  }
+
+  revalidateVendorPaths(contactId)
   return { success: true as const }
 }
 

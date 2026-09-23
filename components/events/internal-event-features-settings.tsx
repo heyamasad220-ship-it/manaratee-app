@@ -26,8 +26,8 @@ const FEATURE_ROWS: Array<{
   },
   {
     key: "staff",
-    label: "Staff & volunteers",
-    description: "Paid staff and volunteer assignments.",
+    label: "Staff",
+    description: "Paid staff assignments.",
   },
   {
     key: "youth",

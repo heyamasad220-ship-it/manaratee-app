@@ -1,17 +1,16 @@
-"use client"
-
 import { Header } from "@/components/layout/header"
-import { SignUpsTabNav } from "@/components/layout/sign-ups-tab-nav"
 import { PlaceholderPage } from "@/components/layout/placeholder-page"
+import { requireSignUpsAccess } from "@/lib/sign-ups/sign-up-access"
 
-export default function SignUpsSettingsPage() {
+export default async function SignUpsSettingsPage() {
+  await requireSignUpsAccess()
+
   return (
     <>
-      <Header title="Sign-Ups" />
-      <SignUpsTabNav />
+      <Header title="Settings" />
       <PlaceholderPage
-        title="Sign-Up Settings"
-        description="Settings for sign-ups will appear here."
+        title="Settings"
+        description="Sign-up settings will be set up on this page."
       />
     </>
   )

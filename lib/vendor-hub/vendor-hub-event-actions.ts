@@ -31,6 +31,7 @@ export type UpsertBazaarEventInput = {
   organizer_contact_id?: string | null
   organizer_name?: string | null
   venue_id?: string | null
+  venue_ids?: string[] | null
 }
 
 export type BazaarVenueOption = {
@@ -62,6 +63,26 @@ function revalidateVendorHubEventPaths(eventId?: string, internalEventId?: strin
   }
 }
 
+export async function fetchSelectedOrganizationName(): Promise<string | null> {
+  await requireVendorHubManage()
+
+  const supabase = await createClient()
+  const organizationId = await getSelectedOrganizationId()
+  if (!organizationId) return null
+
+  const { data, error } = await supabase
+    .from("organizations")
+    .select("name")
+    .eq("id", organizationId)
+    .maybeSingle()
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return ((data?.name as string | null) || "").trim() || null
+}
+
 export async function fetchVenuesForBazaarPicker(): Promise<BazaarVenueOption[]> {
   await requireVendorHubManage()
 
@@ -87,6 +108,40 @@ export async function fetchVenuesForBazaarPicker(): Promise<BazaarVenueOption[]>
     id: row.id as string,
     name: (row.name as string) || "Untitled space",
   }))
+}
+
+export async function fetchBazaarLinkedVenueIds(eventId: string): Promise<string[]> {
+  await requireVendorHubManage()
+
+  const supabase = await createClient()
+  const organizationId = await getSelectedOrganizationId()
+  if (!organizationId) return []
+
+  const { data: event, error } = await supabase
+    .from("vendor_hub_events")
+    .select("venue_id, internal_event_id")
+    .eq("id", eventId)
+    .eq("organization_id", organizationId)
+    .maybeSingle()
+
+  if (error || !event) return []
+
+  const internalEventId = (event.internal_event_id as string | null) || null
+  if (internalEventId) {
+    const { data: links } = await supabase
+      .from("internal_event_venues")
+      .select("venue_id")
+      .eq("organization_id", organizationId)
+      .eq("internal_event_id", internalEventId)
+
+    const ids = (links || [])
+      .map((row) => row.venue_id as string)
+      .filter((id) => id.trim().length > 0)
+    if (ids.length > 0) return [...new Set(ids)]
+  }
+
+  const primary = (event.venue_id as string | null)?.trim()
+  return primary ? [primary] : []
 }
 
 export async function upsertBazaarEvent(input: UpsertBazaarEventInput) {
@@ -155,23 +210,35 @@ export async function upsertBazaarEvent(input: UpsertBazaarEventInput) {
     }
   }
 
-  const venueId = input.venue_id?.trim() || null
-  if (venueId) {
-    const { data: venue, error: venueError } = await supabase
+  const requestedVenueIds = [
+    ...new Set(
+      (input.venue_ids || [])
+        .map((id) => id.trim())
+        .filter((id) => id.length > 0)
+    ),
+  ]
+  if (requestedVenueIds.length === 0 && input.venue_id?.trim()) {
+    requestedVenueIds.push(input.venue_id.trim())
+  }
+
+  if (requestedVenueIds.length > 0) {
+    const { data: venueRows, error: venueError } = await supabase
       .from("venues")
       .select("id")
-      .eq("id", venueId)
+      .in("id", requestedVenueIds)
       .eq("organization_id", organizationId)
-      .maybeSingle()
 
     if (venueError) {
       throw new Error(venueError.message)
     }
 
-    if (!venue) {
+    const found = new Set((venueRows || []).map((row) => row.id as string))
+    if (requestedVenueIds.some((id) => !found.has(id))) {
       throw new Error("Selected space was not found")
     }
   }
+
+  const venueId = requestedVenueIds[0] || null
 
   const identity = {
     name,
@@ -182,6 +249,7 @@ export async function upsertBazaarEvent(input: UpsertBazaarEventInput) {
     location: input.location?.trim() || null,
     flyerUrl: input.flyer_url?.trim() || null,
     venueId,
+    venueIds: requestedVenueIds,
     calendarVisibility: input.calendar_visibility,
     coordinatorContactId: organizerContactId,
   }
@@ -193,23 +261,32 @@ export async function upsertBazaarEvent(input: UpsertBazaarEventInput) {
     internalEventId: existingInternalEventId,
   })
 
+  const { data: organization, error: organizationError } = await supabase
+    .from("organizations")
+    .select("name")
+    .eq("id", organizationId)
+    .maybeSingle()
+
+  if (organizationError) {
+    throw new Error(organizationError.message)
+  }
+
+  const organizerName = ((organization?.name as string | null) || "").trim() || null
+
   const payload = {
     name,
-    event_type: input.event_type?.trim() || null,
     event_date: input.event_date || null,
     start_time: input.start_time || null,
     end_time: input.end_time || null,
     location: input.location?.trim() || null,
     description: input.description?.trim() || null,
-    expected_attendees: input.expected_attendees ?? 0,
-    total_booths: input.total_booths ?? 0,
     status: "draft" as const,
     calendar_status: calendarStatusFromVisibility(input.calendar_visibility),
     organization_id: organizationId,
     internal_event_id: internalEventId,
     flyer_url: input.flyer_url?.trim() || null,
     organizer_contact_id: organizerContactId,
-    organizer_name: input.organizer_name?.trim() || null,
+    organizer_name: organizerName,
     venue_id: venueId,
   }
 
@@ -248,6 +325,8 @@ export async function upsertBazaarEvent(input: UpsertBazaarEventInput) {
     .from("vendor_hub_events")
     .insert({
       ...payload,
+      expected_attendees: input.expected_attendees ?? 0,
+      total_booths: input.total_booths ?? 0,
       public_share_token: createBazaarShareToken(),
     })
     .select("id")

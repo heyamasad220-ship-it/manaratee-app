@@ -3,110 +3,83 @@
 import Link from "next/link"
 import { useState } from "react"
 import {
-  AlertCircle,
-  Calendar,
-  Clock,
+  ChevronRight,
+  ClipboardList,
   DollarSign,
   FileText,
-  Globe,
-  MapPin,
+  LayoutGrid,
   Plus,
   Store,
   Users,
-  Utensils,
 } from "lucide-react"
 
 import { CreateBazaarEventDrawer } from "@/components/bazaar/create-bazaar-event-drawer"
+import {
+  DonationMetricCard,
+  DonationMetricCardGrid,
+} from "@/components/donations/donation-metric-card"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { StatCard, StatCardsRow, type StatCardTone } from "@/components/ui/stat-card"
-import { VendorHubReportsOverviewPanels } from "@/components/vendor-hub/vendor-hub-reports-overview-panels"
 import { VENDOR_HUB_ROUTES } from "@/lib/vendor-hub/vendor-hub-routes"
-import type { VendorHubReportOverview } from "@/lib/vendor-hub/vendor-hub-reports-queries"
+import { formatCalendarDate } from "@/lib/vendor-hub/vendor-hub-overview"
 import type {
   VendorHubEventWithInternal,
   VendorHubOrgDashboardMetrics,
 } from "@/lib/vendor-hub/vendor-hub-types"
 
-function formatEventDate(value?: string | null) {
-  if (!value) return "Date not set"
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleDateString(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  })
-}
-
-function formatMoney(amount: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(amount || 0)
-}
-
 export function VendorHubDashboardClient({
   metrics,
   upcomingEvents,
-  reportsOverview,
+  currentEventName,
+  boothsOpen,
+  boothsTotal,
+  unpaidBooths,
 }: {
   metrics: VendorHubOrgDashboardMetrics
   upcomingEvents: VendorHubEventWithInternal[]
-  reportsOverview: VendorHubReportOverview
+  currentEventName: string | null
+  boothsOpen: number
+  boothsTotal: number
+  unpaidBooths: number
 }) {
   const [createDrawerOpen, setCreateDrawerOpen] = useState(false)
+  const currentEventId = metrics.currentEventId
+  const reservedBooths = Math.max(0, boothsTotal - boothsOpen)
 
-  const healthStats: Array<{
-    label: string
-    value: string | number
-    icon: typeof FileText
-    tone: StatCardTone
-    href: string
-  }> = [
-    {
-      label: "Onboarding pending",
-      value: metrics.onboardingPending,
-      icon: FileText,
-      tone: "amber",
+  const actionItems: Array<{ id: string; label: string; href: string }> = []
+  if (metrics.onboardingPending > 0) {
+    actionItems.push({
+      id: "onboarding",
+      label: `${metrics.onboardingPending} vendor application${metrics.onboardingPending === 1 ? "" : "s"} waiting`,
       href: VENDOR_HUB_ROUTES.network.onboarding,
-    },
-    {
-      label: "Active vendors",
-      value: metrics.activeVendors,
-      icon: Users,
-      tone: "emerald",
-      href: VENDOR_HUB_ROUTES.network.vendors,
-    },
-    {
-      label: "Outstanding balance",
-      value: `$${metrics.outstandingBalance.toFixed(2)}`,
-      icon: AlertCircle,
-      tone: "rose",
-      href: VENDOR_HUB_ROUTES.reports,
-    },
-    {
-      label: "Total revenue",
-      value: formatMoney(reportsOverview.totalRevenue),
-      icon: DollarSign,
-      tone: "violet",
-      href: VENDOR_HUB_ROUTES.reports,
-    },
-    {
-      label: "Food category",
-      value: reportsOverview.foodVendors,
-      icon: Utensils,
-      tone: "amber",
-      href: VENDOR_HUB_ROUTES.reports,
-    },
-  ]
+    })
+  }
+  if (currentEventId && metrics.boothRequestsPending > 0) {
+    actionItems.push({
+      id: "requests",
+      label: `${metrics.boothRequestsPending} booth request${metrics.boothRequestsPending === 1 ? "" : "s"}${currentEventName ? ` for ${currentEventName}` : ""}`,
+      href: VENDOR_HUB_ROUTES.events.booths(currentEventId),
+    })
+  }
+  if (currentEventId && unpaidBooths > 0) {
+    actionItems.push({
+      id: "unpaid",
+      label: `${unpaidBooths} unpaid booth${unpaidBooths === 1 ? "" : "s"}${currentEventName ? ` for ${currentEventName}` : ""}`,
+      href: VENDOR_HUB_ROUTES.events.booths(currentEventId),
+    })
+  }
+  if (currentEventId && boothsOpen > 0) {
+    actionItems.push({
+      id: "open-booths",
+      label: `${boothsOpen} booth${boothsOpen === 1 ? "" : "s"} still open${currentEventName ? ` for ${currentEventName}` : ""}`,
+      href: VENDOR_HUB_ROUTES.events.booths(currentEventId),
+    })
+  }
 
   const quickActions = [
     {
       id: "create-event",
-      label: "Create Vendor Event",
+      label: "Create bazaar",
       icon: Plus,
       onClick: () => setCreateDrawerOpen(true),
     },
@@ -123,18 +96,6 @@ export function VendorHubDashboardClient({
       href: VENDOR_HUB_ROUTES.network.onboarding,
     },
     {
-      id: "history",
-      label: "Participation History",
-      icon: Store,
-      href: VENDOR_HUB_ROUTES.reportsHistory(),
-    },
-    {
-      id: "calendar",
-      label: "Community Calendar",
-      icon: Globe,
-      href: VENDOR_HUB_ROUTES.communityCalendar,
-    },
-    {
       id: "reports",
       label: "Reports",
       icon: DollarSign,
@@ -143,124 +104,200 @@ export function VendorHubDashboardClient({
   ]
 
   return (
-    <div className="p-6">
-      <div className="mb-6 border-b border-border pb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Overview</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Organization-wide vendor health, sales snapshot, and upcoming bazaars.
+    <div className="flex flex-col gap-4 p-6">
+      <div>
+        <h2 className="text-xl font-semibold text-foreground">Dashboard Overview</h2>
+        <p className="text-sm text-muted-foreground">
+          Bazaars, vendors, items needing attention, and next steps
         </p>
       </div>
 
-      <div className="flex flex-col gap-6">
-        <StatCardsRow equal columns={5} className="lg:grid-cols-5">
-          {healthStats.map((stat) => (
-            <Link key={stat.label} href={stat.href} className="min-w-0">
-              <StatCard
-                fill
-                layout="header"
-                label={stat.label}
-                value={stat.value}
-                icon={stat.icon}
-                tone={stat.tone}
-                className="h-full transition-shadow hover:shadow-sm"
+      <div className="grid items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_13.5rem]">
+        <div className="flex min-w-0 flex-col gap-4">
+          <DonationMetricCardGrid colorful compact className="lg:grid-cols-4">
+            <Link href={VENDOR_HUB_ROUTES.events.list} className="min-w-0">
+              <DonationMetricCard
+                compact
+                title="Active events"
+                value={upcomingEvents.length}
+                icon={Store}
+                accent="blue"
+                description="Today and upcoming bazaars"
               />
             </Link>
-          ))}
-        </StatCardsRow>
+            <Link href={VENDOR_HUB_ROUTES.network.onboarding} className="min-w-0">
+              <DonationMetricCard
+                compact
+                title="Onboarding pending"
+                value={metrics.onboardingPending}
+                icon={FileText}
+                accent="amber"
+                description="Vendor applications to review"
+              />
+            </Link>
+            {currentEventId ? (
+              <Link href={VENDOR_HUB_ROUTES.events.booths(currentEventId)} className="min-w-0">
+                <DonationMetricCard
+                  compact
+                  title="Booth requests"
+                  value={metrics.boothRequestsPending}
+                  icon={ClipboardList}
+                  accent="purple"
+                  description={currentEventName || "Next bazaar"}
+                />
+              </Link>
+            ) : (
+              <DonationMetricCard
+                compact
+                title="Booth requests"
+                value={0}
+                icon={ClipboardList}
+                accent="purple"
+                description="No upcoming bazaar"
+              />
+            )}
+            {currentEventId ? (
+              <Link href={VENDOR_HUB_ROUTES.events.booths(currentEventId)} className="min-w-0">
+                <DonationMetricCard
+                  compact
+                  title="Booths still open"
+                  value={boothsOpen}
+                  icon={LayoutGrid}
+                  accent="emerald"
+                  description={
+                    boothsTotal > 0
+                      ? `${reservedBooths} of ${boothsTotal} reserved`
+                      : currentEventName || "Next bazaar"
+                  }
+                />
+              </Link>
+            ) : (
+              <DonationMetricCard
+                compact
+                title="Booths still open"
+                value={0}
+                icon={LayoutGrid}
+                accent="emerald"
+                description="No upcoming bazaar"
+              />
+            )}
+          </DonationMetricCardGrid>
 
-        <VendorHubReportsOverviewPanels overview={reportsOverview} />
-
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Upcoming events</CardTitle>
-              <CardDescription>
-                Today and future bazaars — open an event for booths, vendors, and payments.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3">
-              {upcomingEvents.length === 0 ? (
-                <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
-                  No upcoming vendor events. Create one to start planning your next bazaar.
-                </div>
-              ) : (
-                upcomingEvents.map((event) => {
-                  const location =
-                    event.location ||
-                    event.venue_name ||
-                    event.internal_event?.location_label ||
-                    "Location not set"
-                  const time = event.start_time || "Time not set"
-
-                  return (
-                    <Link
-                      key={event.id}
-                      href={VENDOR_HUB_ROUTES.events.detail(event.id)}
-                      className="flex flex-col gap-2 rounded-lg border p-4 transition-colors hover:bg-muted/50 sm:flex-row sm:items-center sm:justify-between"
-                    >
-                      <div className="min-w-0 space-y-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-medium text-foreground">{event.name}</span>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                          <span className="flex items-center gap-1.5">
-                            <Calendar className="h-3.5 w-3.5" />
-                            {formatEventDate(event.event_date)}
-                          </span>
-                          <span className="flex items-center gap-1.5">
-                            <Clock className="h-3.5 w-3.5" />
-                            {time}
-                          </span>
-                          <span className="flex items-center gap-1.5">
-                            <MapPin className="h-3.5 w-3.5" />
-                            {location}
-                          </span>
-                        </div>
-                      </div>
-                      <span className="text-sm font-medium text-primary">Open workspace</span>
-                    </Link>
-                  )
-                })
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="h-fit lg:sticky lg:top-6">
-            <CardHeader>
-              <CardTitle className="text-base">Quick Actions</CardTitle>
-              <CardDescription>Organization shortcuts</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col gap-2">
-                {quickActions.map((action) =>
-                  action.href ? (
-                    <Button
-                      key={action.id}
-                      variant="outline"
-                      className="h-auto w-full justify-start gap-2 px-3 py-2.5"
-                      asChild
-                    >
-                      <Link href={action.href}>
-                        <action.icon className="h-4 w-4 shrink-0" />
-                        <span className="text-left">{action.label}</span>
-                      </Link>
-                    </Button>
-                  ) : (
-                    <Button
-                      key={action.id}
-                      variant="outline"
-                      className="h-auto w-full justify-start gap-2 px-3 py-2.5"
-                      onClick={action.onClick}
-                    >
-                      <action.icon className="h-4 w-4 shrink-0" />
-                      <span className="text-left">{action.label}</span>
-                    </Button>
-                  )
+          <div className="grid flex-1 gap-4 md:grid-cols-2">
+            <Card className="h-full">
+              <CardHeader className="p-4 pb-2">
+                <CardTitle className="text-sm">Action Required</CardTitle>
+                <CardDescription className="text-xs">
+                  Operational items that need staff attention
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-4 pt-2">
+                {actionItems.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No vendor actions need attention right now.
+                  </p>
+                ) : (
+                  <ul className="space-y-1.5">
+                    {actionItems.map((item) => (
+                      <li key={item.id}>
+                        <Link
+                          href={item.href}
+                          className="flex items-center justify-between gap-3 rounded-md border px-2.5 py-1.5 text-sm transition hover:bg-muted/50"
+                        >
+                          <span>{item.label}</span>
+                          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
                 )}
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+
+            <Card className="h-full">
+              <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 p-4 pb-2">
+                <div>
+                  <CardTitle className="text-sm">Active events</CardTitle>
+                  <CardDescription className="text-xs">Today and upcoming bazaars</CardDescription>
+                </div>
+                <Button variant="outline" size="sm" className="h-7 px-2 text-xs" asChild>
+                  <Link href={VENDOR_HUB_ROUTES.events.list}>View all</Link>
+                </Button>
+              </CardHeader>
+              <CardContent className="p-4 pt-2">
+                {upcomingEvents.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No active bazaars.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {upcomingEvents.slice(0, 4).map((event) => {
+                      const location =
+                        event.location ||
+                        event.venue_name ||
+                        event.internal_event?.location_label ||
+                        "Location not set"
+                      const isCurrent = event.id === currentEventId
+                      return (
+                        <li key={event.id} className="space-y-1 rounded-md border p-2.5">
+                          <div className="flex items-start justify-between gap-3">
+                            <Link
+                              href={VENDOR_HUB_ROUTES.events.detail(event.id)}
+                              className="text-sm font-medium text-primary hover:underline"
+                            >
+                              {event.name}
+                            </Link>
+                            <span className="whitespace-nowrap text-xs text-muted-foreground">
+                              {formatCalendarDate(event.event_date, { weekday: true }) || "Date not set"}
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {location}
+                            {isCurrent && boothsTotal > 0
+                              ? ` · ${reservedBooths} of ${boothsTotal} booths reserved`
+                              : ""}
+                          </p>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </div>
+
+        <Card className="h-full">
+          <CardHeader className="p-4 pb-2">
+            <CardTitle className="text-sm">Quick Actions</CardTitle>
+            <CardDescription className="text-xs">Jump to common bazaar workflows</CardDescription>
+          </CardHeader>
+          <CardContent className="p-4 pt-2">
+            <ul className="space-y-2">
+              {quickActions.map((action) => {
+                const Icon = action.icon
+                const className =
+                  "inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+                if (action.href) {
+                  return (
+                    <li key={action.id}>
+                      <Link href={action.href} className={className}>
+                        <Icon className="h-4 w-4 shrink-0" />
+                        {action.label}
+                      </Link>
+                    </li>
+                  )
+                }
+                return (
+                  <li key={action.id}>
+                    <button type="button" onClick={action.onClick} className={className}>
+                      <Icon className="h-4 w-4 shrink-0" />
+                      {action.label}
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          </CardContent>
+        </Card>
       </div>
 
       <CreateBazaarEventDrawer open={createDrawerOpen} onOpenChange={setCreateDrawerOpen} />

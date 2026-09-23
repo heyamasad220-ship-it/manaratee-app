@@ -21,6 +21,8 @@ type TableColumnHeaderFilterHelpers = {
 type TableColumnHeaderFilterProps = {
   label: string
   active?: boolean
+  contentClassName?: string
+  onOpenChange?: (open: boolean) => void
   children: ReactNode | ((helpers: TableColumnHeaderFilterHelpers) => ReactNode)
   trailing?: ReactNode
 }
@@ -28,6 +30,8 @@ type TableColumnHeaderFilterProps = {
 export function TableColumnHeaderFilter({
   label,
   active = false,
+  contentClassName,
+  onOpenChange,
   children,
   trailing,
 }: TableColumnHeaderFilterProps) {
@@ -39,7 +43,13 @@ export function TableColumnHeaderFilter({
     <div className="flex items-center gap-1">
       <span className="font-medium">{label}</span>
       {trailing}
-      <Popover open={open} onOpenChange={setOpen}>
+      <Popover
+        open={open}
+        onOpenChange={(next) => {
+          setOpen(next)
+          onOpenChange?.(next)
+        }}
+      >
         <PopoverTrigger asChild>
           <Button
             type="button"
@@ -54,7 +64,7 @@ export function TableColumnHeaderFilter({
             <Filter className="h-3.5 w-3.5" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-56 p-3" align="start">
+        <PopoverContent className={cn("w-56 p-3", contentClassName)} align="start">
           {content}
         </PopoverContent>
       </Popover>
