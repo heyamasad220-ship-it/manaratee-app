@@ -1,4 +1,7 @@
+import { redirect } from "next/navigation"
+
 import { TicketingOrdersClient } from "@/components/tickets/ticketing-orders-client"
+import { eventTicketingWorkspaceHref } from "@/lib/events/event-management-section-path"
 import {
   getTicketOrders,
   getTicketedEvents,
@@ -21,6 +24,9 @@ export default async function EventManagementTicketingOrdersPage({
   )
 
   const params = await searchParams
+  if (params.event) {
+    redirect(eventTicketingWorkspaceHref(params.event, "orders"))
+  }
   const initialEventFilter = params.event
 
   const [orders, events, canManage] = await Promise.all([

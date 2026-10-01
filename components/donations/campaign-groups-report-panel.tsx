@@ -49,7 +49,13 @@ function downloadCsv(filename: string, header: string[], rows: Array<Array<strin
 export function CampaignGroupsReportPanel({ embedded = false }: { embedded?: boolean }) {
   const [rows, setRows] = useState<OrgCampaignGroupReportRow[]>([])
   const [campaigns, setCampaigns] = useState<Array<{ id: string; name: string }>>([])
-  const [totals, setTotals] = useState({ groups: 0, pledged: 0, collected: 0, donors: 0 })
+  const [totals, setTotals] = useState({
+    groups: 0,
+    received: 0,
+    pledgedNotReceived: 0,
+    groupTotal: 0,
+    donors: 0,
+  })
   const [campaignFilter, setCampaignFilter] = useState(ALL)
   const [statusFilter, setStatusFilter] = useState(ALL)
   const [loading, setLoading] = useState(true)
@@ -84,7 +90,7 @@ export function CampaignGroupsReportPanel({ embedded = false }: { embedded?: boo
         <div>
           <h2 className="text-xl font-semibold">Campaign Groups</h2>
           <p className="text-sm text-muted-foreground">
-            Fundraising teams across campaigns. Separate from CRM Group Giving on Donors.
+            Competition score is money received plus pledges not yet received. Public donation links still show received only. Separate from CRM Group Giving on Donors.
           </p>
         </div>
       )}
@@ -100,18 +106,28 @@ export function CampaignGroupsReportPanel({ embedded = false }: { embedded?: boo
         </Card>
         <Card className="border border-border shadow-sm">
           <CardHeader className="pb-1 pt-4">
-            <CardTitle className="text-xs uppercase text-muted-foreground">Pledged</CardTitle>
+            <CardTitle className="text-xs uppercase text-muted-foreground">Received</CardTitle>
           </CardHeader>
           <CardContent className="pb-4 text-xl font-semibold tabular-nums">
-            {formatDonationCurrency(totals.pledged)}
+            {formatDonationCurrency(totals.received)}
           </CardContent>
         </Card>
         <Card className="border border-border shadow-sm">
           <CardHeader className="pb-1 pt-4">
-            <CardTitle className="text-xs uppercase text-muted-foreground">Collected</CardTitle>
+            <CardTitle className="text-xs uppercase text-muted-foreground">
+              Pledged, not received
+            </CardTitle>
           </CardHeader>
           <CardContent className="pb-4 text-xl font-semibold tabular-nums">
-            {formatDonationCurrency(totals.collected)}
+            {formatDonationCurrency(totals.pledgedNotReceived)}
+          </CardContent>
+        </Card>
+        <Card className="border border-border shadow-sm">
+          <CardHeader className="pb-1 pt-4">
+            <CardTitle className="text-xs uppercase text-muted-foreground">Group total</CardTitle>
+          </CardHeader>
+          <CardContent className="pb-4 text-xl font-semibold tabular-nums">
+            {formatDonationCurrency(totals.groupTotal)}
           </CardContent>
         </Card>
         <Card className="border border-border shadow-sm">
@@ -165,8 +181,9 @@ export function CampaignGroupsReportPanel({ embedded = false }: { embedded?: boo
                 "Status",
                 "Goal",
                 "Donors",
-                "Pledged",
-                "Collected",
+                "Received",
+                "Pledged, not received",
+                "Group total",
               ],
               rows.map((row) => [
                 row.campaignName,
@@ -175,8 +192,9 @@ export function CampaignGroupsReportPanel({ embedded = false }: { embedded?: boo
                 CAMPAIGN_GROUP_STATUS_LABELS[row.status],
                 row.goalAmount ?? "",
                 row.donorCount,
-                row.pledged,
                 row.collected,
+                row.outstanding,
+                row.groupTotal,
               ])
             )
           }
@@ -199,21 +217,22 @@ export function CampaignGroupsReportPanel({ embedded = false }: { embedded?: boo
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Goal</TableHead>
                 <TableHead className="text-right">Donors</TableHead>
-                <TableHead className="text-right">Pledged</TableHead>
-                <TableHead className="text-right">Collected</TableHead>
+                <TableHead className="text-right">Received</TableHead>
+                <TableHead className="text-right">Pledged, not received</TableHead>
+                <TableHead className="text-right">Group total</TableHead>
                 <TableHead>Progress</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="py-8 text-center text-muted-foreground">
+                  <TableCell colSpan={10} className="py-8 text-center text-muted-foreground">
                     Loading campaign groups…
                   </TableCell>
                 </TableRow>
               ) : rows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="py-8 text-center text-muted-foreground">
+                  <TableCell colSpan={10} className="py-8 text-center text-muted-foreground">
                     No campaign groups found.
                   </TableCell>
                 </TableRow>
@@ -246,10 +265,13 @@ export function CampaignGroupsReportPanel({ embedded = false }: { embedded?: boo
                     </TableCell>
                     <TableCell className="text-right tabular-nums">{row.donorCount}</TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {formatDonationCurrency(row.pledged)}
+                      {formatDonationCurrency(row.collected)}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {formatDonationCurrency(row.collected)}
+                      {formatDonationCurrency(row.outstanding)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums font-medium">
+                      {formatDonationCurrency(row.groupTotal)}
                     </TableCell>
                     <TableCell className="min-w-[110px]">
                       {row.progressPercent != null ? (

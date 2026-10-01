@@ -16,7 +16,6 @@ export const CAMPAIGN_WORKSPACE_TABS = [
   { id: "prospects", label: "Prospects" },
   { id: "pledges", label: "Pledges" },
   { id: "donations", label: "Donations" },
-  { id: "sponsors", label: "Sponsorship" },
   { id: "groups", label: "Groups" },
   { id: "wishlist", label: "Wishlist" },
 ] as const satisfies readonly { id: CampaignWorkspaceTab; label: string }[]

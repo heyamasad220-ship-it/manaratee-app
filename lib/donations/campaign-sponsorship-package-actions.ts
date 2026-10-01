@@ -368,16 +368,6 @@ export async function createSponsorshipPackageAction(input: SponsorshipPackageWr
         .maybeSingle()
       if (eventError) return { success: false as const, error: eventError.message }
       if (!event) return { success: false as const, error: "Event not found" }
-
-      const { data: campaignEvents } = await writeClient
-        .from("internal_events")
-        .select("id")
-        .eq("organization_id", access.orgId)
-        .eq("campaign_id", campaignId)
-      const campaignEventIds = (campaignEvents || []).map((row) => row.id as string)
-      if (campaignEventIds.length === 1 && campaignEventIds[0] === eventId) {
-        eventId = null
-      }
     }
 
     const displayOrder =

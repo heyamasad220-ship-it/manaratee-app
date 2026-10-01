@@ -57,6 +57,7 @@ export function CampaignSponsorshipPackageDialog({
   canManage,
   events,
   pkg,
+  defaultEventId,
   onSaved,
 }: {
   open: boolean
@@ -65,6 +66,7 @@ export function CampaignSponsorshipPackageDialog({
   canManage: boolean
   events: CampaignLinkedEventOption[]
   pkg: SponsorshipPackageListItem | null
+  defaultEventId?: string
   onSaved: () => void
 }) {
   const [name, setName] = useState("")
@@ -102,12 +104,12 @@ export function CampaignSponsorshipPackageDialog({
 
     setName("")
     setAmount("")
-    setEventId("")
+    setEventId(defaultEventId || "")
     setDescription("")
     setActive(true)
     setDisplayOrder("")
     setBenefits([emptyBenefit()])
-  }, [open, pkg])
+  }, [open, pkg, defaultEventId])
 
   useEffect(() => {
     if (!open || pkg) return

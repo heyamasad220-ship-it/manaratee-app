@@ -118,8 +118,12 @@ export async function getEventOverviewSummary(input: {
   participations: ServiceParticipationWithContact[]
   childcareRegistrations: ChildcareRegistration[]
   linkedCampaignRaisedCents?: number
+  featureHints?: { hasPlanningQuote?: boolean; hasSponsors?: boolean }
 }): Promise<EventOverviewSummary> {
-  const features = resolveEventWorkspaceFeatures(input.event)
+  const features = resolveEventWorkspaceFeatures({
+    ...input.event,
+    ...input.featureHints,
+  })
   const attendanceMode = resolveAttendanceMode(input.event)
   const config = input.event.ticketing_config || {}
   const service = parseServiceRequirements(input.event.service_requirements)
@@ -176,7 +180,8 @@ export async function getEventOverviewSummary(input: {
 
   const kpis: EventOverviewKpi[] = buildEventOverviewOpsKpis(
     input.event,
-    seriesRows
+    seriesRows,
+    input.featureHints
   )
 
   const alerts: EventOverviewAlert[] = []
@@ -200,15 +205,6 @@ export async function getEventOverviewSummary(input: {
       severity: "warning",
       message: `${taskCount} task${taskCount === 1 ? "" : "s"} configured with no assignments yet`,
       hrefTab: "staff",
-    })
-  }
-
-  if (features.youth && youthCapacity != null && youthRegistered >= youthCapacity) {
-    alerts.push({
-      id: "youth-full",
-      severity: "info",
-      message: "Youth offerings are at capacity",
-      hrefTab: "youth",
     })
   }
 

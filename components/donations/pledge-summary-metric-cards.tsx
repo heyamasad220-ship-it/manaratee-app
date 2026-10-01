@@ -11,6 +11,7 @@ export type PledgeSummaryMetrics = {
   totalCollected: number
   outstandingBalance: number
   activePledgeCount: number
+  fulfilledPledgeCount?: number
   pledgeCount: number
 }
 
@@ -19,6 +20,12 @@ type PledgeSummaryMetricCardsProps = {
   className?: string
   statusFilter?: string
   overdueCount?: number
+  /** Campaign tab: three cards for every pledge on the campaign, ignoring the table status filter. */
+  variant?: "default" | "campaign"
+}
+
+function countLabel(count: number, singular: string, plural = `${singular}s`) {
+  return `${count} ${count === 1 ? singular : plural}`
 }
 
 function getPledgeCountLabel(statusFilter?: string) {
@@ -48,9 +55,39 @@ export function PledgeSummaryMetricCards({
   className,
   statusFilter = "all",
   overdueCount,
+  variant = "default",
 }: PledgeSummaryMetricCardsProps) {
   const { totalPledged, totalCollected, outstandingBalance, activePledgeCount, pledgeCount } =
     metrics
+
+  if (variant === "campaign") {
+    const fulfilledPledgeCount = metrics.fulfilledPledgeCount ?? 0
+    return (
+      <DonationMetricCardGrid colorful columns={3} className={className}>
+        <DonationMetricCard
+          title="Total Pledged"
+          value={formatDonationCurrency(totalPledged)}
+          icon={Heart}
+          accent="blue"
+          description={countLabel(pledgeCount, "pledge")}
+        />
+        <DonationMetricCard
+          title="Collected"
+          value={formatDonationCurrency(totalCollected)}
+          icon={DollarSign}
+          accent="emerald"
+          description={countLabel(fulfilledPledgeCount, "paid in full", "paid in full")}
+        />
+        <DonationMetricCard
+          title="Remaining"
+          value={formatDonationCurrency(outstandingBalance)}
+          icon={AlertCircle}
+          accent="amber"
+          description={countLabel(activePledgeCount, "open pledge")}
+        />
+      </DonationMetricCardGrid>
+    )
+  }
   const activeCard = getActivePledgeCardLabels(statusFilter === "all" ? undefined : statusFilter)
   const pledgeLabel = getPledgeCountLabel(statusFilter === "all" ? undefined : statusFilter)
   const remainingDescription =

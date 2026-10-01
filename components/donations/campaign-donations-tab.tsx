@@ -45,6 +45,7 @@ import { ensureGroupMembershipForDonationAction } from "@/lib/contacts/group-giv
 import {
   campaignPaymentTypeLabel,
   formatDonationCurrency,
+  isPledgeAppliedCampaignPayment,
   type CampaignPaymentRow,
   type CampaignRecurringPlanRow,
 } from "@/lib/donations/campaign-analytics"
@@ -61,6 +62,8 @@ import {
   formatRecurringStatusLabel,
   type RecurringFrequency,
 } from "@/lib/donations/recurring-donation-types"
+import { fetchOpenPledgesForAllocationAction } from "@/lib/donations/donation-list-actions"
+import { allocatePaymentToOpenPledgeAction } from "@/lib/donations/payment-admin-actions"
 import { createClient } from "@/lib/supabase/client"
 
 function formatShortDate(value: string | null | undefined) {
@@ -95,7 +98,6 @@ export function CampaignDonationsTab({
   openPledgeContactIds,
   canManage,
   onDonorClick,
-  onPledgeClick,
   onRecurringDonorClick,
   onReload,
 }: {
@@ -113,6 +115,19 @@ export function CampaignDonationsTab({
 }) {
   const supabase = createClient()
 
+  const [applyPayment, setApplyPayment] = useState<CampaignPaymentRow | null>(null)
+  const [applyPledgeId, setApplyPledgeId] = useState("")
+  const [applyPledges, setApplyPledges] = useState<
+    Array<{
+      id: string
+      campaign_id?: string | null
+      campaign_name: string | null
+      balance_remaining: number | null
+    }>
+  >([])
+  const [applyLoading, setApplyLoading] = useState(false)
+  const [applySaving, setApplySaving] = useState(false)
+  const [applyError, setApplyError] = useState<string | null>(null)
   const [showReceiveDialog, setShowReceiveDialog] = useState(false)
   const [showPlanDialog, setShowPlanDialog] = useState(false)
   const [showQuickAddContact, setShowQuickAddContact] = useState(false)
@@ -358,13 +373,64 @@ export function CampaignDonationsTab({
     onReload()
   }
 
+  const donationPayments = payments.filter((payment) => !isPledgeAppliedCampaignPayment(payment))
+
+  async function openApplyDialog(payment: CampaignPaymentRow) {
+    setApplyPayment(payment)
+    setApplyPledgeId("")
+    setApplyError(null)
+    setApplyLoading(true)
+    const result = await fetchOpenPledgesForAllocationAction(payment.donor_id)
+    setApplyLoading(false)
+    if (!result.success) {
+      setApplyError(result.error)
+      setApplyPledges([])
+      return
+    }
+    const pledges = [...(result.pledges || [])].sort((a, b) => {
+      const aHere = a.campaign_id === campaignId ? 0 : 1
+      const bHere = b.campaign_id === campaignId ? 0 : 1
+      return aHere - bHere
+    })
+    setApplyPledges(pledges)
+  }
+
+  function closeApplyDialog() {
+    setApplyPayment(null)
+    setApplyPledgeId("")
+    setApplyPledges([])
+    setApplyError(null)
+    setApplySaving(false)
+  }
+
+  async function handleApplyPledge() {
+    if (!applyPayment) return
+    if (!applyPledgeId) {
+      setApplyError("Choose a pledge.")
+      return
+    }
+    setApplySaving(true)
+    setApplyError(null)
+    const result = await allocatePaymentToOpenPledgeAction({
+      paymentId: applyPayment.id,
+      pledgeId: applyPledgeId,
+    })
+    setApplySaving(false)
+    if (!result.success) {
+      setApplyError(result.error)
+      return
+    }
+    closeApplyDialog()
+    onReload()
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-base font-semibold text-foreground">Campaign Donations</h2>
           <p className="text-sm text-muted-foreground">
-            Actual payments attributed to this campaign (one ledger — no duplicate records).
+            Gifts with no pledge. Apply one to a pledge and it leaves this list.
           </p>
         </div>
         {canManage ? (
@@ -391,19 +457,19 @@ export function CampaignDonationsTab({
                 <TableHead className="text-right">Amount</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Payment Method</TableHead>
-                <TableHead>Pledge Applied To</TableHead>
+                <TableHead>Pledge</TableHead>
                 <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {payments.length === 0 ? (
+              {donationPayments.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
-                    No donations for this campaign yet.
+                    No donations without a pledge yet.
                   </TableCell>
                 </TableRow>
               ) : (
-                payments.map((payment) => (
+                donationPayments.map((payment) => (
                   <TableRow key={payment.id}>
                     <TableCell>{formatShortDate(payment.payment_date)}</TableCell>
                     <TableCell>
@@ -420,16 +486,18 @@ export function CampaignDonationsTab({
                     </TableCell>
                     <TableCell>{campaignPaymentTypeLabel(payment)}</TableCell>
                     <TableCell className="capitalize">{payment.source || "—"}</TableCell>
-                    <TableCell className="font-mono text-xs">
-                      {payment.pledge_id ? (
-                        <button
+                    <TableCell>
+                      {canManage &&
+                      ((payment.donor_id && openPledgeDonorIds.has(payment.donor_id)) ||
+                        (payment.contact_id && openPledgeContactIds.has(payment.contact_id))) ? (
+                        <Button
                           type="button"
-                          className="text-primary hover:underline"
-                          title="Open pledge"
-                          onClick={() => onPledgeClick(payment.pledge_id!)}
+                          variant="link"
+                          className="h-auto p-0"
+                          onClick={() => void openApplyDialog(payment)}
                         >
-                          {`${payment.pledge_id.slice(0, 8)}…`}
-                        </button>
+                          Apply to pledge
+                        </Button>
                       ) : (
                         <span className="text-muted-foreground">—</span>
                       )}
@@ -456,8 +524,8 @@ export function CampaignDonationsTab({
         <div>
           <h2 className="text-base font-semibold text-foreground">Recurring</h2>
           <p className="text-sm text-muted-foreground">
-            Monthly and other recurring plans tied to this campaign. Collected installments still
-            appear in the ledger above.
+            Monthly and other recurring plans tied to this campaign. A payment applied to a pledge
+            is listed on that pledge, not in the gifts above.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -805,6 +873,68 @@ export function CampaignDonationsTab({
             </Button>
             <Button onClick={() => void handleCreatePlan()} disabled={saving}>
               {saving ? "Creating..." : "Create Plan"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(applyPayment)}
+        onOpenChange={(open) => {
+          if (!open) closeApplyDialog()
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Apply to pledge</DialogTitle>
+            <DialogDescription>
+              This gift leaves Donations and is collected on the pledge you choose.
+            </DialogDescription>
+          </DialogHeader>
+          {applyPayment ? (
+            <div className="flex flex-col gap-4">
+              <p className="text-sm text-muted-foreground">
+                {applyPayment.sender_name || "Donor"} ·{" "}
+                {formatDonationCurrency(Number(applyPayment.amount || 0))}
+              </p>
+              {applyLoading ? (
+                <p className="text-sm text-muted-foreground">Loading open pledges...</p>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="campaign-apply-pledge">Open pledge</Label>
+                  <Select value={applyPledgeId} onValueChange={setApplyPledgeId}>
+                    <SelectTrigger id="campaign-apply-pledge">
+                      <SelectValue placeholder="Choose a pledge" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {applyPledges.length === 0 ? (
+                        <SelectItem value="none" disabled>
+                          No open pledges for this donor
+                        </SelectItem>
+                      ) : (
+                        applyPledges.map((pledge) => (
+                          <SelectItem key={pledge.id} value={pledge.id}>
+                            {pledge.campaign_name || "No campaign"} — Balance{" "}
+                            {formatDonationCurrency(Number(pledge.balance_remaining || 0))}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              {applyError ? <p className="text-sm text-destructive">{applyError}</p> : null}
+            </div>
+          ) : null}
+          <DialogFooter>
+            <Button variant="outline" onClick={closeApplyDialog} disabled={applySaving}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => void handleApplyPledge()}
+              disabled={applySaving || applyLoading || applyPledges.length === 0}
+            >
+              {applySaving ? "Applying..." : "Apply"}
             </Button>
           </DialogFooter>
         </DialogContent>

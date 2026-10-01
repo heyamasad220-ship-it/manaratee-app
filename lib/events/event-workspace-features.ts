@@ -11,7 +11,7 @@ export type EventAttendanceMode =
   | "open_public"
 
 export type EventWorkspaceFeatures = {
-  /** Registration offerings / tickets / free sign-up (not open-public-only). */
+  /** Ticketing tab. Stored under this key for existing rows. */
   registration: boolean
   staff: boolean
   youth: boolean
@@ -19,6 +19,14 @@ export type EventWorkspaceFeatures = {
   /** Explicit expense tracking UI; finance tab also appears when money exists. */
   finance: boolean
   waitlist: boolean
+  /** Plan tab: venue and transportation quotes. */
+  plan: boolean
+  /** Sponsors tab. */
+  sponsors: boolean
+  /** Volunteer openings on Sign-ups. */
+  volunteers: boolean
+  /** Childcare tab: age groups and child care providers. */
+  childcare: boolean
 }
 
 export const DEFAULT_WORKSPACE_FEATURES: EventWorkspaceFeatures = {
@@ -28,15 +36,65 @@ export const DEFAULT_WORKSPACE_FEATURES: EventWorkspaceFeatures = {
   vendors: false,
   finance: false,
   waitlist: false,
+  plan: false,
+  sponsors: false,
+  volunteers: false,
+  childcare: false,
 }
+
+export const EVENT_FEATURE_SWITCHES: Array<{
+  key: keyof EventWorkspaceFeatures
+  label: string
+  description: string
+}> = [
+  {
+    key: "volunteers",
+    label: "Volunteers",
+    description: "Sign-up openings for volunteers.",
+  },
+  {
+    key: "childcare",
+    label: "Childcare",
+    description: "Age groups for this event. Providers already in the system sign up, and staff confirm them.",
+  },
+  {
+    key: "vendors",
+    label: "Vendors",
+    description: "Vendor applications and assignments.",
+  },
+  {
+    key: "sponsors",
+    label: "Sponsors",
+    description: "Sponsorship packages for this event.",
+  },
+  {
+    key: "registration",
+    label: "Ticketing",
+    description: "Ticket types, orders, and check-in.",
+  },
+  {
+    key: "plan",
+    label: "Plan",
+    description: "Venue and transportation quotes.",
+  },
+  {
+    key: "staff",
+    label: "Staff",
+    description: "Paid staff for this event. Child care providers stay on the Childcare tab.",
+  },
+]
 
 export type EventWorkspaceTabId =
   | "overview"
+  | "plan"
+  | "ticketing"
   | "attendees"
   | "staff"
   | "volunteers"
+  | "childcare"
   | "youth"
   | "vendors"
+  | "sponsors"
   | "finance"
   | "reports"
   | "settings"
@@ -50,12 +108,14 @@ export type EventWorkspaceTabDef = {
 
 const ALL_TABS: EventWorkspaceTabDef[] = [
   { value: "overview", label: "Overview" },
+  { value: "plan", label: "Plan" },
+  { value: "ticketing", label: "Ticketing" },
   { value: "attendees", label: "Orders" },
   { value: "staff", label: "Staff" },
-  { value: "volunteers", label: "Volunteers" },
-  { value: "youth", label: "Youth" },
+  { value: "volunteers", label: "Sign-ups" },
+  { value: "childcare", label: "Childcare" },
   { value: "vendors", label: "Vendors" },
-  { value: "finance", label: "Finance" },
+  { value: "sponsors", label: "Sponsors" },
   { value: "reports", label: "Reports" },
   { value: "settings", label: "Settings" },
 ]
@@ -99,6 +159,14 @@ export function resolveAttendanceMode(input: {
   return "open_public"
 }
 
+function storedFlag(
+  stored: Partial<EventWorkspaceFeatures>,
+  key: keyof EventWorkspaceFeatures,
+  fallback: boolean
+) {
+  return typeof stored[key] === "boolean" ? Boolean(stored[key]) : fallback
+}
+
 /** Merge stored features with legacy requires_* flags. */
 export function resolveEventWorkspaceFeatures(input: {
   workspace_features?: unknown
@@ -107,20 +175,24 @@ export function resolveEventWorkspaceFeatures(input: {
   requires_childcare?: boolean | null
   requires_vendors?: boolean | null
   ticketing_config?: { attendanceMode?: unknown } | null
+  /** True when this event already has a planning quote. */
+  hasPlanningQuote?: boolean
+  /** True when this event has a sponsorship package or a linked campaign. */
+  hasSponsors?: boolean
 }): EventWorkspaceFeatures {
   const stored = parseEventWorkspaceFeatures(input.workspace_features)
-  const mode = resolveAttendanceMode(input)
-  const registrationFromMode = mode !== "open_public"
 
   return {
-    registration:
-      stored.registration ??
-      (input.requires_ticketing === true || registrationFromMode),
-    staff: stored.staff ?? false,
-    youth: stored.youth ?? input.requires_childcare === true,
-    vendors: stored.vendors ?? input.requires_vendors === true,
-    finance: stored.finance ?? false,
-    waitlist: stored.waitlist ?? false,
+    registration: storedFlag(stored, "registration", input.requires_ticketing === true),
+    staff: storedFlag(stored, "staff", false),
+    youth: stored.youth === true,
+    vendors: storedFlag(stored, "vendors", input.requires_vendors === true),
+    finance: storedFlag(stored, "finance", false),
+    waitlist: storedFlag(stored, "waitlist", false),
+    plan: storedFlag(stored, "plan", input.hasPlanningQuote === true),
+    sponsors: storedFlag(stored, "sponsors", input.hasSponsors === true),
+    volunteers: storedFlag(stored, "volunteers", input.requires_volunteers === true),
+    childcare: storedFlag(stored, "childcare", input.requires_childcare === true),
   }
 }
 
@@ -143,31 +215,30 @@ export function getVisibleWorkspaceTabs(
 ): EventWorkspaceTabDef[] {
   const { features } = ctx
   const showStaff = features.staff || Boolean(ctx.hasStaffAssignments)
-  const showVolunteers = Boolean(ctx.needsVolunteers)
-  const showYouth = features.youth
-  const showVendors = features.vendors
-  const showFinance = features.finance || Boolean(ctx.hasFinancialActivity)
-  const showReports = true
-
   return ALL_TABS.filter((tab) => {
     switch (tab.value) {
       case "overview":
       case "settings":
+      case "reports":
         return true
+      case "plan":
+        return features.plan
+      case "ticketing":
+        return features.registration
+      case "sponsors":
+        return features.sponsors
       case "attendees":
+      case "finance":
+      case "youth":
         return false
       case "staff":
         return showStaff
       case "volunteers":
-        return showVolunteers
-      case "youth":
-        return showYouth
+        return features.volunteers || features.childcare
+      case "childcare":
+        return features.childcare
       case "vendors":
-        return showVendors
-      case "finance":
-        return showFinance
-      case "reports":
-        return showReports
+        return features.vendors
       default:
         return false
     }
@@ -200,9 +271,11 @@ export function resolveWorkspaceTabId(
   value: string | null | undefined
 ): EventWorkspaceTabId | null {
   if (!value) return null
-  if (isLegacyTicketsTab(value)) return "settings"
-  if (value === "orders") return "attendees"
-  if (value === "childcare") return "youth"
+  if (value === "orders" || value === "attendees") return "ticketing"
+  if (value === "finance") return "reports"
+  if (isLegacyTicketsTab(value)) return "ticketing"
+  if (value === "youth") return "overview"
+  if (value === "sign-ups" || value === "signups") return "volunteers"
   if (ALL_TABS.some((tab) => tab.value === value)) {
     return value as EventWorkspaceTabId
   }

@@ -405,8 +405,9 @@ export function AttendeeQuestionsEditor({
           <DialogHeader>
             <DialogTitle>Youth question pack</DialogTitle>
             <DialogDescription>
-              Adds age, grade, emergency contact, allergies, and photo consent — all required
-              and per attendee — for the kids ticket types you select.
+              Adds age, grade, emergency contact, authorized pickup, allergies, and photo
+              consent for the kids ticket types you select. Pickup is optional. The others
+              are required.
             </DialogDescription>
           </DialogHeader>
           <div className="max-h-56 space-y-2 overflow-y-auto rounded-md border p-3">

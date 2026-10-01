@@ -2,7 +2,6 @@
 
 import type { LucideIcon } from "lucide-react"
 import {
-  Activity,
   AlertTriangle,
   Baby,
   Banknote,
@@ -11,8 +10,8 @@ import {
   MapPin,
   Repeat,
   Store,
+  Ticket,
   Users,
-  UsersRound,
 } from "lucide-react"
 import Link from "next/link"
 
@@ -25,10 +24,6 @@ import {
 } from "@/components/ui/stat-card"
 import { eventManagementOrdersHref } from "@/lib/events/event-management-reports-path"
 import type { EventOverviewSummary } from "@/lib/events/event-overview-metrics"
-import {
-  formatActivityWhen,
-  type EventRecentActivityItem,
-} from "@/lib/events/event-recent-activity"
 
 const KPI_STYLES: Record<string, { tone: StatCardTone; icon: LucideIcon }> = {
   type: { tone: "indigo", icon: Repeat },
@@ -37,24 +32,6 @@ const KPI_STYLES: Record<string, { tone: StatCardTone; icon: LucideIcon }> = {
   childcare: { tone: "violet", icon: Baby },
   volunteers: { tone: "amber", icon: Users },
   vendors: { tone: "orange", icon: Store },
-}
-
-function formatMoney(cents: number, currency: string) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency,
-  }).format(cents / 100)
-}
-
-function formatOptionalDate(value: string | null) {
-  if (!value) return "—"
-  return new Date(value).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  })
 }
 
 export function InternalEventOverviewKpis({
@@ -96,27 +73,18 @@ export function InternalEventOverviewDashboard({
   canManage,
   eventId,
   coordinatorName,
-  recentActivity = [],
   onNavigateTab,
 }: {
   overview: EventOverviewSummary
   canManage: boolean
   eventId: string
   coordinatorName?: string | null
-  recentActivity?: EventRecentActivityItem[]
   onNavigateTab: (tab: string) => void
 }) {
-  const { features, alerts, registration, youth, staff, vendors, finance } =
-    overview
+  const { features, alerts, staff, vendors } = overview
 
-  const showYouth = features.youth
   const showStaff = features.staff || staff.paidCount > 0
   const showVendors = features.vendors
-  const showFinance =
-    features.finance ||
-    finance.expenseCents > 0 ||
-    finance.ticketRevenueCents > 0 ||
-    finance.refundCents > 0
 
   return (
     <div className="flex flex-col gap-6">
@@ -167,89 +135,27 @@ export function InternalEventOverviewDashboard({
       ) : null}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0">
-            <div>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <ClipboardList className="h-4 w-4" />
-                Tickets
-              </CardTitle>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {registration.modeLabel}
-              </p>
-            </div>
-            {canManage ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => onNavigateTab("tickets")}
-              >
-                Manage
-              </Button>
-            ) : null}
-          </CardHeader>
-          <CardContent className="space-y-1 text-sm">
-            <p>
-              Registered:{" "}
-              <span className="font-medium">
-                {registration.capacity != null
-                  ? `${registration.registered} / ${registration.capacity}`
-                  : registration.registered}
-              </span>
-            </p>
-            {registration.remaining != null ? (
-              <p className="text-muted-foreground">
-                Remaining: {registration.remaining}
-              </p>
-            ) : null}
-            <p className="text-muted-foreground">
-            Starts / ends: {formatOptionalDate(registration.salesOpenAt)} →{" "}
-            {formatOptionalDate(registration.salesCloseAt)}
-            </p>
-          </CardContent>
-        </Card>
-
-        {showYouth ? (
+        {features.registration ? (
           <Card>
             <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0">
               <div>
                 <CardTitle className="flex items-center gap-2 text-base">
-                  <UsersRound className="h-4 w-4" />
-                  Youth
+                  <Ticket className="h-4 w-4" />
+                  Ticketing
                 </CardTitle>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Ticket types, prices, orders, and check-in.
+                </p>
               </div>
-              {canManage ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onNavigateTab("youth")}
-                >
-                  Manage
-                </Button>
-              ) : null}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => onNavigateTab("ticketing")}
+              >
+                Open
+              </Button>
             </CardHeader>
-            <CardContent className="space-y-1 text-sm">
-              <p>
-                Registered:{" "}
-                <span className="font-medium">
-                  {youth.capacity != null
-                    ? `${youth.registered} / ${youth.capacity}`
-                    : youth.registered}
-                </span>
-              </p>
-              {youth.groups.length > 0 ? (
-                <ul className="text-muted-foreground">
-                  {youth.groups.map((group) => (
-                    <li key={group.name}>
-                      {group.name}
-                      {group.capacity != null ? ` · cap ${group.capacity}` : ""}
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-            </CardContent>
           </Card>
         ) : null}
 
@@ -314,78 +220,28 @@ export function InternalEventOverviewDashboard({
           </Card>
         ) : null}
 
-        {showFinance ? (
-          <Card>
-            <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0">
-              <div>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Banknote className="h-4 w-4" />
-                  Finance
-                </CardTitle>
-              </div>
-              {canManage ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onNavigateTab("finance")}
-                >
-                  Manage
-                </Button>
-              ) : null}
-            </CardHeader>
-            <CardContent className="space-y-1 text-sm">
-              <p>
-                Revenue:{" "}
-                <span className="font-medium">
-                  {formatMoney(finance.ticketRevenueCents, finance.currency)}
-                </span>
+        <Card>
+          <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Banknote className="h-4 w-4" />
+                Reports
+              </CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">
+                What this event spent, and tickets sold by type.
               </p>
-              <p>
-                Expenses:{" "}
-                <span className="font-medium">
-                  {formatMoney(finance.expenseCents, finance.currency)}
-                </span>
-              </p>
-              <p>
-                Net:{" "}
-                <span className="font-medium">
-                  {formatMoney(finance.netCents, finance.currency)}
-                </span>
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Tickets + gifts − refunds − expenses
-              </p>
-            </CardContent>
-          </Card>
-        ) : null}
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => onNavigateTab("reports")}
+            >
+              Open
+            </Button>
+          </CardHeader>
+        </Card>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Activity className="h-4 w-4" />
-            Recent orders
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm">
-          {recentActivity.length === 0 ? (
-            <p className="text-muted-foreground">No recent orders or refunds.</p>
-          ) : (
-            recentActivity.slice(0, 4).map((item) => (
-              <div
-                key={item.id}
-                className="flex flex-wrap items-baseline justify-between gap-2"
-              >
-                <span>{item.label}</span>
-                <span className="text-xs text-muted-foreground">
-                  {formatActivityWhen(item.when)}
-                </span>
-              </div>
-            ))
-          )}
-        </CardContent>
-      </Card>
     </div>
   )
 }

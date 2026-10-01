@@ -86,6 +86,12 @@ export const YOUTH_ATTENDEE_QUESTION_PACK: Array<
     perAttendee: true,
   },
   {
+    question: "Authorized pickup (name & phone)",
+    type: "text",
+    required: false,
+    perAttendee: true,
+  },
+  {
     question: "Allergies or medical notes",
     type: "textarea",
     required: true,

@@ -6,15 +6,18 @@ import { useRouter, useSearchParams } from "next/navigation"
 import {
   CheckCircle2,
   Clock,
+  Download,
   ExternalLink,
   MoreHorizontal,
   Plus,
   Search,
   Users,
 } from "lucide-react"
-import type {
-  ChildcareProviderRecord,
-  ChildcareProviderStats,
+import {
+  addChildcareProvider,
+  updateChildcareProvider,
+  type ChildcareProviderRecord,
+  type ChildcareProviderStats,
 } from "@/lib/hr/childcare-provider-actions"
 import { fetchApplicationDashboardStats } from "@/lib/applications/application-actions"
 import { HR_CHILDCARE_APPLICATIONS_PATH, CUSTOMER_CHILDCARE_APPLY_PATH } from "@/lib/applications/application-routes"
@@ -43,6 +46,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { PhoneText } from "@/components/ui/phone-text"
 import { formatPhoneDisplay } from "@/lib/ui/format-phone"
 import {
@@ -146,6 +150,14 @@ export function HrChildcarePanel({ providers, stats }: HrChildcarePanelProps) {
   const [selectedProvider, setSelectedProvider] = useState<ChildcareProviderRecord | null>(
     null
   )
+  const [editingApplicationId, setEditingApplicationId] = useState<string | null>(null)
+  const [addOpen, setAddOpen] = useState(false)
+  const [addName, setAddName] = useState("")
+  const [addEmail, setAddEmail] = useState("")
+  const [addPhone, setAddPhone] = useState("")
+  const [addPayRate, setAddPayRate] = useState("")
+  const [addError, setAddError] = useState<string | null>(null)
+  const [addPending, setAddPending] = useState(false)
 
   useEffect(() => {
     void fetchApplicationDashboardStats({ applicationType: "childcare_provider" })
@@ -170,6 +182,31 @@ export function HrChildcarePanel({ providers, stats }: HrChildcarePanelProps) {
   useEffect(() => {
     setPage(1)
   }, [search, statusFilter, directoryTab])
+
+  function resetProviderForm() {
+    setEditingApplicationId(null)
+    setAddName("")
+    setAddEmail("")
+    setAddPhone("")
+    setAddPayRate("")
+    setAddError(null)
+    setAddPending(false)
+  }
+
+  function openAddProvider() {
+    resetProviderForm()
+    setAddOpen(true)
+  }
+
+  function openEditProvider(provider: ChildcareProviderRecord) {
+    setEditingApplicationId(provider.applicationId)
+    setAddName(provider.name)
+    setAddEmail(provider.email.trim() === "—" ? "" : provider.email)
+    setAddPhone(formatPhoneDisplay(provider.phone === "—" ? "" : provider.phone))
+    setAddPayRate(provider.payRate)
+    setAddError(null)
+    setAddOpen(true)
+  }
 
   function setDirectoryTabAndUrl(tabId: "providers" | "applications") {
     setDirectoryTab(tabId)
@@ -215,13 +252,20 @@ export function HrChildcarePanel({ providers, stats }: HrChildcarePanelProps) {
       <HrDirectoryShell
         title="Childcare Providers"
         description="Manage childcare providers linked to applications and contacts. Review applications to add providers to this directory."
-        onExport={
-          directoryTab === "applications" ? undefined : () => downloadProvidersCsv(filtered)
-        }
-        exportDisabled={filtered.length === 0}
         primaryAction={
           directoryTab === "applications" ? undefined : (
             <div className="flex flex-wrap gap-2">
+              <Button type="button" onClick={openAddProvider}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add provider
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setDirectoryTabAndUrl("applications")}
+              >
+                Review Applications
+              </Button>
               <Button
                 type="button"
                 variant="outline"
@@ -236,9 +280,14 @@ export function HrChildcarePanel({ providers, stats }: HrChildcarePanelProps) {
               >
                 Copy apply link
               </Button>
-              <Button type="button" onClick={() => setDirectoryTabAndUrl("applications")}>
-                <Plus className="mr-2 h-4 w-4" />
-                Review Applications
+              <Button
+                type="button"
+                variant="outline"
+                disabled={filtered.length === 0}
+                onClick={() => downloadProvidersCsv(filtered)}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Export
               </Button>
             </div>
           )
@@ -393,20 +442,18 @@ export function HrChildcarePanel({ providers, stats }: HrChildcarePanelProps) {
               </TableHeader>
               <TableBody>
                 {pagedRows.map((provider) => (
-                  <TableRow key={provider.id}>
+                  <TableRow
+                    key={provider.id}
+                    className="cursor-pointer"
+                    onClick={() => openEditProvider(provider)}
+                  >
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Avatar className="h-9 w-9">
                           <AvatarFallback>{getInitials(provider.name)}</AvatarFallback>
                         </Avatar>
                         <div className="min-w-0">
-                          <button
-                            type="button"
-                            onClick={() => setSelectedProvider(provider)}
-                            className="font-medium text-left hover:text-primary hover:underline"
-                          >
-                            {provider.name}
-                          </button>
+                          <p className="font-medium">{provider.name}</p>
                           <p className="truncate text-xs text-muted-foreground">
                             {provider.email || "—"}
                           </p>
@@ -433,7 +480,7 @@ export function HrChildcarePanel({ providers, stats }: HrChildcarePanelProps) {
                         {provider.status}
                       </span>
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right" onClick={(event) => event.stopPropagation()}>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="sm">
@@ -460,6 +507,113 @@ export function HrChildcarePanel({ providers, stats }: HrChildcarePanelProps) {
           </div>
         )}
       </HrDirectoryShell>
+
+      <Dialog
+        open={addOpen}
+        onOpenChange={(open) => {
+          setAddOpen(open)
+          if (!open) resetProviderForm()
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingApplicationId ? "Edit provider" : "Add provider"}</DialogTitle>
+            <DialogDescription>
+              {editingApplicationId
+                ? "Update this childcare provider."
+                : "Adds an approved childcare provider to this directory."}
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            className="space-y-4"
+            onSubmit={(event) => {
+              event.preventDefault()
+              setAddError(null)
+              setAddPending(true)
+              const payload = {
+                name: addName,
+                email: addEmail,
+                phone: addPhone,
+                payRate: addPayRate,
+              }
+              const request = editingApplicationId
+                ? updateChildcareProvider({
+                    applicationId: editingApplicationId,
+                    ...payload,
+                  })
+                : addChildcareProvider(payload)
+              void request.then((result) => {
+                setAddPending(false)
+                if (!result.success) {
+                  setAddError(result.error)
+                  return
+                }
+                setAddOpen(false)
+                router.refresh()
+              })
+            }}
+          >
+            <div className="space-y-2">
+              <Label htmlFor="provider-name">Name</Label>
+              <Input
+                id="provider-name"
+                value={addName}
+                onChange={(event) => setAddName(event.target.value)}
+                required
+                autoFocus
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="provider-email">Email</Label>
+              <Input
+                id="provider-email"
+                type="email"
+                value={addEmail}
+                onChange={(event) => setAddEmail(event.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="provider-phone">Phone</Label>
+              <Input
+                id="provider-phone"
+                type="tel"
+                value={addPhone}
+                onChange={(event) => setAddPhone(event.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="provider-pay-rate">Pay rate</Label>
+              <Input
+                id="provider-pay-rate"
+                inputMode="decimal"
+                value={addPayRate}
+                onChange={(event) => setAddPayRate(event.target.value)}
+                placeholder="$/hr"
+                aria-label="Pay rate"
+                required
+              />
+            </div>
+            {addError ? <p className="text-sm text-destructive">{addError}</p> : null}
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setAddOpen(false)}
+                disabled={addPending}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={addPending}>
+                {addPending
+                  ? "Saving…"
+                  : editingApplicationId
+                    ? "Save"
+                    : "Add provider"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!selectedProvider} onOpenChange={() => setSelectedProvider(null)}>
         <DialogContent className="max-w-2xl">

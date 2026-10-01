@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
+import { programWorkspaceHref } from "@/lib/programs/program-workspace-path"
 import { VENDOR_HUB_ROUTES } from "@/lib/vendor-hub/vendor-hub-routes"
 
 import {
@@ -68,24 +69,25 @@ export async function getSignUpOverviewEvents(): Promise<SignUpOverviewEvent[]> 
   const events = ((eventsResult.data || []) as EventRow[]).filter((event) =>
     isSignUpOverviewStatusVisible(event.status)
   )
-  if (events.length === 0) return []
 
   const eventIds = events.map((event) => event.id)
-  const [bazaarsResult, assignmentsResult] = await Promise.all([
-    supabase
-      .from("vendor_hub_events")
-      .select("id, name, internal_event_id, location")
-      .eq("organization_id", organizationId)
-      .in("internal_event_id", eventIds),
-    supabase
-      .from("service_participations")
-      .select("source_id, status")
-      .eq("organization_id", organizationId)
-      .eq("source_type", "internal_event")
-      .eq("participation_type", "volunteer")
-      .in("source_id", eventIds)
-      .in("status", ["pending", "confirmed"]),
-  ])
+  const [bazaarsResult, assignmentsResult] = eventIds.length
+    ? await Promise.all([
+        supabase
+          .from("vendor_hub_events")
+          .select("id, name, internal_event_id, location")
+          .eq("organization_id", organizationId)
+          .in("internal_event_id", eventIds),
+        supabase
+          .from("service_participations")
+          .select("source_id, status")
+          .eq("organization_id", organizationId)
+          .eq("source_type", "internal_event")
+          .eq("participation_type", "volunteer")
+          .in("source_id", eventIds)
+          .in("status", ["pending", "confirmed"]),
+      ])
+    : [{ data: [], error: null }, { data: [], error: null }]
 
   if (bazaarsResult.error) {
     console.error("getSignUpOverviewEvents bazaars:", bazaarsResult.error.message)
@@ -139,6 +141,61 @@ export async function getSignUpOverviewEvents(): Promise<SignUpOverviewEvent[]> 
       volunteersNeeded: volunteerSlotsNeeded(event.service_requirements),
     }
   })
+
+  const programsResult = await supabase
+    .from("programs")
+    .select("id, name, start_date, end_date, status, service_requirements")
+    .eq("organization_id", organizationId)
+    .eq("requires_volunteers", true)
+    .neq("status", "archived")
+
+  if (programsResult.error && !isMissingColumnError(programsResult.error)) {
+    console.error("getSignUpOverviewEvents programs:", programsResult.error.message)
+  }
+
+  const programs = (programsResult.error ? [] : programsResult.data || []) as Array<{
+    id: string
+    name: string | null
+    start_date: string | null
+    end_date: string | null
+    status: string | null
+    service_requirements?: unknown
+  }>
+
+  if (programs.length > 0) {
+    const programIds = programs.map((program) => program.id)
+    const programAssignments = await supabase
+      .from("service_participations")
+      .select("source_id")
+      .eq("organization_id", organizationId)
+      .eq("source_type", "program")
+      .eq("participation_type", "volunteer")
+      .in("source_id", programIds)
+      .in("status", ["pending", "confirmed"])
+
+    const filledByProgramId = new Map<string, number>()
+    for (const row of programAssignments.data || []) {
+      const sourceId = row.source_id as string
+      filledByProgramId.set(sourceId, (filledByProgramId.get(sourceId) || 0) + 1)
+    }
+
+    for (const program of programs) {
+      rows.push({
+        id: program.id,
+        name: program.name?.trim() || "Untitled program",
+        source: "programs",
+        href: programWorkspaceHref(program.id, { tab: "sign-ups" }),
+        startAt: program.start_date ? `${program.start_date}T00:00:00` : null,
+        endAt: program.end_date ? `${program.end_date}T23:59:59` : null,
+        location: null,
+        status: program.status || "active",
+        volunteersFilled: filledByProgramId.get(program.id) || 0,
+        volunteersNeeded: volunteerSlotsNeeded(program.service_requirements),
+      })
+    }
+  }
+
+  if (rows.length === 0) return []
 
   rows.sort((left, right) => {
     const leftTime = left.startAt ? new Date(left.startAt).getTime() : Number.MAX_SAFE_INTEGER

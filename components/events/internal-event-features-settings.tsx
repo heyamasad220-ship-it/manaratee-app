@@ -11,45 +11,43 @@ import { Switch } from "@/components/ui/switch"
 import { updateEventWorkspaceFeatures } from "@/lib/events/internal-event-actions"
 import {
   DEFAULT_WORKSPACE_FEATURES,
+  EVENT_FEATURE_SWITCHES,
   type EventWorkspaceFeatures,
 } from "@/lib/events/event-workspace-features"
 
-const FEATURE_ROWS: Array<{
-  key: keyof EventWorkspaceFeatures
-  label: string
-  description: string
-}> = [
-  {
-    key: "registration",
-    label: "Tickets",
-    description: "Paid or free tickets, and the Orders list.",
-  },
-  {
-    key: "staff",
-    label: "Staff",
-    description: "Paid staff assignments.",
-  },
-  {
-    key: "youth",
-    label: "Youth",
-    description: "Childcare and youth group registrations.",
-  },
-  {
-    key: "vendors",
-    label: "Vendors",
-    description: "Vendor applications and assignments.",
-  },
-  {
-    key: "finance",
-    label: "Finance",
-    description: "Expense tracking and event net summary.",
-  },
-  {
-    key: "waitlist",
-    label: "Waitlist",
-    description: "Allow waitlisting when capacity is full.",
-  },
-]
+export function EventFeatureSwitchList({
+  features,
+  onToggle,
+  disabled,
+}: {
+  features: EventWorkspaceFeatures
+  onToggle: (key: keyof EventWorkspaceFeatures, checked: boolean) => void
+  disabled?: boolean
+}) {
+  return (
+    <div className="space-y-3">
+      {EVENT_FEATURE_SWITCHES.map((row) => (
+        <div
+          key={row.key}
+          className="flex items-center justify-between gap-4 rounded-lg border p-3"
+        >
+          <div>
+            <Label htmlFor={`feature-${row.key}`} className="text-sm font-medium">
+              {row.label}
+            </Label>
+            <p className="text-sm text-muted-foreground">{row.description}</p>
+          </div>
+          <Switch
+            id={`feature-${row.key}`}
+            checked={features[row.key]}
+            disabled={disabled}
+            onCheckedChange={(checked) => onToggle(row.key, checked)}
+          />
+        </div>
+      ))}
+    </div>
+  )
+}
 
 export function InternalEventFeaturesSettings({
   eventId,
@@ -102,32 +100,19 @@ export function InternalEventFeaturesSettings({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Workspace modules</CardTitle>
+        <CardTitle className="text-base">Features</CardTitle>
         <p className="text-sm text-muted-foreground">
-          Turn modules on to show their tabs and overview cards. Some tabs also
-          appear automatically when data already exists.
+          Turn a feature on to show its tab. Overview, Reports, and Settings
+          stay on every event. Childcare is its own tab for age groups.
+          Providers sign up and staff confirm them. Sign-ups is the volunteer time slots.
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
-        {FEATURE_ROWS.map((row) => (
-          <div
-            key={row.key}
-            className="flex items-center justify-between gap-4 rounded-lg border p-3"
-          >
-            <div>
-              <Label htmlFor={`feature-${row.key}`} className="text-sm font-medium">
-                {row.label}
-              </Label>
-              <p className="text-sm text-muted-foreground">{row.description}</p>
-            </div>
-            <Switch
-              id={`feature-${row.key}`}
-              checked={features[row.key]}
-              disabled={!canManage || isPending}
-              onCheckedChange={(checked) => toggle(row.key, checked)}
-            />
-          </div>
-        ))}
+        <EventFeatureSwitchList
+          features={features}
+          onToggle={toggle}
+          disabled={!canManage || isPending}
+        />
 
         {canManage ? (
           <div className="flex flex-wrap items-center justify-end gap-3 border-t pt-4">

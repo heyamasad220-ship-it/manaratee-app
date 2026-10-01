@@ -35,6 +35,8 @@ export type EventStaffAssignmentMeta = {
   hourlyRate?: number | null
   /** Planned / logged hours */
   hours?: number | null
+  /** Staff confirmed the hours after the event. */
+  hoursApproved?: boolean
   /** Actual hours worked (optional; defaults to hours) */
   actualHours?: number | null
   paidAt?: string | null
@@ -87,6 +89,7 @@ export function parseEventStaffAssignmentMeta(
   return {
     hourlyRate: hourlyRate != null && Number.isFinite(hourlyRate) ? hourlyRate : null,
     hours: hours != null && Number.isFinite(hours) ? hours : null,
+    hoursApproved: row.hoursApproved === true,
     actualHours:
       actualHours != null && Number.isFinite(actualHours) ? actualHours : null,
     paidAt: typeof row.paidAt === "string" && row.paidAt ? row.paidAt : null,
@@ -118,6 +121,10 @@ export function mergeEventStaffAssignmentMeta(
     hourlyRate:
       patch.hourlyRate !== undefined ? patch.hourlyRate : (current?.hourlyRate ?? null),
     hours: patch.hours !== undefined ? patch.hours : (current?.hours ?? null),
+    hoursApproved:
+      patch.hoursApproved !== undefined
+        ? patch.hoursApproved
+        : (current?.hoursApproved ?? false),
     actualHours:
       patch.actualHours !== undefined
         ? patch.actualHours

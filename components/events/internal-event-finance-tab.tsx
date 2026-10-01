@@ -57,9 +57,11 @@ export function InternalEventFinanceTab({
   linkedCampaignId = null,
   linkedCampaignSummary = null,
   campaignOptions = [],
+  readOnly = false,
 }: {
   eventId: string
   canManage?: boolean
+  readOnly?: boolean
   initialExpenses?: EventExpense[]
   financeSummary?: {
     ticketRevenueCents: number
@@ -133,6 +135,8 @@ export function InternalEventFinanceTab({
     setSelectedCampaignId(linkedCampaignId || NONE)
   }, [linkedCampaignId])
 
+  const canEdit = canManage && !readOnly
+
   function handleSaveCampaignLink() {
     setCampaignError(null)
     startTransition(async () => {
@@ -193,23 +197,26 @@ export function InternalEventFinanceTab({
 
   return (
     <div className="flex flex-col gap-6">
-      {campaignOptions.length > 0 ? (
+      {(campaignOptions.length > 0 && !readOnly) || linkedCampaignSummary ? (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Fundraising campaign</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Link a donations campaign to include pledge and gift totals on this
-              event&apos;s finance summary.
+              {readOnly
+                ? linkedCampaignSummary?.campaignName || "Linked campaign totals."
+                : "Link a donations campaign to include pledge and gift totals on this event's finance summary."}
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
+            {!readOnly ? (
+            <>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
               <div className="flex-1 space-y-2">
                 <Label>Campaign</Label>
                 <Select
                   value={selectedCampaignId}
                   onValueChange={setSelectedCampaignId}
-                  disabled={!canManage || isPending}
+                  disabled={!canEdit || isPending}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="None" />
@@ -224,7 +231,7 @@ export function InternalEventFinanceTab({
                   </SelectContent>
                 </Select>
               </div>
-              {canManage ? (
+              {canEdit ? (
                 <Button
                   type="button"
                   onClick={handleSaveCampaignLink}
@@ -236,6 +243,8 @@ export function InternalEventFinanceTab({
             </div>
             {campaignError ? (
               <p className="text-sm text-destructive">{campaignError}</p>
+            ) : null}
+            </>
             ) : null}
             {linkedCampaignSummary ? (
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -423,7 +432,7 @@ export function InternalEventFinanceTab({
         </Card>
       </div>
 
-      {canManage ? (
+      {canEdit ? (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Add expense</CardTitle>
@@ -520,7 +529,7 @@ export function InternalEventFinanceTab({
                     <TableHead>Payee</TableHead>
                     <TableHead>Description</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
-                    {canManage ? <TableHead className="w-[60px]" /> : null}
+                    {canEdit ? <TableHead className="w-[60px]" /> : null}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -535,7 +544,7 @@ export function InternalEventFinanceTab({
                       <TableCell className="text-right">
                         {formatMoney(row.amount_cents, row.currency)}
                       </TableCell>
-                      {canManage ? (
+                      {canEdit ? (
                         <TableCell>
                           <Button
                             type="button"

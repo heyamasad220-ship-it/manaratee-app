@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,7 +24,6 @@ import {
 import { Plus, ArrowUpDown, Download } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { PledgeDonorSubline } from "@/components/donations/pledge-donor-subline";
-import { ContactProfileDialog } from "@/components/contacts/contact-profile-dialog";
 import { PledgeDetailsDialog } from "@/components/donations/pledge-details-dialog";
 import {
   PledgeSummaryMetricCards,
@@ -196,7 +195,13 @@ function pledgeFromRow(row: any): Pledge {
   };
 }
 
-export default function PledgesPage() {
+export function PledgesLedger({
+  lockedCampaignId,
+  embedded = false,
+}: {
+  lockedCampaignId?: string;
+  embedded?: boolean;
+}) {
   const supabase = createClient();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -205,7 +210,10 @@ export default function PledgesPage() {
   const [donorNameFilter, setDonorNameFilter] = useState("");
   const [donorNameFilterInput, setDonorNameFilterInput] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("Open");
-  const [campaignFilter, setCampaignFilter] = useState<string>("all");
+  const [campaignFilter, setCampaignFilter] = useState<string>(
+    () => lockedCampaignId || searchParams.get("campaignId") || "all"
+  );
+  const pledgeFetchGeneration = useRef(0);
   const [page, setPage] = useState(1);
   const [totalPledges, setTotalPledges] = useState(0);
   const [summaryMetrics, setSummaryMetrics] = useState<PledgeSummaryMetrics>({
@@ -220,8 +228,6 @@ export default function PledgesPage() {
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [campaignOptions, setCampaignOptions] = useState<CampaignOption[]>([]);
-  const [contactProfileId, setContactProfileId] = useState<string | null>(null);
-  const [showContactProfile, setShowContactProfile] = useState(false);
   const [handledPledgeQuery, setHandledPledgeQuery] = useState<string | null>(null);
   const [handledAddQuery, setHandledAddQuery] = useState(false);
 
@@ -230,32 +236,6 @@ export default function PledgesPage() {
   const [detailsProspectId, setDetailsProspectId] = useState<string | null>(null);
   const [detailsCampaignId, setDetailsCampaignId] = useState<string | null>(null);
   const [detailsContactId, setDetailsContactId] = useState<string | null>(null);
-
-  async function openContactProfile(pledge: Pledge) {
-    let contactId = pledge.contactId;
-
-    if (!contactId && pledge.donorId) {
-      const orgId = organizationId || (await getOrgIdForCurrentUser());
-      if (orgId) {
-        const { data: donorRow } = await supabase
-          .from("donors")
-          .select("contact_id")
-          .eq("id", pledge.donorId)
-          .eq("organization_id", orgId)
-          .maybeSingle();
-
-        contactId = (donorRow?.contact_id as string | null) ?? null;
-      }
-    }
-
-    if (!contactId) {
-      alert("No contact profile is linked to this donor yet.");
-      return;
-    }
-
-    setContactProfileId(contactId);
-    setShowContactProfile(true);
-  }
 
   async function getOrgIdForCurrentUser() {
     const {
@@ -314,9 +294,11 @@ export default function PledgesPage() {
   }
 
   const fetchPledges = async (nextPage = page) => {
+    const generation = ++pledgeFetchGeneration.current;
     setLoading(true);
 
     const orgId = await getOrgIdForCurrentUser();
+    if (generation !== pledgeFetchGeneration.current) return;
 
     if (!orgId) {
       setOrganizationId(null);
@@ -337,9 +319,13 @@ export default function PledgesPage() {
         pageSize: DONATIONS_PAGE_SIZE,
         ...filters,
       }),
-      fetchPledgeSummaryMetricsAction(filters),
+      fetchPledgeSummaryMetricsAction(
+        lockedCampaignId ? { campaignId: lockedCampaignId } : filters
+      ),
       getPledgeCollectionReportAction(),
     ]);
+
+    if (generation !== pledgeFetchGeneration.current) return;
 
     if (!pageResult.success) {
       console.error("Error loading donation pledges:", pageResult.error);
@@ -436,14 +422,19 @@ export default function PledgesPage() {
   }, [loading]);
 
   useEffect(() => {
+    if (lockedCampaignId) {
+      setCampaignFilter(lockedCampaignId);
+      return;
+    }
     const campaignId = searchParams.get("campaignId");
     const action = searchParams.get("action");
     if (!campaignId || action === "add") return;
 
     setCampaignFilter(campaignId);
-  }, [searchParams]);
+  }, [searchParams, lockedCampaignId]);
 
   useEffect(() => {
+    if (lockedCampaignId) return;
     const pledgeId = searchParams.get("pledgeId");
     const action = searchParams.get("action");
     const prospectId = searchParams.get("prospectId");
@@ -473,7 +464,7 @@ export default function PledgesPage() {
     setDetailsOpen(true);
     setHandledAddQuery(true);
     router.replace(DONATION_PLEDGES_PATH, { scroll: false });
-  }, [searchParams, handledPledgeQuery, handledAddQuery, router]);
+  }, [searchParams, handledPledgeQuery, handledAddQuery, router, lockedCampaignId]);
 
   function openAddPledge() {
     setDetailsPledgeId(null);
@@ -531,7 +522,13 @@ export default function PledgesPage() {
 
   return (
     <>
-      <div className="flex h-[calc(100vh-11.75rem)] min-h-0 flex-col overflow-hidden p-6">
+      <div
+        className={
+          embedded
+            ? "flex h-[calc(100vh-20rem)] min-h-[28rem] flex-col overflow-hidden"
+            : "flex h-[calc(100vh-11.75rem)] min-h-0 flex-col overflow-hidden p-6"
+        }
+      >
         <div className="mb-4 flex shrink-0 justify-end gap-2">
           <Button variant="outline" onClick={() => void handleExport()} disabled={exporting}>
             <Download className="mr-2 h-4 w-4" />
@@ -546,7 +543,8 @@ export default function PledgesPage() {
         <PledgeSummaryMetricCards
           metrics={summaryMetrics}
           statusFilter={statusFilter === "Partial" ? "Open" : statusFilter}
-          overdueCount={overdueCount}
+          overdueCount={lockedCampaignId ? undefined : overdueCount}
+          variant={lockedCampaignId ? "campaign" : "default"}
           className="mb-6 shrink-0"
         />
 
@@ -614,35 +612,37 @@ export default function PledgesPage() {
                       )}
                     </TableColumnHeaderFilter>
                   </TableHead>
-                  <TableHead>
-                    <TableColumnHeaderFilter
-                      label="Campaign"
-                      active={campaignFilter !== "all"}
-                    >
-                      {({ close }) => (
-                        <Select
-                          value={campaignFilter}
-                          onValueChange={(value) => {
-                            setCampaignFilter(value);
-                            close();
-                          }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select Campaign" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All Campaigns</SelectItem>
-                            <SelectItem value="__none__">Unassigned</SelectItem>
-                            {campaignOptions.map((campaign) => (
-                              <SelectItem key={campaign.id} value={campaign.id}>
-                                {campaign.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      )}
-                    </TableColumnHeaderFilter>
-                  </TableHead>
+                  {lockedCampaignId ? null : (
+                    <TableHead>
+                      <TableColumnHeaderFilter
+                        label="Campaign"
+                        active={campaignFilter !== "all"}
+                      >
+                        {({ close }) => (
+                          <Select
+                            value={campaignFilter}
+                            onValueChange={(value) => {
+                              setCampaignFilter(value);
+                              close();
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select Campaign" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All Campaigns</SelectItem>
+                              <SelectItem value="__none__">Unassigned</SelectItem>
+                              {campaignOptions.map((campaign) => (
+                                <SelectItem key={campaign.id} value={campaign.id}>
+                                  {campaign.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </TableColumnHeaderFilter>
+                    </TableHead>
+                  )}
                   <TableHead>Last Reminder</TableHead>
                   <TableHead>Last Contacted</TableHead>
                 </TableRow>
@@ -651,13 +651,19 @@ export default function PledgesPage() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center text-muted-foreground">
+                    <TableCell
+                      colSpan={lockedCampaignId ? 7 : 8}
+                      className="text-center text-muted-foreground"
+                    >
                       Loading pledges...
                     </TableCell>
                   </TableRow>
                 ) : pledges.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center text-muted-foreground">
+                    <TableCell
+                      colSpan={lockedCampaignId ? 7 : 8}
+                      className="text-center text-muted-foreground"
+                    >
                       No pledges found.
                     </TableCell>
                   </TableRow>
@@ -668,15 +674,9 @@ export default function PledgesPage() {
                       className="cursor-pointer hover:bg-muted/50"
                       onClick={() => openPledge(pledge.id)}
                     >
-                      <TableCell onClick={(event) => event.stopPropagation()}>
+                      <TableCell>
                         <div>
-                          <button
-                            type="button"
-                            className="font-medium text-primary hover:underline"
-                            onClick={() => void openContactProfile(pledge)}
-                          >
-                            {pledge.donorName}
-                          </button>
+                          <span className="font-medium text-primary">{pledge.donorName}</span>
                           <PledgeDonorSubline
                             contactType={pledge.contactType}
                             primaryContactName={pledge.primaryContactName}
@@ -705,9 +705,11 @@ export default function PledgesPage() {
 
                       <TableCell>{getStatusBadge(pledge.status)}</TableCell>
 
-                      <TableCell>
-                        <Badge variant="outline">{pledge.campaignName}</Badge>
-                      </TableCell>
+                      {lockedCampaignId ? null : (
+                        <TableCell>
+                          <Badge variant="outline">{pledge.campaignName}</Badge>
+                        </TableCell>
+                      )}
 
                       <TableCell className="text-sm text-muted-foreground">
                         {pledge.lastReminderAt ? (
@@ -786,12 +788,10 @@ export default function PledgesPage() {
         }}
       />
 
-      <ContactProfileDialog
-        contactId={contactProfileId}
-        open={showContactProfile}
-        onOpenChange={setShowContactProfile}
-        onContactUpdated={() => void fetchPledges()}
-      />
     </>
   );
+}
+
+export default function PledgesPage() {
+  return <PledgesLedger />;
 }

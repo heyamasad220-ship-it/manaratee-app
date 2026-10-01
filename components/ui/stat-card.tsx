@@ -1,6 +1,6 @@
 import type { LucideIcon } from "lucide-react"
 import type { ReactNode } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 
 /** Standard width for KPI / summary cards in a row. */
@@ -14,82 +14,82 @@ export const statCardsEqualRowClassName = "grid w-full items-stretch gap-4"
 
 export const STAT_CARD_TONES = {
   blue: {
-    card: "border-blue-200 bg-blue-50 shadow-none",
-    label: "text-blue-700",
-    value: "text-blue-950",
-    hint: "text-blue-700/75",
+    card: "border-l-4 border-l-blue-500 shadow-sm",
+    label: "text-muted-foreground",
+    value: "text-foreground",
+    hint: "text-muted-foreground",
     icon: "text-blue-600",
     iconWrap: "bg-blue-100",
   },
   emerald: {
-    card: "border-emerald-200 bg-emerald-50 shadow-none",
-    label: "text-emerald-700",
-    value: "text-emerald-950",
-    hint: "text-emerald-700/75",
+    card: "border-l-4 border-l-emerald-500 shadow-sm",
+    label: "text-muted-foreground",
+    value: "text-foreground",
+    hint: "text-muted-foreground",
     icon: "text-emerald-600",
     iconWrap: "bg-emerald-100",
   },
   sky: {
-    card: "border-sky-200 bg-sky-50 shadow-none",
-    label: "text-sky-700",
-    value: "text-sky-950",
-    hint: "text-sky-700/75",
+    card: "border-l-4 border-l-sky-500 shadow-sm",
+    label: "text-muted-foreground",
+    value: "text-foreground",
+    hint: "text-muted-foreground",
     icon: "text-sky-600",
     iconWrap: "bg-sky-100",
   },
   violet: {
-    card: "border-violet-200 bg-violet-50 shadow-none",
-    label: "text-violet-700",
-    value: "text-violet-950",
-    hint: "text-violet-700/75",
+    card: "border-l-4 border-l-violet-500 shadow-sm",
+    label: "text-muted-foreground",
+    value: "text-foreground",
+    hint: "text-muted-foreground",
     icon: "text-violet-600",
     iconWrap: "bg-violet-100",
   },
   amber: {
-    card: "border-amber-200 bg-amber-50 shadow-none",
-    label: "text-amber-800",
-    value: "text-amber-950",
-    hint: "text-amber-800/75",
+    card: "border-l-4 border-l-amber-500 shadow-sm",
+    label: "text-muted-foreground",
+    value: "text-foreground",
+    hint: "text-muted-foreground",
     icon: "text-amber-600",
     iconWrap: "bg-amber-100",
   },
   rose: {
-    card: "border-rose-200 bg-rose-50 shadow-none",
-    label: "text-rose-700",
-    value: "text-rose-950",
-    hint: "text-rose-700/75",
+    card: "border-l-4 border-l-rose-500 shadow-sm",
+    label: "text-muted-foreground",
+    value: "text-foreground",
+    hint: "text-muted-foreground",
     icon: "text-rose-600",
     iconWrap: "bg-rose-100",
   },
   slate: {
-    card: "border-slate-200 bg-slate-50 shadow-none",
-    label: "text-slate-600",
-    value: "text-slate-950",
-    hint: "text-slate-600/75",
+    card: "border-l-4 border-l-slate-400 shadow-sm",
+    label: "text-muted-foreground",
+    value: "text-foreground",
+    hint: "text-muted-foreground",
     icon: "text-slate-500",
     iconWrap: "bg-slate-100",
   },
   teal: {
-    card: "border-teal-200 bg-teal-50 shadow-none",
-    label: "text-teal-700",
-    value: "text-teal-950",
-    hint: "text-teal-700/75",
+    card: "border-l-4 border-l-teal-500 shadow-sm",
+    label: "text-muted-foreground",
+    value: "text-foreground",
+    hint: "text-muted-foreground",
     icon: "text-teal-600",
     iconWrap: "bg-teal-100",
   },
   orange: {
-    card: "border-orange-200 bg-orange-50 shadow-none",
-    label: "text-orange-700",
-    value: "text-orange-950",
-    hint: "text-orange-700/75",
+    card: "border-l-4 border-l-orange-500 shadow-sm",
+    label: "text-muted-foreground",
+    value: "text-foreground",
+    hint: "text-muted-foreground",
     icon: "text-orange-600",
     iconWrap: "bg-orange-100",
   },
   indigo: {
-    card: "border-indigo-200 bg-indigo-50 shadow-none",
-    label: "text-indigo-700",
-    value: "text-indigo-950",
-    hint: "text-indigo-700/75",
+    card: "border-l-4 border-l-indigo-500 shadow-sm",
+    label: "text-muted-foreground",
+    value: "text-foreground",
+    hint: "text-muted-foreground",
     icon: "text-indigo-600",
     iconWrap: "bg-indigo-100",
   },
@@ -142,7 +142,7 @@ type StatCardProps = {
   className?: string
   iconClassName?: string
   valueClassName?: string
-  /** Soft tinted background / border color. */
+  /** Colored left edge and icon, matching Vendor Hub Overview. */
   tone?: StatCardTone
   /** Grow to fill equal-row grid cells instead of fixed width. */
   fill?: boolean
@@ -169,60 +169,41 @@ export function StatCard({
     valueClassName
   )
 
-  if (layout === "header") {
+  if (layout === "header" || layout === "compact") {
     return (
       <Card
         className={cn(
+          "h-full",
           widthClass,
-          fill && "flex h-full flex-col",
+          fill && "flex flex-col",
           colors?.card,
           className
         )}
       >
-        <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0 pb-2">
-          <CardTitle
-            className={cn(
-              "text-sm font-medium",
-              colors?.label ?? "text-muted-foreground"
-            )}
-          >
-            {label}
-          </CardTitle>
-          {Icon ? (
-            <Icon
-              className={cn(
-                "h-4 w-4 shrink-0",
-                colors?.icon ?? "text-muted-foreground",
-                iconClassName
-              )}
-            />
-          ) : null}
-        </CardHeader>
-        <CardContent className={cn(fill && "flex flex-1 flex-col")}>
-          <div className={valueClasses}>{value}</div>
-          {hint ? (
-            <p className={cn("mt-1 text-xs", colors?.hint ?? "text-muted-foreground")}>{hint}</p>
-          ) : null}
-          {footer}
-        </CardContent>
-      </Card>
-    )
-  }
-
-  if (layout === "compact") {
-    return (
-      <Card className={cn(widthClass, colors?.card, className)}>
-        <CardContent className="p-4">
-          <div className="flex items-center gap-2">
+        <CardContent className="flex h-full flex-col justify-center p-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-medium leading-tight text-muted-foreground">{label}</p>
+              <div className={cn("mt-0.5 text-lg font-bold leading-tight tabular-nums", valueClassName)}>
+                {value}
+              </div>
+              {hint ? (
+                <p className="mt-0.5 text-xs leading-tight text-muted-foreground">{hint}</p>
+              ) : null}
+              {footer}
+            </div>
             {Icon ? (
-              <Icon className={cn("h-4 w-4", colors?.icon ?? "text-muted-foreground", iconClassName)} />
+              <div className={cn("shrink-0 rounded-full p-2", colors?.iconWrap ?? "bg-muted")}>
+                <Icon
+                  className={cn(
+                    "h-4 w-4",
+                    colors?.icon ?? "text-muted-foreground",
+                    iconClassName
+                  )}
+                />
+              </div>
             ) : null}
-            <div className={valueClasses}>{value}</div>
           </div>
-          <div className={cn("whitespace-nowrap text-sm", colors?.label ?? "text-muted-foreground")}>
-            {label}
-          </div>
-          {footer}
         </CardContent>
       </Card>
     )

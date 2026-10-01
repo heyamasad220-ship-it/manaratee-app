@@ -3,7 +3,7 @@ import { parseServiceRequirements } from "@/lib/events/event-service-requirement
 import { INTERNAL_EVENT_SOURCE_MODULE } from "@/lib/events/internal-event-source"
 import { volunteerOpeningsFromConfig } from "@/lib/events/volunteer-windows"
 
-export type SignUpOverviewSource = "event-management" | "vendor-hub"
+export type SignUpOverviewSource = "event-management" | "vendor-hub" | "programs"
 
 export type SignUpOverviewWhen = "upcoming" | "past" | "all"
 
@@ -58,5 +58,7 @@ export function formatVolunteerCoverage(filled: number, needed: number | null) {
 }
 
 export function signUpOverviewSourceLabel(source: SignUpOverviewSource) {
-  return source === "vendor-hub" ? "Vendor Hub" : "Event Management"
+  if (source === "vendor-hub") return "Vendor Hub"
+  if (source === "programs") return "Programs"
+  return "Event Management"
 }

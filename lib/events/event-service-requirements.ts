@@ -26,6 +26,23 @@ export type EventChildcareAgeGroup = {
   capacity: number
 }
 
+export type ChildcareAgeBand = {
+  id: string
+  name: string
+  ageMin: number | null
+  ageMax: number | null
+}
+
+export type BabysitterPayType = "volunteer" | "paid"
+
+export type BabysitterOpening = {
+  id: string
+  name: string
+  openings: number
+  payType: BabysitterPayType
+  hourlyRate: number | null
+}
+
 export type EventYouthOffering = "childcare" | "field_trip"
 
 export type EventYouthGender = "all" | "male" | "female"
@@ -109,6 +126,9 @@ export type EventServiceRequirements = {
     /** Preferred: childcare / field trip groups */
     groups?: EventYouthGroup[]
     ageGroups?: EventChildcareAgeGroup[]
+    /** Short age list on Sign-ups: name and ages only. */
+    ageBands?: ChildcareAgeBand[]
+    babysitterOpenings?: BabysitterOpening[]
     /** @deprecated Use groups / ageGroups */
     capacity?: number | null
     /** @deprecated Use groups / ageGroups */
@@ -184,6 +204,19 @@ export type EventServiceRequirementsFormState = {
   childcareAgeGroups: ChildcareAgeGroupFormRow[]
   childcareDeadline: string
   requireYouthWaiver: boolean
+  childcareAgeBands: Array<{
+    id: string
+    name: string
+    ageMin: string
+    ageMax: string
+  }>
+  babysitterOpenings: Array<{
+    id: string
+    name: string
+    openings: string
+    payType: BabysitterPayType
+    hourlyRate: string
+  }>
   vendorSlots: VendorSlotFormRow[]
   vendorDeadline: string
   vendorApprovalRequired: boolean
@@ -255,6 +288,8 @@ export const DEFAULT_EVENT_SERVICE_REQUIREMENTS_FORM: EventServiceRequirementsFo
   childcareAgeGroups: [],
   childcareDeadline: "",
   requireYouthWaiver: false,
+  childcareAgeBands: [],
+  babysitterOpenings: [],
   vendorSlots: [],
   vendorDeadline: "",
   vendorApprovalRequired: true,
@@ -484,6 +519,33 @@ export function parseServiceRequirements(value: unknown): EventServiceRequiremen
   return value as EventServiceRequirements
 }
 
+function newChildcareId(prefix: string) {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+}
+
+function ageBandsFromConfig(
+  childcare: EventServiceRequirements["childcare"] | undefined
+) {
+  return (childcare?.ageBands || []).map((band) => ({
+    id: band.id || newChildcareId("age"),
+    name: band.name || "",
+    ageMin: band.ageMin != null ? String(band.ageMin) : "",
+    ageMax: band.ageMax != null ? String(band.ageMax) : "",
+  }))
+}
+
+function babysitterOpeningsFromConfig(
+  childcare: EventServiceRequirements["childcare"] | undefined
+) {
+  return (childcare?.babysitterOpenings || []).map((opening) => ({
+    id: opening.id || newChildcareId("sitter"),
+    name: opening.name || "",
+    openings: String(opening.openings || 1),
+    payType: opening.payType === "paid" ? ("paid" as const) : ("volunteer" as const),
+    hourlyRate: opening.hourlyRate != null ? String(opening.hourlyRate) : "",
+  }))
+}
+
 export function serviceRequirementsFormFromEvent(input: {
   requires_volunteers?: boolean | null
   requires_childcare?: boolean | null
@@ -524,6 +586,8 @@ export function serviceRequirementsFormFromEvent(input: {
       youthGroups.find((group) => group.registrationDeadline)?.registrationDeadline ||
       "",
     requireYouthWaiver: config.childcare?.requireWaiver === true,
+    childcareAgeBands: ageBandsFromConfig(config.childcare),
+    babysitterOpenings: babysitterOpeningsFromConfig(config.childcare),
     vendorSlots: vendorSlotsFromConfig(config.vendors),
     vendorDeadline: config.vendors?.applicationDeadline || "",
     vendorApprovalRequired: config.vendors?.approvalRequired !== false,
@@ -659,11 +723,40 @@ export function buildServiceRequirementsPayload(
       groups.find((group) => group.registrationDeadline)?.registrationDeadline ||
       null
 
+    const ageBands = form.childcareAgeBands
+      .map((band) => {
+        const ageMin = Number.parseInt(band.ageMin, 10)
+        const ageMax = Number.parseInt(band.ageMax, 10)
+        return {
+          id: band.id,
+          name: band.name.trim(),
+          ageMin: Number.isFinite(ageMin) ? ageMin : null,
+          ageMax: Number.isFinite(ageMax) ? ageMax : null,
+        }
+      })
+      .filter((band) => band.name || band.ageMin != null || band.ageMax != null)
+
+    const babysitterOpenings = form.babysitterOpenings
+      .map((opening) => {
+        const hourly = Number.parseFloat(opening.hourlyRate)
+        return {
+          id: opening.id,
+          name: opening.name.trim(),
+          openings: Number.parseInt(opening.openings, 10) || 1,
+          payType: opening.payType === "paid" ? ("paid" as const) : ("volunteer" as const),
+          hourlyRate:
+            opening.payType === "paid" && Number.isFinite(hourly) ? hourly : null,
+        }
+      })
+      .filter((opening) => opening.name.length > 0)
+
     service_requirements.childcare = {
       groups,
       ageGroups,
       registrationDeadline: sharedDeadline,
       requireWaiver: form.requireYouthWaiver === true,
+      ageBands,
+      babysitterOpenings,
     }
   }
 

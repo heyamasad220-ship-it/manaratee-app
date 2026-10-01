@@ -14,6 +14,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { EventFeatureSwitchList } from "@/components/events/internal-event-features-settings"
 import { EventServiceRequirementsFields } from "@/components/events/event-service-requirements-fields"
 import { EventTicketingFields } from "@/components/events/event-ticketing-fields"
 import { FacilityVenueMultiSelect } from "@/components/reservations/facility-venue-multi-select"
@@ -52,6 +53,10 @@ import {
 } from "@/lib/events/internal-event-location"
 import { isSafeReturnToPath } from "@/lib/navigation/return-to"
 import type { RoomSetupStyle } from "@/lib/setup-styles/setup-style-types"
+import {
+  DEFAULT_WORKSPACE_FEATURES,
+  type EventWorkspaceFeatures,
+} from "@/lib/events/event-workspace-features"
 import type { VendorHubVendorType } from "@/lib/vendor-hub/vendor-type-types"
 
 type InternalEventFormProps = (
@@ -204,6 +209,9 @@ export function InternalEventForm(props: InternalEventFormProps) {
     DEFAULT_EVENT_TICKETING_FORM
   )
   const [ticketingLoaded, setTicketingLoaded] = useState(props.mode !== "edit")
+  const [createFeatures, setCreateFeatures] = useState<EventWorkspaceFeatures>(
+    DEFAULT_WORKSPACE_FEATURES
+  )
   const [operationalSetup, setOperationalSetup] = useState({
     expectedAttendance: "",
     setupStyle: "",
@@ -407,8 +415,15 @@ export function InternalEventForm(props: InternalEventFormProps) {
             operationalSetup: showFacilitySetup
               ? buildOperationalSetupPayload()
               : undefined,
-            ...servicePayload,
-            ...ticketingPayload,
+            requires_volunteers: createFeatures.volunteers,
+            requires_childcare: createFeatures.childcare,
+            requires_vendors: createFeatures.vendors,
+            requires_ticketing: createFeatures.registration,
+            workspace_features: createFeatures,
+            service_requirements: {},
+            ticketing_config: {
+              attendanceMode: createFeatures.registration ? "paid" : "open_public",
+            },
           })
           router.push(returnTo || `/event-management/${id}`)
           router.refresh()
@@ -429,8 +444,6 @@ export function InternalEventForm(props: InternalEventFormProps) {
           operationalSetup: showFacilitySetup
             ? buildOperationalSetupPayload()
             : undefined,
-          ...servicePayload,
-          ...ticketingPayload,
         })
         router.refresh()
       } catch (submitError) {
@@ -1020,23 +1033,25 @@ export function InternalEventForm(props: InternalEventFormProps) {
               {renderLocationFields()}
             </div>
 
-            <div className="grid gap-8 border-t pt-8 lg:grid-cols-2 lg:gap-10">
-              <EventServiceRequirementsFields
-                value={serviceRequirements}
-                onChange={setServiceRequirements}
-                vendorTypes={props.vendorTypes}
-                canManageVendorTypes={props.canManageVendorTypes}
-                hideVolunteerDetails
-              />
-
-              {ticketingLoaded ? (
-                <EventTicketingFields value={ticketing} onChange={setTicketing} />
-              ) : (
-                <div className="rounded-lg border p-4 text-sm text-muted-foreground">
-                  Loading ticketing settings...
+            {props.mode === "create" ? (
+              <details className="rounded-lg border">
+                <summary className="cursor-pointer px-4 py-3 text-sm font-medium">
+                  Features
+                </summary>
+                <div className="space-y-3 border-t p-4">
+                  <p className="text-sm text-muted-foreground">
+                    Leave these off for a simple event. Turn on only what this
+                    event needs. You can change them later under Settings.
+                  </p>
+                  <EventFeatureSwitchList
+                    features={createFeatures}
+                    onToggle={(key, checked) =>
+                      setCreateFeatures((current) => ({ ...current, [key]: checked }))
+                    }
+                  />
                 </div>
-              )}
-            </div>
+              </details>
+            ) : null}
 
             {renderFormActions()}
           </div>

@@ -51,10 +51,13 @@ export function CampaignSponsorsTab({
   campaignId,
   canManage,
   onChanged,
+  lockedEventId,
 }: {
   campaignId: string
   canManage: boolean
   onChanged: () => void
+  /** When set, this tab is the event's sponsor list. Packages still post money to the campaign. */
+  lockedEventId?: string
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -100,6 +103,14 @@ export function CampaignSponsorsTab({
   }, [loadData])
 
   function setSection(next: SponsorsSection) {
+    if (lockedEventId) {
+      const params = new URLSearchParams(searchParams.toString())
+      params.set("tab", "sponsors")
+      if (next === "packages") params.set("section", "packages")
+      else params.delete("section")
+      router.replace(`/event-management/${lockedEventId}?${params.toString()}`, { scroll: false })
+      return
+    }
     router.replace(
       donationCampaignWorkspaceHref(campaignId, {
         tab: "sponsors",
@@ -108,8 +119,18 @@ export function CampaignSponsorsTab({
     )
   }
 
+  const visiblePackages = useMemo(() => {
+    if (!lockedEventId) return packages
+    return packages.filter((pkg) => !pkg.event_id || pkg.event_id === lockedEventId)
+  }, [lockedEventId, packages])
+
+  const visibleSponsorships = useMemo(() => {
+    if (!lockedEventId) return sponsorships
+    return sponsorships.filter((row) => !row.event_id || row.event_id === lockedEventId)
+  }, [lockedEventId, sponsorships])
+
   const metrics = useMemo(() => {
-    return sponsorships.reduce(
+    return visibleSponsorships.reduce(
       (sum, row) => {
         if (row.status === "cancelled") return sum
         const collected = row.payment_status === "paid" ? row.cash_amount : 0
@@ -125,7 +146,7 @@ export function CampaignSponsorsTab({
       },
       { sponsors: 0, committed: 0, collected: 0, outstanding: 0, inKind: 0 }
     )
-  }, [sponsorships])
+  }, [visibleSponsorships])
 
   async function handleDuplicate(pkg: SponsorshipPackageListItem) {
     const result = await duplicateSponsorshipPackageAction(pkg.id)
@@ -166,6 +187,12 @@ export function CampaignSponsorsTab({
 
   return (
     <div className="flex flex-col gap-4">
+      {lockedEventId ? (
+        <p className="text-sm text-muted-foreground">
+          Sponsors are for this event. Customize each package: a nonprofit can get fundraising
+          dates, and a service provider can get a booth. Payments still record on the linked campaign.
+        </p>
+      ) : null}
       <ToggleGroup
         type="single"
         value={section}
@@ -237,7 +264,7 @@ export function CampaignSponsorsTab({
                         Loading packages…
                       </TableCell>
                     </TableRow>
-                  ) : packages.length === 0 ? (
+                  ) : visiblePackages.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={canManage ? 8 : 7} className="py-10 text-center">
                         <p className="font-medium text-foreground">No sponsorship packages yet</p>
@@ -258,7 +285,7 @@ export function CampaignSponsorsTab({
                       </TableCell>
                     </TableRow>
                   ) : (
-                    packages.map((pkg) => (
+                    visiblePackages.map((pkg) => (
                       <TableRow
                         key={pkg.id}
                         className="cursor-pointer hover:bg-muted/40"
@@ -332,7 +359,7 @@ export function CampaignSponsorsTab({
             </p>
           </div>
 
-          {!loading && sponsorships.length > 0 ? (
+          {!loading && visibleSponsorships.length > 0 ? (
             <StatCardsRow equal columns={5}>
               <StatCard label="Sponsors" value={metrics.sponsors} layout="compact" fill tone="slate" />
               <StatCard
@@ -390,7 +417,7 @@ export function CampaignSponsorsTab({
                         Loading sponsors…
                       </TableCell>
                     </TableRow>
-                  ) : sponsorships.length === 0 ? (
+                  ) : visibleSponsorships.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={10} className="py-10 text-center">
                         <p className="font-medium text-foreground">No sponsors yet</p>
@@ -411,7 +438,7 @@ export function CampaignSponsorsTab({
                       </TableCell>
                     </TableRow>
                   ) : (
-                    sponsorships.map((row) => (
+                    visibleSponsorships.map((row) => (
                       <TableRow
                         key={row.id}
                         className="cursor-pointer hover:bg-muted/40"
@@ -471,6 +498,14 @@ export function CampaignSponsorsTab({
         campaignId={campaignId}
         canManage={canManage}
         sponsorshipId={selectedId}
+        prefill={lockedEventId && !selectedId ? {
+          contactId: "",
+          contactName: "",
+          eventId: lockedEventId,
+          packageId: null,
+          amount: null,
+          notes: null,
+        } : null}
         onSaved={() => {
           void loadData()
           onChanged()
@@ -487,6 +522,7 @@ export function CampaignSponsorsTab({
         canManage={canManage}
         events={events}
         pkg={editingPackage}
+        defaultEventId={lockedEventId}
         onSaved={() => {
           void loadData()
           onChanged()

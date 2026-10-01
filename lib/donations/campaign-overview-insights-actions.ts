@@ -45,8 +45,9 @@ export type CampaignGroupOverviewRow = {
   groupId: string
   name: string
   goalAmount: number | null
-  collected: number
-  pledged: number
+  received: number
+  pledgedNotReceived: number
+  groupTotal: number
   progressPercent: number | null
   donorCount: number
 }
@@ -62,7 +63,7 @@ export type CampaignOverviewInsights = {
   actionItems: CampaignOverviewActionItem[]
   teamMetrics: CampaignTeamMetricRow[]
   groups: CampaignGroupOverviewRow[]
-  groupsCollectedTotal: number
+  groupsCompetitionTotal: number
   wishlist: CampaignWishlistOverviewSummary | null
 }
 
@@ -111,7 +112,7 @@ export async function getCampaignOverviewInsightsAction(campaignId: string) {
             actionItems: [],
             teamMetrics: [],
             groups: [],
-            groupsCollectedTotal: 0,
+            groupsCompetitionTotal: 0,
             wishlist: null,
           } satisfies CampaignOverviewInsights,
         }
@@ -324,12 +325,13 @@ export async function getCampaignOverviewInsightsAction(campaignId: string) {
         groupId: row.groupId,
         name: row.name,
         goalAmount: row.goalAmount,
-        collected: row.collected,
-        pledged: row.pledged,
+        received: row.collected,
+        pledgedNotReceived: row.outstanding,
+        groupTotal: row.groupTotal,
         progressPercent: row.progressPercent,
         donorCount: row.donorCount,
       }))
-      .sort((a, b) => b.collected - a.collected)
+      .sort((a, b) => b.groupTotal - a.groupTotal)
 
     let wishlist: CampaignWishlistOverviewSummary | null = null
     try {
@@ -405,7 +407,7 @@ export async function getCampaignOverviewInsightsAction(campaignId: string) {
         actionItems,
         teamMetrics,
         groups: groupRows,
-        groupsCollectedTotal: groupRows.reduce((sum, row) => sum + row.collected, 0),
+        groupsCompetitionTotal: groupRows.reduce((sum, row) => sum + row.groupTotal, 0),
         wishlist,
       } satisfies CampaignOverviewInsights,
     }

@@ -169,7 +169,7 @@ export function TicketingEventSalesTable({
                   <TableCell className="align-top whitespace-normal">
                     <div className="min-w-0 space-y-0.5">
                       <Link
-                        href={`/event-management/${event.id}`}
+                        href={`/event-management/${event.id}?tab=ticketing`}
                         className="font-medium break-words text-primary hover:underline"
                       >
                         {event.name}

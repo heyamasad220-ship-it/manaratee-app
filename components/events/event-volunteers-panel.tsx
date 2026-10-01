@@ -20,7 +20,7 @@ import {
   serviceRequirementsFormFromEvent,
   type EventServiceRequirementsFormState,
 } from "@/lib/events/event-service-requirements"
-import type { InternalEventWithRelations } from "@/lib/events/internal-event-types"
+import { updateProgramVolunteerSignups } from "@/lib/programs/program-volunteer-actions"
 import { storedWindowsFromForm } from "@/lib/events/volunteer-windows"
 import { signUpReportSlotAndTime } from "@/lib/sign-ups/sign-up-reports"
 import type { ServiceParticipationWithContact } from "@/lib/service-participations/service-participation-types"
@@ -32,14 +32,24 @@ function display(value: string | null | undefined) {
 
 type SignUpSection = "slots" | "volunteers"
 
+type SignUpSlotSource = {
+  id: string
+  requires_volunteers?: boolean | null
+  requires_childcare?: boolean | null
+  requires_vendors?: boolean | null
+  service_requirements?: unknown
+}
+
 export function EventVolunteersPanel({
   event,
   participations,
   canManage,
+  sourceType = "internal_event",
 }: {
-  event: InternalEventWithRelations
+  event: SignUpSlotSource
   participations: ServiceParticipationWithContact[]
   canManage: boolean
+  sourceType?: "internal_event" | "program"
 }) {
   const router = useRouter()
   const [section, setSection] = useState<SignUpSection>("slots")
@@ -63,15 +73,22 @@ export function EventVolunteersPanel({
     setError(null)
     const hasSlots =
       storedWindowsFromForm(serviceForm.volunteerWindows || []).length > 0
+    const serviceFormToSave = {
+      ...serviceForm,
+      requiresVolunteers: hasSlots || serviceForm.requiresVolunteers,
+      volunteerWindowsExplicit: true,
+    }
     startTransition(async () => {
-      const result = await updateInternalEventModules({
-        eventId: event.id,
-        serviceForm: {
-          ...serviceForm,
-          requiresVolunteers: hasSlots,
-          volunteerWindowsExplicit: true,
-        },
-      })
+      const result =
+        sourceType === "program"
+          ? await updateProgramVolunteerSignups({
+              programId: event.id,
+              serviceForm: serviceFormToSave,
+            })
+          : await updateInternalEventModules({
+              eventId: event.id,
+              serviceForm: serviceFormToSave,
+            })
       if (!result.success) {
         setError(result.error)
         return

@@ -174,7 +174,7 @@ export function TicketingSettingsClient({
                       <p className="text-sm text-muted-foreground">Custom checkout enabled</p>
                     </div>
                     <Button variant="outline" size="sm" asChild>
-                      <Link href={`/event-management/${event.eventId}?tab=settings&section=tickets`}>
+                      <Link href={`/event-management/${event.eventId}?tab=ticketing`}>
                         Open event tickets
                         <ExternalLink className="ml-2 h-4 w-4" />
                       </Link>

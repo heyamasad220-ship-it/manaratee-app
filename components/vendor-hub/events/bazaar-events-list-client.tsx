@@ -182,7 +182,7 @@ export function BazaarEventsListClient({
           </Button>
         </div>
 
-        <div className="mt-4 grid grid-cols-4 gap-3">
+        <div className="mt-4 grid grid-cols-2 gap-2 lg:grid-cols-4">
           <StatCard
             fill
             layout="header"
@@ -209,7 +209,6 @@ export function BazaarEventsListClient({
             label="Next"
             value={nextEvent?.event_date ? shortDate(nextEvent.event_date) : "—"}
             hint={nextHint}
-            valueClassName="text-xl"
           />
           <StatCard
             fill

@@ -82,7 +82,7 @@ function VolunteerHourSelect({
     <div className="space-y-1">
       <Label className="text-xs">{label}</Label>
       <Select value={value || undefined} onValueChange={onValueChange}>
-        <SelectTrigger className="w-[120px]" aria-label={label}>
+        <SelectTrigger className="w-full" aria-label={label}>
           <SelectValue placeholder="Select time" />
         </SelectTrigger>
         <SelectContent>
@@ -384,7 +384,7 @@ export function EventServiceRequirementsFields({
           {windows.map((window) => (
             <div
               key={window.id}
-              className="grid grid-cols-[120px_120px_minmax(12rem,1fr)_6.5rem_auto] items-end gap-x-2 gap-y-2"
+              className="grid w-full grid-cols-[minmax(10.5rem,1fr)_minmax(10.5rem,1fr)_minmax(14rem,1.35fr)_minmax(6.5rem,0.7fr)_auto] items-end gap-x-3 gap-y-2"
             >
               {window.slots.map((slot, index) => (
                 <Fragment key={slot.id}>
@@ -414,7 +414,7 @@ export function EventServiceRequirementsFields({
                       <div aria-hidden />
                     </>
                   )}
-                  <div className="min-w-[12rem] flex-1 space-y-1">
+                  <div className="space-y-1">
                     {index === 0 ? <Label className="text-xs">Slot</Label> : null}
                     <Input
                       placeholder="Registration"
@@ -440,7 +440,7 @@ export function EventServiceRequirementsFields({
                           openings: event.target.value,
                         })
                       }
-                      className="w-[6.5rem]"
+                      className="w-full"
                       aria-label="Open slots"
                     />
                   </div>

@@ -5,7 +5,9 @@ import { ProgramDetailClient } from "@/components/programs/program-detail-client
 import { ProgramWorkspaceClient } from "@/components/programs/program-workspace-client"
 import { getDepartments } from "@/lib/departments/department-queries"
 import { getOfferingsForProgram } from "@/lib/programs/program-offering-queries"
+import { canManageProgram } from "@/lib/programs/program-access"
 import { getProgramById } from "@/lib/programs/program-queries"
+import { getParticipationsForSource } from "@/lib/service-participations/service-participation-queries"
 import { getOfferingEnrollmentCount } from "@/lib/programs/program-staff-assignment-queries"
 import type { ProgramWithExtraFields } from "@/components/programs/edit/types"
 
@@ -26,7 +28,15 @@ export default async function ProgramDetailsPage({
   }
 
   if (program.department_id) {
-    const departments = await getDepartments()
+    const [departments, volunteerParticipations, canManageSignups] = await Promise.all([
+      getDepartments(),
+      getParticipationsForSource({
+        sourceType: "program",
+        sourceId: program.id,
+        organizationId: program.organization_id,
+      }),
+      canManageProgram(program.id),
+    ])
     const departmentName =
       departments.find((department) => department.id === program.department_id)
         ?.name ?? "Department"
@@ -41,6 +51,8 @@ export default async function ProgramDetailsPage({
           program={program}
           departmentId={program.department_id}
           departmentName={departmentName}
+          volunteerParticipations={volunteerParticipations}
+          canManageSignups={canManageSignups}
         />
       </>
     )

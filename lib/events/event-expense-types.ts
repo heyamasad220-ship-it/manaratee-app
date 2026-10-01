@@ -1,7 +1,15 @@
-export const EVENT_EXPENSE_CATEGORIES = [
+/** Short list on the event Reports tab. */
+export const EVENT_REPORT_EXPENSE_CATEGORIES = [
   "Venue",
-  "Food/Catering",
   "Transportation",
+  "Babysitters",
+  "Food",
+  "Other",
+] as const
+
+export const EVENT_EXPENSE_CATEGORIES = [
+  ...EVENT_REPORT_EXPENSE_CATEGORIES,
+  "Food/Catering",
   "Youth Activities",
   "Decor",
   "Printing",
@@ -10,7 +18,6 @@ export const EVENT_EXPENSE_CATEGORIES = [
   "Staff",
   "Equipment",
   "Marketing",
-  "Other",
 ] as const
 
 export type EventExpenseCategory = (typeof EVENT_EXPENSE_CATEGORIES)[number]

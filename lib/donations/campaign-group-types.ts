@@ -57,9 +57,12 @@ export type CampaignGroupMetrics = {
   description: string | null
   /** Valid pledges attributed to this campaign group. */
   pledged: number
-  /** Successful payments attributed to this campaign group. */
+  /** Money already received through this group (gifts and pledge payments). */
   collected: number
+  /** Open pledge balances attributed to this group. Counts in the competition before the money arrives. */
   outstanding: number
+  /** Competition score: money received plus pledges not yet received. */
+  groupTotal: number
   donorCount: number
   progressPercent: number | null
 }

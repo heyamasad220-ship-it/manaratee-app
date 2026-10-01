@@ -91,6 +91,11 @@ export type CampaignRecurringPlanRow = {
 }
 
 /** Square dinner import stores Recurring Type in memo part 4 and remarks after part 6. */
+/** A payment linked to a pledge is collected on that pledge, not as a campaign donation. */
+export function isPledgeAppliedCampaignPayment(payment: { pledge_id?: string | null }): boolean {
+  return Boolean(payment.pledge_id)
+}
+
 export function isRecurringCampaignPayment(payment: CampaignPaymentRow): boolean {
   if (payment.recurring_donation_plan_id) return true
   const memo = String(payment.memo || "")
@@ -141,7 +146,9 @@ export function computeCampaignDonationKpis(
   payments: CampaignPaymentRow[],
   recurringPlans: CampaignRecurringPlanRow[]
 ): CampaignDonationKpis {
-  const countablePayments = payments.filter((payment) => isCountableCampaignPayment(payment))
+  const countablePayments = payments.filter(
+    (payment) => isCountableCampaignPayment(payment) && !isPledgeAppliedCampaignPayment(payment)
+  )
   const oneTimePayments = countablePayments.filter((payment) => !isRecurringCampaignPayment(payment))
   const livePlans = recurringPlans.filter((plan) => isLiveRecurringPlan(plan))
 

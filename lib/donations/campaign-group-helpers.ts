@@ -117,10 +117,11 @@ export function computeCampaignGroupMetrics(input: {
       if (pledge.donor_id) donorKeys.add(`donor:${pledge.donor_id}`)
     }
 
+    const groupTotal = collected + outstanding
     const goalAmount = group.goal_amount
     const progressPercent =
       goalAmount != null && goalAmount > 0
-        ? Math.min((collected / goalAmount) * 100, 100)
+        ? Math.min((groupTotal / goalAmount) * 100, 100)
         : null
 
     return {
@@ -143,6 +144,7 @@ export function computeCampaignGroupMetrics(input: {
       pledged,
       collected,
       outstanding,
+      groupTotal,
       donorCount: donorKeys.size,
       progressPercent,
     }

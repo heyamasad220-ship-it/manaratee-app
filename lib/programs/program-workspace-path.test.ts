@@ -135,6 +135,8 @@ describe("program workspace paths", () => {
     assert.equal(parseProgramWorkspaceTab("programs"), "offerings")
     assert.equal(parseProgramWorkspaceTab("applications"), "applications")
     assert.equal(parseProgramWorkspaceTab("schedule"), "schedule")
+    assert.equal(parseProgramWorkspaceTab("sign-ups"), "sign-ups")
+    assert.equal(parseProgramWorkspaceTab("volunteers"), "sign-ups")
     assert.equal(parseProgramWorkspaceTab("finance"), "finance")
     assert.equal(parseProgramWorkspaceTab("reports"), "reports")
   })

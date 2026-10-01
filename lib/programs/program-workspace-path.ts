@@ -9,6 +9,7 @@ export type ProgramWorkspaceTab =
   | "applications"
   | "students"
   | "schedule"
+  | "sign-ups"
   | "finance"
   | "reports"
   | "settings"
@@ -36,6 +37,9 @@ export function parseProgramWorkspaceTab(
   if (value === "applications") return "applications"
   if (value === "students" || value === "registrations") return "students"
   if (value === "schedule") return "schedule"
+  if (value === "sign-ups" || value === "signups" || value === "volunteers") {
+    return "sign-ups"
+  }
   if (value === "finance") return "finance"
   if (value === "reports") return "reports"
   if (value === "settings") return "settings"

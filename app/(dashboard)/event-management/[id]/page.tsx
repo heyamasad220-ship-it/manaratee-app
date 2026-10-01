@@ -4,9 +4,13 @@ import { Suspense } from "react"
 import { InternalEventWorkspace } from "@/components/events/internal-event-workspace"
 import { getChildcareForInternalEvent } from "@/lib/child-care/childcare-registration-queries"
 import { listEventExpenses } from "@/lib/events/event-expense-actions"
+import { getEventFeatureHints } from "@/lib/events/event-feature-hints"
 import { getLinkedCampaignSummary, listActiveCampaignsForEvent } from "@/lib/events/event-finance-queries"
 import { linkedCampaignIdFromEvent } from "@/lib/events/event-campaign-id"
-import { eventManagementOrdersHref } from "@/lib/events/event-management-reports-path"
+import {
+  canonicalEventWorkspaceTicketingHref,
+  parseEventTicketingPanelSection,
+} from "@/lib/events/event-management-section-path"
 import { getEventOverviewSummary } from "@/lib/events/event-overview-metrics"
 import { loadInternalEventCreateFormOptions } from "@/lib/events/internal-event-form-options"
 import { getInternalEventDeleteBlockers } from "@/lib/events/internal-event-actions"
@@ -14,7 +18,7 @@ import { getInternalEventById } from "@/lib/events/internal-event-queries"
 import { resolveWorkspaceTabId } from "@/lib/events/event-workspace-features"
 import { getParticipationsForSource } from "@/lib/service-participations/service-participation-queries"
 import { getEventTicketTypes } from "@/lib/tickets/ticket-type-actions"
-import { getEventAttendees } from "@/lib/tickets/ticket-order-queries"
+import { getEventAttendees, getTicketOrders } from "@/lib/tickets/ticket-order-queries"
 import { getEventStaffCandidates } from "@/lib/events/event-staff-assignment-queries"
 import { getVendorHubVendorTypes } from "@/lib/vendor-hub/vendor-type-queries"
 import {
@@ -35,7 +39,7 @@ export default async function InternalEventWorkspacePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ tab?: string }>
+  searchParams: Promise<{ tab?: string; section?: string }>
 }) {
   const { id } = await params
   const bazaarHref = await getBazaarWorkspaceHrefForInternalEvent(id)
@@ -43,11 +47,19 @@ export default async function InternalEventWorkspacePage({
     redirect(bazaarHref)
   }
   await requireInternalEventWorkspaceAccess(id)
-  const { tab } = await searchParams
-  if (tab === "orders" || tab === "attendees") {
-    redirect(eventManagementOrdersHref(id))
+  const { tab, section } = await searchParams
+  if (tab === "youth") {
+    redirect(`/event-management/${id}`)
+  }
+  if (tab === "finance") {
+    redirect(`/event-management/${id}?tab=reports`)
+  }
+  const ticketingHref = canonicalEventWorkspaceTicketingHref(id, tab, section)
+  if (ticketingHref) {
+    redirect(ticketingHref)
   }
   const initialTab = resolveWorkspaceTabId(tab) ?? "overview"
+  const ticketingSection = parseEventTicketingPanelSection(section)
 
   const [
     event,
@@ -56,6 +68,7 @@ export default async function InternalEventWorkspacePage({
     participations,
     ticketTypes,
     attendees,
+    orders,
     childcare,
     vendorTypes,
     expenses,
@@ -66,6 +79,7 @@ export default async function InternalEventWorkspacePage({
     getParticipationsForSource({ sourceType: "internal_event", sourceId: id }),
     getEventTicketTypes(id),
     getEventAttendees(id),
+    getTicketOrders({ eventId: id }),
     getChildcareForInternalEvent(id),
     getVendorHubVendorTypes({ activeOnly: true }),
     listEventExpenses(id),
@@ -91,6 +105,10 @@ export default async function InternalEventWorkspacePage({
     : null
 
   const linkedCampaignId = linkedCampaignIdFromEvent(event)
+  const featureHints = await getEventFeatureHints({
+    eventId: id,
+    campaignId: linkedCampaignId,
+  })
 
   const organizationId = await getSelectedOrganizationId()
   let organizationSlug: string | null = null
@@ -120,6 +138,7 @@ export default async function InternalEventWorkspacePage({
     participations,
     childcareRegistrations: childcare.registrations,
     linkedCampaignRaisedCents: linkedCampaignSummary?.raisedCents ?? 0,
+    featureHints,
   })
 
   const deleteBlockedReason = canManage
@@ -140,11 +159,11 @@ export default async function InternalEventWorkspacePage({
         participations={participations}
         ticketTypes={ticketTypes}
         attendees={attendees}
+        orders={orders}
+        ticketingSection={initialTab === "ticketing" ? ticketingSection : "settings"}
         staffCandidates={staffCandidates}
         coordinatorCandidates={coordinatorCandidates}
         coordinatorName={coordinatorName}
-        childcareEvent={childcare.childcareEvent}
-        childcareRegistrations={childcare.registrations}
         vendorTypes={vendorTypes}
         overview={overview}
         expenses={expenses}
@@ -156,6 +175,7 @@ export default async function InternalEventWorkspacePage({
         organizationSlug={organizationSlug}
         initialTab={initialTab}
         eventFormOptions={eventFormOptions}
+        featureHints={featureHints}
       />
     </Suspense>
   )

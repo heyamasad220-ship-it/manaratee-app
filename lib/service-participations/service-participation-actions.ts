@@ -411,6 +411,81 @@ export async function assignEventStaffMember(input: {
   }
 }
 
+export async function assignChildcareProviderToEvent(input: {
+  eventId: string
+  contactId: string
+}): Promise<{ success: true } | { success: false; error: string }> {
+  try {
+    const canManage = await hasAnyPermission(
+      PERMISSIONS.EVENTS_MANAGE,
+      PERMISSIONS.PROGRAMS_MANAGE
+    )
+    if (!canManage) {
+      return { success: false, error: "You do not have permission to assign providers." }
+    }
+
+    const organizationId = await getSelectedOrganizationId()
+    if (!organizationId) {
+      return { success: false, error: "No organization selected." }
+    }
+    if (!input.contactId.trim()) {
+      return { success: false, error: "Choose a provider." }
+    }
+
+    const supabase = await createClient()
+    const { data: event, error: eventError } = await supabase
+      .from("internal_events")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .eq("id", input.eventId)
+      .maybeSingle()
+
+    if (eventError || !event) {
+      return { success: false, error: "Event not found." }
+    }
+
+    const { data: approved } = await supabase
+      .from("applications")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .eq("contact_id", input.contactId)
+      .eq("application_type", "childcare_provider")
+      .eq("status", "approved")
+      .limit(1)
+
+    if (!approved?.length) {
+      return { success: false, error: "That person is not an approved childcare provider." }
+    }
+
+    const { error } = await supabase.from("service_participations").upsert(
+      {
+        organization_id: organizationId,
+        source_type: "internal_event" as const,
+        source_id: input.eventId,
+        contact_id: input.contactId,
+        participation_type: "childcare_provider" as const,
+        status: "confirmed" as const,
+        updated_at: new Date().toISOString(),
+      },
+      {
+        onConflict: "organization_id,source_type,source_id,contact_id,participation_type",
+      }
+    )
+
+    if (error) {
+      return { success: false, error: error.message || "Could not assign provider." }
+    }
+
+    revalidateParticipationPaths("internal_event", input.eventId)
+    return { success: true }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Could not assign provider.",
+    }
+  }
+}
+
 export async function updateEventStaffAssignment(input: {
   participationId: string
   contactId?: string
@@ -418,6 +493,7 @@ export async function updateEventStaffAssignment(input: {
   status?: ServiceParticipationStatus
   hourlyRate?: number | null
   hours?: number | null
+  hoursApproved?: boolean
   actualHours?: number | null
   paidAt?: string | null
   certificateSentAt?: string | null
@@ -465,7 +541,8 @@ export async function updateEventStaffAssignment(input: {
 
     if (
       existingRow!.participation_type !== "staff" &&
-      existingRow!.participation_type !== "volunteer"
+      existingRow!.participation_type !== "volunteer" &&
+      existingRow!.participation_type !== "childcare_provider"
     ) {
       return { success: false, error: "Only paid and volunteer assignments can be edited here." }
     }
@@ -474,6 +551,7 @@ export async function updateEventStaffAssignment(input: {
     const assignment_meta = mergeEventStaffAssignmentMeta(currentMeta, {
       hourlyRate: input.hourlyRate,
       hours: input.hours,
+      hoursApproved: input.hoursApproved,
       actualHours: input.actualHours,
       paidAt: input.paidAt,
       certificateSentAt: input.certificateSentAt,

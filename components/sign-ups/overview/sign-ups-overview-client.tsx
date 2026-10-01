@@ -5,6 +5,7 @@ import Link from "next/link"
 import { Search } from "lucide-react"
 
 import { InternalEventDbStatusBadge } from "@/components/events/internal-event-db-status-badge"
+import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import {
   Select,
@@ -39,6 +40,7 @@ const sourceFilters: Array<{ value: "all" | SignUpOverviewSource; label: string 
   { value: "all", label: "All sources" },
   { value: "event-management", label: "Event Management" },
   { value: "vendor-hub", label: "Vendor Hub" },
+  { value: "programs", label: "Programs" },
 ]
 
 const whenFilters: Array<{ value: SignUpOverviewWhen; label: string }> = [
@@ -149,7 +151,7 @@ export function SignUpsOverviewClient({
               <TableRow>
                 <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
                   {events.length === 0
-                    ? "No events need volunteers yet. Turn on volunteers in an event’s Service Needs. Bazaars show up here once that same need is on."
+                    ? "No sign-ups yet. Add slots on an event or program Sign-ups tab, or on a bazaar Sign-ups tab."
                     : "No events match these filters."}
                 </TableCell>
               </TableRow>
@@ -167,15 +169,23 @@ export function SignUpsOverviewClient({
                   <TableCell>{signUpOverviewSourceLabel(event.source)}</TableCell>
                   <TableCell>{formatEventDate(event.startAt)}</TableCell>
                   <TableCell>
-                    {formatEventTimeRange(event.startAt, event.endAt)}
+                    {event.source === "programs"
+                      ? "—"
+                      : formatEventTimeRange(event.startAt, event.endAt)}
                   </TableCell>
                   <TableCell>{event.location || "—"}</TableCell>
                   <TableCell>
-                    <InternalEventDbStatusBadge
-                      status={event.status as InternalEventStatus}
-                      startAt={event.startAt}
-                      endAt={event.endAt}
-                    />
+                    {event.source === "programs" ? (
+                      <Badge variant="outline" className="capitalize">
+                        {event.status}
+                      </Badge>
+                    ) : (
+                      <InternalEventDbStatusBadge
+                        status={event.status as InternalEventStatus}
+                        startAt={event.startAt}
+                        endAt={event.endAt}
+                      />
+                    )}
                   </TableCell>
                   <TableCell>
                     {formatVolunteerCoverage(

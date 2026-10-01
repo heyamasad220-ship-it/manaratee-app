@@ -127,6 +127,13 @@ describe("campaign donation kpis", () => {
       [
         { id: "ot-1", amount: 200, donor_id: "a", sender_name: "Ali" },
         { id: "ot-2", amount: 100, donor_id: "a", sender_name: "Ali" },
+        {
+          id: "pledge-pay",
+          amount: 15000,
+          donor_id: "amr",
+          sender_name: "Dr. Amr Morsy",
+          pledge_id: "pledge-amr",
+        },
         { id: "rec-1", amount: 50, donor_id: "susan", sender_name: "Susan", recurring_donation_plan_id: "p1" },
         { id: "voided", amount: 25, status: "voided", donor_id: "z", sender_name: "Voided" },
       ],

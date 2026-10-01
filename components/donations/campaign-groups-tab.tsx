@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
-import { Copy, DollarSign, Download, ExternalLink, HeartHandshake, Plus, QrCode, Users } from "lucide-react"
+import { Copy, DollarSign, Download, ExternalLink, HeartHandshake, Plus, QrCode, Trophy, Users } from "lucide-react"
 
 import { PledgeContactPicker } from "@/components/donations/pledge-contact-picker"
 import { Button } from "@/components/ui/button"
@@ -367,23 +367,32 @@ export function CampaignGroupsTab({
             ) : null}
           </div>
 
-          <StatCardsRow equal columns={3} className="gap-3">
-            <StatCard
-              fill
-              className="h-full"
-              tone="violet"
-              icon={HeartHandshake}
-              label="Pledged"
-              value={formatDonationCurrency(selectedMetric.pledged)}
-              valueClassName="text-xl"
-            />
+          <StatCardsRow equal columns={4} className="gap-3">
             <StatCard
               fill
               className="h-full"
               tone="emerald"
               icon={DollarSign}
-              label="Collected"
+              label="Received"
               value={formatDonationCurrency(selectedMetric.collected)}
+              valueClassName="text-xl"
+            />
+            <StatCard
+              fill
+              className="h-full"
+              tone="violet"
+              icon={HeartHandshake}
+              label="Pledged, not received"
+              value={formatDonationCurrency(selectedMetric.outstanding)}
+              valueClassName="text-xl"
+            />
+            <StatCard
+              fill
+              className="h-full"
+              tone="amber"
+              icon={Trophy}
+              label="Group total"
+              value={formatDonationCurrency(selectedMetric.groupTotal)}
               valueClassName="text-xl"
             />
             <StatCard
@@ -496,10 +505,6 @@ export function CampaignGroupsTab({
                 <span className="text-muted-foreground">Status: </span>
                 {CAMPAIGN_GROUP_STATUS_LABELS[selectedMetric.status]}
               </p>
-              <p>
-                <span className="text-muted-foreground">Outstanding: </span>
-                {formatDonationCurrency(selectedMetric.outstanding)}
-              </p>
               {selectedMetric.description ? (
                 <p className="sm:col-span-2">{selectedMetric.description}</p>
               ) : null}
@@ -512,7 +517,7 @@ export function CampaignGroupsTab({
             <div>
               <h2 className="text-base font-semibold">Groups</h2>
               <p className="text-sm text-muted-foreground">
-                Campaign fundraising teams with unique donation links.
+                Competition score is money received plus pledges not yet received. The public link shows received only.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -522,16 +527,25 @@ export function CampaignGroupsTab({
                 onClick={() =>
                   downloadCsv(
                     `${campaignName.replace(/[^\w]+/g, "-").toLowerCase()}-campaign-groups.csv`,
-                    ["Group", "Org group", "Lead", "Status", "Donors", "Pledged", "Collected", "Outstanding"],
+                    [
+                      "Group",
+                      "Org group",
+                      "Lead",
+                      "Status",
+                      "Donors",
+                      "Received",
+                      "Pledged, not received",
+                      "Group total",
+                    ],
                     metrics.map((row) => [
                       row.name,
                       row.organizationalGroupName || "",
                       row.leadName || "",
                       CAMPAIGN_GROUP_STATUS_LABELS[row.status],
                       row.donorCount,
-                      row.pledged,
                       row.collected,
                       row.outstanding,
+                      row.groupTotal,
                     ])
                   )
                 }
@@ -558,8 +572,9 @@ export function CampaignGroupsTab({
                     <TableHead>Group</TableHead>
                     <TableHead>Lead</TableHead>
                     <TableHead className="text-right">Donors</TableHead>
-                    <TableHead className="text-right">Pledged</TableHead>
-                    <TableHead className="text-right">Collected</TableHead>
+                    <TableHead className="text-right">Received</TableHead>
+                    <TableHead className="text-right">Pledged, not received</TableHead>
+                    <TableHead className="text-right">Group total</TableHead>
                     <TableHead>Link</TableHead>
                     {canManage ? <TableHead>Actions</TableHead> : null}
                   </TableRow>
@@ -568,7 +583,7 @@ export function CampaignGroupsTab({
                   {loading ? (
                     <TableRow>
                       <TableCell
-                        colSpan={canManage ? 7 : 6}
+                        colSpan={canManage ? 8 : 7}
                         className="py-8 text-center text-muted-foreground"
                       >
                         Loading groups…
@@ -577,7 +592,7 @@ export function CampaignGroupsTab({
                   ) : metrics.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={canManage ? 7 : 6}
+                        colSpan={canManage ? 8 : 7}
                         className="py-8 text-center text-muted-foreground"
                       >
                         No campaign groups yet.
@@ -605,10 +620,13 @@ export function CampaignGroupsTab({
                         <TableCell>{row.leadName || "—"}</TableCell>
                         <TableCell className="text-right tabular-nums">{row.donorCount}</TableCell>
                         <TableCell className="text-right tabular-nums">
-                          {formatDonationCurrency(row.pledged)}
+                          {formatDonationCurrency(row.collected)}
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
-                          {formatDonationCurrency(row.collected)}
+                          {formatDonationCurrency(row.outstanding)}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums font-medium">
+                          {formatDonationCurrency(row.groupTotal)}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-0.5">

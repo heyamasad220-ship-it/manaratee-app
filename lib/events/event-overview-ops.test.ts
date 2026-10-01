@@ -18,18 +18,26 @@ describe("buildEventOverviewOpsKpis", () => {
     const byId = Object.fromEntries(kpis.map((kpi) => [kpi.id, kpi]))
     assert.equal(byId.type?.value, "One-time")
     assert.equal(byId.location?.value, "Main Prayer Hall (MPH)")
-    assert.equal(byId.childcare?.value, "Not needed")
+    assert.equal(byId.childcare, undefined)
     assert.equal(byId.volunteers?.value, "Needed")
-    assert.equal(byId.vendors?.value, "Not needed")
+    assert.equal(byId.vendors, undefined)
   })
 
-  it("treats same-name siblings as a recurring series", () => {
+  it("treats a shared series id as a recurring series", () => {
     const event = {
       name: "Learn, Love, Live the Quran",
       start_at: "2026-09-30T14:00:00.000Z",
       end_at: "2026-09-30T15:00:00.000Z",
       timezone: "America/Chicago",
       venueNames: ["Main Prayer Hall (MPH)"],
+      recurrence_config: {
+        enabled: true,
+        frequency: "weekly",
+        interval: 1,
+        weekdays: [3],
+        endType: "count",
+        seriesId: "series-quran",
+      },
     }
     const kpis = buildEventOverviewOpsKpis(event, [
       event,
@@ -43,5 +51,28 @@ describe("buildEventOverviewOpsKpis", () => {
     assert.equal(byId.type?.value, "Recurring")
     assert.equal(byId.schedule?.value, "Every Wednesday")
     assert.equal(byId.location?.value, "Main Prayer Hall (MPH)")
+  })
+
+  it("keeps a one-time event one-time when another event has the same name", () => {
+    const event = {
+      name: "Mentors Training",
+      start_at: "2026-11-07T20:00:00.000Z",
+      end_at: "2026-11-07T23:00:00.000Z",
+      timezone: "America/Chicago",
+      recurrence_config: null,
+    }
+    const kpis = buildEventOverviewOpsKpis(event, [
+      event,
+      {
+        name: "Mentors Training",
+        start_at: "2026-08-29T19:00:00.000Z",
+        end_at: "2026-08-29T22:00:00.000Z",
+        timezone: "America/Chicago",
+        recurrence_config: null,
+      },
+    ])
+    const byId = Object.fromEntries(kpis.map((kpi) => [kpi.id, kpi]))
+    assert.equal(byId.type?.value, "One-time")
+    assert.equal(byId.schedule?.value?.startsWith("Every"), false)
   })
 })

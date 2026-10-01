@@ -1,4 +1,7 @@
-import { EVENT_MANAGEMENT_TICKETING_ORDERS_PATH } from "@/lib/events/event-management-section-path"
+import {
+  EVENT_MANAGEMENT_TICKETING_ORDERS_PATH,
+  eventTicketingWorkspaceHref,
+} from "@/lib/events/event-management-section-path"
 
 export const EVENT_MANAGEMENT_REPORTS_PATH = "/event-management/reports"
 export const EVENT_MANAGEMENT_ORDERS_REPORTS_PATH =
@@ -29,5 +32,5 @@ export const EVENT_MANAGEMENT_REPORTS_TABS: Array<{
 
 export function eventManagementOrdersHref(eventId?: string | null) {
   if (!eventId) return EVENT_MANAGEMENT_TICKETING_ORDERS_PATH
-  return `${EVENT_MANAGEMENT_TICKETING_ORDERS_PATH}?event=${encodeURIComponent(eventId)}`
+  return eventTicketingWorkspaceHref(eventId, "orders")
 }

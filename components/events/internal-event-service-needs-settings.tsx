@@ -57,9 +57,9 @@ export function InternalEventServiceNeedsSettings({
       <CardHeader>
         <CardTitle className="text-base">Service needs</CardTitle>
         <p className="text-sm text-muted-foreground">
-          When this event is active, eligible volunteers, childcare providers, and
-          vendors can sign up from the customer Opportunities page. Parent childcare
-          registration is also enabled when childcare is on.
+          When this event is active, eligible volunteers and vendors can sign up
+          from the customer Opportunities page. Kids are registered by buying a
+          ticket. Child care providers sign up on the Childcare tab, and staff confirm them.
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -80,6 +80,7 @@ export function InternalEventServiceNeedsSettings({
           vendorTypes={vendorTypes}
           canManageVendorTypes={canManage && canManageVendorTypes}
           hideVolunteerDetails
+          visibleModules={["volunteers", "vendors"]}
         />
         {canManage ? (
           <div className="flex justify-end">

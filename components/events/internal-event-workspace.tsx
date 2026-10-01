@@ -6,12 +6,10 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { Header } from "@/components/layout/header"
 import { FacilityEventRequestDrawer } from "@/components/events/facility-event-request-drawer"
 import { InternalEventCardActions } from "@/components/events/internal-event-card-actions"
-import { InternalEventChildcareTab } from "@/components/events/internal-event-childcare-tab"
 import { InternalEventFeaturesSettings } from "@/components/events/internal-event-features-settings"
 import { InternalEventGeneralSettings } from "@/components/events/internal-event-general-settings"
 import { InternalEventMetaSettings } from "@/components/events/internal-event-meta-settings"
-import { InternalEventServiceNeedsSettings } from "@/components/events/internal-event-service-needs-settings"
-import { InternalEventFinanceTab } from "@/components/events/internal-event-finance-tab"
+import { EventReportsPanel } from "@/components/events/event-reports-panel"
 import { InternalEventModuleSetupPanel } from "@/components/events/internal-event-module-setup-panel"
 import { InternalEventModuleDisabledState } from "@/components/events/internal-event-participations-panel"
 import { InternalEventAttendeesTab } from "@/components/events/internal-event-attendees-tab"
@@ -19,20 +17,24 @@ import {
   InternalEventOverviewDashboard,
   InternalEventOverviewKpis,
 } from "@/components/events/internal-event-overview-dashboard"
-import { InternalEventRegistrationWorkspace } from "@/components/events/internal-event-registration-workspace"
-import { InternalEventReportsTab } from "@/components/events/internal-event-reports-tab"
+import { EventPlanningPanel } from "@/components/events/event-planning-panel"
+import { EventChildcarePanel } from "@/components/events/event-childcare-panel"
 import { EventVolunteersPanel } from "@/components/events/event-volunteers-panel"
 import {
   getEventTaskDefinitionsFromRequirements,
   getEventTaskNamesFromRequirements,
   InternalEventStaffAssignments,
 } from "@/components/events/internal-event-staff-tab"
-import { InternalEventSettingsWorkspace } from "@/components/events/internal-event-settings-workspace"
 import { InternalEventVendorsTab } from "@/components/events/internal-event-vendors-tab"
 import { InternalEventStatusSelect } from "@/components/events/internal-event-status-select"
+import { CampaignSponsorsTab } from "@/components/donations/campaign-sponsors-tab"
+import { EventTicketingWorkspace } from "@/components/events/event-ticketing-workspace"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { buildEventRecentOrders } from "@/lib/events/event-recent-activity"
+import {
+  parseEventTicketingPanelSection,
+  type EventTicketingPanelSection,
+} from "@/lib/events/event-management-section-path"
 import type { EventOverviewSummary } from "@/lib/events/event-overview-metrics"
 import type { EventExpense } from "@/lib/events/event-expense-types"
 import type {
@@ -41,7 +43,6 @@ import type {
 } from "@/lib/events/event-finance-types"
 import {
   getVisibleWorkspaceTabs,
-  isLegacyTicketsTab,
   parseEventSettingsSection,
   resolveAttendanceMode,
   resolveEventWorkspaceFeatures,
@@ -50,11 +51,7 @@ import {
   type EventWorkspaceTabId,
 } from "@/lib/events/event-workspace-features"
 import type { InternalEventWithRelations } from "@/lib/events/internal-event-types"
-import type {
-  ChildcareEventSummary,
-  ChildcareRegistration,
-} from "@/lib/child-care/childcare-registration-types"
-import type { EventAttendeeListItem } from "@/lib/tickets/ticket-order-queries"
+import type { EventAttendeeListItem, TicketOrderListItem } from "@/lib/tickets/ticket-order-queries"
 import type { EventStaffCandidate } from "@/lib/events/event-staff-assignment-queries"
 import type { EventTicketType } from "@/lib/tickets/ticket-types"
 import type { ServiceParticipationWithContact } from "@/lib/service-participations/service-participation-types"
@@ -78,11 +75,11 @@ export function InternalEventWorkspace({
   participations = [],
   ticketTypes = [],
   attendees = [],
+  orders = [],
+  ticketingSection = "settings",
   staffCandidates = [],
   coordinatorCandidates = [],
   coordinatorName = null,
-  childcareEvent = null,
-  childcareRegistrations = [],
   vendorTypes = [],
   overview,
   expenses = [],
@@ -94,6 +91,7 @@ export function InternalEventWorkspace({
   organizationSlug = null,
   initialTab = "overview",
   eventFormOptions = null,
+  featureHints,
 }: {
   event: InternalEventWithRelations
   canManage: boolean
@@ -102,11 +100,11 @@ export function InternalEventWorkspace({
   participations?: ServiceParticipationWithContact[]
   ticketTypes?: EventTicketType[]
   attendees?: EventAttendeeListItem[]
+  orders?: TicketOrderListItem[]
+  ticketingSection?: EventTicketingPanelSection
   staffCandidates?: EventStaffCandidate[]
   coordinatorCandidates?: Array<{ id: string; full_name: string }>
   coordinatorName?: string | null
-  childcareEvent?: ChildcareEventSummary | null
-  childcareRegistrations?: ChildcareRegistration[]
   vendorTypes?: VendorHubVendorType[]
   overview: EventOverviewSummary
   expenses?: EventExpense[]
@@ -118,6 +116,7 @@ export function InternalEventWorkspace({
   organizationSlug?: string | null
   initialTab?: EventWorkspaceTabId
   eventFormOptions?: InternalEventCreateFormOptions | null
+  featureHints?: { hasPlanningQuote?: boolean; hasSponsors?: boolean }
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -125,7 +124,7 @@ export function InternalEventWorkspace({
   const tabParam = searchParams.get("tab")
   const resolvedFromUrl = resolveWorkspaceTabId(tabParam)
 
-  const features = resolveEventWorkspaceFeatures(event)
+  const features = resolveEventWorkspaceFeatures({ ...event, ...featureHints })
   const attendanceMode = resolveAttendanceMode(event)
   const hasPaidStaff = participations.some(
     (row) => row.participation_type === "staff" && row.status !== "cancelled"
@@ -156,37 +155,30 @@ export function InternalEventWorkspace({
   const vendorParticipations = participations.filter(
     (row) => row.participation_type === "vendor"
   )
-  const providerParticipations = participations.filter(
-    (row) => row.participation_type === "childcare_provider"
-  )
   const staffTasks = getEventTaskNamesFromRequirements(event.service_requirements)
   const staffTaskDefinitions = getEventTaskDefinitionsFromRequirements(
     event.service_requirements
   )
-  const recentActivity = buildEventRecentOrders(attendees, 4)
-  const showCheckoutSettings =
-    features.registration && attendanceMode !== "open_public"
-  const requestedSettingsSection = isLegacyTicketsTab(tabParam)
-    ? "tickets"
-    : parseEventSettingsSection(searchParams.get("section"))
+  const requestedSettingsSection = parseEventSettingsSection(
+    searchParams.get("section")
+  )
   const settingsSection: EventSettingsSection =
-    requestedSettingsSection === "checkout" && !showCheckoutSettings
-      ? "tickets"
-      : requestedSettingsSection
+    requestedSettingsSection === "general" ? "general" : "features"
 
   const settingsSections: Array<{ id: EventSettingsSection; label: string }> = [
     { id: "general", label: "General" },
-    { id: "tickets", label: "Tickets" },
     { id: "features", label: "Features" },
-    ...(showCheckoutSettings
-      ? [{ id: "checkout" as const, label: "Checkout" }]
-      : []),
   ]
 
-  function replaceWorkspaceQuery(next: { tab: EventWorkspaceTabId; section?: EventSettingsSection }) {
+  function replaceWorkspaceQuery(next: {
+    tab: EventWorkspaceTabId
+    section?: EventSettingsSection | EventTicketingPanelSection
+  }) {
     const params = new URLSearchParams(searchParams.toString())
     params.set("tab", next.tab)
     if (next.tab === "settings" && next.section && next.section !== "general") {
+      params.set("section", next.section)
+    } else if (next.tab === "ticketing" && next.section && next.section !== "settings") {
       params.set("section", next.section)
     } else {
       params.delete("section")
@@ -197,11 +189,16 @@ export function InternalEventWorkspace({
     router.replace(nextHref, { scroll: false })
   }
 
+  const ticketingSections: Array<{ id: EventTicketingPanelSection; label: string }> = [
+    { id: "settings", label: "Settings" },
+    { id: "orders", label: "Orders" },
+    { id: "check-in", label: "Check-in" },
+  ]
+  const activeTicketingSection = parseEventTicketingPanelSection(
+    activeTab === "ticketing" ? searchParams.get("section") ?? ticketingSection : "settings"
+  )
+
   function handleTabChange(value: string) {
-    if (isLegacyTicketsTab(value)) {
-      replaceWorkspaceQuery({ tab: "settings", section: "tickets" })
-      return
-    }
     const nextTab = resolveWorkspaceTabId(value)
     if (!nextTab) return
     if (!visibleTabs.some((tab) => tab.value === nextTab)) return
@@ -210,8 +207,13 @@ export function InternalEventWorkspace({
     if (nextTab === activeTab) return
     replaceWorkspaceQuery({
       tab: nextTab,
-      section: nextTab === "settings" ? "general" : undefined,
+      section: nextTab === "settings" ? "general" : nextTab === "ticketing" ? "settings" : undefined,
     })
+  }
+
+  function handleTicketingSectionChange(section: EventTicketingPanelSection) {
+    if (activeTab === "ticketing" && section === activeTicketingSection) return
+    replaceWorkspaceQuery({ tab: "ticketing", section })
   }
 
   function handleSettingsSectionChange(section: EventSettingsSection) {
@@ -295,6 +297,31 @@ export function InternalEventWorkspace({
             {activeTab === "overview" ? (
               <InternalEventOverviewKpis overview={overview} />
             ) : null}
+            {activeTab === "ticketing" ? (
+              <nav
+                aria-label="Ticketing"
+                className="flex flex-wrap gap-1 border-b border-border pb-px"
+              >
+                {ticketingSections.map((section) => {
+                  const isActive = section.id === activeTicketingSection
+                  return (
+                    <button
+                      key={section.id}
+                      type="button"
+                      onClick={() => handleTicketingSectionChange(section.id)}
+                      className={cn(
+                        "-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors",
+                        isActive
+                          ? "border-primary text-primary"
+                          : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
+                      )}
+                    >
+                      {section.label}
+                    </button>
+                  )
+                })}
+              </nav>
+            ) : null}
             {activeTab === "settings" ? (
               <nav
                 aria-label="Event settings"
@@ -328,8 +355,33 @@ export function InternalEventWorkspace({
               canManage={canManage}
               eventId={event.id}
               coordinatorName={coordinatorName}
-              recentActivity={recentActivity}
               onNavigateTab={handleTabChange}
+            />
+          </TabsContent>
+
+          <TabsContent value="plan" className="mt-0">
+            <EventPlanningPanel eventId={event.id} canManage={canManage} />
+          </TabsContent>
+
+          <TabsContent value="ticketing" className="mt-0">
+            <EventTicketingWorkspace
+              eventId={event.id}
+              eventName={event.name}
+              section={activeTicketingSection}
+              canManage={canManage}
+              canCheckIn={canCheckIn}
+              features={features}
+              ticketTypes={ticketTypes}
+              ticketingConfig={event.ticketing_config}
+              requiresTicketing={event.requires_ticketing}
+              orders={orders}
+              orderEvent={{
+                id: event.id,
+                name: event.name,
+                startAt: event.start_at ?? null,
+                endAt: event.end_at ?? null,
+              }}
+              attendees={attendees}
             />
           </TabsContent>
 
@@ -367,39 +419,12 @@ export function InternalEventWorkspace({
             />
           </TabsContent>
 
-          <TabsContent value="youth" className="mt-0">
-            {features.youth ? (
-              <div className="space-y-6">
-                {canManage ? (
-                  <InternalEventModuleSetupPanel
-                    event={event}
-                    module="childcare"
-                    title="Youth offerings"
-                    description="Configure childcare and field trip groups, capacity, and registration deadlines."
-                  />
-                ) : null}
-                <InternalEventChildcareTab
-                  event={event}
-                  childcareEvent={childcareEvent}
-                  registrations={childcareRegistrations}
-                  providerParticipations={providerParticipations}
-                  canManage={canManage}
-                  canCheckIn={canCheckIn || canManage}
-                />
-              </div>
-            ) : canManage ? (
-              <InternalEventModuleSetupPanel
-                event={event}
-                module="childcare"
-                title="Youth"
-                description="Enable youth offerings (childcare and field trips) to register children and assign providers for this event."
-              />
-            ) : (
-              <InternalEventModuleDisabledState
-                title="Youth"
-                description="Youth offerings are not enabled for this event."
-              />
-            )}
+          <TabsContent value="childcare" className="mt-0">
+            <EventChildcarePanel
+              event={event}
+              participations={participations}
+              canManage={canManage}
+            />
           </TabsContent>
 
           <TabsContent value="vendors" className="mt-0">
@@ -437,26 +462,29 @@ export function InternalEventWorkspace({
             )}
           </TabsContent>
 
-          <TabsContent value="finance" className="mt-0">
-            <InternalEventFinanceTab
-              eventId={event.id}
-              initialExpenses={expenses}
-              financeSummary={overview.finance}
-              linkedCampaignId={linkedCampaignId}
-              linkedCampaignSummary={linkedCampaignSummary}
-              campaignOptions={campaignOptions}
-              canManage={canManage}
-            />
+          <TabsContent value="sponsors" className="mt-0">
+            {linkedCampaignId ? (
+              <CampaignSponsorsTab
+                campaignId={linkedCampaignId}
+                lockedEventId={event.id}
+                canManage={canManage}
+                onChanged={() => router.refresh()}
+              />
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Link this event to a fundraising campaign before adding sponsors. The campaign
+                still holds the payments.
+              </p>
+            )}
           </TabsContent>
 
           <TabsContent value="reports" className="mt-0">
-            <InternalEventReportsTab
+            <EventReportsPanel
               eventId={event.id}
+              canManage={canManage}
+              expenses={expenses}
+              ticketTypes={ticketTypes}
               attendees={attendees}
-              overview={overview}
-              staffParticipations={participations}
-              youthRegistrations={childcareRegistrations}
-              vendorParticipations={vendorParticipations}
             />
           </TabsContent>
 
@@ -469,25 +497,8 @@ export function InternalEventWorkspace({
               />
             ) : null}
 
-            {settingsSection === "tickets" ? (
-              <InternalEventRegistrationWorkspace
-                eventId={event.id}
-                ticketTypes={ticketTypes}
-                ticketingConfig={event.ticketing_config}
-                requiresTicketing={event.requires_ticketing}
-                canManage={canManage}
-              />
-            ) : null}
-
             {settingsSection === "features" ? (
               <div className="space-y-6">
-                <InternalEventServiceNeedsSettings
-                  key={event.id}
-                  event={event}
-                  vendorTypes={vendorTypes}
-                  canManage={canManage}
-                  canManageVendorTypes={canManage}
-                />
                 <InternalEventFeaturesSettings
                   eventId={event.id}
                   initialFeatures={features}
@@ -511,28 +522,6 @@ export function InternalEventWorkspace({
                   canManage={canManage}
                 />
               </div>
-            ) : null}
-
-            {settingsSection === "checkout" ? (
-              showCheckoutSettings ? (
-                <InternalEventSettingsWorkspace
-                  eventId={event.id}
-                  eventName={event.name}
-                  ticketTypes={ticketTypes}
-                  ticketingConfig={event.ticketing_config}
-                  canManage={canManage}
-                />
-              ) : canManage ? (
-                <p className="text-sm text-muted-foreground">
-                  Checkout fields, attendee questions, and promo codes appear
-                  when this event has paid or free tickets.
-                </p>
-              ) : (
-                <InternalEventModuleDisabledState
-                  title="Checkout settings"
-                  description="Registration checkout is not configured for this event."
-                />
-              )
             ) : null}
           </TabsContent>
         </Tabs>

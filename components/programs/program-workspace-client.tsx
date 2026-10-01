@@ -8,6 +8,7 @@ import {
   BookOpen,
   CalendarClock,
   ClipboardList,
+  HandHelping,
   Landmark,
   LayoutDashboard,
   Settings,
@@ -21,6 +22,7 @@ import { DepartmentStudentsPanel } from "@/components/departments/department-stu
 import { ProgramWorkspaceFinancePanel } from "@/components/programs/program-workspace-finance-panel"
 import { ProgramWorkspaceReportsPanel } from "@/components/programs/program-workspace-reports-panel"
 import { ProgramWorkspaceSettingsPanel } from "@/components/programs/program-workspace-settings-panel"
+import { EventVolunteersPanel } from "@/components/events/event-volunteers-panel"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
@@ -35,6 +37,7 @@ import {
   type ProgramStatus,
 } from "@/lib/programs/program-status"
 import type { Program } from "@/lib/programs/program-types"
+import type { ServiceParticipationWithContact } from "@/lib/service-participations/service-participation-types"
 import {
   isLegacyProgramApplicationsQuery,
   isLegacyReportsAddons,
@@ -54,10 +57,14 @@ export function ProgramWorkspaceClient({
   program,
   departmentId,
   departmentName,
+  volunteerParticipations = [],
+  canManageSignups = false,
 }: {
   program: Program
   departmentId: string
   departmentName: string
+  volunteerParticipations?: ServiceParticipationWithContact[]
+  canManageSignups?: boolean
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -245,6 +252,10 @@ export function ProgramWorkspaceClient({
             <CalendarClock className="size-4" />
             Schedule
           </TabsTrigger>
+          <TabsTrigger value="sign-ups" className="gap-2">
+            <HandHelping className="size-4" />
+            Sign-ups
+          </TabsTrigger>
           <TabsTrigger value="finance" className="gap-2">
             <Landmark className="size-4" />
             Finance
@@ -301,6 +312,21 @@ export function ProgramWorkspaceClient({
           programName={programName}
           initialSection={scheduleSection}
           onSectionChange={handleScheduleSectionChange}
+        />
+      ) : null}
+
+      {activeTab === "sign-ups" ? (
+        <EventVolunteersPanel
+          sourceType="program"
+          canManage={canManageSignups}
+          participations={volunteerParticipations}
+          event={{
+            id: program.id,
+            requires_volunteers: program.requires_volunteers,
+            requires_childcare: program.requires_childcare,
+            requires_vendors: program.requires_vendors,
+            service_requirements: program.service_requirements,
+          }}
         />
       ) : null}
 

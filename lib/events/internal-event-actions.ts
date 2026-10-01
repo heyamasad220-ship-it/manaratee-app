@@ -62,10 +62,10 @@ import {
   type EventRecurrenceConfig,
 } from "./event-recurrence"
 import {
+  DEFAULT_WORKSPACE_FEATURES,
   parseAttendanceMode,
   parseEventWorkspaceFeatures,
   resolveAttendanceMode,
-  resolveEventWorkspaceFeatures,
   type EventAttendanceMode,
   type EventWorkspaceFeatures,
 } from "./event-workspace-features"
@@ -101,6 +101,7 @@ type CreateInternalEventInput = {
   recurrence_config?: EventRecurrenceConfig | Record<string, unknown> | null
   /** When creating from a campaign Event tab, link this campaign. */
   linkedCampaignId?: string | null
+  workspace_features?: EventWorkspaceFeatures | null
 }
 
 type UpdateInternalEventInput = CreateInternalEventInput & {
@@ -252,7 +253,11 @@ function validateTicketingInput(input: CreateInternalEventInput) {
     return
   }
 
-  const ticketTypes = input.ticketTypes || []
+  if (input.ticketTypes == null) {
+    return
+  }
+
+  const ticketTypes = input.ticketTypes
   const validTypes = ticketTypes.filter((type) => type.name.trim())
 
   if (validTypes.length === 0) {
@@ -470,9 +475,10 @@ function revalidateInternalEventPaths(eventId?: string) {
   revalidatePath("/facilities/reservation-center")
   revalidatePath("/facilities/overview")
   revalidateTicketingPaths()
-  if (eventId) {
-    revalidatePath(`/event-management/${eventId}`)
-  }
+    if (eventId) {
+      revalidatePath(`/event-management/${eventId}`)
+      revalidatePath(`/event-management/${eventId}/ticketing`)
+    }
 }
 
 export async function createInternalEvent(input: CreateInternalEventInput) {
@@ -515,6 +521,7 @@ export async function createInternalEvent(input: CreateInternalEventInput) {
     .insert({
       organization_id: organizationId,
       ...eventPayload,
+      workspace_features: input.workspace_features ?? { ...DEFAULT_WORKSPACE_FEATURES },
       created_by: user?.id ?? null,
     })
     .select("id")
@@ -657,6 +664,7 @@ export async function submitInternalEventRequest(input: CreateInternalEventInput
         approved_at: needsApproval ? null : nowIso,
         created_by: user.id,
         recurrence_config: storedRecurrence,
+        workspace_features: input.workspace_features ?? { ...DEFAULT_WORKSPACE_FEATURES },
       })
       .select("id")
       .single()
@@ -1578,12 +1586,6 @@ export async function updateInternalEventModules(input: {
       updatePayload.requires_vendors = servicePayload.requires_vendors
       updatePayload.service_requirements = servicePayload.service_requirements
 
-      const currentFeatures = resolveEventWorkspaceFeatures(existingEvent)
-      updatePayload.workspace_features = {
-        ...currentFeatures,
-        youth: currentFeatures.youth || servicePayload.requires_childcare,
-        vendors: currentFeatures.vendors || servicePayload.requires_vendors,
-      }
     }
 
     if (input.ticketingForm) {
@@ -1646,6 +1648,14 @@ export async function updateInternalEventModules(input: {
         attendanceMode: mode,
       }
       updatePayload.requires_ticketing = requiresTicketing
+      const featureBase =
+        (updatePayload.workspace_features as Record<string, unknown> | undefined) ||
+        (existingEvent.workspace_features as Record<string, unknown> | null) ||
+        {}
+      updatePayload.workspace_features = {
+        ...featureBase,
+        registration: requiresTicketing,
+      }
       if (ticketSyncInput) {
         ticketSyncInput = {
           ...ticketSyncInput,
@@ -1714,31 +1724,22 @@ export async function updateEventWorkspaceFeatures(input: {
     }
 
     const parsed = parseEventWorkspaceFeatures(input.features)
+    const existing = parseEventWorkspaceFeatures(existingEvent.workspace_features)
     const features: EventWorkspaceFeatures = {
-      registration: parsed.registration ?? false,
-      staff: parsed.staff ?? false,
-      youth: parsed.youth ?? false,
-      vendors: parsed.vendors ?? false,
-      finance: parsed.finance ?? false,
-      waitlist: parsed.waitlist ?? false,
+      ...DEFAULT_WORKSPACE_FEATURES,
+      ...existing,
+      ...parsed,
+      youth: parsed.youth ?? existing.youth ?? false,
     }
 
     const { error } = await supabase
       .from("internal_events")
       .update({
         workspace_features: features,
-        // Keep legacy module flags in sync for Youth/Vendors eligibility.
-        // Do NOT map staff → requires_volunteers (that flag means open volunteer sign-ups).
-        requires_childcare: features.youth,
+        requires_volunteers: features.volunteers,
+        requires_childcare: features.childcare,
         requires_vendors: features.vendors,
-        requires_ticketing:
-          features.registration &&
-          resolveAttendanceMode({
-            requires_ticketing: existingEvent.requires_ticketing,
-            ticketing_config: existingEvent.ticketing_config as {
-              attendanceMode?: unknown
-            } | null,
-          }) !== "open_public",
+        requires_ticketing: features.registration,
       })
       .eq("id", input.eventId)
       .eq("organization_id", organizationId)

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useParams, useRouter, useSearchParams } from "next/navigation"
-import { ArrowLeft, Plus } from "lucide-react"
+import { ArrowLeft } from "lucide-react"
 import dynamic from "next/dynamic"
 
 import { ContactProfileDialog } from "@/components/contacts/contact-profile-dialog"
@@ -19,9 +19,10 @@ import { CampaignDonationsKpis } from "@/components/donations/campaign-donations
 import { CampaignDonationsTab } from "@/components/donations/campaign-donations-tab"
 import { CampaignEventKpis } from "@/components/donations/campaign-event-kpis"
 import { CampaignOverviewSummary, CampaignOverviewTab } from "@/components/donations/campaign-overview-tab"
-import { CampaignSponsorsTab } from "@/components/donations/campaign-sponsors-tab"
+import { useCampaignBreadcrumb } from "@/components/donations/campaign-breadcrumb-context"
 import { CampaignWorkspaceNav } from "@/components/donations/campaign-workspace-nav"
 import { CampaignWishlistTab } from "@/components/donations/campaign-wishlist-tab"
+import { PledgesLedger } from "@/app/(dashboard)/donations/campaigns/pledges/page"
 
 const CampaignEventsTab = dynamic(
   () =>
@@ -35,17 +36,7 @@ const CampaignEventsTab = dynamic(
     ),
   }
 )
-import { Card, CardContent } from "@/components/ui/card"
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import {
-  formatDonationCurrency,
   type CampaignAnalyticsEntry,
   type CampaignDonorInsights,
   type CampaignOutstandingPledgeRow,
@@ -63,7 +54,6 @@ import {
   isFundraisingPlanTab,
   parseCampaignWorkspaceTab,
 } from "@/lib/donations/campaign-workspace-paths"
-import { donationPledgesHref } from "@/lib/donations/donation-pledge-paths"
 import { isOpenAllocatablePledge } from "@/lib/donations/donation-status"
 import { createClient } from "@/lib/supabase/client"
 import { STAFF_MAIN_CONTENT_STICKY_TOP_CLASS } from "@/lib/layout/staff-dashboard-chrome"
@@ -84,104 +74,6 @@ function formatShortDate(value: string | null | undefined) {
     day: "numeric",
     year: "numeric",
   })
-}
-
-function CampaignPledgesTab({
-  campaignId,
-  pledges,
-  canManage,
-  onDonorClick,
-  onAddPledge,
-  onPledgeClick,
-}: {
-  campaignId: string
-  pledges: CampaignOutstandingPledgeRow[]
-  canManage: boolean
-  onDonorClick: (pledge: CampaignOutstandingPledgeRow) => void
-  onAddPledge: () => void
-  onPledgeClick: (pledgeId: string) => void
-}) {
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h2 className="text-base font-semibold text-foreground">Campaign Pledges</h2>
-          <p className="text-sm text-muted-foreground">
-            Same pledge records as the global Pledges page, filtered to this campaign.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" asChild>
-            <Link href={donationPledgesHref({ campaignId })}>Open full pledges view</Link>
-          </Button>
-          {canManage ? (
-            <Button onClick={onAddPledge}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Pledge
-            </Button>
-          ) : null}
-        </div>
-      </div>
-
-      <Card className="border border-border shadow-sm">
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Donor</TableHead>
-                <TableHead>Pledge Date</TableHead>
-                <TableHead className="text-right">Amount Pledged</TableHead>
-                <TableHead className="text-right">Amount Paid</TableHead>
-                <TableHead className="text-right">Balance</TableHead>
-                <TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {pledges.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
-                    No pledges for this campaign yet.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                pledges.map((pledge) => (
-                  <TableRow
-                    key={pledge.id}
-                    className="cursor-pointer hover:bg-muted/40"
-                    onClick={() => onPledgeClick(pledge.id)}
-                  >
-                    <TableCell>
-                      <button
-                        type="button"
-                        className="font-medium text-primary hover:underline"
-                        onClick={(event) => {
-                          event.stopPropagation()
-                          onDonorClick(pledge)
-                        }}
-                      >
-                        {pledge.donorName}
-                      </button>
-                    </TableCell>
-                    <TableCell>{formatShortDate(pledge.pledgeDate)}</TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatDonationCurrency(pledge.amountPledged)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatDonationCurrency(pledge.amountPaid)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums text-red-600">
-                      {formatDonationCurrency(pledge.balanceRemaining)}
-                    </TableCell>
-                    <TableCell className="capitalize">{pledge.status}</TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-    </div>
-  )
 }
 
 export default function CampaignDetailPage() {
@@ -221,6 +113,12 @@ export default function CampaignDetailPage() {
   const [planKpis, setPlanKpis] = useState<CampaignFundraisingPlanKpis | null>(null)
 
   const supabase = useMemo(() => createClient(), [])
+  const { setCampaignName } = useCampaignBreadcrumb()
+
+  useEffect(() => {
+    setCampaignName(campaign?.name ?? null)
+    return () => setCampaignName(null)
+  }, [campaign?.name, setCampaignName])
 
   const { openPledgeDonorIds, openPledgeContactIds } = useMemo(() => {
     const donorIds = new Set<string>()
@@ -306,13 +204,37 @@ export default function CampaignDetailPage() {
 
   useEffect(() => {
     if (!campaignId) return
+    if (searchParams.get("tab") === "sponsors") {
+      let cancelled = false
+      void (async () => {
+        const { data } = await supabase
+          .from("internal_events")
+          .select("id")
+          .eq("campaign_id", campaignId)
+          .order("start_at", { ascending: false, nullsFirst: false })
+          .limit(1)
+        if (cancelled) return
+        const eventId = data?.[0]?.id as string | undefined
+        if (eventId) {
+          const params = new URLSearchParams()
+          params.set("tab", "sponsors")
+          if (searchParams.get("section") === "packages") params.set("section", "packages")
+          router.replace(`/event-management/${eventId}?${params.toString()}`)
+          return
+        }
+        router.replace(`/donations/campaigns/${campaignId}?tab=events`)
+      })()
+      return () => {
+        cancelled = true
+      }
+    }
     const canonical = canonicalizeCampaignWorkspaceHref(campaignId, searchParams)
     if (!canonical) return
     const current = `${window.location.pathname}${window.location.search}`
     if (canonical !== current) {
       router.replace(canonical)
     }
-  }, [campaignId, router, searchParams])
+  }, [campaignId, router, searchParams, supabase])
 
   if (loading) {
     return <div className="p-6 text-muted-foreground">Loading campaign...</div>
@@ -434,25 +356,7 @@ export default function CampaignDetailPage() {
           ) : null}
 
           {activeTab === "pledges" ? (
-            <CampaignPledgesTab
-              campaignId={campaign.id}
-              pledges={campaignPledges}
-              canManage={canManage}
-              onDonorClick={(pledge) =>
-                void openContactProfile({
-                  contactId: pledge.contactId,
-                  donorId: pledge.donorId,
-                })
-              }
-              onAddPledge={() => {
-                setDetailsPledgeId(null)
-                setDetailsOpen(true)
-              }}
-              onPledgeClick={(pledgeId) => {
-                setDetailsPledgeId(pledgeId)
-                setDetailsOpen(true)
-              }}
-            />
+            <PledgesLedger lockedCampaignId={campaign.id} embedded />
           ) : null}
 
           {activeTab === "donations" ? (
@@ -485,11 +389,7 @@ export default function CampaignDetailPage() {
           ) : null}
 
           {activeTab === "sponsors" ? (
-            <CampaignSponsorsTab
-              campaignId={campaign.id}
-              canManage={canManageProspects}
-              onChanged={() => void loadCampaign()}
-            />
+            <p className="text-sm text-muted-foreground">Opening sponsors on the event…</p>
           ) : null}
 
           {activeTab === "groups" ? (

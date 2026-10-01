@@ -39,6 +39,8 @@ export type EventOverviewOpsEvent = {
   requires_ticketing?: boolean | null
   workspace_features?: unknown
   ticketing_config?: { attendanceMode?: unknown } | null
+  hasPlanningQuote?: boolean
+  hasSponsors?: boolean
 }
 
 export type EventOverviewOpsSibling = {
@@ -47,6 +49,14 @@ export type EventOverviewOpsSibling = {
   end_at?: string | null
   timezone?: string | null
   recurrence_config?: Record<string, unknown> | null
+}
+
+function recurrenceSeriesId(
+  config: Record<string, unknown> | null | undefined
+) {
+  if (!config || typeof config !== "object") return null
+  const seriesId = config.seriesId
+  return typeof seriesId === "string" && seriesId.trim() ? seriesId.trim() : null
 }
 
 function weekdayFromStart(startAt: string | null | undefined, timezone?: string | null) {
@@ -73,17 +83,19 @@ export function formatEventOverviewLocation(event: EventOverviewOpsEvent) {
   return "—"
 }
 
-function neededLabel(needed: boolean) {
-  return needed ? "Needed" : "Not needed"
-}
-
 export function buildEventOverviewOpsKpis(
   event: EventOverviewOpsEvent,
-  siblings: EventOverviewOpsSibling[] = []
+  siblings: EventOverviewOpsSibling[] = [],
+  hints?: { hasPlanningQuote?: boolean; hasSponsors?: boolean }
 ): EventOverviewOpsKpi[] {
-  const related = siblings.length > 0 ? siblings : [event]
+  const pool = siblings.length > 0 ? siblings : [event]
   const fromConfig = isInternalEventRecurring(event.recurrence_config)
-  const isRecurring = fromConfig || related.length > 1
+  const ownSeriesId = recurrenceSeriesId(event.recurrence_config)
+  const seriesMembers = ownSeriesId
+    ? pool.filter((row) => recurrenceSeriesId(row.recurrence_config) === ownSeriesId)
+    : [event]
+  // A second event with the same name is its own meeting unless they share a series.
+  const isRecurring = fromConfig || seriesMembers.length > 1
   const time = formatEventTimeRange(event.start_at ?? null, event.end_at ?? null)
   const fromConfigSchedule = formatEventRecurrenceSchedule(event.recurrence_config)
 
@@ -91,7 +103,7 @@ export function buildEventOverviewOpsKpis(
   if (!schedule && isRecurring) {
     const weekdays = Array.from(
       new Set(
-        related
+        seriesMembers
           .map((row) => weekdayFromStart(row.start_at ?? null, row.timezone))
           .filter((day): day is number => day != null)
       )
@@ -105,7 +117,7 @@ export function buildEventOverviewOpsKpis(
     schedule = formatEventDate(event.start_at ?? null)
   }
 
-  const features = resolveEventWorkspaceFeatures(event)
+  const features = resolveEventWorkspaceFeatures({ ...event, ...hints })
 
   return [
     {
@@ -124,20 +136,12 @@ export function buildEventOverviewOpsKpis(
       label: "Location",
       value: formatEventOverviewLocation(event),
     },
-    {
-      id: "childcare",
-      label: "Childcare",
-      value: neededLabel(features.youth),
-    },
-    {
-      id: "volunteers",
-      label: "Volunteers",
-      value: neededLabel(event.requires_volunteers === true),
-    },
-    {
-      id: "vendors",
-      label: "Vendors",
-      value: neededLabel(features.vendors),
-    },
-  ]
+    features.childcare
+      ? { id: "childcare", label: "Childcare", value: "Needed" }
+      : null,
+    features.volunteers
+      ? { id: "volunteers", label: "Volunteers", value: "Needed" }
+      : null,
+    features.vendors ? { id: "vendors", label: "Vendors", value: "Needed" } : null,
+  ].filter((kpi): kpi is EventOverviewOpsKpi => kpi != null)
 }

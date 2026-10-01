@@ -11,13 +11,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { DatePickerInput } from "@/components/ui/date-picker-input"
 import { Label } from "@/components/ui/label"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
   Table,
   TableBody,
   TableCell,
@@ -28,12 +21,6 @@ import {
 import { TimeInput } from "@/components/ui/time-input"
 import { updateInternalEventModules } from "@/lib/events/internal-event-actions"
 import { eventManagementOrdersHref } from "@/lib/events/event-management-reports-path"
-import {
-  ATTENDANCE_MODE_OPTIONS,
-  resolveAttendanceMode,
-  toAttendancePickerMode,
-  type EventAttendancePickerMode,
-} from "@/lib/events/event-workspace-features"
 import {
   formatTicketPrice,
   ticketingFormFromEvent,
@@ -85,28 +72,10 @@ function roundTimeToStep(time: string, stepMinutes: number) {
   return `${String(hours).padStart(2, "0")}:${String(rounded).padStart(2, "0")}`
 }
 
-function applyAttendancePricing(
-  form: EventTicketingFormState,
-  mode: EventAttendancePickerMode
-): EventTicketingFormState {
-  return {
-    ...form,
-    ticketTypes: form.ticketTypes.map((row) =>
-      mode === "free"
-        ? { ...row, offeringKind: "complimentary" as const, price: "0" }
-        : {
-            ...row,
-            offeringKind: row.offeringKind === "complimentary" ? "standard" : row.offeringKind,
-          }
-    ),
-  }
-}
-
 export function InternalEventRegistrationWorkspace({
   eventId,
   ticketTypes,
   ticketingConfig,
-  requiresTicketing,
   canManage = true,
 }: {
   eventId: string
@@ -122,15 +91,6 @@ export function InternalEventRegistrationWorkspace({
 
   const activeTypes = ticketTypes.filter((type) => type.is_active)
 
-  const [attendanceMode, setAttendanceMode] = useState<EventAttendancePickerMode>(() =>
-    toAttendancePickerMode(
-      resolveAttendanceMode({
-        requires_ticketing: requiresTicketing,
-        ticketing_config: ticketingConfig,
-      })
-    )
-  )
-
   const [ticketingForm, setTicketingForm] = useState<EventTicketingFormState>(() =>
     ticketingFormFromEvent({
       requires_ticketing: true,
@@ -140,34 +100,15 @@ export function InternalEventRegistrationWorkspace({
   )
 
   useEffect(() => {
-    const nextMode = toAttendancePickerMode(
-      resolveAttendanceMode({
-        requires_ticketing: requiresTicketing,
+    setTicketingForm(
+      ticketingFormFromEvent({
+        requires_ticketing: true,
         ticketing_config: ticketingConfig,
+        ticketTypes: ticketTypes.filter((type) => type.is_active),
       })
     )
-    setAttendanceMode(nextMode)
-    setTicketingForm(
-      applyAttendancePricing(
-        ticketingFormFromEvent({
-          requires_ticketing: true,
-          ticketing_config: ticketingConfig,
-          ticketTypes: ticketTypes.filter((type) => type.is_active),
-        }),
-        nextMode
-      )
-    )
     setSaved(false)
-  }, [eventId, ticketingConfig, ticketTypes, requiresTicketing])
-
-  const pickerMode = toAttendancePickerMode(attendanceMode)
-  const isFree = pickerMode === "free"
-
-  function handleAttendanceChange(next: EventAttendancePickerMode) {
-    setAttendanceMode(next)
-    setTicketingForm((current) => applyAttendancePricing(current, next))
-    setSaved(false)
-  }
+  }, [eventId, ticketingConfig, ticketTypes])
 
   function updateSalesPart(
     field: "salesOpenAt" | "salesCloseAt",
@@ -201,12 +142,11 @@ export function InternalEventRegistrationWorkspace({
     setSaveError(null)
     setSaved(false)
     startTransition(async () => {
-      const pricedForm = applyAttendancePricing(ticketingForm, pickerMode)
       const result = await updateInternalEventModules({
         eventId,
-        attendanceMode: pickerMode,
+        attendanceMode: "paid",
         ticketingForm: {
-          ...pricedForm,
+          ...ticketingForm,
           requiresTicketing: true,
         },
       })
@@ -229,27 +169,6 @@ export function InternalEventRegistrationWorkspace({
         <CardContent className="pt-6">
           {canManage ? (
             <div className="flex flex-col gap-4 xl:flex-row xl:items-end">
-              <div className="w-full max-w-[160px] space-y-1.5">
-                <Label htmlFor="attendance-method">Attendance method</Label>
-                <Select
-                  value={pickerMode}
-                  onValueChange={(value) =>
-                    handleAttendanceChange(value as EventAttendancePickerMode)
-                  }
-                >
-                  <SelectTrigger id="attendance-method">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ATTENDANCE_MODE_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
               <div className="space-y-1.5">
                 <Label>Starts</Label>
                 <div className="flex flex-col gap-2 sm:flex-row">
@@ -306,14 +225,7 @@ export function InternalEventRegistrationWorkspace({
               </div>
             </div>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div>
-                <p className="text-sm font-medium">Attendance method</p>
-                <p className="text-sm text-muted-foreground">
-                  {ATTENDANCE_MODE_OPTIONS.find((o) => o.value === pickerMode)
-                    ?.label ?? pickerMode}
-                </p>
-              </div>
+            <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <p className="text-sm font-medium">Starts</p>
                 <p className="text-sm text-muted-foreground">
@@ -351,18 +263,12 @@ export function InternalEventRegistrationWorkspace({
               <EventTicketingFields
                 value={ticketingForm}
                 onChange={(next) => {
-                  setTicketingForm(
-                    applyAttendancePricing(
-                      { ...next, requiresTicketing: true },
-                      pickerMode
-                    )
-                  )
+                  setTicketingForm({ ...next, requiresTicketing: true })
                   setSaved(false)
                 }}
                 hideEnableSwitch
                 hideSalesWindow
                 hideKind
-                lockFreePricing={isFree}
               />
               {activeTypes.some((type) => type.quantity_sold > 0) ? (
                 <p className="text-xs text-muted-foreground">

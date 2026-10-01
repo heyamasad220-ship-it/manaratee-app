@@ -208,7 +208,8 @@ export function CampaignOverviewGroupsCard({
         <div>
           <CardTitle className="text-base">Campaign Groups</CardTitle>
           <CardDescription>
-            Collected via group links: {formatDonationCurrency(insights.groupsCollectedTotal)}
+            Competition total: {formatDonationCurrency(insights.groupsCompetitionTotal)}. Received
+            plus pledges not yet received.
           </CardDescription>
         </div>
         <Link
@@ -224,8 +225,9 @@ export function CampaignOverviewGroupsCard({
             <TableRow>
               <TableHead>Group</TableHead>
               <TableHead className="text-right">Donors</TableHead>
-              <TableHead className="text-right">Pledged</TableHead>
-              <TableHead className="text-right">Collected</TableHead>
+              <TableHead className="text-right">Received</TableHead>
+              <TableHead className="text-right">Pledged, not received</TableHead>
+              <TableHead className="text-right">Group total</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -244,10 +246,13 @@ export function CampaignOverviewGroupsCard({
                 </TableCell>
                 <TableCell className="text-right tabular-nums">{row.donorCount}</TableCell>
                 <TableCell className="text-right tabular-nums">
-                  {formatDonationCurrency(row.pledged)}
+                  {formatDonationCurrency(row.received)}
                 </TableCell>
                 <TableCell className="text-right tabular-nums">
-                  {formatDonationCurrency(row.collected)}
+                  {formatDonationCurrency(row.pledgedNotReceived)}
+                </TableCell>
+                <TableCell className="text-right tabular-nums font-medium">
+                  {formatDonationCurrency(row.groupTotal)}
                 </TableCell>
               </TableRow>
             ))}

@@ -166,6 +166,10 @@ type TicketingOrdersClientProps = {
   events: TicketedEventOption[]
   initialEventFilter?: string
   canManage: boolean
+  /** Hide the event picker and keep the list on this event. */
+  lockedEventId?: string
+  /** Drop the page title when this list sits inside the event ticketing workspace. */
+  embedded?: boolean
 }
 
 export function TicketingOrdersClient({
@@ -173,11 +177,15 @@ export function TicketingOrdersClient({
   events,
   initialEventFilter,
   canManage,
+  lockedEventId,
+  embedded = false,
 }: TicketingOrdersClientProps) {
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedEventIds, setSelectedEventIds] = useState<string[]>(() =>
-    parseInitialSelectedEventIds(initialEventFilter, events)
+    lockedEventId
+      ? [lockedEventId]
+      : parseInitialSelectedEventIds(initialEventFilter, events)
   )
   const [statusFilter, setStatusFilter] = useState<TicketOrderStatus | "all">("all")
   const [dateFrom, setDateFrom] = useState("")
@@ -273,12 +281,16 @@ export function TicketingOrdersClient({
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        {embedded ? (
+          <div />
+        ) : (
         <div>
           <h2 className="text-2xl font-semibold tracking-tight">Manage orders</h2>
           <p className="text-sm text-muted-foreground">
             Search, filter, and manually add ticket orders.
           </p>
         </div>
+        )}
         {canManage ? (
           <Button onClick={() => setCreateOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
@@ -300,6 +312,7 @@ export function TicketingOrdersClient({
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+            {lockedEventId ? null : (
             <div className="space-y-2">
               <Label>Events</Label>
               <Popover open={eventsOpen} onOpenChange={setEventsOpen}>
@@ -371,6 +384,7 @@ export function TicketingOrdersClient({
                 </PopoverContent>
               </Popover>
             </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="order-date-from">Order date from</Label>
               <Input

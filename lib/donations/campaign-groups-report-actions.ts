@@ -71,7 +71,7 @@ export async function listOrgCampaignGroupsReportAction(input?: {
           id: row.id as string,
           name: (row.name as string) || "Campaign",
         })),
-        totals: { groups: 0, pledged: 0, collected: 0, donors: 0 },
+        totals: { groups: 0, received: 0, pledgedNotReceived: 0, groupTotal: 0, donors: 0 },
       }
     }
 
@@ -161,16 +161,16 @@ export async function listOrgCampaignGroupsReportAction(input?: {
     rows.sort((a, b) => {
       const byCampaign = a.campaignName.localeCompare(b.campaignName)
       if (byCampaign !== 0) return byCampaign
-      return b.collected - a.collected
+      return b.groupTotal - a.groupTotal
     })
 
     const donorKeys = new Set<string>()
     // Approximate unique donors across groups (may double-count multi-group donors).
-    let pledged = 0
-    let collected = 0
+    let received = 0
+    let pledgedNotReceived = 0
     for (const row of rows) {
-      pledged += row.pledged
-      collected += row.collected
+      received += row.collected
+      pledgedNotReceived += row.outstanding
       donorKeys.add(`${row.groupId}:${row.donorCount}`)
     }
 
@@ -183,8 +183,9 @@ export async function listOrgCampaignGroupsReportAction(input?: {
       })),
       totals: {
         groups: rows.length,
-        pledged,
-        collected,
+        received,
+        pledgedNotReceived,
+        groupTotal: received + pledgedNotReceived,
         donors: rows.reduce((sum, row) => sum + row.donorCount, 0),
       },
     }

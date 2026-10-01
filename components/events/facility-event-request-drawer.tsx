@@ -24,6 +24,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
+import { EventFeatureSwitchList } from "@/components/events/internal-event-features-settings"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -50,6 +51,10 @@ import {
 } from "@/components/ui/time-picker"
 import { FacilityVenueMultiSelect } from "@/components/reservations/facility-venue-multi-select"
 import { SetupStyleField } from "@/components/setup-styles/setup-style-field"
+import {
+  DEFAULT_WORKSPACE_FEATURES,
+  type EventWorkspaceFeatures,
+} from "@/lib/events/event-workspace-features"
 import { cn } from "@/lib/utils"
 
 import {
@@ -236,6 +241,9 @@ export function FacilityEventRequestDrawer({
   const [departmentId, setDepartmentId] = useState("")
   const [eventTypeId, setEventTypeId] = useState("")
   const [name, setName] = useState("")
+  const [createFeatures, setCreateFeatures] = useState<EventWorkspaceFeatures>(
+    DEFAULT_WORKSPACE_FEATURES
+  )
   const [description, setDescription] = useState("")
   const [eventDate, setEventDate] = useState("")
   const [startTime, setStartTime] = useState("")
@@ -411,6 +419,12 @@ export function FacilityEventRequestDrawer({
   }, [open, defaults, eventTypes, initialSlot, editEventId])
 
   const isEditMode = Boolean(editingEventId)
+
+  useEffect(() => {
+    if (open && !editingEventId) {
+      setCreateFeatures(DEFAULT_WORKSPACE_FEATURES)
+    }
+  }, [open, editingEventId])
 
   function handleScheduleModeChange(next: EventScheduleMode) {
     setScheduleMode(next)
@@ -683,6 +697,15 @@ export function FacilityEventRequestDrawer({
             ...basePayload,
             recurrence_config: recurrenceConfig,
             linkedCampaignId,
+            requires_volunteers: createFeatures.volunteers,
+            requires_childcare: createFeatures.childcare,
+            requires_vendors: createFeatures.vendors,
+            requires_ticketing: createFeatures.registration,
+            workspace_features: createFeatures,
+            service_requirements: {},
+            ticketing_config: {
+              attendanceMode: createFeatures.registration ? "paid" : "open_public",
+            },
           })
         }
 
@@ -1273,6 +1296,26 @@ export function FacilityEventRequestDrawer({
                   />
                 </div>
               </div>
+            ) : null}
+
+            {!isEditMode ? (
+              <details className="rounded-lg border">
+                <summary className="cursor-pointer px-4 py-3 text-sm font-medium">
+                  Features
+                </summary>
+                <div className="space-y-3 border-t p-4">
+                  <p className="text-sm text-muted-foreground">
+                    Leave these off for a simple event. Turn on only what this
+                    event needs. You can change them later under Settings.
+                  </p>
+                  <EventFeatureSwitchList
+                    features={createFeatures}
+                    onToggle={(key, checked) =>
+                      setCreateFeatures((current) => ({ ...current, [key]: checked }))
+                    }
+                  />
+                </div>
+              </details>
             ) : null}
           </div>
           )}

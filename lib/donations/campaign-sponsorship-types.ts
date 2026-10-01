@@ -60,6 +60,7 @@ export const SPONSORSHIP_PACKAGE_BENEFIT_TYPES = [
   "enewsletter",
   "promotional_materials",
   "logo_placement",
+  "fundraising_dates",
   "other",
 ] as const
 
@@ -80,6 +81,7 @@ export const SPONSORSHIP_PACKAGE_BENEFIT_TYPE_LABELS: Record<
   enewsletter: "eNewsletter Exposure",
   promotional_materials: "Promotional Materials / Giveaways",
   logo_placement: "Logo Placement",
+  fundraising_dates: "Fundraising dates",
   other: "Other",
 }
 

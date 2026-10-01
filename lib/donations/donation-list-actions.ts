@@ -940,6 +940,7 @@ async function aggregatePledgeSummaryMetrics(
     totalCollected: 0,
     outstandingBalance: 0,
     activePledgeCount: 0,
+    fulfilledPledgeCount: 0,
     pledgeCount: 0,
   }
 
@@ -970,13 +971,14 @@ async function aggregatePledgeSummaryMetrics(
       metrics.outstandingBalance += Number(row.balance_remaining || 0)
       metrics.pledgeCount += 1
 
+      const status = String(row.calculated_status || "").toLowerCase()
+      if (status === "fulfilled") {
+        metrics.fulfilledPledgeCount += 1
+      }
       if (statusFilter) {
         metrics.activePledgeCount += 1
-      } else {
-        const status = String(row.calculated_status || "").toLowerCase()
-        if (status === "open" || status === "partial") {
-          metrics.activePledgeCount += 1
-        }
+      } else if (status === "open" || status === "partial") {
+        metrics.activePledgeCount += 1
       }
     }
 
@@ -1007,6 +1009,7 @@ export async function fetchPledgeSummaryMetricsAction(input: PledgeSummaryMetric
         totalCollected: Number(row?.total_collected || 0),
         outstandingBalance: Number(row?.outstanding_balance || 0),
         activePledgeCount,
+        fulfilledPledgeCount: 0,
         pledgeCount: activePledgeCount,
       },
     }
@@ -1612,7 +1615,7 @@ export async function fetchOpenPledgesForAllocationAction(donorId?: string | nul
   let query = access.supabase
     .from("pledge_status_view")
     .select(
-      "id, donor_id, donor_name, campaign_name, amount_pledged, amount_paid, balance_remaining, calculated_status"
+      "id, donor_id, donor_name, campaign_id, campaign_name, amount_pledged, amount_paid, balance_remaining, calculated_status"
     )
     .eq("organization_id", access.orgId)
     .gt("balance_remaining", 0)
