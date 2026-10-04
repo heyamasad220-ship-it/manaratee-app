@@ -18,24 +18,11 @@ import {
 import { CampaignDonationsKpis } from "@/components/donations/campaign-donations-kpis"
 import { CampaignDonationsTab } from "@/components/donations/campaign-donations-tab"
 import { CampaignEventKpis } from "@/components/donations/campaign-event-kpis"
-import { CampaignOverviewSummary, CampaignOverviewTab } from "@/components/donations/campaign-overview-tab"
+import { CampaignOverviewTab } from "@/components/donations/campaign-overview-tab"
 import { useCampaignBreadcrumb } from "@/components/donations/campaign-breadcrumb-context"
 import { CampaignWorkspaceNav } from "@/components/donations/campaign-workspace-nav"
 import { CampaignWishlistTab } from "@/components/donations/campaign-wishlist-tab"
 import { PledgesLedger } from "@/app/(dashboard)/donations/campaigns/pledges/page"
-
-const CampaignEventsTab = dynamic(
-  () =>
-    import("@/components/donations/campaign-events-tab").then((mod) => ({
-      default: mod.CampaignEventsTab,
-    })),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="text-sm text-muted-foreground">Loading event...</div>
-    ),
-  }
-)
 import {
   type CampaignAnalyticsEntry,
   type CampaignDonorInsights,
@@ -56,8 +43,19 @@ import {
 } from "@/lib/donations/campaign-workspace-paths"
 import { isOpenAllocatablePledge } from "@/lib/donations/donation-status"
 import { createClient } from "@/lib/supabase/client"
-import { STAFF_MAIN_CONTENT_STICKY_TOP_CLASS } from "@/lib/layout/staff-dashboard-chrome"
-import { cn } from "@/lib/utils"
+
+const CampaignEventsTab = dynamic(
+  () =>
+    import("@/components/donations/campaign-events-tab").then((mod) => ({
+      default: mod.CampaignEventsTab,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="text-sm text-muted-foreground">Loading event...</div>
+    ),
+  }
+)
 
 type ContactProfileTarget = {
   contactId?: string | null
@@ -88,7 +86,6 @@ export default function CampaignDetailPage() {
   const [entry, setEntry] = useState<CampaignAnalyticsEntry | null>(null)
   const [insights, setInsights] = useState<CampaignDonorInsights | null>(null)
   const [sourceBreakdown, setSourceBreakdown] = useState<CampaignSourceBreakdown | null>(null)
-  const [outstandingPledges, setOutstandingPledges] = useState<CampaignOutstandingPledgeRow[]>([])
   const [campaignPledges, setCampaignPledges] = useState<CampaignOutstandingPledgeRow[]>([])
   const [campaignPayments, setCampaignPayments] = useState<CampaignPaymentRow[]>([])
   const [campaignRecurringPlans, setCampaignRecurringPlans] = useState<CampaignRecurringPlanRow[]>(
@@ -173,7 +170,6 @@ export default function CampaignDetailPage() {
       setEntry(null)
       setInsights(null)
       setSourceBreakdown(null)
-      setOutstandingPledges([])
       setCampaignPledges([])
       setCampaignPayments([])
       setCampaignRecurringPlans([])
@@ -185,7 +181,6 @@ export default function CampaignDetailPage() {
     setEntry(result.entry)
     setInsights(result.insights)
     setSourceBreakdown(result.sourceBreakdown)
-    setOutstandingPledges(result.outstandingPledges)
     setCampaignPledges(result.campaignPledges)
     setCampaignPayments(result.campaignPayments)
     setCampaignRecurringPlans(result.campaignRecurringPlans)
@@ -255,8 +250,8 @@ export default function CampaignDetailPage() {
 
   return (
     <>
-      <div className="p-6">
-        <div className="flex flex-col gap-6">
+      <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="shrink-0 space-y-4 px-6 pb-4 pt-6">
           <div className="flex flex-wrap items-center gap-3">
             <Button variant="outline" size="sm" asChild>
               <Link href="/donations/campaigns">
@@ -283,22 +278,8 @@ export default function CampaignDetailPage() {
             </div>
           </div>
 
-          <div
-            className={cn(
-              "sticky z-40 -mx-6 min-w-0 space-y-4 border-b border-border bg-background px-6 pb-4 pt-1",
-              STAFF_MAIN_CONTENT_STICKY_TOP_CLASS
-            )}
-          >
+          <div className="min-w-0 space-y-4 border-b border-border pb-4">
             <CampaignWorkspaceNav campaignId={campaign.id} activeTab={activeTab} />
-            {activeTab === "overview" ? (
-              <CampaignOverviewSummary
-                campaign={campaign}
-                entry={entry}
-                insights={insights}
-                onShowDonorsDialogChange={setShowDonorsDialog}
-                onOpenContactProfile={(target) => void openContactProfile(target)}
-              />
-            ) : null}
             {isFundraisingPlanTab(activeTab) ? (
               <CampaignFundraisingPlanHeader kpis={planKpis} />
             ) : null}
@@ -312,14 +293,18 @@ export default function CampaignDetailPage() {
               />
             ) : null}
           </div>
+        </div>
 
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-6 pb-6">
           {activeTab === "overview" ? (
+            <div className="h-full min-h-0 flex-1 overflow-y-auto">
             <CampaignOverviewTab
               campaign={campaign}
               entry={entry}
               insights={insights}
               sourceBreakdown={sourceBreakdown}
-              outstandingPledges={outstandingPledges}
+              payments={campaignPayments}
+              pledges={campaignPledges}
               overviewMetricKeys={overviewMetricKeys}
               canManage={canManageCampaigns}
               showMetricsEditor={showMetricsEditor}
@@ -328,23 +313,22 @@ export default function CampaignDetailPage() {
               onShowDonorsDialogChange={setShowDonorsDialog}
               onOverviewMetricKeysSaved={setOverviewMetricKeys}
               onOpenContactProfile={(target) => void openContactProfile(target)}
-              onPledgeClick={(pledgeId) => {
-                setDetailsPledgeId(pledgeId)
-                setDetailsOpen(true)
-              }}
               onReload={() => void loadCampaign()}
-              showSummary={false}
             />
+            </div>
           ) : null}
 
           {activeTab === "events" ? (
+            <div className="h-full min-h-0 flex-1 overflow-y-auto">
             <CampaignEventsTab
               campaignId={campaign.id}
               onStatsChange={setEventStats}
             />
+            </div>
           ) : null}
 
           {isFundraisingPlanTab(activeTab) ? (
+            <div className="h-full min-h-0 flex-1 overflow-y-auto">
             <CampaignFundraisingPlanTab
               campaignId={campaign.id}
               organizationId={campaign.organization_id}
@@ -353,6 +337,7 @@ export default function CampaignDetailPage() {
               onKpisChange={setPlanKpis}
               showHeader={false}
             />
+            </div>
           ) : null}
 
           {activeTab === "pledges" ? (
@@ -388,8 +373,38 @@ export default function CampaignDetailPage() {
             />
           ) : null}
 
+          {activeTab === "transactions" ? (
+            <CampaignDonationsTab
+              campaignId={campaign.id}
+              organizationId={campaign.organization_id}
+              payments={campaignPayments}
+              recurringPlans={campaignRecurringPlans}
+              openPledgeDonorIds={openPledgeDonorIds}
+              openPledgeContactIds={openPledgeContactIds}
+              canManage={canManage}
+              mode="transactions"
+              onDonorClick={(payment) =>
+                void openContactProfile({
+                  contactId: payment.contact_id,
+                  donorId: payment.donor_id,
+                })
+              }
+              onPledgeClick={(pledgeId) => {
+                setDetailsPledgeId(pledgeId)
+                setDetailsOpen(true)
+              }}
+              onRecurringDonorClick={(plan) =>
+                void openContactProfile({
+                  contactId: plan.contact_id,
+                  donorId: plan.donor_id,
+                })
+              }
+              onReload={() => void loadCampaign()}
+            />
+          ) : null}
+
           {activeTab === "sponsors" ? (
-            <p className="text-sm text-muted-foreground">Opening sponsors on the event…</p>
+            <p className="h-full overflow-y-auto text-sm text-muted-foreground">Opening sponsors on the event…</p>
           ) : null}
 
           {activeTab === "groups" ? (
@@ -404,11 +419,13 @@ export default function CampaignDetailPage() {
           ) : null}
 
           {activeTab === "wishlist" ? (
+            <div className="h-full min-h-0 flex-1 overflow-y-auto">
             <CampaignWishlistTab
               campaignId={campaign.id}
               organizationId={campaign.organization_id}
               canManage={canManageCampaigns}
             />
+            </div>
           ) : null}
         </div>
       </div>

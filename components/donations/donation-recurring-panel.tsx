@@ -71,6 +71,7 @@ import {
   toAttributionIds,
   type DonationAttributionValue,
 } from "@/components/donations/donation-attribution-fields"
+import { CampaignGroupPicker } from "@/components/donations/campaign-group-picker"
 import type { RecurringPlanWithDonor } from "@/lib/donations/recurring-donation-types"
 import type { ContactPaymentMethodRow } from "@/lib/contacts/contact-payment-method-actions"
 import {
@@ -297,6 +298,8 @@ export function DonationRecurringPanel({
     EMPTY_DONATION_ATTRIBUTION_VALUE
   )
   const [editNotes, setEditNotes] = useState("")
+  const [editCampaignGroupId, setEditCampaignGroupId] = useState<string | null>(null)
+  const [editCampaignGroupLabel, setEditCampaignGroupLabel] = useState("")
 
   const [donors, setDonors] = useState<Array<{ id: string; full_name: string | null; email: string | null }>>([])
   const [organizationId, setOrganizationId] = useState<string | null>(null)
@@ -310,6 +313,10 @@ export function DonationRecurringPanel({
   const [planPayments, setPlanPayments] = useState("")
   const [planEndDate, setPlanEndDate] = useState("")
   const [notes, setNotes] = useState("")
+  const [planCampaignGroupId, setPlanCampaignGroupId] = useState<string | null>(null)
+  const [planCampaignGroupLabel, setPlanCampaignGroupLabel] = useState("")
+  const [paymentCampaignGroupId, setPaymentCampaignGroupId] = useState<string | null>(null)
+  const [paymentCampaignGroupLabel, setPaymentCampaignGroupLabel] = useState("")
   const [paymentSource, setPaymentSource] = useState("cash")
 
   const isDonorScoped = Boolean(scopedDonorId)
@@ -518,6 +525,7 @@ export function DonationRecurringPanel({
       numberOfPayments: planPayments ? Number(planPayments) : null,
       endDate: planEndDate || null,
       notes: notes || null,
+      campaignGroupId: planCampaignGroupId,
     })
     setSaving(false)
 
@@ -533,6 +541,8 @@ export function DonationRecurringPanel({
     setPlanPayments("")
     setPlanEndDate("")
     setNotes("")
+    setPlanCampaignGroupId(null)
+    setPlanCampaignGroupLabel("")
     await refreshAfterChange()
   }
 
@@ -542,6 +552,7 @@ export function DonationRecurringPanel({
     const result = await recordRecurringDonationPaymentAction({
       planId: selectedPlan.id,
       source: paymentSource,
+      campaignGroupId: paymentCampaignGroupId,
     })
     setSaving(false)
 
@@ -584,6 +595,8 @@ export function DonationRecurringPanel({
     setEditTotalPayments(plan.total_payments == null ? "" : String(plan.total_payments))
     setEditPaymentsMade(plan.payments_made == null ? "" : String(plan.payments_made))
     setEditAttribution(attributionFromPlan(plan))
+    setEditCampaignGroupId(plan.campaign_group_id)
+    setEditCampaignGroupLabel("")
     setEditNotes(plan.notes || "")
     setShowEditDialog(true)
   }
@@ -609,6 +622,7 @@ export function DonationRecurringPanel({
       campaignId: attributionIds.campaign_id,
       categoryId: attributionIds.category_id,
       subcategoryId: attributionIds.subcategory_id,
+      campaignGroupId: editCampaignGroupId,
       notes: editNotes.trim() ? editNotes.trim() : null,
     })
     setSaving(false)
@@ -1035,6 +1049,8 @@ export function DonationRecurringPanel({
                                   <DropdownMenuItem
                                     onClick={() => {
                                       setSelectedPlan(plan)
+                                      setPaymentCampaignGroupId(plan.campaign_group_id)
+                                      setPaymentCampaignGroupLabel("")
                                       setShowPaymentDialog(true)
                                     }}
                                   >
@@ -1160,7 +1176,23 @@ export function DonationRecurringPanel({
             <DonationAttributionFields
               organizationId={organizationId}
               value={attribution}
-              onChange={setAttribution}
+              onChange={(value) => {
+                setAttribution(value)
+                if (value.campaignId !== attribution.campaignId) {
+                  setPlanCampaignGroupId(null)
+                  setPlanCampaignGroupLabel("")
+                }
+              }}
+            />
+            <CampaignGroupPicker
+              campaignId={attribution.campaignId || null}
+              groupId={planCampaignGroupId}
+              groupLabel={planCampaignGroupLabel}
+              onChange={(nextGroupId, label) => {
+                setPlanCampaignGroupId(nextGroupId)
+                setPlanCampaignGroupLabel(label)
+              }}
+              disabled={saving}
             />
             <div className="flex flex-col gap-2">
               <Label>Notes</Label>
@@ -1210,6 +1242,16 @@ export function DonationRecurringPanel({
                   </SelectContent>
                 </Select>
               </div>
+              <CampaignGroupPicker
+                campaignId={selectedPlan.campaign_id}
+                groupId={paymentCampaignGroupId}
+                groupLabel={paymentCampaignGroupLabel}
+                onChange={(nextGroupId, label) => {
+                  setPaymentCampaignGroupId(nextGroupId)
+                  setPaymentCampaignGroupLabel(label)
+                }}
+                disabled={saving}
+              />
             </div>
           )}
           <DialogFooter>
@@ -1322,7 +1364,23 @@ export function DonationRecurringPanel({
               <DonationAttributionFields
                 organizationId={organizationId}
                 value={editAttribution}
-                onChange={setEditAttribution}
+                onChange={(value) => {
+                  setEditAttribution(value)
+                  if (value.campaignId !== editAttribution.campaignId) {
+                    setEditCampaignGroupId(null)
+                    setEditCampaignGroupLabel("")
+                  }
+                }}
+              />
+              <CampaignGroupPicker
+                campaignId={editAttribution.campaignId || null}
+                groupId={editCampaignGroupId}
+                groupLabel={editCampaignGroupLabel}
+                onChange={(nextGroupId, label) => {
+                  setEditCampaignGroupId(nextGroupId)
+                  setEditCampaignGroupLabel(label)
+                }}
+                disabled={saving}
               />
               <div className="flex flex-col gap-2">
                 <Label htmlFor="edit-plan-notes">Notes</Label>

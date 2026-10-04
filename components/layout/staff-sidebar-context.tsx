@@ -23,13 +23,28 @@ export type StaffSidebarContextValue = {
   toggleSubExpanded: (key: string) => void
 }
 
+const STAFF_SIDEBAR_CONTEXT_KEY = "__manarateeStaffSidebarContext"
+
+type GlobalWithStaffSidebar = typeof globalThis & {
+  [STAFF_SIDEBAR_CONTEXT_KEY]?: ReturnType<
+    typeof createContext<StaffSidebarContextValue | null>
+  >
+}
+
 /**
- * Kept in a small dedicated module so layout (SidebarProvider) and page
- * chunks (Header / MobileMenuTrigger) share one Context instance under Turbopack.
+ * Header and the dashboard layout are separate Turbopack chunks. Pin the
+ * context on globalThis so both chunks share one React context object.
  */
-export const StaffSidebarContext = createContext<StaffSidebarContextValue | null>(
-  null
-)
+function getStaffSidebarContext() {
+  const root = globalThis as GlobalWithStaffSidebar
+  const existing = root[STAFF_SIDEBAR_CONTEXT_KEY]
+  if (existing) return existing
+  const created = createContext<StaffSidebarContextValue | null>(null)
+  root[STAFF_SIDEBAR_CONTEXT_KEY] = created
+  return created
+}
+
+export const StaffSidebarContext = getStaffSidebarContext()
 
 export function useSidebarContext() {
   const context = useContext(StaffSidebarContext)

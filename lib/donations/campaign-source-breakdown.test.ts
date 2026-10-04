@@ -4,7 +4,9 @@ import { describe, it } from "node:test"
 import {
   classifyCampaignPaymentSource,
   campaignPaymentTypeLabel,
+  campaignTransactionKindLabel,
   computeCampaignDonationKpis,
+  computeCampaignPaymentMethodTotals,
   computeCampaignSourceBreakdown,
 } from "./campaign-analytics"
 
@@ -68,6 +70,21 @@ describe("campaign source breakdown", () => {
         memo: "FUNDRAISER_DINNER_DONATIONS_SEP2026_V1|hash|QIL|ONE_TIME|CARD|last4:1234",
       }),
       "One-Time"
+    )
+  })
+
+  it("labels a campaign transaction as a one-time donation, recurring donation, or pledge", () => {
+    assert.equal(
+      campaignTransactionKindLabel({ id: "pledge", pledge_id: "p1", memo: "tag | hash | reason | MONTHLY | txn" }),
+      "Pledge"
+    )
+    assert.equal(
+      campaignTransactionKindLabel({ id: "plan", recurring_donation_plan_id: "plan-1" }),
+      "Recurring donation"
+    )
+    assert.equal(
+      campaignTransactionKindLabel({ id: "gift", memo: "tag | hash | reason | ONE_TIME | txn" }),
+      "One-time donation"
     )
   })
 
@@ -185,5 +202,64 @@ describe("campaign donation kpis", () => {
     assert.equal(kpis.recurringCount, 2)
     assert.equal(kpis.monthlyRecurringAmount, 90)
     assert.equal(kpis.donorCount, 3)
+  })
+
+  it("totals Stripe, Zelle, and Square payments, including pledge payments", () => {
+    const totals = computeCampaignPaymentMethodTotals([
+      { id: "s1", source: "stripe", amount: 50, pledge_id: "p1" },
+      { id: "s2", source: "Stripe", amount: 25 },
+      { id: "z1", source: "zelle", amount: 100 },
+      { id: "q1", source: "square", amount: 40 },
+      { id: "void", source: "square", amount: 15, status: "voided" },
+      { id: "cash", source: "cash", amount: 10 },
+    ])
+    assert.equal(totals.stripe.amount, 75)
+    assert.equal(totals.stripe.count, 2)
+    assert.equal(totals.zelle.amount, 100)
+    assert.equal(totals.zelle.count, 1)
+    assert.equal(totals.square.amount, 40)
+    assert.equal(totals.square.count, 1)
+  })
+
+  it("puts an Intuit pledge payment in Other and names the donor", async () => {
+    const { buildCampaignOverviewMetricDetail } = await import("./campaign-overview-metric-details")
+    const payment = {
+      id: "intuit-1",
+      campaign_id: "camp",
+      sender_name: "Baraka Mortgage",
+      amount: 1000,
+      source: "intuit",
+      status: "allocated",
+      pledge_id: "pledge-1",
+      payment_date: "2026-09-01",
+    }
+    const breakdown = computeCampaignSourceBreakdown("camp", 600000, [], [payment], new Map())
+    assert.equal(breakdown.other, 1000)
+    assert.equal(breakdown.intuit, 0)
+
+    const detail = buildCampaignOverviewMetricDetail({
+      key: "other",
+      metrics: {
+        campaignId: "camp",
+        raised: 1000,
+        pledged: 1000,
+        collectedAgainstPledges: 1000,
+        outstanding: 0,
+        totalCommitted: 1000,
+        progressPercent: null,
+        donorCount: 1,
+        paymentCount: 1,
+        averageGift: 1000,
+        largestGift: 1000,
+        donationRaised: 0,
+        largestPayment: 1000,
+      },
+      payments: [payment],
+      pledges: [],
+    })
+    assert.equal(detail?.lines.length, 1)
+    assert.equal(detail?.lines[0]?.name, "Baraka Mortgage")
+    assert.equal(detail?.lines[0]?.method, "Intuit")
+    assert.equal(detail?.lines[0]?.amount, 1000)
   })
 })

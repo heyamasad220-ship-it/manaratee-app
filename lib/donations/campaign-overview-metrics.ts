@@ -4,6 +4,7 @@ import type { CampaignSourceBreakdown } from "@/lib/donations/campaign-analytics
 export type CampaignOverviewMetricKey =
   | "cash"
   | "checks"
+  | "ach"
   | "square"
   | "one-time"
   | "recurring"
@@ -23,11 +24,12 @@ export type CampaignOverviewMetricDefinition = {
 export const CAMPAIGN_OVERVIEW_METRIC_CATALOG: CampaignOverviewMetricDefinition[] = [
   { key: "cash", title: "Cash", group: "sources" },
   { key: "checks", title: "Checks", group: "sources" },
+  { key: "ach", title: "ACH", group: "sources" },
   { key: "square", title: "Square", group: "sources" },
   { key: "one-time", title: "One-Time Donations", group: "sources" },
   { key: "recurring", title: "Recurring Donations", group: "sources" },
   { key: "ticket-sales", title: "Ticket Sales", group: "sources" },
-  { key: "other", title: "Other", group: "sources", description: "Unclassified payment sources" },
+  { key: "other", title: "Other", group: "sources", description: "Intuit and other payment methods" },
   { key: "donors", title: "Donors", group: "insights" },
   { key: "largest-gift", title: "Largest Gift", group: "insights" },
   { key: "pledges", title: "Pledges", group: "insights" },
@@ -43,6 +45,7 @@ const VALID_KEYS = new Set<CampaignOverviewMetricKey>(
 const SOURCE_METRIC_KEYS = new Set<CampaignOverviewMetricKey>([
   "cash",
   "checks",
+  "ach",
   "square",
   "one-time",
   "recurring",
@@ -59,6 +62,8 @@ function sourceMetricAmount(
       return breakdown.cash
     case "checks":
       return breakdown.checks
+    case "ach":
+      return breakdown.ach
     case "square":
       return breakdown.square
     case "one-time":

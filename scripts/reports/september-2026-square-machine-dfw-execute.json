@@ -1,0 +1,104 @@
+{
+  "mode": "execute",
+  "fileRows": 13,
+  "fileAmount": 22036,
+  "paymentsCreated": 13,
+  "oneTime": 10,
+  "oneTimeAmount": 10986,
+  "pledgePayments": 3,
+  "pledgeAmount": 11050,
+  "contactsCreated": 7,
+  "donorsCreated": 7,
+  "alreadyImported": 0,
+  "pledgeApplications": [
+    {
+      "name": "Adam Aly",
+      "amount": 550,
+      "date": "2026-09-11",
+      "pledge": "Adam Aly $500",
+      "remainingAfter": -60
+    },
+    {
+      "name": "Eman Shehata",
+      "amount": 500,
+      "date": "2026-09-12",
+      "pledge": "Eman Shehata $500",
+      "remainingAfter": 0
+    },
+    {
+      "name": "Nader Ahmad",
+      "amount": 10000,
+      "date": "2026-09-12",
+      "pledge": "Nader Ahmad $10000",
+      "remainingAfter": 0
+    }
+  ],
+  "oneTimeGifts": [
+    {
+      "name": "Aihab Hassan",
+      "amount": 20,
+      "date": "2026-09-04",
+      "note": null
+    },
+    {
+      "name": "Aihab Hassan",
+      "amount": 1000,
+      "date": "2026-09-11",
+      "note": null
+    },
+    {
+      "name": "Aihab Hassan",
+      "amount": 20,
+      "date": "2026-09-11",
+      "note": null
+    },
+    {
+      "name": "Hani LLC",
+      "amount": 500,
+      "date": "2026-09-11",
+      "note": null
+    },
+    {
+      "name": "Teyseer Elashyi",
+      "amount": 25,
+      "date": "2026-09-11",
+      "note": null
+    },
+    {
+      "name": "Ahmad Nabizadah",
+      "amount": 500,
+      "date": "2026-09-12",
+      "note": null
+    },
+    {
+      "name": "Amina Gomaa",
+      "amount": 1500,
+      "date": "2026-09-12",
+      "note": null
+    },
+    {
+      "name": "Hisham Morgan",
+      "amount": 500,
+      "date": "2026-09-12",
+      "note": null
+    },
+    {
+      "name": "Sara Kenana",
+      "amount": 200,
+      "date": "2026-09-12",
+      "note": null
+    },
+    {
+      "name": "Misc",
+      "amount": 6721,
+      "date": "2026-09-12",
+      "note": "Square machine miscellaneous total, no customer names"
+    }
+  ],
+  "pledgesFulfilled": [
+    "Adam Aly $500",
+    "Eman Shehata $500",
+    "Nader Ahmad $10000"
+  ],
+  "errors": []
+}

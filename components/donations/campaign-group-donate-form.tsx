@@ -4,7 +4,6 @@ import { useEffect, useState, useTransition } from "react"
 import { CheckCircle2, Loader2 } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 
-import { CampaignProgressBar } from "@/components/donations/campaign-progress-bar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -21,6 +20,7 @@ import {
   getPublicCampaignGroupCheckoutStatusAction,
   type PublicCampaignGroupDonateInfo,
 } from "@/lib/donations/campaign-group-public-actions"
+import { cn } from "@/lib/utils"
 
 type CampaignGroupDonateFormProps = {
   info: PublicCampaignGroupDonateInfo
@@ -29,6 +29,7 @@ type CampaignGroupDonateFormProps = {
 export function CampaignGroupDonateForm({ info }: CampaignGroupDonateFormProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const [groupId, setGroupId] = useState("")
   const [amount, setAmount] = useState("")
   const [donorName, setDonorName] = useState("")
   const [donorEmail, setDonorEmail] = useState("")
@@ -39,11 +40,13 @@ export function CampaignGroupDonateForm({ info }: CampaignGroupDonateFormProps) 
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
   const [successAmount, setSuccessAmount] = useState<number | null>(null)
+  const [successGroupName, setSuccessGroupName] = useState<string | null>(null)
   const [pledgeOnlySuccess, setPledgeOnlySuccess] = useState(false)
   const [polling, setPolling] = useState(false)
 
   const checkoutFlag = searchParams.get("checkout")
   const sessionId = searchParams.get("session_id")
+  const selectedGroup = info.groups.find((group) => group.id === groupId) || null
 
   useEffect(() => {
     if (checkoutFlag !== "success" || !sessionId || successAmount != null) return
@@ -62,6 +65,7 @@ export function CampaignGroupDonateForm({ info }: CampaignGroupDonateFormProps) 
 
       if (result.success && result.status === "complete") {
         setSuccessAmount(result.amount)
+        setSuccessGroupName(result.groupName)
         setPolling(false)
         router.replace(`/donate/g/${info.token}?checkout=success`)
         return
@@ -90,9 +94,15 @@ export function CampaignGroupDonateForm({ info }: CampaignGroupDonateFormProps) 
     event.preventDefault()
     setErrorMessage(null)
 
+    if (!selectedGroup) {
+      setErrorMessage("Choose a group")
+      return
+    }
+
     startTransition(async () => {
       const result = await createPublicCampaignGroupDonationCheckoutAction({
         token: info.token,
+        groupId: selectedGroup.id,
         amount: Number(amount),
         donorName,
         donorEmail,
@@ -106,6 +116,7 @@ export function CampaignGroupDonateForm({ info }: CampaignGroupDonateFormProps) 
       if (result.mode === "pledge_only") {
         setPledgeOnlySuccess(true)
         setSuccessAmount(Number(amount))
+        setSuccessGroupName(selectedGroup.name)
         return
       }
       if (!result.checkoutUrl) {
@@ -116,7 +127,16 @@ export function CampaignGroupDonateForm({ info }: CampaignGroupDonateFormProps) 
     })
   }
 
+  if (info.groups.length === 0) {
+    return (
+      <div className="rounded-lg border border-border bg-card p-6 text-center shadow-sm">
+        <p className="text-sm text-muted-foreground">No groups are open for donations yet.</p>
+      </div>
+    )
+  }
+
   if (checkoutFlag === "success" || successAmount != null || pledgeOnlySuccess) {
+    const groupLabel = successGroupName || selectedGroup?.name || "this group"
     return (
       <div className="rounded-lg border border-border bg-card p-6 text-center shadow-sm">
         {polling && successAmount == null ? (
@@ -132,7 +152,7 @@ export function CampaignGroupDonateForm({ info }: CampaignGroupDonateFormProps) 
               {pledgeOnlySuccess
                 ? `Your pledge${successAmount != null ? ` of ${formatDonationCurrency(successAmount)}` : ""} supporting `
                 : `Your gift${successAmount != null ? ` of ${formatDonationCurrency(successAmount)}` : ""} supporting `}
-              <span className="font-medium text-foreground">{info.groupName}</span> is recorded.
+              <span className="font-medium text-foreground">{groupLabel}</span> is recorded.
             </p>
           </div>
         )}
@@ -148,22 +168,32 @@ export function CampaignGroupDonateForm({ info }: CampaignGroupDonateFormProps) 
           Checkout was cancelled. You can try again below.
         </p>
       ) : null}
-      {info.publicProgressEnabled ? (
-        <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
-          <div className="mb-2 flex items-baseline justify-between gap-2 text-sm">
-            <span className="text-muted-foreground">Collected</span>
-            <span className="font-semibold tabular-nums">
-              {formatDonationCurrency(info.collected || 0)}
-              {info.goalAmount != null
-                ? ` of ${formatDonationCurrency(info.goalAmount)}`
-                : ""}
-            </span>
-          </div>
-          {info.progressPercent != null ? (
-            <CampaignProgressBar progressPercent={info.progressPercent} />
-          ) : null}
+
+      <div className="flex flex-col gap-2">
+        <Label>Choose a group</Label>
+        <div className="flex flex-col gap-2">
+          {info.groups.map((group) => {
+            const selected = group.id === groupId
+            return (
+              <button
+                key={group.id}
+                type="button"
+                onClick={() => setGroupId(group.id)}
+                className={cn(
+                  "flex items-center justify-between gap-3 rounded-lg border bg-card px-4 py-3 text-left shadow-sm",
+                  selected ? "border-primary ring-1 ring-primary" : "border-border"
+                )}
+                aria-pressed={selected}
+              >
+                <span className="font-medium">{group.name}</span>
+                <span className="shrink-0 text-sm tabular-nums text-muted-foreground">
+                  {formatDonationCurrency(group.received)} received
+                </span>
+              </button>
+            )
+          })}
         </div>
-      ) : null}
+      </div>
 
       {!info.onlineDonationsReady && mode !== "pledge_only" ? (
         <div className="rounded-lg border border-border bg-card p-5 text-center shadow-sm">
@@ -268,7 +298,7 @@ export function CampaignGroupDonateForm({ info }: CampaignGroupDonateFormProps) 
 
           {errorMessage ? <p className="text-sm text-red-600">{errorMessage}</p> : null}
 
-          <Button type="submit" disabled={pending} className="w-full">
+          <Button type="submit" disabled={pending || !selectedGroup} className="w-full">
             {pending
               ? mode === "pledge_only"
                 ? "Recording pledge…"
@@ -282,11 +312,13 @@ export function CampaignGroupDonateForm({ info }: CampaignGroupDonateFormProps) 
                     : "Donate with card"}
           </Button>
           <p className="text-center text-xs text-muted-foreground">
-            {mode === "pledge_only"
-              ? `Your pledge will be attributed to ${info.groupName}. Staff can collect payment later. A confirmation email will be sent.`
-              : mode === "recurring"
-                ? `You will set up a ${frequency} gift on Stripe. Renewals are attributed to ${info.groupName}.`
-                : `You will complete payment securely on Stripe. Your gift is attributed to ${info.groupName}.`}
+            {selectedGroup
+              ? mode === "pledge_only"
+                ? `Your pledge will be attributed to ${selectedGroup.name}. Staff can collect payment later. A confirmation email will be sent.`
+                : mode === "recurring"
+                  ? `You will set up a ${frequency} gift on Stripe. Renewals are attributed to ${selectedGroup.name}.`
+                  : `You will complete payment securely on Stripe. Your gift is attributed to ${selectedGroup.name}.`
+              : "Choose a group above. Received totals are money already collected."}
           </p>
         </form>
       ) : null}

@@ -177,7 +177,7 @@ export function CampaignGroupsReportPanel({ embedded = false }: { embedded?: boo
               [
                 "Campaign",
                 "Group",
-                "Lead",
+                "Primary Contact",
                 "Status",
                 "Goal",
                 "Donors",
@@ -213,7 +213,7 @@ export function CampaignGroupsReportPanel({ embedded = false }: { embedded?: boo
               <TableRow>
                 <TableHead>Campaign</TableHead>
                 <TableHead>Group</TableHead>
-                <TableHead>Lead</TableHead>
+                <TableHead>Primary Contact</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Goal</TableHead>
                 <TableHead className="text-right">Donors</TableHead>

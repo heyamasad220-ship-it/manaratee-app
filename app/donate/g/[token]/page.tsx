@@ -9,8 +9,8 @@ type PageProps = {
 }
 
 /**
- * Public campaign group donation page.
- * Stripe Checkout → webhook writes one payment with campaign_id + campaign_group_id.
+ * Shared campaign group donation page.
+ * The donor picks a group. Stripe Checkout writes one payment with campaign_id + campaign_group_id.
  */
 export default async function CampaignGroupDonatePage({ params }: PageProps) {
   const { token } = await params
@@ -36,14 +36,8 @@ export default async function CampaignGroupDonatePage({ params }: PageProps) {
           {info.organizationName}
         </p>
         <h1 className="text-3xl font-semibold tracking-tight">{info.campaignName}</h1>
-        <p className="text-lg text-muted-foreground">
-          Supporting <span className="font-medium text-foreground">{info.groupName}</span>
-        </p>
+        <p className="text-lg text-muted-foreground">Choose the group you are supporting.</p>
       </div>
-
-      {info.description ? (
-        <p className="text-center text-sm text-muted-foreground">{info.description}</p>
-      ) : null}
 
       <Suspense fallback={<p className="text-center text-sm text-muted-foreground">Loading…</p>}>
         <CampaignGroupDonateForm info={info} />

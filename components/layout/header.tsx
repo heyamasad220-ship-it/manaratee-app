@@ -7,7 +7,7 @@ import Link from "next/link"
 
 import { StaffOrganizationHeaderSwitcher } from "@/components/layout/staff-organization-switcher"
 import { UserMenu } from "@/components/layout/user-menu"
-import { MobileMenuTrigger } from "@/components/layout/sidebar"
+import { MobileMenuTrigger } from "@/components/layout/mobile-menu-trigger"
 import { NavigationBreadcrumbs } from "@/components/navigation/navigation-breadcrumbs"
 import { STAFF_HEADER_HEIGHT_CLASS } from "@/lib/layout/staff-dashboard-chrome"
 import { Search } from "lucide-react"

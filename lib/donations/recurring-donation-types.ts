@@ -17,6 +17,7 @@ export type RecurringDonationPlan = {
   donor_id: string
   contact_id: string | null
   campaign_id: string | null
+  campaign_group_id: string | null
   category_id: string | null
   subcategory_id: string | null
   payment_method_id: string | null

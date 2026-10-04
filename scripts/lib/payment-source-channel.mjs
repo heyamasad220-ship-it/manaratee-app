@@ -6,6 +6,9 @@ export const PAYMENT_SOURCE_CHANNELS = [
   "venmo",
   "paypal",
   "stripe",
+  "square",
+  "ach",
+  "intuit",
   "import",
   "manual",
 ]

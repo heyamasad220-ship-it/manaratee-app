@@ -1,0 +1,305 @@
+{
+  "mode": "execute",
+  "file": "C:/Users/danan/Downloads/ZelleDonationsSept2026.xlsx",
+  "fileRows": 29,
+  "fileAmount": 34071,
+  "paymentsCreated": 32,
+  "oneTime": 22,
+  "oneTimeAmount": 26096,
+  "pledgePayments": 10,
+  "pledgeAmount": 7975,
+  "contactsCreated": 20,
+  "contactsMatched": 2,
+  "donorsCreated": 20,
+  "groupsCreated": 0,
+  "fundsCreated": 1,
+  "alreadyImported": 0,
+  "pledgeApplications": [
+    {
+      "name": "Aly Taha",
+      "amount": 1000,
+      "date": "2026-09-12",
+      "note": "Aly Taha Fundraiser Donation (part of Usrat Al Sabiqoon pledge)",
+      "pledge": "Ahmed Taha $1000 (Usrat As-Sabiqoon CYP)",
+      "how": "note",
+      "remainingAfter": 0
+    },
+    {
+      "name": "Obada Ismail",
+      "amount": 250,
+      "date": "2026-09-12",
+      "note": "masfund",
+      "pledge": "Obada Ismail $250 (Zahra Family)",
+      "how": "name",
+      "remainingAfter": 0
+    },
+    {
+      "name": "Covered Girl LLC",
+      "amount": 2000,
+      "date": "2026-09-12",
+      "note": "",
+      "pledge": "Covered Girl $2000",
+      "how": "name",
+      "remainingAfter": 0
+    },
+    {
+      "name": "Ahmad Gharbieh",
+      "amount": 1000,
+      "date": "2026-09-13",
+      "note": "zahra family pledge, gharbieh family pledge, Sabiqoon usra pledge",
+      "pledge": "Ahmad Gharbieh $1000 (Zahra Family)",
+      "how": "note-split",
+      "remainingAfter": 0
+    },
+    {
+      "name": "Ahmad Gharbieh",
+      "amount": 250,
+      "date": "2026-09-13",
+      "note": "zahra family pledge, gharbieh family pledge, Sabiqoon usra pledge",
+      "pledge": "Ahmad Gharbieh $250 (Gharbieh Family)",
+      "how": "note-split",
+      "remainingAfter": 0
+    },
+    {
+      "name": "Hamza Zahra",
+      "amount": 500,
+      "date": "2026-09-14",
+      "note": "",
+      "pledge": "Hamza Zahra $500 (Zahra Family)",
+      "how": "split-remaining",
+      "remainingAfter": 0
+    },
+    {
+      "name": "Hamza Zahra",
+      "amount": 500,
+      "date": "2026-09-14",
+      "note": "",
+      "pledge": "Hamza Zahra $500 (Usrat Super MAS Bros)",
+      "how": "split-remaining",
+      "remainingAfter": 0
+    },
+    {
+      "name": "Eaman Attia",
+      "amount": 225,
+      "date": "2026-09-23",
+      "note": "Wednesday Halaqa",
+      "pledge": "Dr. Eaman Attia $5000",
+      "how": "name",
+      "remainingAfter": 4775
+    },
+    {
+      "name": "Eaman Attia",
+      "amount": 250,
+      "date": "2026-09-23",
+      "note": "CYP Usrat Al-Islah",
+      "pledge": "Dr. Eaman Attia $5000",
+      "how": "name",
+      "remainingAfter": 4525
+    },
+    {
+      "name": "Azza Aly",
+      "amount": 2000,
+      "date": "2026-09-25",
+      "note": "ADAM ALY FAMILY PLEDGE SEPT12 REMAIN$3000.00",
+      "pledge": "Adam Aly & Family $5000",
+      "how": "note",
+      "remainingAfter": 3000
+    }
+  ],
+  "oneTimeGifts": [
+    {
+      "name": "Indian Touch Of Gallup, LLC",
+      "amount": 2000,
+      "date": "2026-09-10",
+      "note": "donation Ahmad Ayesh & Family May Allah make this is a success will not be able to attend 5058706364",
+      "fund": "Annual Fundraiser - September 2026",
+      "how": "no-pledge"
+    },
+    {
+      "name": "Abdallah Alrosan",
+      "amount": 500,
+      "date": "2026-09-11",
+      "note": "",
+      "fund": "Annual Fundraiser - September 2026",
+      "how": "no-pledge"
+    },
+    {
+      "name": "Ahmed Alobaidi",
+      "amount": 50,
+      "date": "2026-09-11",
+      "note": "",
+      "fund": "Annual Fundraiser - September 2026",
+      "how": "no-pledge"
+    },
+    {
+      "name": "Abdulrahman Seleim",
+      "amount": 1000,
+      "date": "2026-09-12",
+      "note": "MAS ANNUAL FUNDRAISING",
+      "fund": "Annual Fundraiser - September 2026",
+      "how": "no-pledge"
+    },
+    {
+      "name": "Diaa Khamis",
+      "amount": 250,
+      "date": "2026-09-12",
+      "note": "sadaqah donation",
+      "fund": "Sadaqah",
+      "how": "no-pledge"
+    },
+    {
+      "name": "Abeer A Qandil",
+      "amount": 100,
+      "date": "2026-09-12",
+      "note": "youth",
+      "fund": "Youth",
+      "how": "no-pledge"
+    },
+    {
+      "name": "Haneen M Wadi",
+      "amount": 25,
+      "date": "2026-09-12",
+      "note": "fundraiser",
+      "fund": "Annual Fundraiser - September 2026",
+      "how": "no-pledge"
+    },
+    {
+      "name": "Musa Abdelaziz",
+      "amount": 10000,
+      "date": "2026-09-12",
+      "note": "musara87@gmail.com",
+      "fund": "Annual Fundraiser - September 2026",
+      "how": "no-pledge"
+    },
+    {
+      "name": "Sumaya Farran",
+      "amount": 200,
+      "date": "2026-09-12",
+      "note": "annual fundraising",
+      "fund": "Annual Fundraiser - September 2026",
+      "how": "no-pledge"
+    },
+    {
+      "name": "A M For Trade & Import Inc",
+      "amount": 5000,
+      "date": "2026-09-12",
+      "note": "",
+      "fund": "Annual Fundraiser - September 2026",
+      "how": "no-pledge"
+    },
+    {
+      "name": "Gamal Omer Mohed",
+      "amount": 300,
+      "date": "2026-09-13",
+      "note": "MAS fundraiser-Boyscout leader",
+      "fund": "Annual Fundraiser - September 2026",
+      "how": "no-pledge"
+    },
+    {
+      "name": "Ahmad Gharbieh",
+      "amount": 250,
+      "date": "2026-09-13",
+      "note": "zahra family pledge, gharbieh family pledge, Sabiqoon usra pledge",
+      "fund": "Usrat As-Sabiqoon CYP",
+      "how": "note-remainder"
+    },
+    {
+      "name": "Ai Interventional LLC",
+      "amount": 500,
+      "date": "2026-09-14",
+      "note": "",
+      "fund": "Annual Fundraiser - September 2026",
+      "how": "no-pledge"
+    },
+    {
+      "name": "Nour Almahaini",
+      "amount": 1000,
+      "date": "2026-09-14",
+      "note": "FR",
+      "fund": "Annual Fundraiser - September 2026",
+      "how": "no-pledge"
+    },
+    {
+      "name": "Usamah Mohd Zakir",
+      "amount": 100,
+      "date": "2026-09-15",
+      "note": "sdqh",
+      "fund": "Sadaqah",
+      "how": "no-pledge"
+    },
+    {
+      "name": "David Mooers",
+      "amount": 21,
+      "date": "2026-09-18",
+      "note": "DONATION",
+      "fund": "Annual Fundraiser - September 2026",
+      "how": "no-pledge"
+    },
+    {
+      "name": "Ahmed Alobaidi",
+      "amount": 50,
+      "date": "2026-09-19",
+      "note": "",
+      "fund": "Annual Fundraiser - September 2026",
+      "how": "no-pledge"
+    },
+    {
+      "name": "Tamim Hamdi",
+      "amount": 500,
+      "date": "2026-09-20",
+      "note": "Fundraiser",
+      "fund": "Annual Fundraiser - September 2026",
+      "how": "no-pledge"
+    },
+    {
+      "name": "Md Atikur Rahman",
+      "amount": 200,
+      "date": "2026-09-20",
+      "note": "Troop 2054 Family pledge",
+      "fund": "Annual Fundraiser - September 2026",
+      "how": "no-pledge"
+    },
+    {
+      "name": "Yousra M Rashed",
+      "amount": 2000,
+      "date": "2026-09-23",
+      "note": "almuhajira",
+      "fund": "Usrat Al-Muhajira",
+      "how": "no-pledge"
+    },
+    {
+      "name": "Yousra Eldemairy",
+      "amount": 50,
+      "date": "2026-09-23",
+      "note": "",
+      "fund": "Annual Fundraiser - September 2026",
+      "how": "no-pledge"
+    },
+    {
+      "name": "Wareef Kabbani",
+      "amount": 2000,
+      "date": "2026-09-23",
+      "note": "Thursday Halaka",
+      "fund": "Thursday Halaqa",
+      "how": "no-pledge"
+    }
+  ],
+  "unmatchedPledgeNotes": [
+    {
+      "name": "Md Atikur Rahman",
+      "amount": 200,
+      "note": "Troop 2054 Family pledge"
+    }
+  ],
+  "ambiguous": [],
+  "pledgesFulfilled": [
+    "Ahmed Taha $1000 (Usrat As-Sabiqoon CYP)",
+    "Obada Ismail $250 (Zahra Family)",
+    "Covered Girl $2000",
+    "Ahmad Gharbieh $1000 (Zahra Family)",
+    "Ahmad Gharbieh $250 (Gharbieh Family)",
+    "Hamza Zahra $500 (Zahra Family)",
+    "Hamza Zahra $500 (Usrat Super MAS Bros)"
+  ],
+  "errors": []
+}

@@ -9,7 +9,7 @@ import {
   toAttributionIds,
   type DonationAttributionValue,
 } from "@/components/donations/donation-attribution-fields"
-import { DonationGroupPicker } from "@/components/donations/donation-group-picker"
+import { CampaignGroupPicker } from "@/components/donations/campaign-group-picker"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -28,7 +28,6 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { ensureGroupMembershipForDonationAction } from "@/lib/contacts/group-giving-actions"
 import { ensureDonorExtensionForContact } from "@/lib/donations/donor-contact-bridge"
 import { getDonorPledgesAction } from "@/lib/donations/pledge-reminder-actions"
 import { recordPledgePaymentAction } from "@/lib/donations/pledge-admin-actions"
@@ -42,13 +41,19 @@ const APPLY_PLAN_PREFIX = "plan:"
 
 type OpenPledgeOption = {
   id: string
+  campaignId: string | null
   campaignName: string | null
+  campaignGroupId: string | null
+  campaignGroupName: string | null
   balanceRemaining: number
 }
 
 type OpenPlanOption = {
   id: string
+  campaignId: string | null
   campaignName: string | null
+  campaignGroupId: string | null
+  campaignGroupName: string | null
   amount: number
   frequency: string
   status: string
@@ -105,8 +110,8 @@ export function ContactReceivePaymentDialog({
   const [attribution, setAttribution] = useState<DonationAttributionValue>(
     EMPTY_DONATION_ATTRIBUTION_VALUE
   )
-  const [groupContactId, setGroupContactId] = useState<string | null>(null)
-  const [groupLabel, setGroupLabel] = useState("")
+  const [campaignGroupId, setCampaignGroupId] = useState<string | null>(null)
+  const [campaignGroupLabel, setCampaignGroupLabel] = useState("")
   const [applyTo, setApplyTo] = useState(APPLY_ONE_TIME)
   const [openPledges, setOpenPledges] = useState<OpenPledgeOption[]>([])
   const [openPlans, setOpenPlans] = useState<OpenPlanOption[]>([])
@@ -119,8 +124,8 @@ export function ContactReceivePaymentDialog({
     setSource("cash")
     setMemo("")
     setAttribution(EMPTY_DONATION_ATTRIBUTION_VALUE)
-    setGroupContactId(null)
-    setGroupLabel("")
+    setCampaignGroupId(null)
+    setCampaignGroupLabel("")
     setApplyTo(APPLY_ONE_TIME)
     setOpenPledges([])
     setOpenPlans([])
@@ -143,7 +148,7 @@ export function ContactReceivePaymentDialog({
           getDonorPledgesAction(donorId),
           supabase
             .from("recurring_donation_plans")
-            .select("id, amount, frequency, status, campaigns(name)")
+            .select("id, campaign_id, amount, frequency, status, campaign_group_id, campaigns(name)")
             .eq("organization_id", orgId)
             .eq("donor_id", donorId)
             .in("status", ["active", "paused", "past_due"])
@@ -160,7 +165,10 @@ export function ContactReceivePaymentDialog({
                 )
                 .map((pledge) => ({
                   id: pledge.id,
+                  campaignId: pledge.campaignId,
                   campaignName: pledge.campaignName,
+                  campaignGroupId: pledge.campaignGroupId,
+                  campaignGroupName: pledge.campaignGroupName,
                   balanceRemaining: pledge.balanceRemaining,
                 }))
             : []
@@ -172,7 +180,10 @@ export function ContactReceivePaymentDialog({
           setOpenPlans(
             (plansResult.data || []).map((plan: any) => ({
               id: plan.id as string,
+              campaignId: (plan.campaign_id as string | null) ?? null,
               campaignName: (plan.campaigns?.name as string | null) ?? null,
+              campaignGroupId: (plan.campaign_group_id as string | null) ?? null,
+              campaignGroupName: null,
               amount: Number(plan.amount || 0),
               frequency: String(plan.frequency || ""),
               status: String(plan.status || ""),
@@ -189,13 +200,24 @@ export function ContactReceivePaymentDialog({
     const target = parseApplyTo(applyTo)
     if (target.kind === "pledge") {
       const pledge = openPledges.find((row) => row.id === target.id)
-      if (pledge) setAmount(String(pledge.balanceRemaining))
+      if (pledge) {
+        setAmount(String(pledge.balanceRemaining))
+        setCampaignGroupId(pledge.campaignGroupId)
+        setCampaignGroupLabel(pledge.campaignGroupName || "")
+      }
       return
     }
     if (target.kind === "plan") {
       const plan = openPlans.find((row) => row.id === target.id)
-      if (plan) setAmount(String(plan.amount))
+      if (plan) {
+        setAmount(String(plan.amount))
+        setCampaignGroupId(plan.campaignGroupId)
+        setCampaignGroupLabel(plan.campaignGroupName || "")
+      }
+      return
     }
+    setCampaignGroupId(null)
+    setCampaignGroupLabel("")
   }, [applyTo, openPledges, openPlans])
 
   async function handleSave() {
@@ -211,18 +233,6 @@ export function ContactReceivePaymentDialog({
     }
 
     setSaving(true)
-
-    if (groupContactId) {
-      const groupResult = await ensureGroupMembershipForDonationAction({
-        memberContactId: contactId,
-        groupContactId,
-      })
-      if (!groupResult.success) {
-        setSaving(false)
-        alert(groupResult.error)
-        return
-      }
-    }
 
     const donorId = await ensureDonorExtensionForContact(orgId, contactId)
     if (!donorId) {
@@ -240,7 +250,7 @@ export function ContactReceivePaymentDialog({
         paymentDate,
         source,
         memo: memo || null,
-        attributedGroupContactId: groupContactId,
+        campaignGroupId,
       })
 
       setSaving(false)
@@ -262,7 +272,7 @@ export function ContactReceivePaymentDialog({
         paymentDate,
         source,
         memo: memo || undefined,
-        attributedGroupContactId: groupContactId,
+        campaignGroupId,
       })
 
       setSaving(false)
@@ -281,7 +291,7 @@ export function ContactReceivePaymentDialog({
       organization_id: orgId,
       donor_id: donorId,
       contact_id: contactId,
-      attributed_group_contact_id: groupContactId,
+      campaign_group_id: attribution.campaignId ? campaignGroupId : null,
       pledge_id: null,
       sender_name: contactName || null,
       amount: Number(amount),
@@ -317,7 +327,14 @@ export function ContactReceivePaymentDialog({
     onSuccess?.()
   }
 
+  const applyTarget = parseApplyTo(applyTo)
   const applyingToTarget = applyTo !== APPLY_ONE_TIME
+  const pickerCampaignId =
+    applyTarget.kind === "pledge"
+      ? openPledges.find((row) => row.id === applyTarget.id)?.campaignId || null
+      : applyTarget.kind === "plan"
+        ? openPlans.find((row) => row.id === applyTarget.id)?.campaignId || null
+        : attribution.campaignId || null
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -356,17 +373,6 @@ export function ContactReceivePaymentDialog({
               wired up.
             </p>
           </div>
-
-          <DonationGroupPicker
-            groupContactId={groupContactId}
-            groupLabel={groupLabel}
-            memberContactId={contactId}
-            onChange={(nextGroupId, label) => {
-              setGroupContactId(nextGroupId)
-              setGroupLabel(label)
-            }}
-            disabled={saving}
-          />
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-2">
@@ -410,9 +416,26 @@ export function ContactReceivePaymentDialog({
             <DonationAttributionFields
               organizationId={organizationId}
               value={attribution}
-              onChange={setAttribution}
+              onChange={(value) => {
+                setAttribution(value)
+                if (value.campaignId !== attribution.campaignId) {
+                  setCampaignGroupId(null)
+                  setCampaignGroupLabel("")
+                }
+              }}
             />
           ) : null}
+
+          <CampaignGroupPicker
+            campaignId={pickerCampaignId}
+            groupId={campaignGroupId}
+            groupLabel={campaignGroupLabel}
+            onChange={(nextGroupId, label) => {
+              setCampaignGroupId(nextGroupId)
+              setCampaignGroupLabel(label)
+            }}
+            disabled={saving}
+          />
 
           <div className="flex flex-col gap-2">
             <Label>Memo</Label>

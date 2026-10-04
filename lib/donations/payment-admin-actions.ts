@@ -633,3 +633,45 @@ export async function allocatePaymentToOpenPledgeAction(input: {
   revalidatePath("/donations/payments")
   return { success: true as const }
 }
+
+export async function unallocatePaymentFromPledgeAction(input: { paymentId: string }) {
+  const loaded = await loadOrgPayment(input.paymentId)
+  if (!loaded.ok) return { success: false as const, error: loaded.error }
+
+  const { payment, access } = loaded
+  if (!payment.pledge_id) {
+    return { success: false as const, error: "This payment is not allocated to a pledge." }
+  }
+
+  const pledgeId = payment.pledge_id
+  const status = String(payment.status || "").toLowerCase()
+  const patch: { pledge_id: null; status?: string } = { pledge_id: null }
+  if (status === "allocated" || status === "unallocated" || !status) {
+    patch.status = "unallocated"
+  }
+
+  const { error } = await access.supabase
+    .from("payments")
+    .update(patch)
+    .eq("id", payment.id)
+    .eq("organization_id", access.orgId)
+
+  if (error) return { success: false as const, error: error.message }
+
+  await writeOrganizationAuditLog({
+    organizationId: access.orgId,
+    category: "financial",
+    action: ORGANIZATION_AUDIT_ACTIONS.PAYMENT_UNALLOCATED,
+    actorUserId: access.userId,
+    actorEmail: access.userEmail,
+    targetType: "payment",
+    targetId: payment.id,
+    targetLabel: formatMoney(Number(payment.amount || 0)),
+    summary: `Removed payment ${formatMoney(Number(payment.amount || 0))} from a pledge`,
+    metadata: { pledgeId },
+  })
+
+  revalidateDonationPaths(payment.donor_id, payment.id)
+  revalidatePath("/donations/payments")
+  return { success: true as const, pledgeId }
+}

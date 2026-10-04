@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 
 import { requireDonationStaffAccess } from "@/lib/donations/donation-action-auth"
+import { campaignGroupIdForCampaign } from "@/lib/donations/campaign-group-helpers"
 import { DONATIONS_PAGE_SIZE } from "@/lib/donations/donation-pagination"
 import { ensureDonorExtensionForContact } from "@/lib/donations/donor-contact-bridge"
 import { handleDonationAffiliationSync } from "@/lib/contacts/contact-affiliation-sync"
@@ -953,6 +954,8 @@ export async function convertCampaignProspectToPledgeAction(input: {
   categoryId?: string | null
   subcategoryId?: string | null
   wishlistItemId?: string | null
+  campaignGroupId?: string | null
+  solicitorContactId?: string | null
 }) {
   const access = await requireDonationStaffAccess("prospects")
   if (!access.ok) return { success: false as const, error: access.error }
@@ -1015,6 +1018,30 @@ export async function convertCampaignProspectToPledgeAction(input: {
       return { success: false as const, error: plan.error }
     }
 
+    const group = await campaignGroupIdForCampaign(
+      writeClient,
+      access.orgId,
+      prospect.campaign_id,
+      input.campaignGroupId
+    )
+    if (!group.ok) return { success: false as const, error: group.error }
+
+    let solicitorContactId: string | null = null
+    const solicitorId = input.solicitorContactId?.trim() || ""
+    if (solicitorId) {
+      const { data: solicitor, error: solicitorError } = await writeClient
+        .from("contacts")
+        .select("id")
+        .eq("organization_id", access.orgId)
+        .eq("id", solicitorId)
+        .maybeSingle()
+      if (solicitorError) return { success: false as const, error: solicitorError.message }
+      if (!solicitor) {
+        return { success: false as const, error: "Solicitor was not found in this organization." }
+      }
+      solicitorContactId = solicitor.id as string
+    }
+
     const suggestedNote =
       prospect.suggested_ask_amount != null
         ? `Suggested ask: $${Number(prospect.suggested_ask_amount).toLocaleString("en-US", {
@@ -1045,6 +1072,8 @@ export async function convertCampaignProspectToPledgeAction(input: {
       campaign_phase_id: null,
       ask_level_id: prospect.ask_level_id,
       campaign_prospect_id: prospect.id,
+      campaign_group_id: group.campaignGroupId,
+      solicitor_contact_id: solicitorContactId,
     }
 
     let { data: pledge, error: pledgeError } = await writeClient
@@ -1057,7 +1086,7 @@ export async function convertCampaignProspectToPledgeAction(input: {
     if (
       pledgeError &&
       (pledgeError.code === "42703" ||
-        /campaign_phase_id|ask_level_id|campaign_prospect_id|wishlist_item_id/i.test(
+        /campaign_phase_id|ask_level_id|campaign_prospect_id|wishlist_item_id|campaign_group_id|solicitor_contact_id/i.test(
           pledgeError.message || ""
         ))
     ) {
@@ -1065,6 +1094,8 @@ export async function convertCampaignProspectToPledgeAction(input: {
       delete insertPayload.ask_level_id
       delete insertPayload.campaign_prospect_id
       delete insertPayload.wishlist_item_id
+      delete insertPayload.campaign_group_id
+      delete insertPayload.solicitor_contact_id
       const retry = await writeClient
         .from("pledges")
         .insert(insertPayload)

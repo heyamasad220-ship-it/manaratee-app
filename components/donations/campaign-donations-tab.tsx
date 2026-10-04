@@ -1,11 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { Plus } from "lucide-react"
+import { ArrowDown, ArrowUp, ArrowUpDown, CreditCard, Landmark, Plus, Store } from "lucide-react"
 
 import { QuickAddContactDialog, type QuickAddContactResult } from "@/components/contacts/quick-add-contact-dialog"
-import { DonationGroupPicker } from "@/components/donations/donation-group-picker"
+import { CampaignGroupPicker } from "@/components/donations/campaign-group-picker"
 import {
   DonationAttributionFields,
   EMPTY_DONATION_ATTRIBUTION_VALUE,
@@ -24,6 +24,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import {
+  TableColumnHeaderFilter,
+  TableColumnHeaderSort,
+} from "@/components/ui/table-column-header-filter"
 import { Label } from "@/components/ui/label"
 import {
   Select,
@@ -40,19 +44,26 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { ListPagination } from "@/components/ui/list-pagination"
+import { StatCard, StatCardsRow } from "@/components/ui/stat-card"
 import { Textarea } from "@/components/ui/textarea"
-import { ensureGroupMembershipForDonationAction } from "@/lib/contacts/group-giving-actions"
+import { ensureDonorExtensionForContact } from "@/lib/donations/donor-contact-bridge"
 import {
-  campaignPaymentTypeLabel,
+  anonymousBulkSenderName,
+  campaignPaymentMethodKey,
+  campaignTransactionKind,
+  campaignTransactionKindLabel,
+  computeCampaignPaymentMethodTotals,
   formatDonationCurrency,
-  isPledgeAppliedCampaignPayment,
+  type CampaignPaymentMethodKey,
   type CampaignPaymentRow,
   type CampaignRecurringPlanRow,
 } from "@/lib/donations/campaign-analytics"
+import { formatPaymentSourceLabel } from "@/lib/donations/payment-source-channel"
 import { createRecurringDonationPlanAction } from "@/lib/donations/recurring-donation-actions"
+import { DONATIONS_PAGE_SIZE } from "@/lib/donations/donation-pagination"
 import { DONATION_RECURRING_OPS_PATH } from "@/lib/donations/donation-payment-paths"
 import { formatPaymentAllocationStatus } from "@/lib/donations/donation-status"
-import { ensureDonorExtensionForContact } from "@/lib/donations/donor-contact-bridge"
 import {
   lastRecurringDateFromCount,
   paymentCountFromLastRecurringDate,
@@ -65,6 +76,7 @@ import {
 import { fetchOpenPledgesForAllocationAction } from "@/lib/donations/donation-list-actions"
 import { allocatePaymentToOpenPledgeAction } from "@/lib/donations/payment-admin-actions"
 import { createClient } from "@/lib/supabase/client"
+import { cn } from "@/lib/utils"
 
 function formatShortDate(value: string | null | undefined) {
   if (!value) return "—"
@@ -82,6 +94,22 @@ function todayDateOnly() {
   return new Date().toISOString().slice(0, 10)
 }
 
+type DonationSortKey = "none" | "donor_asc" | "donor_desc" | "amount_asc" | "amount_desc"
+type DonationListView = "all" | "one-time" | "recurring"
+type PaymentMethodFilter = "all" | CampaignPaymentMethodKey
+type PledgePaymentFilter = "all" | "pledge" | "not_pledge"
+
+const PAYMENT_METHOD_CARDS: Array<{
+  key: CampaignPaymentMethodKey
+  label: string
+  icon: typeof CreditCard
+  tone: "blue" | "violet" | "emerald"
+}> = [
+  { key: "stripe", label: "Stripe", icon: CreditCard, tone: "blue" },
+  { key: "zelle", label: "Zelle", icon: Landmark, tone: "violet" },
+  { key: "square", label: "Square", icon: Store, tone: "emerald" },
+]
+
 function lockedCampaignAttribution(campaignId: string) {
   return {
     ...EMPTY_DONATION_ATTRIBUTION_VALUE,
@@ -97,7 +125,9 @@ export function CampaignDonationsTab({
   openPledgeDonorIds,
   openPledgeContactIds,
   canManage,
+  mode = "donations",
   onDonorClick,
+  onPledgeClick,
   onRecurringDonorClick,
   onReload,
 }: {
@@ -108,6 +138,7 @@ export function CampaignDonationsTab({
   openPledgeDonorIds: Set<string>
   openPledgeContactIds: Set<string>
   canManage: boolean
+  mode?: "donations" | "transactions"
   onDonorClick: (payment: CampaignPaymentRow) => void
   onPledgeClick: (pledgeId: string) => void
   onRecurringDonorClick: (plan: CampaignRecurringPlanRow) => void
@@ -129,6 +160,11 @@ export function CampaignDonationsTab({
   const [applySaving, setApplySaving] = useState(false)
   const [applyError, setApplyError] = useState<string | null>(null)
   const [showReceiveDialog, setShowReceiveDialog] = useState(false)
+  const [showBulkDialog, setShowBulkDialog] = useState(false)
+  const [bulkSource, setBulkSource] = useState<"cash" | "square">("square")
+  const [bulkAmount, setBulkAmount] = useState("")
+  const [bulkDate, setBulkDate] = useState(todayDateOnly())
+  const [bulkMemo, setBulkMemo] = useState("")
   const [showPlanDialog, setShowPlanDialog] = useState(false)
   const [showQuickAddContact, setShowQuickAddContact] = useState(false)
   const [quickAddTarget, setQuickAddTarget] = useState<"donation" | "plan">("donation")
@@ -143,8 +179,8 @@ export function CampaignDonationsTab({
   const [donationMemo, setDonationMemo] = useState("")
   const [donationAttribution, setDonationAttribution] = useState(lockedCampaignAttribution(campaignId))
   const [donationWishlistItemId, setDonationWishlistItemId] = useState<string | null>(null)
-  const [donationGroupContactId, setDonationGroupContactId] = useState<string | null>(null)
-  const [donationGroupLabel, setDonationGroupLabel] = useState("")
+  const [donationCampaignGroupId, setDonationCampaignGroupId] = useState<string | null>(null)
+  const [donationCampaignGroupLabel, setDonationCampaignGroupLabel] = useState("")
 
   const [planContactId, setPlanContactId] = useState("")
   const [planContactLabel, setPlanContactLabel] = useState("")
@@ -154,7 +190,17 @@ export function CampaignDonationsTab({
   const [planPayments, setPlanPayments] = useState("")
   const [planEndDate, setPlanEndDate] = useState("")
   const [planNotes, setPlanNotes] = useState("")
+  const [planCampaignGroupId, setPlanCampaignGroupId] = useState<string | null>(null)
+  const [planCampaignGroupLabel, setPlanCampaignGroupLabel] = useState("")
   const [planAttribution, setPlanAttribution] = useState(lockedCampaignAttribution(campaignId))
+  const [donorNameQuery, setDonorNameQuery] = useState("")
+  const [sortKey, setSortKey] = useState<DonationSortKey>("none")
+  const [methodFilter, setMethodFilter] = useState<PaymentMethodFilter>("all")
+  const [pledgeFilter, setPledgeFilter] = useState<PledgePaymentFilter>("all")
+  const [listView, setListView] = useState<DonationListView>("one-time")
+  const paymentView: DonationListView = mode === "transactions" ? "all" : listView
+  const [page, setPage] = useState(1)
+  const [recurringPage, setRecurringPage] = useState(1)
 
   function resetReceiveForm() {
     setDonationContactId("")
@@ -165,8 +211,8 @@ export function CampaignDonationsTab({
     setDonationMemo("")
     setDonationAttribution(lockedCampaignAttribution(campaignId))
     setDonationWishlistItemId(null)
-    setDonationGroupContactId(null)
-    setDonationGroupLabel("")
+    setDonationCampaignGroupId(null)
+    setDonationCampaignGroupLabel("")
   }
 
   function resetPlanForm() {
@@ -178,12 +224,57 @@ export function CampaignDonationsTab({
     setPlanPayments("")
     setPlanEndDate("")
     setPlanNotes("")
+    setPlanCampaignGroupId(null)
+    setPlanCampaignGroupLabel("")
     setPlanAttribution(lockedCampaignAttribution(campaignId))
   }
 
   function openReceiveDialog() {
     resetReceiveForm()
     setShowReceiveDialog(true)
+  }
+
+  function openBulkDialog() {
+    setBulkSource("square")
+    setBulkAmount("")
+    setBulkDate(todayDateOnly())
+    setBulkMemo("")
+    setShowBulkDialog(true)
+  }
+
+  async function handleBulkEntry() {
+    if (!bulkAmount || Number(bulkAmount) <= 0) {
+      alert("Please enter a valid amount.")
+      return
+    }
+
+    setSaving(true)
+    const { error } = await supabase.from("payments").insert({
+      organization_id: organizationId,
+      donor_id: null,
+      contact_id: null,
+      campaign_group_id: null,
+      pledge_id: null,
+      sender_name: anonymousBulkSenderName(bulkSource),
+      amount: Number(bulkAmount),
+      payment_date: bulkDate ? `${bulkDate}T12:00:00` : new Date().toISOString(),
+      source: bulkSource,
+      source_type: "manual",
+      memo: bulkMemo.trim() || null,
+      status: "unallocated",
+      is_verified: false,
+      campaign_id: campaignId,
+      wishlist_item_id: null,
+    })
+    setSaving(false)
+
+    if (error) {
+      alert(error.message)
+      return
+    }
+
+    setShowBulkDialog(false)
+    onReload()
   }
 
   function openPlanDialog() {
@@ -253,24 +344,8 @@ export function CampaignDonationsTab({
       alert("Please enter a valid amount.")
       return
     }
-    if (donationGroupContactId && !donationContactId) {
-      alert("Select a donor when counting a gift toward a group.")
-      return
-    }
 
     setSaving(true)
-
-    if (donationGroupContactId) {
-      const groupResult = await ensureGroupMembershipForDonationAction({
-        memberContactId: donationContactId,
-        groupContactId: donationGroupContactId,
-      })
-      if (!groupResult.success) {
-        setSaving(false)
-        alert(groupResult.error)
-        return
-      }
-    }
 
     const resolvedDonorId = await ensureDonorExtensionForContact(organizationId, donationContactId)
     if (!resolvedDonorId) {
@@ -283,7 +358,7 @@ export function CampaignDonationsTab({
       organization_id: organizationId,
       donor_id: resolvedDonorId,
       contact_id: donationContactId,
-      attributed_group_contact_id: donationGroupContactId,
+      campaign_group_id: donationCampaignGroupId,
       pledge_id: null,
       sender_name: donationContactLabel || null,
       amount: Number(donationAmount),
@@ -360,6 +435,7 @@ export function CampaignDonationsTab({
       numberOfPayments: planPayments ? Number(planPayments) : null,
       endDate: planEndDate || null,
       notes: planNotes || null,
+      campaignGroupId: planCampaignGroupId,
     })
     setSaving(false)
 
@@ -373,7 +449,55 @@ export function CampaignDonationsTab({
     onReload()
   }
 
-  const donationPayments = payments.filter((payment) => !isPledgeAppliedCampaignPayment(payment))
+  const methodTotals = useMemo(
+    () => (mode === "transactions" ? computeCampaignPaymentMethodTotals(payments) : null),
+    [mode, payments]
+  )
+
+  const donationPayments = useMemo(() => {
+    const gifts =
+      paymentView === "all"
+        ? payments
+        : payments.filter((payment) => campaignTransactionKind(payment) === "one_time")
+    const query = donorNameQuery.trim().toLowerCase()
+    const matched = gifts.filter((payment) => {
+      if (query && !(payment.sender_name || "").toLowerCase().includes(query)) return false
+      if (paymentView === "all" && methodFilter !== "all") {
+        if (campaignPaymentMethodKey(payment.source) !== methodFilter) return false
+      }
+      if (paymentView === "all" && pledgeFilter === "pledge" && !payment.pledge_id) return false
+      if (paymentView === "all" && pledgeFilter === "not_pledge" && payment.pledge_id) return false
+      return true
+    })
+    if (sortKey === "none") return matched
+    return [...matched].sort((left, right) => {
+      if (sortKey === "donor_asc" || sortKey === "donor_desc") {
+        const byName = (left.sender_name || "").localeCompare(right.sender_name || "", undefined, {
+          sensitivity: "base",
+        })
+        return sortKey === "donor_asc" ? byName : -byName
+      }
+      const byAmount = Number(left.amount || 0) - Number(right.amount || 0)
+      return sortKey === "amount_asc" ? byAmount : -byAmount
+    })
+  }, [donorNameQuery, methodFilter, paymentView, payments, pledgeFilter, sortKey])
+
+  useEffect(() => {
+    setPage(1)
+  }, [donorNameQuery, methodFilter, paymentView, pledgeFilter, sortKey])
+
+  const donationPageCount = Math.max(1, Math.ceil(donationPayments.length / DONATIONS_PAGE_SIZE))
+  const donationPage = Math.min(page, donationPageCount)
+  const pagedDonationPayments = donationPayments.slice(
+    (donationPage - 1) * DONATIONS_PAGE_SIZE,
+    donationPage * DONATIONS_PAGE_SIZE
+  )
+  const recurringPageCount = Math.max(1, Math.ceil(recurringPlans.length / DONATIONS_PAGE_SIZE))
+  const recurringCurrentPage = Math.min(recurringPage, recurringPageCount)
+  const pagedRecurringPlans = recurringPlans.slice(
+    (recurringCurrentPage - 1) * DONATIONS_PAGE_SIZE,
+    recurringCurrentPage * DONATIONS_PAGE_SIZE
+  )
 
   async function openApplyDialog(payment: CampaignPaymentRow) {
     setApplyPayment(payment)
@@ -425,51 +549,245 @@ export function CampaignDonationsTab({
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h2 className="text-base font-semibold text-foreground">Campaign Donations</h2>
-          <p className="text-sm text-muted-foreground">
-            Gifts with no pledge. Apply one to a pledge and it leaves this list.
+    <div className="flex h-full min-h-0 flex-1 flex-col gap-4">
+      <div className="flex shrink-0 flex-wrap items-end justify-between gap-3">
+        <div className="min-w-0">
+          {mode === "donations" ? (
+          <nav aria-label="Donation lists" className="flex gap-1 border-b border-border">
+            {(
+              [
+                ["one-time", "One-Time"],
+                ["recurring", "Recurring"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                className={cn(
+                  "-mb-px border-b-2 px-3 py-2 text-sm font-medium",
+                  listView === value
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                )}
+                onClick={() => setListView(value)}
+              >
+                {label}
+              </button>
+            ))}
+          </nav>
+          ) : null}
+          <p className={cn("text-sm text-muted-foreground", mode === "donations" && "mt-3")}>
+            {paymentView === "all"
+              ? "Every payment on this campaign: one-time donations, recurring donations, and pledges."
+              : paymentView === "one-time"
+                ? "One-time gifts only. Apply one to a pledge and it leaves this list."
+                : "Monthly and other recurring plans tied to this campaign."}
           </p>
         </div>
-        {canManage ? (
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={openPlanDialog}>
+        <div className="flex flex-wrap gap-2">
+          {listView === "recurring" ? (
+            <Button variant="outline" size="sm" asChild>
+              <Link href={DONATION_RECURRING_OPS_PATH}>All recurring plans</Link>
+            </Button>
+          ) : null}
+          {canManage && listView === "recurring" ? (
+            <Button size="sm" onClick={openPlanDialog}>
               <Plus className="mr-2 h-4 w-4" />
               New Recurring Plan
             </Button>
-            <Button onClick={openReceiveDialog}>
-              <Plus className="mr-2 h-4 w-4" />
-              Receive Donation
-            </Button>
-          </div>
-        ) : null}
+          ) : null}
+          {canManage && listView === "one-time" ? (
+            <>
+              <Button variant="outline" onClick={openBulkDialog}>
+                Bulk entry
+              </Button>
+              <Button onClick={openReceiveDialog}>
+                <Plus className="mr-2 h-4 w-4" />
+                Receive Donation
+              </Button>
+            </>
+          ) : null}
+        </div>
       </div>
 
-      <Card className="border border-border shadow-sm">
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
+      {methodTotals ? (
+        <StatCardsRow equal columns={3} className="shrink-0 gap-3">
+          {PAYMENT_METHOD_CARDS.map((card) => {
+            const selected = methodFilter === card.key
+            const totals = methodTotals[card.key]
+            const countLabel = `${totals.count.toLocaleString()} payment${totals.count === 1 ? "" : "s"}`
+            return (
+              <button
+                key={card.key}
+                type="button"
+                aria-pressed={selected}
+                className={cn(
+                  "block h-full w-full cursor-pointer rounded-xl border-0 bg-transparent p-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  selected && "ring-2 ring-primary"
+                )}
+                onClick={() =>
+                  setMethodFilter((current) => (current === card.key ? "all" : card.key))
+                }
+              >
+                <StatCard
+                  layout="compact"
+                  fill
+                  className="h-full"
+                  tone={card.tone}
+                  icon={card.icon}
+                  label={card.label}
+                  value={formatDonationCurrency(totals.amount)}
+                  hint={selected ? `${countLabel} · click to show all` : countLabel}
+                  valueClassName="text-xl"
+                />
+              </button>
+            )
+          })}
+        </StatCardsRow>
+      ) : null}
+
+      {paymentView !== "recurring" ? (
+      <div className="flex min-h-0 flex-1 flex-col gap-4">
+      <Card className="min-h-0 flex-1 gap-0 overflow-hidden border border-border py-0 shadow-sm">
+        <CardContent className="h-full min-h-0 p-0">
+          <Table containerClassName="h-full overflow-auto">
+            <TableHeader className="sticky top-0 z-10 bg-card [&_th]:bg-card">
               <TableRow>
                 <TableHead>Date</TableHead>
-                <TableHead>Donor</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
+                <TableHead>
+                  <TableColumnHeaderFilter
+                    label="Donor"
+                    active={Boolean(donorNameQuery.trim())}
+                    trailing={
+                      <TableColumnHeaderSort
+                        label="Donor"
+                        value={sortKey.startsWith("donor_") ? sortKey : "donor_asc"}
+                        active={sortKey.startsWith("donor_")}
+                        options={[
+                          { value: "donor_asc", label: "A to Z" },
+                          { value: "donor_desc", label: "Z to A" },
+                        ]}
+                        onChange={(value) => setSortKey(value as DonationSortKey)}
+                      />
+                    }
+                  >
+                    <Input
+                      placeholder="Search by name"
+                      value={donorNameQuery}
+                      onChange={(event) => setDonorNameQuery(event.target.value)}
+                      aria-label="Search donations by donor name"
+                    />
+                  </TableColumnHeaderFilter>
+                </TableHead>
+                <TableHead className="text-right">
+                  <div className="flex items-center justify-end gap-1">
+                    <span className="font-medium">Amount</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className={cn(
+                        "h-7 w-7 shrink-0",
+                        sortKey.startsWith("amount_") &&
+                          "rounded-full bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary"
+                      )}
+                      aria-label={
+                        sortKey === "amount_desc"
+                          ? "Sort amount lowest first"
+                          : "Sort amount highest first"
+                      }
+                      onClick={() =>
+                        setSortKey((current) =>
+                          current === "amount_desc" ? "amount_asc" : "amount_desc"
+                        )
+                      }
+                    >
+                      {sortKey === "amount_asc" ? (
+                        <ArrowUp className="h-3.5 w-3.5" />
+                      ) : sortKey === "amount_desc" ? (
+                        <ArrowDown className="h-3.5 w-3.5" />
+                      ) : (
+                        <ArrowUpDown className="h-3.5 w-3.5" />
+                      )}
+                    </Button>
+                  </div>
+                </TableHead>
                 <TableHead>Type</TableHead>
-                <TableHead>Payment Method</TableHead>
-                <TableHead>Pledge</TableHead>
+                <TableHead>
+                  {paymentView === "all" ? (
+                    <TableColumnHeaderFilter
+                      label="Payment Method"
+                      active={methodFilter !== "all"}
+                    >
+                      {({ close }) => (
+                        <Select
+                          value={methodFilter}
+                          onValueChange={(value) => {
+                            setMethodFilter(value as PaymentMethodFilter)
+                            close()
+                          }}
+                        >
+                          <SelectTrigger aria-label="Filter by payment method">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All methods</SelectItem>
+                            <SelectItem value="stripe">Stripe</SelectItem>
+                            <SelectItem value="zelle">Zelle</SelectItem>
+                            <SelectItem value="square">Square</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </TableColumnHeaderFilter>
+                  ) : (
+                    "Payment Method"
+                  )}
+                </TableHead>
+                <TableHead>
+                  {paymentView === "all" ? (
+                    <TableColumnHeaderFilter label="Pledge" active={pledgeFilter !== "all"}>
+                      {({ close }) => (
+                        <Select
+                          value={pledgeFilter}
+                          onValueChange={(value) => {
+                            setPledgeFilter(value as PledgePaymentFilter)
+                            close()
+                          }}
+                        >
+                          <SelectTrigger aria-label="Filter by pledge">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All transactions</SelectItem>
+                            <SelectItem value="pledge">Pledge payments</SelectItem>
+                            <SelectItem value="not_pledge">Not a pledge</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </TableColumnHeaderFilter>
+                  ) : (
+                    "Pledge"
+                  )}
+                </TableHead>
                 <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {donationPayments.length === 0 ? (
+              {pagedDonationPayments.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
-                    No donations without a pledge yet.
+                    {paymentView === "all" &&
+                    (donorNameQuery.trim() || methodFilter !== "all" || pledgeFilter !== "all")
+                      ? "No transactions match those filters."
+                      : donorNameQuery.trim()
+                        ? "No donations match that donor."
+                        : paymentView === "all"
+                          ? "No transactions on this campaign yet."
+                          : "No one-time donations yet."}
                   </TableCell>
                 </TableRow>
               ) : (
-                donationPayments.map((payment) => (
+                pagedDonationPayments.map((payment) => (
                   <TableRow key={payment.id}>
                     <TableCell>{formatShortDate(payment.payment_date)}</TableCell>
                     <TableCell>
@@ -484,12 +802,22 @@ export function CampaignDonationsTab({
                     <TableCell className="text-right tabular-nums">
                       {formatDonationCurrency(Number(payment.amount || 0))}
                     </TableCell>
-                    <TableCell>{campaignPaymentTypeLabel(payment)}</TableCell>
-                    <TableCell className="capitalize">{payment.source || "—"}</TableCell>
+                    <TableCell>{campaignTransactionKindLabel(payment)}</TableCell>
+                    <TableCell>{payment.source ? formatPaymentSourceLabel(payment.source) : "—"}</TableCell>
                     <TableCell>
-                      {canManage &&
-                      ((payment.donor_id && openPledgeDonorIds.has(payment.donor_id)) ||
-                        (payment.contact_id && openPledgeContactIds.has(payment.contact_id))) ? (
+                      {payment.pledge_id ? (
+                        <Button
+                          type="button"
+                          variant="link"
+                          className="h-auto p-0"
+                          onClick={() => onPledgeClick(payment.pledge_id as string)}
+                        >
+                          Pledge
+                        </Button>
+                      ) : canManage &&
+                        campaignTransactionKind(payment) === "one_time" &&
+                        ((payment.donor_id && openPledgeDonorIds.has(payment.donor_id)) ||
+                          (payment.contact_id && openPledgeContactIds.has(payment.contact_id))) ? (
                         <Button
                           type="button"
                           variant="link"
@@ -519,32 +847,21 @@ export function CampaignDonationsTab({
           </Table>
         </CardContent>
       </Card>
-
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 className="text-base font-semibold text-foreground">Recurring</h2>
-          <p className="text-sm text-muted-foreground">
-            Monthly and other recurring plans tied to this campaign. A payment applied to a pledge
-            is listed on that pledge, not in the gifts above.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" asChild>
-            <Link href={DONATION_RECURRING_OPS_PATH}>All recurring plans</Link>
-          </Button>
-          {canManage ? (
-            <Button size="sm" onClick={openPlanDialog}>
-              <Plus className="mr-2 h-4 w-4" />
-              New Recurring Plan
-            </Button>
-          ) : null}
-        </div>
+      <ListPagination
+        page={donationPage}
+        pageSize={DONATIONS_PAGE_SIZE}
+        total={donationPayments.length}
+        onPageChange={setPage}
+        hidePageSize
+        entryLabel={paymentView === "all" ? "transactions" : "donations"}
+      />
       </div>
-
-      <Card className="border border-border shadow-sm">
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
+      ) : (
+      <div className="flex min-h-0 flex-1 flex-col gap-4">
+      <Card className="min-h-0 flex-1 gap-0 overflow-hidden border border-border py-0 shadow-sm">
+        <CardContent className="h-full min-h-0 p-0">
+          <Table containerClassName="h-full overflow-auto">
+            <TableHeader className="sticky top-0 z-10 bg-card [&_th]:bg-card">
               <TableRow>
                 <TableHead>Donor</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
@@ -556,14 +873,14 @@ export function CampaignDonationsTab({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {recurringPlans.length === 0 ? (
+              {pagedRecurringPlans.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
                     No recurring plans on this campaign yet.
                   </TableCell>
                 </TableRow>
               ) : (
-                recurringPlans.map((plan) => (
+                pagedRecurringPlans.map((plan) => (
                   <TableRow key={plan.id}>
                     <TableCell>
                       <button
@@ -595,6 +912,86 @@ export function CampaignDonationsTab({
           </Table>
         </CardContent>
       </Card>
+      <ListPagination
+        page={recurringCurrentPage}
+        pageSize={DONATIONS_PAGE_SIZE}
+        total={recurringPlans.length}
+        onPageChange={setRecurringPage}
+        hidePageSize
+        entryLabel="plans"
+      />
+      </div>
+      )}
+
+      <Dialog open={showBulkDialog} onOpenChange={setShowBulkDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Bulk entry</DialogTitle>
+            <DialogDescription>
+              One total for cash counted with no names, or Square taps with no customer. It stays in
+              collected and raised, and it is not a donor.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-4 py-2">
+            <div className="flex flex-col gap-2">
+              <Label>Method</Label>
+              <Select
+                value={bulkSource}
+                onValueChange={(value) => setBulkSource(value as "cash" | "square")}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="square">Square</SelectItem>
+                  <SelectItem value="cash">Cash</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="campaign-bulk-amount">Amount</Label>
+                <Input
+                  id="campaign-bulk-amount"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={bulkAmount}
+                  onChange={(event) => setBulkAmount(event.target.value)}
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="campaign-bulk-date">Date</Label>
+                <Input
+                  id="campaign-bulk-date"
+                  type="date"
+                  value={bulkDate}
+                  onChange={(event) => setBulkDate(event.target.value)}
+                />
+              </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="campaign-bulk-memo">Note</Label>
+              <Textarea
+                id="campaign-bulk-memo"
+                rows={2}
+                value={bulkMemo}
+                onChange={(event) => setBulkMemo(event.target.value)}
+                placeholder="Optional"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowBulkDialog(false)} disabled={saving}>
+              Cancel
+            </Button>
+            <Button onClick={() => void handleBulkEntry()} disabled={saving}>
+              {saving ? "Saving..." : "Save bulk entry"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={showReceiveDialog}
@@ -627,8 +1024,8 @@ export function CampaignDonationsTab({
               onChange={(contactId, label) => {
                 setDonationContactId(contactId)
                 setDonationContactLabel(label)
-                setDonationGroupContactId(null)
-                setDonationGroupLabel("")
+                setDonationCampaignGroupId(null)
+                setDonationCampaignGroupLabel("")
               }}
               label="Donor"
               inputId="campaign-donation-donor"
@@ -640,13 +1037,13 @@ export function CampaignDonationsTab({
               }}
               disabled={saving}
             />
-            <DonationGroupPicker
-              groupContactId={donationGroupContactId}
-              groupLabel={donationGroupLabel}
-              memberContactId={donationContactId || null}
-              onChange={(groupContactId, label) => {
-                setDonationGroupContactId(groupContactId)
-                setDonationGroupLabel(label)
+            <CampaignGroupPicker
+              campaignId={campaignId}
+              groupId={donationCampaignGroupId}
+              groupLabel={donationCampaignGroupLabel}
+              onChange={(nextGroupId, label) => {
+                setDonationCampaignGroupId(nextGroupId)
+                setDonationCampaignGroupLabel(label)
               }}
               disabled={saving}
             />
@@ -774,6 +1171,16 @@ export function CampaignDonationsTab({
               onCreateClick={() => {
                 setQuickAddTarget("plan")
                 setShowQuickAddContact(true)
+              }}
+              disabled={saving}
+            />
+            <CampaignGroupPicker
+              campaignId={campaignId}
+              groupId={planCampaignGroupId}
+              groupLabel={planCampaignGroupLabel}
+              onChange={(nextGroupId, label) => {
+                setPlanCampaignGroupId(nextGroupId)
+                setPlanCampaignGroupLabel(label)
               }}
               disabled={saving}
             />

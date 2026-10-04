@@ -724,15 +724,6 @@ function applyPledgeListFilters<
   return query
 }
 
-function hasPledgeListFilters(input: PledgeListFilters) {
-  return (
-    Boolean(input.search?.trim()) ||
-    Boolean(input.status && input.status !== "all") ||
-    Boolean(input.campaignId && input.campaignId !== "all") ||
-    (input.minAmountPledged != null && input.minAmountPledged > 0)
-  )
-}
-
 export async function fetchPledgesPageAction(input: PledgesPageInput = {}) {
   const access = await requireDonationStaffAccess("view")
   if (!access.ok) return { success: false as const, error: access.error }
@@ -992,28 +983,6 @@ async function aggregatePledgeSummaryMetrics(
 export async function fetchPledgeSummaryMetricsAction(input: PledgeSummaryMetricsInput = {}) {
   const access = await requireDonationStaffAccess("view")
   if (!access.ok) return { success: false as const, error: access.error }
-
-  if (!hasPledgeListFilters(input)) {
-    const { data, error } = await access.supabase.rpc("donation_org_pledge_summary", {
-      p_org_id: access.orgId,
-    })
-
-    if (error) return { success: false as const, error: error.message }
-
-    const row = Array.isArray(data) ? data[0] : data
-    const activePledgeCount = Number(row?.active_pledge_count || 0)
-    return {
-      success: true as const,
-      metrics: {
-        totalPledged: Number(row?.total_pledged || 0),
-        totalCollected: Number(row?.total_collected || 0),
-        outstandingBalance: Number(row?.outstanding_balance || 0),
-        activePledgeCount,
-        fulfilledPledgeCount: 0,
-        pledgeCount: activePledgeCount,
-      },
-    }
-  }
 
   const result = await aggregatePledgeSummaryMetrics(access.supabase, access.orgId, input)
   if ("error" in result && result.error) {

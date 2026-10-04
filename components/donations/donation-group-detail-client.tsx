@@ -5,15 +5,11 @@ import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
   ArrowLeft,
-  CalendarDays,
-  Heart,
   Loader2,
   Pencil,
   Users,
 } from "lucide-react"
 
-import { ContactGroupMembersPanel } from "@/components/contacts/contact-group-members-panel"
-import { DonationGroupActivityPanel } from "@/components/donations/donation-group-activity-panel"
 import { DonationGroupEditForm } from "@/components/donations/donation-group-edit-form"
 import { DonationGroupFinancialPanel } from "@/components/donations/donation-group-financial-panel"
 import { Header } from "@/components/layout/header"
@@ -27,14 +23,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { mapStatus, STATUS_COLORS } from "@/lib/contacts/contact-constants"
 import { getCurrentOrganizationId } from "@/lib/current-organization"
 import { findDepartmentForGivingGroupAction } from "@/lib/departments/department-giving-link"
 import {
   departmentGroupWorkspaceHref,
   donationGroupGivingListHref,
-  donationGroupHref,
   mapDonationTabToWorkspaceTab,
 } from "@/lib/donations/donation-group-path"
 import { DONATIONS_GROUP_GIVING_REPORT_PATH } from "@/lib/donations/donor-giving-report"
@@ -54,8 +48,6 @@ type DonationGroupDetailClientProps = {
   groupId: string
 }
 
-type GroupTab = "members" | "financial" | "activity"
-
 type GroupRecord = {
   id: string
   full_name: string | null
@@ -72,12 +64,6 @@ type GroupRecord = {
   giving_group_kind?: string | null
   linked_hr_team_id?: string | null
   linked_department_id?: string | null
-}
-
-function parseGroupTab(value: string | null): GroupTab {
-  if (value === "financial" || value === "group-giving") return "financial"
-  if (value === "activity") return "activity"
-  return "members"
 }
 
 export function DonationGroupDetailClient({ groupId }: DonationGroupDetailClientProps) {
@@ -97,8 +83,6 @@ export function DonationGroupDetailClient({ groupId }: DonationGroupDetailClient
   const backHref = donationGroupGivingListHref(
     returnTo && isSafeReturnToPath(returnTo) ? returnTo : DONATIONS_GROUP_GIVING_REPORT_PATH
   )
-
-  const activeTab = parseGroupTab(searchParams.get("tab"))
 
   const loadGroup = useCallback(async () => {
     setLoading(true)
@@ -203,17 +187,6 @@ export function DonationGroupDetailClient({ groupId }: DonationGroupDetailClient
     void loadGroup()
   }, [loadGroup])
 
-  function handleTabChange(tab: string) {
-    const next = parseGroupTab(tab)
-    router.replace(
-      donationGroupHref(groupId, {
-        tab: next,
-        returnTo: returnTo && isSafeReturnToPath(returnTo) ? returnTo : undefined,
-      }),
-      { scroll: false }
-    )
-  }
-
   if (loading || redirecting) {
     return (
       <>
@@ -281,7 +254,7 @@ export function DonationGroupDetailClient({ groupId }: DonationGroupDetailClient
               </Badge>
             </div>
             <p className="text-sm text-muted-foreground">
-              Workspace for members, campaign group giving, and activity for this group.
+              Campaign gifts attributed to this group.
               {linkedHref && linkedTeamName ? (
                 <>
                   {" "}
@@ -300,45 +273,11 @@ export function DonationGroupDetailClient({ groupId }: DonationGroupDetailClient
           </Button>
         </div>
 
-        <Tabs value={activeTab} onValueChange={handleTabChange}>
-          <TabsList className="flex h-auto flex-wrap justify-start gap-1">
-            <TabsTrigger value="members" className="gap-2">
-              <Users className="size-4" />
-              Members
-            </TabsTrigger>
-            <TabsTrigger value="financial" className="gap-2">
-              <Heart className="size-4" />
-              Group giving
-            </TabsTrigger>
-            <TabsTrigger value="activity" className="gap-2">
-              <CalendarDays className="size-4" />
-              Activity
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
-
-        {activeTab === "members" ? (
-          <ContactGroupMembersPanel
-            groupContactId={group.id}
-            groupName={displayName}
-          />
-        ) : null}
-
-        {activeTab === "financial" ? (
-          <DonationGroupFinancialPanel
-            groupContactId={group.id}
-            groupName={displayName}
-            refreshToken={refreshToken}
-          />
-        ) : null}
-
-        {activeTab === "activity" ? (
-          <DonationGroupActivityPanel
-            groupContactId={group.id}
-            departmentId={group.linked_department_id}
-            refreshToken={refreshToken}
-          />
-        ) : null}
+        <DonationGroupFinancialPanel
+          groupContactId={group.id}
+          groupName={displayName}
+          refreshToken={refreshToken}
+        />
       </div>
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>

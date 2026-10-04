@@ -6,6 +6,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { requireDonationStaffAccess } from "@/lib/donations/donation-action-auth"
 import {
   fetchCampaignAnalyticsEntries,
+  fetchCampaignPortfolioSummary,
   fetchCampaignWorkspaceLedger,
   fetchDonorTaxYearTotals,
   fetchOrgReportsOverview,
@@ -175,8 +176,11 @@ export async function getCampaignAnalyticsAction() {
   if (!access.ok) return { success: false as const, error: access.error }
 
   try {
-    const entries = await fetchCampaignAnalyticsEntries(access.supabase, access.orgId)
-    return { success: true as const, entries }
+    const [entries, summary] = await Promise.all([
+      fetchCampaignAnalyticsEntries(access.supabase, access.orgId),
+      fetchCampaignPortfolioSummary(access.supabase, access.orgId),
+    ])
+    return { success: true as const, entries, summary }
   } catch (error) {
     return { success: false as const, error: (error as Error).message }
   }

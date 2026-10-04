@@ -236,7 +236,7 @@ User Invitations
 
 **Event create + optional approval (September 2026)** — Create event no longer navigates to Facilities. On-site events link out to the facility calendar to check space, then staff come back to finish. **Approval required** is an Event Management Settings toggle (off by default) and applies only to on-site events. Status menu is Draft / Pending / Live / Completed / Cancelled (no Approved tag). SQL **`291_event_management_settings.sql`**.
 
-**Fund Development campaign groups Phase E (August 2026)** — Campaign → Groups with donation tokens (`/donate/g/{token}`), copy-link and copy-QR icons. Group goals are not set in the UI. Migration **`263_campaign_groups.sql`**.
+**Fund Development campaign groups Phase E (August 2026 / October 2026)** — Campaign → Groups. One shared donation link and QR (`/donate/g/{token}` on `campaigns.group_donate_token`); the donor chooses the group. Group goals are not set in the UI. Migrations **`263_campaign_groups.sql`** and **`309_campaign_group_donate_token.sql`**.
 
 **Fund Development public group checkout Phase F (August 2026)** — Guest Stripe Checkout on group links; webhook writes payment with `campaign_id` + `campaign_group_id`. Migration **`264_campaign_group_checkout.sql`**.
 
@@ -244,7 +244,7 @@ User Invitations
 
 **Fund Development follow-ups (August 2026)** — Granular permissions (`265_donations_granular_permissions.sql`); Campaign Performance includes campaign groups reporting; public group pledge modes with `pledge_id` on checkout/payment.
 
-**Fund Development group recurring + FD emails (August 2026)** — Recurring gifts on `/donate/g/{token}`; group pledge confirmation emails; daily prospect follow-up assignee digests. Migration **`266_group_recurring_and_fd_emails.sql`**. Cron: `/api/cron/prospect-follow-up-reminders`.
+**Fund Development group recurring + FD emails (August 2026 / October 2026)** — Recurring gifts on the shared `/donate/g/{token}` page after the donor chooses a group; group pledge confirmation emails; daily prospect follow-up assignee digests. Migration **`266_group_recurring_and_fd_emails.sql`**. Cron: `/api/cron/prospect-follow-up-reminders`.
 
 **Fund Development IA redesign (August 2026)** — Sidebar: Overview / Campaigns / Pledges / **Donations** / Reports / Settings. Operations under `/donations/payments/*`. Transactions date range + export; receipts Missing queue; year-end KPIs from annual statements. No schema change. **Superseded September 2026** by one home per object.
 
@@ -260,7 +260,7 @@ User Invitations
 
 **Campaign same-organization FKs (September 2026)** — Composite `(campaign_id, organization_id)` FKs on campaign children plus same-org triggers on ledger campaign/wishlist links. Service role bypasses RLS; these constraints keep tenants from sharing a campaign UUID. SQL **`292_campaign_same_organization_fks.sql`**.
 
-**Canonical Pledge Details window (August 2026 / September 2026)** — Staff add/edit/collect/remind/delete pledges from one dialog (`components/donations/pledge-details-dialog.tsx`) on Pledges, campaign workspace, prospects, and contact Financial. Monthly, quarterly, and yearly pledges need a first payment date plus installments or an end date. Status is automatic from payments (Open / Fulfilled). Missing contacts can be created from Contact search (person or organization). Customer portal unchanged.
+**Canonical Pledge Details window (August 2026 / September 2026)** — Staff add/edit/collect/remind/delete pledges from one dialog (`components/donations/pledge-details-dialog.tsx`) on Pledges, campaign workspace, prospects, and contact Financial. A pledge is the commitment amount; payment frequency belongs on a recurring donation, not on the pledge. Status is automatic from payments (Open / Fulfilled). Missing contacts can be created from Contact search (person or organization). Customer portal unchanged.
 
 **Contact Financial module sections (September 2026)** — Directory contact Financial stays one tab. Inner nav follows subscribed billing modules: flatten when only Programs (or only Fund Development) is on; mixed tenants get All + Fund Development / Programs / etc. Programs-only contacts in a mixed org open Programs, not empty Recurring/Pledges. Key: `lib/contacts/contact-financial-nav.ts`.
 

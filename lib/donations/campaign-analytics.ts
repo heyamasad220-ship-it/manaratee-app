@@ -108,6 +108,22 @@ export function campaignPaymentTypeLabel(payment: CampaignPaymentRow): string {
   return isRecurringCampaignPayment(payment) ? "Recurring" : "One-Time"
 }
 
+export type CampaignTransactionKind = "one_time" | "recurring" | "pledge"
+
+/** Pledge payments stay pledges even when the Square charge was recurring. */
+export function campaignTransactionKind(payment: CampaignPaymentRow): CampaignTransactionKind {
+  if (isPledgeAppliedCampaignPayment(payment)) return "pledge"
+  if (isRecurringCampaignPayment(payment)) return "recurring"
+  return "one_time"
+}
+
+export function campaignTransactionKindLabel(payment: CampaignPaymentRow): string {
+  const kind = campaignTransactionKind(payment)
+  if (kind === "pledge") return "Pledge"
+  if (kind === "recurring") return "Recurring donation"
+  return "One-time donation"
+}
+
 const LIVE_RECURRING_PLAN_STATUSES = new Set(["active", "past_due"])
 
 export type CampaignDonationKpis = {
@@ -134,12 +150,25 @@ function campaignDonorKey(row: {
   sender_name?: string | null
   donor_name?: string | null
 }): string | null {
+  if (isAnonymousBulkSender(row.sender_name)) return null
   if (row.donor_id) return `donor:${row.donor_id}`
   if (row.contact_id) return `contact:${row.contact_id}`
   const name = String(row.sender_name || row.donor_name || "")
     .trim()
     .toLowerCase()
   return name ? `name:${name}` : null
+}
+
+/** Cash counted with no names, or Square taps with no customer, entered as one gift. */
+export const ANONYMOUS_BULK_SENDER_NAMES = ["Square bulk", "Cash bulk"] as const
+
+export function anonymousBulkSenderName(source: "cash" | "square") {
+  return source === "square" ? "Square bulk" : "Cash bulk"
+}
+
+export function isAnonymousBulkSender(name: string | null | undefined) {
+  const normalized = String(name || "").trim().toLowerCase()
+  return normalized === "square bulk" || normalized === "cash bulk"
 }
 
 export function computeCampaignDonationKpis(
@@ -181,6 +210,8 @@ export function computeCampaignDonationKpis(
 export type CampaignSourceBucket =
   | "cash"
   | "checks"
+  | "ach"
+  | "intuit"
   | "square"
   | "ccOneTime"
   | "ccRecurring"
@@ -190,6 +221,8 @@ export type CampaignSourceBucket =
 export type CampaignSourceBreakdown = {
   cash: number
   checks: number
+  ach: number
+  intuit: number
   square: number
   ccOneTime: number
   ccRecurring: number
@@ -214,6 +247,15 @@ export type CampaignMetrics = {
   paymentCount: number
   averageGift: number
   largestGift: number
+  /** One-time gifts plus recurring charges already received. Pledge payments are excluded. */
+  donationRaised: number
+  /** Largest single payment received, including pledge payments. */
+  largestPayment: number
+}
+
+/** Every payment received, plus open pledge balances. */
+export function campaignCommitmentRaised(metrics: Pick<CampaignMetrics, "raised" | "outstanding">) {
+  return metrics.raised + metrics.outstanding
 }
 
 export type CampaignAnalyticsEntry = {
@@ -241,6 +283,8 @@ export type CampaignLargestGift = {
   donorType: string | null
   contactId: string | null
   displayName: string
+  /** Donors who share this amount. A pledge counts even when nothing has been paid. */
+  matchCount: number
 }
 
 export type CampaignDonorInsights = {
@@ -267,6 +311,48 @@ export function isCountableCampaignPayment(payment: CampaignPaymentRow): boolean
     refunded_amount: payment.refunded_amount,
     status: payment.status,
   })
+}
+
+export const CAMPAIGN_PAYMENT_METHOD_KEYS = ["stripe", "zelle", "square"] as const
+
+export type CampaignPaymentMethodKey = (typeof CAMPAIGN_PAYMENT_METHOD_KEYS)[number]
+
+export type CampaignPaymentMethodTotals = Record<
+  CampaignPaymentMethodKey,
+  { amount: number; count: number }
+>
+
+export function campaignPaymentMethodKey(
+  source: string | null | undefined
+): CampaignPaymentMethodKey | null {
+  const normalized = normalizePaymentSourceChannel(source)
+  if (
+    normalized === "stripe" ||
+    normalized === "zelle" ||
+    normalized === "square"
+  ) {
+    return normalized
+  }
+  return null
+}
+
+/** Totals for All Transactions method cards. Includes pledge payments. Skips voided and fully refunded rows. */
+export function computeCampaignPaymentMethodTotals(
+  payments: CampaignPaymentRow[]
+): CampaignPaymentMethodTotals {
+  const totals: CampaignPaymentMethodTotals = {
+    stripe: { amount: 0, count: 0 },
+    zelle: { amount: 0, count: 0 },
+    square: { amount: 0, count: 0 },
+  }
+  for (const payment of payments) {
+    if (!isCountableCampaignPayment(payment)) continue
+    const key = campaignPaymentMethodKey(payment.source)
+    if (!key) continue
+    totals[key].amount += campaignPaymentNetAmount(payment)
+    totals[key].count += 1
+  }
+  return totals
 }
 
 export function buildPledgeCampaignMap(
@@ -362,8 +448,13 @@ export function computeCampaignMetrics(
   const progressPercent = goal > 0 ? Math.min((raised / goal) * 100, 100) : null
 
   const donorKeys = new Set<string>()
+  let donationRaised = 0
+  let largestPayment = 0
   for (const payment of campaignPayments) {
-    if (isCampaignBatchDepositPayment(payment)) continue
+    const net = campaignPaymentNetAmount(payment)
+    if (net > largestPayment) largestPayment = net
+    if (!isPledgeAppliedCampaignPayment(payment)) donationRaised += net
+    if (isAnonymousBulkSender(payment.sender_name)) continue
     if (payment.donor_id) donorKeys.add(`donor:${payment.donor_id}`)
     else if (payment.contact_id) donorKeys.add(`contact:${payment.contact_id}`)
     else if (payment.sender_name) donorKeys.add(`sender:${payment.sender_name}`)
@@ -373,8 +464,10 @@ export function computeCampaignMetrics(
   }
 
   const paymentCount = campaignPayments.length
-  const amounts = campaignPayments.map((payment) => campaignPaymentNetAmount(payment))
-  const largestGift = amounts.length ? Math.max(...amounts) : 0
+  const largestGift = selectCampaignLargestGift({
+    pledges: campaignPledges,
+    payments: campaignPayments,
+  }).amount
   const averageGift = paymentCount > 0 ? raised / paymentCount : 0
 
   return {
@@ -389,6 +482,8 @@ export function computeCampaignMetrics(
     paymentCount,
     averageGift,
     largestGift,
+    donationRaised,
+    largestPayment,
   }
 }
 
@@ -414,6 +509,8 @@ export function classifyCampaignPaymentSource(payment: CampaignPaymentRow): Camp
 
   if (source === "cash") return "cash"
   if (source === "check") return "checks"
+  if (source === "ach") return "ach"
+  if (source === "intuit") return "other"
   if (source === "square") return "square"
   if (CARD_PAYMENT_CHANNELS.has(source)) {
     return isRecurringCampaignPayment(payment) ? "ccRecurring" : "ccOneTime"
@@ -612,6 +709,8 @@ export function computeCampaignSourceBreakdown(
   const buckets: Record<CampaignSourceBucket, number> = {
     cash: 0,
     checks: 0,
+    ach: 0,
+    intuit: 0,
     square: 0,
     ccOneTime: 0,
     ccRecurring: 0,
@@ -628,6 +727,8 @@ export function computeCampaignSourceBreakdown(
   const collected =
     buckets.cash +
     buckets.checks +
+    buckets.ach +
+    buckets.intuit +
     buckets.square +
     buckets.ccOneTime +
     buckets.ccRecurring +
@@ -645,6 +746,8 @@ export function computeCampaignSourceBreakdown(
   return {
     cash: buckets.cash,
     checks: buckets.checks,
+    ach: buckets.ach,
+    intuit: buckets.intuit,
     square: buckets.square,
     ccOneTime: buckets.ccOneTime,
     ccRecurring: buckets.ccRecurring,
@@ -769,7 +872,7 @@ export function buildCampaignDonorInsights(
   }
 
   for (const payment of campaignPayments) {
-    if (isCampaignBatchDepositPayment(payment)) continue
+    if (isAnonymousBulkSender(payment.sender_name)) continue
     const amount = campaignPaymentNetAmount(payment)
     if (payment.donor_id) {
       const meta = donorMeta.get(payment.donor_id)
@@ -833,33 +936,112 @@ export function buildCampaignDonorInsights(
 
   const donors = [...donorTotals.values()].sort((a, b) => b.totalGiven - a.totalGiven)
 
-  let largestPayment: CampaignPaymentRow | null = null
-  let largestAmount = 0
-  for (const payment of campaignPayments) {
-    if (isCampaignBatchDepositPayment(payment)) continue
-    const amount = campaignPaymentNetAmount(payment)
-    if (amount > largestAmount) {
-      largestAmount = amount
-      largestPayment = payment
+  const selected = selectCampaignLargestGift({
+    pledges: campaignPledges,
+    payments: campaignPayments,
+    donorMeta,
+  })
+  const largestGift = selected.gift
+
+  return { donors, largestGift }
+}
+
+function moneyCents(amount: number) {
+  return Math.round(Number(amount || 0) * 100)
+}
+
+function largestGiftDonorKey(gift: {
+  donorId: string | null
+  contactId: string | null
+  displayName: string
+}) {
+  if (gift.donorId) return `donor:${gift.donorId}`
+  if (gift.contactId) return `contact:${gift.contactId}`
+  return `name:${gift.displayName.trim().toLowerCase()}`
+}
+
+function formatTiedDonorLabel(names: string[]) {
+  const unique = [...new Set(names.filter(Boolean))].sort((a, b) => a.localeCompare(b))
+  if (unique.length <= 1) return unique[0] || "Unknown donor"
+  if (unique.length === 2) return `${unique[0]} and ${unique[1]}`
+  return `${unique[0]} and ${unique.length - 1} others`
+}
+
+/**
+ * Largest gift is the biggest commitment: a pledge counts for its full amount
+ * even when unpaid. A payment counts on its own only when it is not applied to a pledge.
+ */
+export function selectCampaignLargestGift(input: {
+  pledges: CampaignPledgeRow[]
+  payments: CampaignPaymentRow[]
+  donorMeta?: Map<string, DonorMetaRow>
+}): { amount: number; gift: CampaignLargestGift | null } {
+  const byDonor = new Map<string, CampaignLargestGift>()
+
+  const consider = (candidate: Omit<CampaignLargestGift, "matchCount">) => {
+    if (moneyCents(candidate.amount) <= 0) return
+    const key = largestGiftDonorKey(candidate)
+    const existing = byDonor.get(key)
+    if (!existing || moneyCents(candidate.amount) > moneyCents(existing.amount)) {
+      byDonor.set(key, { ...candidate, matchCount: 1 })
     }
   }
 
-  const largestGift =
-    largestPayment && largestAmount > 0
-      ? (() => {
-          const donorId = largestPayment.donor_id ?? null
-          const meta = donorId ? donorMeta.get(donorId) : null
-          return {
-            amount: largestAmount,
-            donorId,
-            donorType: meta?.donor_type ?? null,
-            contactId: meta?.contact_id ?? null,
-            displayName: meta?.full_name || largestPayment.sender_name || "Unknown donor",
-          } satisfies CampaignLargestGift
-        })()
-      : null
+  for (const pledge of input.pledges) {
+    const meta = pledge.donor_id ? input.donorMeta?.get(pledge.donor_id) : undefined
+    consider({
+      amount: Number(pledge.amount_pledged || 0),
+      donorId: pledge.donor_id ?? null,
+      donorType: meta?.donor_type ?? null,
+      contactId: meta?.contact_id ?? null,
+      displayName: meta?.full_name || pledge.donor_name || "Unknown donor",
+    })
+  }
 
-  return { donors, largestGift }
+  for (const payment of input.payments) {
+    if (payment.pledge_id) continue
+    if (isCampaignBatchDepositPayment(payment)) continue
+    const meta = payment.donor_id ? input.donorMeta?.get(payment.donor_id) : undefined
+    consider({
+      amount: campaignPaymentNetAmount(payment),
+      donorId: payment.donor_id ?? null,
+      donorType: meta?.donor_type ?? null,
+      contactId: meta?.contact_id ?? payment.contact_id ?? null,
+      displayName: meta?.full_name || payment.sender_name || "Unknown donor",
+    })
+  }
+
+  let maxCents = 0
+  for (const gift of byDonor.values()) {
+    maxCents = Math.max(maxCents, moneyCents(gift.amount))
+  }
+  if (maxCents <= 0) return { amount: 0, gift: null }
+
+  const matches = [...byDonor.values()]
+    .filter((gift) => moneyCents(gift.amount) === maxCents)
+    .sort((a, b) => a.displayName.localeCompare(b.displayName))
+  const first = matches[0]
+  const single = matches.length === 1
+
+  return {
+    amount: maxCents / 100,
+    gift: {
+      amount: maxCents / 100,
+      donorId: single ? first.donorId : null,
+      donorType: single ? first.donorType : null,
+      contactId: single ? first.contactId : null,
+      displayName: single ? first.displayName : formatTiedDonorLabel(matches.map((gift) => gift.displayName)),
+      matchCount: matches.length,
+    },
+  }
+}
+
+export function formatCampaignLargestGiftLabel(
+  gift: CampaignLargestGift | null | undefined
+): string | null {
+  if (!gift || gift.amount <= 0 || !gift.displayName) return null
+  if (gift.matchCount > 1) return gift.displayName
+  return `From ${gift.displayName}`
 }
 
 const CAMPAIGN_LEDGER_PAGE_SIZE = 1000
@@ -1377,6 +1559,8 @@ function mapRpcCampaignMetrics(row: RpcCampaignMetricsRow): CampaignMetrics {
     paymentCount: Number(row.payment_count || 0),
     averageGift: Number(row.average_gift || 0),
     largestGift: Number(row.largest_gift || 0),
+    donationRaised: 0,
+    largestPayment: 0,
   }
 }
 
@@ -1423,6 +1607,85 @@ export async function fetchCampaignAnalyticsEntries(
         largest_gift: 0,
       }),
   }))
+}
+
+export type CampaignPortfolioSummary = {
+  openPledgeCount: number
+  uniqueDonorCount: number
+}
+
+/** Open-pledge count and donors counted once across every campaign. */
+export async function fetchCampaignPortfolioSummary(
+  supabase: SupabaseClient,
+  organizationId: string
+): Promise<CampaignPortfolioSummary> {
+  const donorKeys = new Set<string>()
+  const pledgeCampaignById = new Map<string, string>()
+  let openPledgeCount = 0
+  const pageSize = 1000
+
+  let pledgeFrom = 0
+  while (true) {
+    const { data, error } = await supabase
+      .from("pledge_status_view")
+      .select("id, donor_id, campaign_id, calculated_status, balance_remaining")
+      .eq("organization_id", organizationId)
+      .not("campaign_id", "is", null)
+      .order("id", { ascending: true })
+      .range(pledgeFrom, pledgeFrom + pageSize - 1)
+    if (error) throw new Error(error.message)
+
+    const rows = data || []
+    for (const row of rows) {
+      const campaignId = row.campaign_id as string | null
+      if (!campaignId) continue
+      pledgeCampaignById.set(row.id as string, campaignId)
+      const status = String(row.calculated_status || "").toLowerCase()
+      if (status === "cancelled") continue
+      const donorKey = campaignDonorKey({ donor_id: row.donor_id as string | null })
+      if (donorKey) donorKeys.add(donorKey)
+      const balance = Number(row.balance_remaining || 0)
+      if ((status === "open" || status === "partial") && balance > 0) {
+        openPledgeCount += 1
+      }
+    }
+    if (rows.length < pageSize) break
+    pledgeFrom += pageSize
+  }
+
+  let paymentFrom = 0
+  while (true) {
+    const { data, error } = await supabase
+      .from("payments")
+      .select("id, donor_id, contact_id, sender_name, campaign_id, pledge_id, status")
+      .eq("organization_id", organizationId)
+      .order("id", { ascending: true })
+      .range(paymentFrom, paymentFrom + pageSize - 1)
+    if (error) throw new Error(error.message)
+
+    const rows = data || []
+    for (const row of rows) {
+      if (isVoidedPayment(row.status as string | null)) continue
+      if (isAnonymousBulkSender(row.sender_name as string | null)) continue
+      const campaignId =
+        (row.campaign_id as string | null) ||
+        (row.pledge_id ? pledgeCampaignById.get(row.pledge_id as string) : null)
+      if (!campaignId) continue
+      const donorKey = campaignDonorKey({
+        donor_id: row.donor_id as string | null,
+        contact_id: row.contact_id as string | null,
+        sender_name: row.sender_name as string | null,
+      })
+      if (donorKey) donorKeys.add(donorKey)
+    }
+    if (rows.length < pageSize) break
+    paymentFrom += pageSize
+  }
+
+  return {
+    openPledgeCount,
+    uniqueDonorCount: donorKeys.size,
+  }
 }
 
 export async function fetchCampaignRecentActivity(

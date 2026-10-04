@@ -1,0 +1,691 @@
+{
+  "execute": true,
+  "file": "C:/Users/danan/Downloads/AFR Pledges Tracker - Sept 12, 2026.xlsx",
+  "organizationId": "e057e00a-e4e3-4adf-9af5-f465db1894be",
+  "campaignId": "74fc4ba9-a7f1-4aec-af12-a62909e32afc",
+  "campaignName": "Annual Fundraiser - September 2026",
+  "sheetRows": 304,
+  "pledgesCreated": 85,
+  "pledgeAmount": 388223,
+  "pledgesSkippedExisting": [
+    {
+      "name": "Islamic Relief USA (IRUSA)",
+      "amount": 25000,
+      "pledgeId": "a613f6cc-a312-47a3-88c1-64fb803cab3c"
+    },
+    {
+      "name": "Baitulmaal",
+      "amount": 20000,
+      "pledgeId": "5d5123c6-85f4-42df-9293-359eab5b1c59"
+    },
+    {
+      "name": "Mercy without Limits (MWL)",
+      "amount": 10000,
+      "pledgeId": "f60dae44-f613-4f3b-a443-010adc361060"
+    },
+    {
+      "name": "Islamic Services Foundation (ISF)",
+      "amount": 10000,
+      "pledgeId": "c2780828-2bfe-4009-b3bb-80b17a29d5e6"
+    }
+  ],
+  "paymentsCreated": 138,
+  "cashAmount": 8653,
+  "checkAmount": 64150,
+  "cardGiftAmount": 96271.95,
+  "cardGiftsSkippedDuplicate": [
+    {
+      "name": "Krystal L Kazi",
+      "amount": 200,
+      "method": "cc1",
+      "excelRow": 98
+    },
+    {
+      "name": "Heyam Asad",
+      "amount": 100,
+      "method": "cc1",
+      "excelRow": 109
+    },
+    {
+      "name": "Rand Arabikatbi",
+      "amount": 100,
+      "method": "cc1",
+      "excelRow": 110
+    },
+    {
+      "name": "Aliya Asdi",
+      "amount": 100,
+      "method": "cc1",
+      "excelRow": 112
+    },
+    {
+      "name": "Hannah Purcell",
+      "amount": 100,
+      "method": "cc1",
+      "excelRow": 113
+    },
+    {
+      "name": "Helwa Aburas",
+      "amount": 100,
+      "method": "cc1",
+      "excelRow": 114
+    },
+    {
+      "name": "Zahraa Elrashidi",
+      "amount": 50,
+      "method": "cc1",
+      "excelRow": 123
+    },
+    {
+      "name": "Mona Aref",
+      "amount": 50,
+      "method": "cc1",
+      "excelRow": 124
+    },
+    {
+      "name": "Amer Doko",
+      "amount": 25,
+      "method": "cc1",
+      "excelRow": 135
+    },
+    {
+      "name": "Makayla Heiser",
+      "amount": 25,
+      "method": "cc1",
+      "excelRow": 137
+    },
+    {
+      "name": "Yusuf Abdeljaber",
+      "amount": 25,
+      "method": "cc1",
+      "excelRow": 138
+    },
+    {
+      "name": "Abdel jawad Odeh",
+      "amount": 500,
+      "method": "cc1",
+      "excelRow": 151
+    },
+    {
+      "name": "Amjad K",
+      "amount": 100,
+      "method": "cc1",
+      "excelRow": 152
+    },
+    {
+      "name": "Asra Alrayyan",
+      "amount": 100,
+      "method": "cc1",
+      "excelRow": 153
+    },
+    {
+      "name": "Hanan Ahmed",
+      "amount": 100,
+      "method": "cc1",
+      "excelRow": 154
+    },
+    {
+      "name": "Haneen Kharoub",
+      "amount": 100,
+      "method": "cc1",
+      "excelRow": 155
+    },
+    {
+      "name": "Heba Jamal Matarieh",
+      "amount": 100,
+      "method": "cc1",
+      "excelRow": 157
+    },
+    {
+      "name": "Kenan Chaballout",
+      "amount": 100,
+      "method": "cc1",
+      "excelRow": 158
+    },
+    {
+      "name": "Rosemary Admiral",
+      "amount": 100,
+      "method": "cc1",
+      "excelRow": 159
+    },
+    {
+      "name": "Huda Elsiesy",
+      "amount": 1000,
+      "method": "cc1",
+      "excelRow": 168
+    },
+    {
+      "name": "Mona Alnaeemi",
+      "amount": 900,
+      "method": "cc1",
+      "excelRow": 169
+    },
+    {
+      "name": "Israa Ali",
+      "amount": 300,
+      "method": "cc1",
+      "excelRow": 171
+    },
+    {
+      "name": "Riad Ali",
+      "amount": 250,
+      "method": "cc1",
+      "excelRow": 173
+    },
+    {
+      "name": "Nour Almaaz",
+      "amount": 250,
+      "method": "cc1",
+      "excelRow": 174
+    },
+    {
+      "name": "Wedad Atwan",
+      "amount": 200,
+      "method": "cc1",
+      "excelRow": 175
+    },
+    {
+      "name": "Sabreen Taha",
+      "amount": 200,
+      "method": "cc1",
+      "excelRow": 176
+    },
+    {
+      "name": "Fadia Salameh",
+      "amount": 161,
+      "method": "cc1",
+      "excelRow": 177
+    },
+    {
+      "name": "Feda",
+      "amount": 100,
+      "method": "cc1",
+      "excelRow": 178
+    },
+    {
+      "name": "Asya Issa",
+      "amount": 100,
+      "method": "cc1",
+      "excelRow": 179
+    },
+    {
+      "name": "Bandar A Hijaz",
+      "amount": 100,
+      "method": "cc1",
+      "excelRow": 180
+    },
+    {
+      "name": "Faten Abdelhadi",
+      "amount": 100,
+      "method": "cc1",
+      "excelRow": 181
+    },
+    {
+      "name": "hadeel khuffash",
+      "amount": 100,
+      "method": "cc1",
+      "excelRow": 182
+    },
+    {
+      "name": "Khitam Alhaj",
+      "amount": 100,
+      "method": "cc1",
+      "excelRow": 183
+    },
+    {
+      "name": "Nada Saleh",
+      "amount": 100,
+      "method": "cc1",
+      "excelRow": 184
+    },
+    {
+      "name": "Narmeen Gamal Alfahal",
+      "amount": 100,
+      "method": "cc1",
+      "excelRow": 185
+    },
+    {
+      "name": "Sarah Yousif",
+      "amount": 100,
+      "method": "cc1",
+      "excelRow": 186
+    },
+    {
+      "name": "Soumia Bouhlal",
+      "amount": 100,
+      "method": "cc1",
+      "excelRow": 187
+    },
+    {
+      "name": "Wessam Abuelfarah",
+      "amount": 100,
+      "method": "cc1",
+      "excelRow": 188
+    },
+    {
+      "name": "Zainab Irshaid",
+      "amount": 100,
+      "method": "cc1",
+      "excelRow": 189
+    },
+    {
+      "name": "Abeer AbuKawan",
+      "amount": 50,
+      "method": "cc1",
+      "excelRow": 192
+    },
+    {
+      "name": "Birlanti abdalhamid Alsawfta",
+      "amount": 50,
+      "method": "cc1",
+      "excelRow": 193
+    },
+    {
+      "name": "Buthaynah Daglas",
+      "amount": 50,
+      "method": "cc1",
+      "excelRow": 194
+    },
+    {
+      "name": "Farah Dabbura",
+      "amount": 50,
+      "method": "cc1",
+      "excelRow": 195
+    },
+    {
+      "name": "Hiba Ayed Hurani",
+      "amount": 50,
+      "method": "cc1",
+      "excelRow": 196
+    },
+    {
+      "name": "Iman Ettabaq",
+      "amount": 50,
+      "method": "cc1",
+      "excelRow": 197
+    },
+    {
+      "name": "Rana Hamadmad",
+      "amount": 50,
+      "method": "cc1",
+      "excelRow": 198
+    },
+    {
+      "name": "Sana Hamdan",
+      "amount": 50,
+      "method": "cc1",
+      "excelRow": 199
+    },
+    {
+      "name": "Souzan Ayoub",
+      "amount": 50,
+      "method": "cc1",
+      "excelRow": 200
+    },
+    {
+      "name": "Hamdeh Elawad",
+      "amount": 45,
+      "method": "cc1",
+      "excelRow": 201
+    },
+    {
+      "name": "Sundus Ghadban",
+      "amount": 25,
+      "method": "cc1",
+      "excelRow": 202
+    },
+    {
+      "name": "wafa yerrou",
+      "amount": 25,
+      "method": "cc1",
+      "excelRow": 203
+    },
+    {
+      "name": "Alaa Lulu",
+      "amount": 10,
+      "method": "cc1",
+      "excelRow": 204
+    },
+    {
+      "name": "Alaa Lulu",
+      "amount": 10,
+      "method": "cc1",
+      "excelRow": 205
+    },
+    {
+      "name": "Ali alsadoon",
+      "amount": 10,
+      "method": "cc1",
+      "excelRow": 206
+    },
+    {
+      "name": "Mohammad Aladra",
+      "amount": 400,
+      "method": "cc1",
+      "excelRow": 208
+    },
+    {
+      "name": "Rahmatullah Akbar",
+      "amount": 300,
+      "method": "cc1",
+      "excelRow": 209
+    },
+    {
+      "name": "Amina Gomaa",
+      "amount": 100,
+      "method": "cc1",
+      "excelRow": 211
+    },
+    {
+      "name": "Dr. Nadia Takieddine",
+      "amount": 5000,
+      "method": "cc1",
+      "excelRow": 214
+    },
+    {
+      "name": "Azza Aly",
+      "amount": 300,
+      "method": "cc1",
+      "excelRow": 225
+    },
+    {
+      "name": "Hana Dwaik",
+      "amount": 200,
+      "method": "cc1",
+      "excelRow": 226
+    },
+    {
+      "name": "Feda",
+      "amount": 100,
+      "method": "cc1",
+      "excelRow": 227
+    },
+    {
+      "name": "Ameen Almallah",
+      "amount": 100,
+      "method": "cc1",
+      "excelRow": 228
+    },
+    {
+      "name": "Aman Salama",
+      "amount": 50,
+      "method": "cc1",
+      "excelRow": 229
+    },
+    {
+      "name": "Lina",
+      "amount": 50,
+      "method": "cc1",
+      "excelRow": 230
+    },
+    {
+      "name": "Zahraa Elrashidi",
+      "amount": 50,
+      "method": "cc1",
+      "excelRow": 231
+    },
+    {
+      "name": "Nezha Oubella",
+      "amount": 25,
+      "method": "cc1",
+      "excelRow": 232
+    },
+    {
+      "name": "Saja Awad",
+      "amount": 200,
+      "method": "cc1",
+      "excelRow": 236
+    },
+    {
+      "name": "Jenine Gharbieh",
+      "amount": 100,
+      "method": "cc1",
+      "excelRow": 237
+    },
+    {
+      "name": "Lama Abu-Amara",
+      "amount": 100,
+      "method": "cc1",
+      "excelRow": 238
+    },
+    {
+      "name": "Rahma Elkamhawy",
+      "amount": 100,
+      "method": "cc1",
+      "excelRow": 239
+    },
+    {
+      "name": "Sumayya Khatib",
+      "amount": 100,
+      "method": "cc1",
+      "excelRow": 240
+    },
+    {
+      "name": "Nahed Darwish",
+      "amount": 50,
+      "method": "cc1",
+      "excelRow": 241
+    },
+    {
+      "name": "Susan Almasri",
+      "amount": 50,
+      "method": "cc1",
+      "excelRow": 242
+    },
+    {
+      "name": "Yasmeen Alhomsy",
+      "amount": 50,
+      "method": "cc1",
+      "excelRow": 243
+    },
+    {
+      "name": "Muhamad Emad Amhan",
+      "amount": 2500,
+      "method": "cc1",
+      "excelRow": 277
+    },
+    {
+      "name": "Muhamad Emad Amhan",
+      "amount": 2000,
+      "method": "cc1",
+      "excelRow": 278
+    },
+    {
+      "name": "Muna Hamadah",
+      "amount": 500,
+      "method": "cc1",
+      "excelRow": 279
+    },
+    {
+      "name": "Uzma Ahmed",
+      "amount": 500,
+      "method": "cc1",
+      "excelRow": 280
+    },
+    {
+      "name": "Tara Cetinkaya",
+      "amount": 300,
+      "method": "cc1",
+      "excelRow": 281
+    },
+    {
+      "name": "Cassandra Benner",
+      "amount": 250,
+      "method": "cc1",
+      "excelRow": 282
+    },
+    {
+      "name": "MAimoona Qamar",
+      "amount": 250,
+      "method": "cc1",
+      "excelRow": 283
+    },
+    {
+      "name": "Rabia Khattak",
+      "amount": 250,
+      "method": "cc1",
+      "excelRow": 284
+    },
+    {
+      "name": "Iffat Mobin-Uddin",
+      "amount": 200,
+      "method": "cc1",
+      "excelRow": 287
+    },
+    {
+      "name": "Mayson Saed",
+      "amount": 100,
+      "method": "cc1",
+      "excelRow": 289
+    },
+    {
+      "name": "Rana Albanna",
+      "amount": 100,
+      "method": "cc1",
+      "excelRow": 290
+    },
+    {
+      "name": "Stacy HopeElsayed",
+      "amount": 50,
+      "method": "cc1",
+      "excelRow": 291
+    },
+    {
+      "name": "Rubbiyah Salman",
+      "amount": 25,
+      "method": "cc1",
+      "excelRow": 292
+    },
+    {
+      "name": "Sandi H",
+      "amount": 25,
+      "method": "cc1",
+      "excelRow": 293
+    },
+    {
+      "name": "Sandi H",
+      "amount": 25,
+      "method": "cc1",
+      "excelRow": 294
+    }
+  ],
+  "cardOnPledgeSkippedAmount": 73761.3,
+  "cardOnPledgeSkippedCount": 29,
+  "groupsCreated": 8,
+  "campaignGroupsCreated": 8,
+  "contactsMatched": 187,
+  "contactsCreated": 76,
+  "donorsCreated": 96,
+  "affiliationsSynced": 123,
+  "errors": [],
+  "samples": [
+    {
+      "name": "Islamic Relief USA (IRUSA)",
+      "group": null,
+      "pledge": 25000,
+      "cash": 0,
+      "checks": 0,
+      "balance": 25000,
+      "skippedExisting": true
+    },
+    {
+      "name": "Baitulmaal",
+      "group": null,
+      "pledge": 20000,
+      "cash": 0,
+      "checks": 20000,
+      "balance": 0,
+      "skippedExisting": true
+    },
+    {
+      "name": "Mercy without Limits (MWL)",
+      "group": null,
+      "pledge": 10000,
+      "cash": 0,
+      "checks": 0,
+      "balance": 10000,
+      "skippedExisting": true
+    },
+    {
+      "name": "Islamic Services Foundation (ISF)",
+      "group": null,
+      "pledge": 10000,
+      "cash": 0,
+      "checks": 0,
+      "balance": 10000,
+      "skippedExisting": true
+    },
+    {
+      "name": "Orphans in Need USA (OINUSA)",
+      "group": null,
+      "pledge": 5000,
+      "cash": 0,
+      "checks": 0,
+      "balance": 5000,
+      "skippedExisting": false
+    },
+    {
+      "name": "Pure Hands",
+      "group": null,
+      "pledge": 5000,
+      "cash": 0,
+      "checks": 0,
+      "balance": 5000,
+      "skippedExisting": false
+    },
+    {
+      "name": "Basmah",
+      "group": null,
+      "pledge": 5000,
+      "cash": 0,
+      "checks": 0,
+      "balance": 5000,
+      "skippedExisting": false
+    },
+    {
+      "name": "Life USA",
+      "group": null,
+      "pledge": 5000,
+      "cash": 0,
+      "checks": 0,
+      "balance": 5000,
+      "skippedExisting": false
+    },
+    {
+      "name": "Sachse Muslim Society (SMS)",
+      "group": null,
+      "pledge": 5000,
+      "cash": 0,
+      "checks": 0,
+      "balance": 5000,
+      "skippedExisting": false
+    },
+    {
+      "name": "Syrian Forum",
+      "group": null,
+      "pledge": 5000,
+      "cash": 0,
+      "checks": 0,
+      "balance": 0,
+      "skippedExisting": false
+    },
+    {
+      "name": "Africa Relief",
+      "group": null,
+      "pledge": 2500,
+      "cash": 0,
+      "checks": 0,
+      "balance": 2500,
+      "skippedExisting": false
+    },
+    {
+      "name": "Muslim Legal Fund of America (MLFA)",
+      "group": null,
+      "pledge": 2500,
+      "cash": 0,
+      "checks": 0,
+      "balance": 2500,
+      "skippedExisting": false
+    }
+  ]
+}

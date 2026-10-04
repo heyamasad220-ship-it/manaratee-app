@@ -1,0 +1,50 @@
+{
+  "execute": false,
+  "file": "C:/Users/danan/Downloads/September2026Pledges2.xlsx",
+  "orgId": "54f5db10-02fe-433a-b91a-f90c16882a97",
+  "campaignId": "fa15246a-e80d-4d65-9bf4-a5af4051b821",
+  "campaignName": "Annual Fundraiser - September 2026",
+  "rows": 8,
+  "pledgesCreated": 8,
+  "pledgesSkipped": 0,
+  "pledgeAmount": 22100,
+  "contactsCreated": 6,
+  "contactsMatched": 2,
+  "donorsCreated": 6,
+  "groupsCreated": 1,
+  "campaignGroupsCreated": 1,
+  "affiliationsSynced": 0,
+  "organizationDonors": 0,
+  "groupedPledges": 4,
+  "withTransactionRef": 6,
+  "plansApplied": [
+    {
+      "name": "Dr. Maheeb Jaouni",
+      "amount": 6000,
+      "installment": 500,
+      "count": 12,
+      "first": "2026-09-22"
+    },
+    {
+      "name": "Dr. Tariq Smadi",
+      "amount": 5000,
+      "installment": 250,
+      "count": 20,
+      "first": "2026-09-13"
+    },
+    {
+      "name": "Shayma Alzubi",
+      "amount": 1000,
+      "installment": 100,
+      "count": 10,
+      "first": "2026-09-25"
+    }
+  ],
+  "errors": [],
+  "groups": [
+    "Thursday Halaqa",
+    "Usrat Al-Muhajira",
+    "Usrat As-Sabiqoon CYP",
+    "Usrat At-Taiboon CYP"
+  ]
+}

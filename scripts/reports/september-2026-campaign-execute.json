@@ -1,0 +1,110 @@
+{
+  "execute": true,
+  "file": "C:/Users/danan/Downloads/September2026Campaign.xlsx",
+  "campaignId": "74fc4ba9-a7f1-4aec-af12-a62909e32afc",
+  "campaignName": "Annual Fundraiser - September 2026",
+  "pledgesCreated": 92,
+  "pledgeAmount": 391674.64,
+  "installmentPledges": 8,
+  "installmentPledgeAmount": 22000,
+  "recurringCommitments": 14,
+  "recurringCommitmentAmount": 19651.64,
+  "paymentsCreated": 231,
+  "paymentAmount": 215315.61,
+  "skippedDuplicate": [
+    {
+      "name": "Ahmad Gharbieh",
+      "amount": 250,
+      "group": "Usrat As-Sabiqoon CYP",
+      "excelRow": 185
+    }
+  ],
+  "sameNameChoices": [
+    {
+      "name": "Hanan Ahmed",
+      "sheet": "Donations",
+      "excelRow": 103,
+      "used": "Hanan Ahmed",
+      "email": "hanoona8@hotmail.com"
+    },
+    {
+      "name": "Sana Hamdan",
+      "sheet": "Donations",
+      "excelRow": 144,
+      "used": "Sana Hamdan",
+      "email": "sanahamdan1975@gmail.com"
+    }
+  ],
+  "contactsMatched": 263,
+  "contactsCreated": 0,
+  "donorsCreated": 0,
+  "campaignGroupsCreated": 14,
+  "affiliationsSynced": 204,
+  "errors": [],
+  "samples": [
+    {
+      "sheet": "Pledges",
+      "name": "Islamic Relief USA (IRUSA)",
+      "pledge": 25000,
+      "received": 0,
+      "install": 0,
+      "group": null
+    },
+    {
+      "sheet": "Pledges",
+      "name": "Marwan Nafal",
+      "pledge": 25000,
+      "received": 0,
+      "install": 0,
+      "group": null
+    },
+    {
+      "sheet": "Pledges",
+      "name": "Dr. Amr Morsy",
+      "pledge": 25000,
+      "received": 15000,
+      "install": 0,
+      "group": null
+    },
+    {
+      "sheet": "Pledges",
+      "name": "Dr. Hesham Elghouhari",
+      "pledge": 24000,
+      "received": 0,
+      "install": 0,
+      "group": null
+    },
+    {
+      "sheet": "Pledges",
+      "name": "Baitulmaal",
+      "pledge": 20000,
+      "received": 20000,
+      "install": 0,
+      "group": null
+    },
+    {
+      "sheet": "Pledges",
+      "name": "Dr. Haroon Rasheed",
+      "pledge": 20000,
+      "received": 10000,
+      "install": 0,
+      "group": null
+    },
+    {
+      "sheet": "Pledges",
+      "name": "Dr. Musa Wadi",
+      "pledge": 15000,
+      "received": 0,
+      "install": 0,
+      "group": null
+    },
+    {
+      "sheet": "Pledges",
+      "name": "Modalla Investments LLC",
+      "pledge": 12000,
+      "received": 0,
+      "install": 0,
+      "group": null
+    }
+  ]
+}

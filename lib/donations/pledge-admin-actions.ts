@@ -10,7 +10,6 @@ import { ensureDonorExtensionForContact } from "@/lib/donations/donor-contact-br
 import { pledgeDisplayStatus } from "@/lib/donations/donation-status"
 import {
   buildPledgePlanWriteFields,
-  normalizePledgePlanFrequency,
   validatePledgePaymentPlanInput,
   type PledgePlanFrequency,
 } from "@/lib/donations/pledge-payment-plan"
@@ -18,6 +17,7 @@ import {
   fetchPledgeAttribution,
   toPaymentAttributionColumns,
 } from "@/lib/donations/payment-attribution"
+import { campaignGroupIdForCampaign } from "@/lib/donations/campaign-group-helpers"
 import { validateOpenDonationFund } from "@/lib/donations/donation-fund-status"
 import {
   ORGANIZATION_AUDIT_ACTIONS,
@@ -34,6 +34,24 @@ function getTodayPlainDate() {
   const today = new Date()
   const timezoneOffset = today.getTimezoneOffset() * 60 * 1000
   return new Date(today.getTime() - timezoneOffset).toISOString().slice(0, 10)
+}
+
+async function resolveSolicitorContactId(
+  supabase: SupabaseClient,
+  orgId: string,
+  contactId: string | null | undefined
+) {
+  const id = contactId?.trim() || ""
+  if (!id) return { ok: true as const, id: null as string | null }
+  const { data, error } = await supabase
+    .from("contacts")
+    .select("id")
+    .eq("organization_id", orgId)
+    .eq("id", id)
+    .maybeSingle()
+  if (error) return { ok: false as const, error: error.message }
+  if (!data) return { ok: false as const, error: "Solicitor was not found in this organization." }
+  return { ok: true as const, id: data.id as string }
 }
 
 function frequencyToDisplay(value: string | null | undefined) {
@@ -229,6 +247,8 @@ export async function createPledgeAction(input: {
   categoryId?: string | null
   subcategoryId?: string | null
   wishlistItemId?: string | null
+  campaignGroupId?: string | null
+  solicitorContactId?: string | null
 }): Promise<{ success: true; pledgeId: string } | { success: false; error: string }> {
   const access = await requireDonationStaffAccess("manage")
   if (!access.ok) return { success: false, error: access.error }
@@ -274,6 +294,21 @@ export async function createPledgeAction(input: {
     return { success: false, error: plan.error }
   }
 
+  const group = await campaignGroupIdForCampaign(
+    access.supabase,
+    access.orgId,
+    input.campaignId,
+    input.campaignGroupId
+  )
+  if (!group.ok) return { success: false, error: group.error }
+
+  const solicitor = await resolveSolicitorContactId(
+    access.supabase,
+    access.orgId,
+    input.solicitorContactId
+  )
+  if (!solicitor.ok) return { success: false, error: solicitor.error }
+
   const { data: pledge, error } = await access.supabase
     .from("pledges")
     .insert({
@@ -293,6 +328,8 @@ export async function createPledgeAction(input: {
       total_payments: plan.fields.total_payments,
       first_payment_date: plan.fields.first_payment_date,
       next_payment_date: plan.fields.next_payment_date,
+      campaign_group_id: input.campaignId ? group.campaignGroupId : null,
+      solicitor_contact_id: solicitor.id,
     })
     .select("id")
     .single()
@@ -331,6 +368,7 @@ export async function createPledgeAction(input: {
       totalPayments: plan.fields.total_payments,
       contactId,
       campaignId: input.campaignId || null,
+      campaignGroupId: group.campaignGroupId,
     },
   })
 
@@ -347,6 +385,34 @@ export async function getPledgeForEditAction(pledgeId: string) {
   const amountPledged = Number(pledge.amount_pledged || 0)
   const amountPaid = Number(pledge.amount_paid || 0)
   const contactId = await resolveDonorContactId(access.supabase, pledge.donor_id)
+  const { data: groupRow } = await access.supabase
+    .from("pledges")
+    .select("campaign_group_id, solicitor_contact_id")
+    .eq("id", pledgeId)
+    .eq("organization_id", access.orgId)
+    .maybeSingle()
+  const campaignGroupId = (groupRow?.campaign_group_id as string | null) ?? null
+  const solicitorContactId = (groupRow?.solicitor_contact_id as string | null) ?? null
+  let campaignGroupName = ""
+  if (campaignGroupId) {
+    const { data: groupNameRow } = await access.supabase
+      .from("campaign_groups")
+      .select("name")
+      .eq("id", campaignGroupId)
+      .eq("organization_id", access.orgId)
+      .maybeSingle()
+    campaignGroupName = (groupNameRow?.name as string | null) || ""
+  }
+  let solicitorName = ""
+  if (solicitorContactId) {
+    const { data: solicitorRow } = await access.supabase
+      .from("contacts")
+      .select("full_name")
+      .eq("id", solicitorContactId)
+      .eq("organization_id", access.orgId)
+      .maybeSingle()
+    solicitorName = (solicitorRow?.full_name as string | null) || ""
+  }
 
   return {
     success: true as const,
@@ -374,6 +440,10 @@ export async function getPledgeForEditAction(pledgeId: string) {
       firstPaymentDate: normalizeDateInput(pledge.first_payment_date) || "",
       nextPaymentDate: normalizeDateInput(pledge.next_payment_date) || "",
       campaignName: pledge.campaign_name || "",
+      campaignGroupId,
+      campaignGroupName,
+      solicitorContactId,
+      solicitorName,
     },
   }
 }
@@ -382,16 +452,14 @@ export async function updatePledgeAction(input: {
   pledgeId: string
   amountPledged: number
   pledgeDate: string
-  frequency: string
-  firstPaymentDate?: string | null
-  numberOfPayments?: number | null
-  endDate?: string | null
   campaignId?: string | null
   categoryId?: string | null
   subcategoryId?: string | null
   wishlistItemId?: string | null
   notes?: string | null
   contactId?: string | null
+  campaignGroupId?: string | null
+  solicitorContactId?: string | null
 }) {
   const loaded = await loadOrgPledge(input.pledgeId)
   if (!loaded.ok) return { success: false as const, error: loaded.error }
@@ -435,25 +503,20 @@ export async function updatePledgeAction(input: {
     }
   }
 
-  const plan = buildPledgePlanWriteFields({
-    frequency: input.frequency,
-    amountPledged: amount,
-    firstPaymentDate: input.firstPaymentDate,
-    numberOfPayments: input.numberOfPayments,
-    endDate: input.endDate,
-  })
-  if (!plan.ok) {
-    return { success: false as const, error: plan.error }
-  }
+  const group = await campaignGroupIdForCampaign(
+    loaded.access.supabase,
+    loaded.access.orgId,
+    input.campaignId,
+    input.campaignGroupId
+  )
+  if (!group.ok) return { success: false as const, error: group.error }
 
-  const existingFirst = normalizeDateInput(loaded.pledge.first_payment_date)
-  const existingTotal =
-    loaded.pledge.total_payments == null ? null : Number(loaded.pledge.total_payments)
-  const keepNextPaymentDate =
-    plan.fields.frequency !== "one_time" &&
-    existingFirst === plan.fields.first_payment_date &&
-    existingTotal === plan.fields.total_payments &&
-    normalizePledgePlanFrequency(String(loaded.pledge.frequency || "")) === plan.fields.frequency
+  const solicitor = await resolveSolicitorContactId(
+    loaded.access.supabase,
+    loaded.access.orgId,
+    input.solicitorContactId
+  )
+  if (!solicitor.ok) return { success: false as const, error: solicitor.error }
 
   const { error } = await loaded.access.supabase
     .from("pledges")
@@ -463,16 +526,10 @@ export async function updatePledgeAction(input: {
       category_id: input.categoryId || null,
       subcategory_id: input.subcategoryId || null,
       wishlist_item_id: input.campaignId ? input.wishlistItemId || null : null,
+      campaign_group_id: input.campaignId ? group.campaignGroupId : null,
       pledge_date: normalizeDateInput(input.pledgeDate) || getTodayPlainDate(),
-      frequency: plan.fields.frequency,
-      pledge_type: plan.fields.pledge_type,
-      installment_amount: plan.fields.installment_amount,
-      total_payments: plan.fields.total_payments,
-      first_payment_date: plan.fields.first_payment_date,
-      next_payment_date: keepNextPaymentDate
-        ? normalizeDateInput(loaded.pledge.next_payment_date) || plan.fields.next_payment_date
-        : plan.fields.next_payment_date,
       notes: input.notes?.trim() || null,
+      solicitor_contact_id: solicitor.id,
     })
     .eq("id", input.pledgeId)
     .eq("organization_id", loaded.access.orgId)
@@ -494,8 +551,6 @@ export async function updatePledgeAction(input: {
     summary: `Updated pledge ${label} (${formatMoney(amount)})`,
     metadata: {
       amount,
-      frequency: plan.fields.frequency,
-      totalPayments: plan.fields.total_payments,
       contactReassigned: Boolean(reassignment?.ok && reassignment.changed),
     },
   })
@@ -514,6 +569,7 @@ export async function recordPledgePaymentAction(input: {
   paymentDate?: string
   source?: string
   memo?: string | null
+  campaignGroupId?: string | null
   attributedGroupContactId?: string | null
   auditAction?:
     | typeof ORGANIZATION_AUDIT_ACTIONS.PLEDGE_PAYMENT_RECORDED
@@ -554,6 +610,21 @@ export async function recordPledgePaymentAction(input: {
 
   const paymentDateValue = normalizeDateInput(input.paymentDate) || getTodayPlainDate()
   const pledgeAttribution = await fetchPledgeAttribution(supabase, input.pledgeId)
+  const { data: pledgeGroupRow } = await supabase
+    .from("pledges")
+    .select("campaign_id, campaign_group_id")
+    .eq("id", input.pledgeId)
+    .eq("organization_id", orgId)
+    .maybeSingle()
+  const resolvedGroup = await campaignGroupIdForCampaign(
+    supabase,
+    orgId,
+    (pledgeGroupRow?.campaign_id as string | null) ?? pledge.campaign_id ?? null,
+    input.campaignGroupId === undefined
+      ? ((pledgeGroupRow?.campaign_group_id as string | null) ?? null)
+      : input.campaignGroupId
+  )
+  if (!resolvedGroup.ok) return { success: false as const, error: resolvedGroup.error }
 
   if (input.attributedGroupContactId && contactId) {
     const groupResult = await ensureGroupMembershipForDonationAction({
@@ -570,6 +641,7 @@ export async function recordPledgePaymentAction(input: {
     donor_id: pledge.donor_id,
     contact_id: contactId,
     attributed_group_contact_id: input.attributedGroupContactId || null,
+    campaign_group_id: resolvedGroup.campaignGroupId,
     pledge_id: input.pledgeId,
     sender_name: pledge.donor_name,
     amount,

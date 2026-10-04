@@ -37,7 +37,6 @@ import {
   fetchPledgeSummaryMetricsAction,
 } from "@/lib/donations/donation-list-actions";
 import { downloadPledgesReportCsv } from "@/lib/donations/pledge-report-csv";
-import { getPledgeCollectionReportAction } from "@/lib/donations/pledge-reminder-actions";
 import { DONATIONS_PAGE_SIZE } from "@/lib/donations/donation-pagination";
 import {
   attachPledgeDonorContext,
@@ -223,7 +222,6 @@ export function PledgesLedger({
     activePledgeCount: 0,
     pledgeCount: 0,
   });
-  const [overdueCount, setOverdueCount] = useState(0);
   const [pledges, setPledges] = useState<Pledge[]>([]);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
@@ -313,16 +311,15 @@ export function PledgesLedger({
 
     const filters = pledgeListFilters();
 
-    const [pageResult, metricsResult, collectionResult] = await Promise.all([
+    const [pageResult, metricsResult] = await Promise.all([
       fetchPledgesPageAction({
         page: nextPage,
         pageSize: DONATIONS_PAGE_SIZE,
         ...filters,
       }),
       fetchPledgeSummaryMetricsAction(
-        lockedCampaignId ? { campaignId: lockedCampaignId } : filters
+        lockedCampaignId ? { campaignId: lockedCampaignId } : {}
       ),
-      getPledgeCollectionReportAction(),
     ]);
 
     if (generation !== pledgeFetchGeneration.current) return;
@@ -336,9 +333,6 @@ export function PledgesLedger({
 
     if (metricsResult.success) {
       setSummaryMetrics(metricsResult.metrics);
-    }
-    if (collectionResult.success) {
-      setOverdueCount(collectionResult.report.overdueCount);
     }
 
     setTotalPledges(pageResult.total);
@@ -525,8 +519,8 @@ export function PledgesLedger({
       <div
         className={
           embedded
-            ? "flex h-[calc(100vh-20rem)] min-h-[28rem] flex-col overflow-hidden"
-            : "flex h-[calc(100vh-11.75rem)] min-h-0 flex-col overflow-hidden p-6"
+            ? "flex h-full min-h-0 flex-1 flex-col overflow-hidden"
+            : "flex h-full min-h-0 flex-1 flex-col overflow-hidden p-6"
         }
       >
         <div className="mb-4 flex shrink-0 justify-end gap-2">
@@ -542,9 +536,7 @@ export function PledgesLedger({
 
         <PledgeSummaryMetricCards
           metrics={summaryMetrics}
-          statusFilter={statusFilter === "Partial" ? "Open" : statusFilter}
-          overdueCount={lockedCampaignId ? undefined : overdueCount}
-          variant={lockedCampaignId ? "campaign" : "default"}
+          variant="campaign"
           className="mb-6 shrink-0"
         />
 

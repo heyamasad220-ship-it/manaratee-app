@@ -19,13 +19,13 @@ function DonationCampaignsShellFrame({ children }: { children: ReactNode }) {
   const showCampaignName = isDonationCampaignsDetailPath(pathname) && !isPledges && campaignName
 
   return (
-    <>
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <Header
         title={isPledges ? "Pledges" : "Campaigns"}
         breadcrumbExtras={showCampaignName ? [{ label: campaignName }] : undefined}
       />
-      {children}
-    </>
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</div>
+    </div>
   )
 }
 

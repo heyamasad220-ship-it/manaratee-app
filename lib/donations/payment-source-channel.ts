@@ -7,6 +7,8 @@ export const PAYMENT_SOURCE_CHANNELS = [
   "venmo",
   "paypal",
   "stripe",
+  "ach",
+  "intuit",
   "import",
   "manual",
 ] as const
@@ -49,6 +51,8 @@ const PAYMENT_SOURCE_LABELS: Record<PaymentSourceChannel, string> = {
   venmo: "Venmo",
   paypal: "PayPal",
   stripe: "Stripe",
+  ach: "ACH",
+  intuit: "Intuit",
   import: "Import",
   manual: "Manual",
 }

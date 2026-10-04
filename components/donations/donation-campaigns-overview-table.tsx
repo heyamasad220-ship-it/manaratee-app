@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { DollarSign, Plus, Target, Users } from "lucide-react"
+import { AlertCircle, DollarSign, Heart, Plus, Target, Users } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -55,8 +55,8 @@ interface CampaignRow {
   description: string
   goalAmount: number
   raisedAmount: number
-  committedAmount: number
   outstandingAmount: number
+  openPledgeBalance: number
   donorCount: number
   startDate: string
   endDate: string
@@ -145,6 +145,7 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
     status: "Draft" as CampaignStatus,
   })
   const [showAllCampaigns, setShowAllCampaigns] = useState(false)
+  const [portfolio, setPortfolio] = useState({ openPledgeCount: 0, uniqueDonorCount: 0 })
 
   async function loadCampaigns() {
     setLoading(true)
@@ -154,10 +155,12 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
     if (!result.success) {
       setErrorMessage(result.error)
       setCampaigns([])
+      setPortfolio({ openPledgeCount: 0, uniqueDonorCount: 0 })
       setLoading(false)
       return
     }
 
+    setPortfolio(result.summary)
     setCampaigns(
       (result.entries || []).map(({ campaign, metrics }) => {
         const headline = computeCampaignHeadlineTotals(metrics)
@@ -167,8 +170,8 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
           description: campaign.description || "",
           goalAmount: Number(campaign.goal_amount || 0),
           raisedAmount: headline.collected,
-          committedAmount: headline.committed,
           outstandingAmount: headline.outstanding,
+          openPledgeBalance: Number(metrics.outstanding || 0),
           donorCount: metrics.donorCount,
           startDate: campaign.start_date || "",
           endDate: campaign.end_date || "",
@@ -219,14 +222,12 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
     () =>
       campaigns.reduce(
         (acc, campaign) => {
-          acc.goal += campaign.goalAmount
-          acc.committed += campaign.committedAmount
           acc.collected += campaign.raisedAmount
-          acc.outstanding += campaign.outstandingAmount
-          acc.donors += campaign.donorCount
+          acc.openPledges += campaign.openPledgeBalance
+          acc.raised += campaign.raisedAmount + campaign.openPledgeBalance
           return acc
         },
-        { goal: 0, committed: 0, collected: 0, outstanding: 0, donors: 0 }
+        { collected: 0, openPledges: 0, raised: 0 }
       ),
     [campaigns]
   )
@@ -304,16 +305,11 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
               accent="blue"
             />
             <DonationMetricCard
-              title="Total Goal"
-              value={formatDonationCurrency(campaignTotals.goal)}
-              icon={Target}
+              title="Total Raised"
+              value={formatDonationCurrency(campaignTotals.raised)}
+              icon={Heart}
               accent="purple"
-            />
-            <DonationMetricCard
-              title="Total Committed"
-              value={formatDonationCurrency(campaignTotals.committed)}
-              icon={DollarSign}
-              accent="amber"
+              description="Collected plus open pledge balances"
             />
             <DonationMetricCard
               title="Total Collected"
@@ -322,11 +318,18 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
               accent="emerald"
             />
             <DonationMetricCard
-              title="Outstanding"
-              value={formatDonationCurrency(campaignTotals.outstanding)}
+              title="Open Pledges"
+              value={formatDonationCurrency(campaignTotals.openPledges)}
+              icon={AlertCircle}
+              accent="amber"
+              description={`${portfolio.openPledgeCount} open ${portfolio.openPledgeCount === 1 ? "pledge" : "pledges"}`}
+            />
+            <DonationMetricCard
+              title="Donors"
+              value={portfolio.uniqueDonorCount}
               icon={Users}
               accent="rose"
-              description={`${campaignTotals.donors} donors`}
+              description="Unique across all campaigns"
             />
           </DonationMetricCardGrid>
         )}
@@ -342,7 +345,7 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
                 <TableRow>
                   <TableHead>Campaign</TableHead>
                   <TableHead>Goal</TableHead>
-                  <TableHead>Committed</TableHead>
+                  <TableHead>Raised</TableHead>
                   <TableHead>Collected</TableHead>
                   <TableHead>Outstanding</TableHead>
                   <TableHead>Donors</TableHead>
@@ -386,7 +389,7 @@ export function DonationCampaignsOverviewTable({ canManage }: { canManage: boole
                           {formatDonationCurrency(campaign.goalAmount)}
                         </TableCell>
                         <TableCell className="font-medium">
-                          {formatDonationCurrency(campaign.committedAmount)}
+                          {formatDonationCurrency(campaign.raisedAmount + campaign.openPledgeBalance)}
                         </TableCell>
                         <TableCell className="font-medium text-emerald-600">
                           {formatDonationCurrency(campaign.raisedAmount)}

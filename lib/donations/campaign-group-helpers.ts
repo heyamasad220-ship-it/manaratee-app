@@ -57,6 +57,31 @@ export async function fetchCampaignGroups(
   return ((data || []) as Record<string, unknown>[]).map(mapCampaignGroupRow)
 }
 
+/** Confirm a campaign group belongs to this organization and campaign. */
+export async function campaignGroupIdForCampaign(
+  supabase: SupabaseClient,
+  organizationId: string,
+  campaignId: string | null | undefined,
+  campaignGroupId: string | null | undefined
+): Promise<{ ok: true; campaignGroupId: string | null } | { ok: false; error: string }> {
+  if (!campaignGroupId) return { ok: true, campaignGroupId: null }
+  if (!campaignId) {
+    return { ok: false, error: "Select a campaign before choosing a campaign group." }
+  }
+
+  const { data, error } = await supabase
+    .from("campaign_groups")
+    .select("id")
+    .eq("id", campaignGroupId)
+    .eq("organization_id", organizationId)
+    .eq("campaign_id", campaignId)
+    .maybeSingle()
+
+  if (error) return { ok: false, error: error.message }
+  if (!data) return { ok: false, error: "That group is not on this campaign." }
+  return { ok: true, campaignGroupId: data.id as string }
+}
+
 export function computeCampaignGroupMetrics(input: {
   groups: CampaignGroupRow[]
   campaignId: string

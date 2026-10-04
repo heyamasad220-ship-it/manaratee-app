@@ -142,7 +142,7 @@ discount_tags.organization_id → organizations.id
 
 **Contact record types (migration `132_contact_type_group.sql`):** `contacts.contact_type` CHECK — `individual` (person), `organization` (external entity), `group` (Fund Development giving collective — department/committee rollup, not a Directory identity) with optional `primary_contact_name`. Group donor rows use `donors.donor_type = 'organization'`. Patch `sync_contact_affiliations` for groups: migration `133_sync_contact_affiliations_group.sql`.
 
-**Giving group category (migration `167_giving_group_category.sql`):** On `contacts` when `contact_type = group`: `giving_group_kind` (`membership_group` | `department` | `group_donation`), optional `linked_hr_team_id` → `hr_teams`, optional `linked_department_id` → `departments`. Drives workspace badge and Events tab (department events; URL `?tab=activity`).
+**Giving group category (migration `167_giving_group_category.sql`):** On `contacts` when `contact_type = group`: `giving_group_kind` (`membership_group` | `department` | `group_donation`), optional `linked_hr_team_id` → `hr_teams`, optional `linked_department_id` → `departments`. Drives the badge on `/donations/groups/[id]`. That page shows campaign gift totals only. Members and events are not tabs there.
 
 **Staff hourly rate (migration `168_staff_hourly_rate.sql`):** Optional `staff.hourly_rate` numeric for department/employee compensation. Used when adding employees from a department workspace.
 
@@ -160,7 +160,7 @@ discount_tags.organization_id → organizations.id
 
 **Youth registration by person (migration `195_register_participant_person.sql`):** `register_for_program` accepts optional `p_participant_person_id`. Minors enroll as people under the parent Contact (`child_person_id` set, `participant_contact_id` null). Helper `is_registrant_related_person` checks `person_relationships`. **`198_people_grade.sql`** adds optional `people.grade` for roster enrichment (upcoming grade bands). **`242_people_participant_details.sql`** adds `people.allergies`, `people.emergency_contact`, `people.photo_consent` (edited from Participant profile / Contact Family; mirrored into enrollment notes).
 
-**Group membership (migration `135_contact_group_members.sql`):** `contact_group_members` links individuals to group contacts (`group_contact_id`, `member_contact_id`, `status`). Group gifts on group Financial tab; member gifts attributed via `payments.attributed_group_contact_id` (migration **`136_payment_attributed_group.sql`**) roll up for group competition; auto-membership when a group is selected on a gift. UI: group **Group Members** on the contact summary; optional group picker on **Record Payment**. Person profiles do not show group badges or assign-to-group actions (July 2026). Contact profile summary combines financial KPIs + activity; personal info is under actions **View Details**. Server: `lib/contacts/group-members-load-action.ts`, `lib/contacts/group-membership-data.ts`, `lib/contacts/group-member-actions.ts`, `lib/contacts/group-giving-actions.ts`.
+**Group membership (migration `135_contact_group_members.sql`):** `contact_group_members` links individuals to group contacts (`group_contact_id`, `member_contact_id`, `status`). Group gifts on group Financial tab; member gifts attributed via `payments.attributed_group_contact_id` (migration **`136_payment_attributed_group.sql`**) roll up for group competition. Staff gift and pledge forms write `campaign_group_id` instead and do not auto-add membership. Public campaign-group checkout can still set `attributed_group_contact_id` when the campaign group links an org group. UI: group **Group Members** on the contact summary. Person profiles do not show group badges or assign-to-group actions (July 2026). Contact profile summary combines financial KPIs + activity; personal info is under actions **View Details**. Server: `lib/contacts/group-members-load-action.ts`, `lib/contacts/group-membership-data.ts`, `lib/contacts/group-member-actions.ts`, `lib/contacts/group-giving-actions.ts`.
 
 **Group giving report (migration `166_group_giving_report.sql`):** RPC `donation_group_giving_report` powers **Fund Development → Donors → Group Giving**. Returns only groups with at least one non-voided gift in the date range (direct gift on the group contact or attributed member gift). Columns include group/member gift split, combined total, gift count, last gift, and group-contact pledge status.
 
@@ -357,13 +357,13 @@ Import CSV flow writes directly to `payments` + `payment_import_batches` (no row
 
 **Dev seed:** `scripts/seed-donations-dev.mjs` inserts test data into canonical tables only (see `docs/Features.md` Donations section). Does not use dropped legacy tables. Horizon demo: `scripts/seed-horizon-community-foundation-demo.mjs` (org-locked). Additive sponsorship demo data: `--sponsorships-only --execute`.
 
-**`payments.source` constraint (patch `131_payments_source_square.sql`):** lowercase channel keys (`cash`, `check`, **`square`**, `zelle`, `venmo`, `paypal`, `stripe`, `import`, `manual`). **`square`** = Square terminal batch deposit on a campaign (no donor/contact). Campaign overview classifies via memo `|batch|square|` or `source = square`. Customer portal normalizes configured payment method display names via `lib/donations/payment-source-channel.ts` before insert.
+**`payments.source` constraint (patch `131_payments_source_square.sql`, `300_payments_source_ach_intuit.sql`):** lowercase channel keys (`cash`, `check`, **`square`**, `zelle`, `venmo`, `paypal`, `stripe`, **`ach`**, **`intuit`**, `import`, `manual`). **`square`** = Square terminal batch deposit on a campaign (no donor/contact). **`ach`** and **`intuit`** are bank and Intuit gifts. Campaign overview classifies via memo `|batch|square|` or `source = square`, and `source = ach` as its own row. Intuit (`source = intuit`) is included in **Other**. Customer portal normalizes configured payment method display names via `lib/donations/payment-source-channel.ts` before insert.
 
-* campaigns (`goal_amount`, `description`, `start_date`, `end_date`, `status`, `code`, `overview_metric_keys` — migration `134`; `flyer_url` — migration `160` for optional customer portal campaign cover images; `goal_breakdown_enabled` — migration `260`)
+* campaigns (`goal_amount`, `description`, `start_date`, `end_date`, `status`, `code`, `overview_metric_keys` — migration `134`; `flyer_url` — migration `160` for optional customer portal campaign cover images; `goal_breakdown_enabled` — migration `260`; `group_donate_token` — migration `309`, one shared `/donate/g/{token}` for campaign groups)
 * campaign_phases (unused — Goal Breakdown retired; table kept; clear with `270_disable_campaign_goal_phases.sql`)
 * campaign_ask_levels (strategy gift chart — migration `261`; `campaign_phase_id` unused)
 * campaign_prospects (outreach pipeline for donation and sponsorship asks — migration `262`, ask type/activity/sponsorship link — `284`; unique contact + ask_type per campaign; RLS via donations helpers)
-* campaign_groups (campaign fundraising teams — migration `263`; optional org group contact + lead; opaque `public_token`; staff RLS; public pages resolve via service role)
+* campaign_groups (campaign fundraising teams — migration `263`; optional org group contact + lead; `public_token` kept on the row and unused by the public page; staff RLS; the shared page resolves `campaigns.group_donate_token` via service role)
 * campaign_wishlist_items (campaign funding priorities — migration `267`; optional fund/department; `campaign_phase_id` unused; opaque `public_token`; staff RLS; public `/donate/w/{token}` via service role)
 * sponsorship_packages (campaign packages — migrations `284`/`285`; required `campaign_id`, optional `event_id`; name/amount/order/status; not a Contact role)
 * sponsorship_package_benefits (package benefit catalog — `284`/`285`; optional `benefit_type` + `value`; copied onto committed sponsorships)
@@ -373,7 +373,7 @@ Import CSV flow writes directly to `payments` + `payment_import_batches` (no row
 * donors
 * donation_categories
 * donation_subcategories (`is_active` — migration `161`; when false the fund is closed and hidden from new donation pickers; migration `162` blocks customer portal `payments` inserts to closed funds)
-* pledges (`installment_amount`, `total_payments`, `first_payment_date`, `next_payment_date` added in migration `158` for customer portal installment pledges; `campaign_phase_id` — migration `260`; `ask_level_id` — migration `261`; `campaign_prospect_id` — migration `262`; `campaign_group_id` — migration `263`; `wishlist_item_id` — migration `267`)
+* pledges (`installment_amount`, `total_payments`, `first_payment_date`, `next_payment_date` added in migration `158` for customer portal installment pledges; `campaign_phase_id` — migration `260`; `ask_level_id` — migration `261`; `campaign_prospect_id` — migration `262`; `campaign_group_id` — migration `263`; `wishlist_item_id` — migration `267`; `solicitor_contact_id` — migration `310`, the contact who follows up with the donor)
 * payments (`campaign_phase_id` — migration `260`; `campaign_group_id` — migration `263`; `wishlist_item_id` — migration `267`)
 * payment_methods
 * donor_summary_view
@@ -408,7 +408,7 @@ Import CSV flow writes directly to `payments` + `payment_import_batches` (no row
 
 **Campaign sponsorships (migration `284_campaign_sponsorship_prospects.sql`, extended `285_campaign_sponsorship_packages.sql`):** `sponsorship_packages` (campaign-scoped; optional related event), `sponsorship_package_benefits`, `campaign_sponsorships` (committed sponsor records; optional `prospect_id` / `event_id` / `sponsorship_package_id`), `campaign_sponsorship_benefits` (copied benefits + fulfillment). Separate from `pledges` and `payments`. Cash sponsorship commitments add to campaign `totalCommitted` only — not `totalRaised` (avoids double-counting payments). In-kind is reported separately and is not treated as cash collected. RLS via donations view/manage helpers.
 
-**Campaign groups (migration `263_campaign_groups.sql`):** `campaign_groups` with opaque `public_token`, optional `organizational_group_id` / `lead_contact_id`. `goal_amount` exists but is unused in the UI. Nullable `campaign_group_id` on `pledges` and `payments`. Staff RLS; public `/donate/g/{token}` resolves via service role (no anon table dump).
+**Campaign groups (migration `263_campaign_groups.sql`, shared link `309_campaign_group_donate_token.sql`):** `campaign_groups` with optional `organizational_group_id` / `lead_contact_id`. `public_token`, `link_active`, and `public_progress_enabled` remain on the row and are unused by the public page. `goal_amount` exists but is unused in the UI. Nullable `campaign_group_id` on `pledges` and `payments`. `campaigns.group_donate_token` is the one opaque token for `/donate/g/{token}`; the donor chooses an active group, and the page shows money received only. Staff RLS; the public page resolves via service role (no anon table dump).
 
 **Campaign wishlist (migration `267_campaign_wishlist.sql`):** `campaign_wishlist_items` (org + campaign scoped). Optional `fund_id` (donation_subcategories), `department_id`, `campaign_phase_id`. Carry-forward via `carried_from_item_id` / `carried_to_item_id` + `previous_funding_amount` (historical snapshot — not current-campaign collected). Nullable `wishlist_item_id` on `pledges`, `payments`, `recurring_donation_plans`, `donation_checkout_sessions`. Staff RLS via donations view/manage helpers. Public donate `/donate/w/{token}` uses service role. Wishlist targets do not increase `campaigns.goal_amount`.
 
@@ -428,6 +428,8 @@ npx supabase db query --linked -f scripts/260_campaign_phases.sql
 npx supabase db query --linked -f scripts/261_campaign_ask_levels.sql
 npx supabase db query --linked -f scripts/262_campaign_prospects.sql
 npx supabase db query --linked -f scripts/263_campaign_groups.sql
+npx supabase db query --linked -f scripts/309_campaign_group_donate_token.sql
+npx supabase db query --linked -f scripts/310_pledge_solicitor.sql
 npx supabase db query --linked -f scripts/264_campaign_group_checkout.sql
 npx supabase db query --linked -f scripts/265_donations_granular_permissions.sql
 npx supabase db query --linked -f scripts/266_group_recurring_and_fd_emails.sql

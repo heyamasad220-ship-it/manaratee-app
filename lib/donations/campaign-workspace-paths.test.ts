@@ -33,6 +33,7 @@ describe("campaign workspace Event tab", () => {
         "prospects",
         "pledges",
         "donations",
+        "transactions",
         "groups",
         "wishlist",
       ]

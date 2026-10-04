@@ -19,10 +19,6 @@ import {
 } from "@/lib/donations/pledge-reminder-actions"
 import { type PledgeReminderRecord } from "@/lib/donations/pledge-reminder-types"
 import { donationPledgesHref } from "@/lib/donations/donation-pledge-paths"
-import {
-  formatPledgePaymentPlanSummary,
-  pledgeHasPaymentPlan,
-} from "@/lib/donations/pledge-payment-plan"
 
 type DonorPledgeRow = {
   id: string
@@ -59,20 +55,6 @@ function formatDate(value: string | null) {
     month: "short",
     day: "numeric",
   })
-}
-
-function formatFrequency(pledge: DonorPledgeRow) {
-  if (pledgeHasPaymentPlan(pledge)) {
-    return formatPledgePaymentPlanSummary({
-      totalAmount: pledge.amountPledged,
-      installmentAmount: pledge.installmentAmount,
-      totalPayments: pledge.totalPayments,
-      frequency: pledge.frequency,
-    })
-  }
-
-  if (!pledge.frequency) return "—"
-  return pledge.frequency.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase())
 }
 
 export function DonorPledgesTab({
@@ -155,19 +137,17 @@ export function DonorPledgesTab({
         <div className="w-full rounded-md border">
           <table className="w-full table-fixed text-sm">
             <colgroup>
-              <col style={{ width: "22%" }} />
+              <col style={{ width: "28%" }} />
+              <col style={{ width: "16%" }} />
               <col style={{ width: "14%" }} />
               <col style={{ width: "14%" }} />
-              <col style={{ width: "12%" }} />
-              <col style={{ width: "12%" }} />
-              <col style={{ width: "12%" }} />
+              <col style={{ width: "14%" }} />
               <col style={{ width: "14%" }} />
             </colgroup>
             <thead className="bg-muted/50">
               <tr className="border-b">
                 <th className="px-3 py-2 text-left font-medium">Campaign</th>
                 <th className="px-3 py-2 text-left font-medium">Pledge Date</th>
-                <th className="px-3 py-2 text-left font-medium">Frequency</th>
                 <th className="px-3 py-2 text-right font-medium">Pledged</th>
                 <th className="px-3 py-2 text-right font-medium">Paid</th>
                 <th className="px-3 py-2 text-right font-medium">Balance</th>
@@ -187,7 +167,6 @@ export function DonorPledgesTab({
                   <td className="whitespace-nowrap px-3 py-2">
                     {formatDate(pledge.pledgeDate)}
                   </td>
-                  <td className="px-3 py-2">{formatFrequency(pledge)}</td>
                   <td className="px-3 py-2 text-right">
                     {formatCurrency(pledge.amountPledged)}
                   </td>

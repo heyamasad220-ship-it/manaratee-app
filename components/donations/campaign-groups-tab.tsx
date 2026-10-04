@@ -1,7 +1,7 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
-import { Copy, DollarSign, Download, ExternalLink, HeartHandshake, Plus, QrCode, Trophy, Users } from "lucide-react"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { Copy, Crown, DollarSign, Download, ExternalLink, HeartHandshake, Plus, QrCode, Trophy, Users } from "lucide-react"
 
 import { PledgeContactPicker } from "@/components/donations/pledge-contact-picker"
 import { Button } from "@/components/ui/button"
@@ -23,8 +23,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Switch } from "@/components/ui/switch"
-import { Textarea } from "@/components/ui/textarea"
 import {
   Table,
   TableBody,
@@ -33,20 +31,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
 import { StatCard, StatCardsRow } from "@/components/ui/stat-card"
 import { formatDonationCurrency } from "@/lib/donations/campaign-analytics"
 import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
 import {
   createCampaignGroupAction,
-  deleteCampaignGroupAction,
   listCampaignGroupDonorsAction,
   listCampaignGroupsAction,
-  regenerateCampaignGroupLinkAction,
   searchOrganizationalGroupsAction,
   updateCampaignGroupAction,
   type CampaignGroupDonorRow,
@@ -75,27 +66,21 @@ type CampaignGroupsTabProps = {
 
 type GroupFormState = {
   name: string
-  description: string
   status: CampaignGroupStatus
   leadContactId: string
   leadLabel: string
   organizationalGroupId: string
   organizationalGroupLabel: string
-  publicProgressEnabled: boolean
-  linkActive: boolean
 }
 
 function emptyForm(): GroupFormState {
   return {
     name: "",
-    description: "",
     status: "active",
     leadContactId: "",
     leadLabel: "",
     organizationalGroupId: "",
     organizationalGroupLabel: "",
-    publicProgressEnabled: false,
-    linkActive: true,
   }
 }
 
@@ -112,34 +97,6 @@ function downloadCsv(filename: string, header: string[], rows: Array<Array<strin
   URL.revokeObjectURL(url)
 }
 
-function GroupLinkIconButton({
-  label,
-  onClick,
-  children,
-}: {
-  label: string
-  onClick: () => void
-  children: ReactNode
-}) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8"
-          onClick={onClick}
-          aria-label={label}
-        >
-          {children}
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent>{label}</TooltipContent>
-    </Tooltip>
-  )
-}
-
 export function CampaignGroupsTab({
   campaignId,
   campaignName,
@@ -150,6 +107,7 @@ export function CampaignGroupsTab({
 }: CampaignGroupsTabProps) {
   const router = useRouter()
   const [metrics, setMetrics] = useState<CampaignGroupMetrics[]>([])
+  const [donateToken, setDonateToken] = useState("")
   const [loading, setLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [showDialog, setShowDialog] = useState(false)
@@ -160,12 +118,10 @@ export function CampaignGroupsTab({
   const [orgGroupResults, setOrgGroupResults] = useState<
     Array<{ id: string; name: string; email: string | null }>
   >([])
-  const [qrGroupId, setQrGroupId] = useState<string | null>(null)
-  const [donorsOpen, setDonorsOpen] = useState(false)
+  const [showQr, setShowQr] = useState(false)
   const [donorsLoading, setDonorsLoading] = useState(false)
   const [donorsError, setDonorsError] = useState<string | null>(null)
   const [donors, setDonors] = useState<CampaignGroupDonorRow[]>([])
-  const [donorsTotal, setDonorsTotal] = useState(0)
 
   const loadGroups = useCallback(async () => {
     setLoading(true)
@@ -174,16 +130,42 @@ export function CampaignGroupsTab({
     if (!result.success) {
       setErrorMessage(result.error)
       setMetrics([])
+      setDonateToken("")
       setLoading(false)
       return
     }
     setMetrics(result.metrics)
+    setDonateToken(result.donateToken)
     setLoading(false)
   }, [campaignId])
 
   useEffect(() => {
     void loadGroups()
   }, [loadGroups])
+
+  useEffect(() => {
+    if (!selectedGroupId) {
+      setDonors([])
+      setDonorsError(null)
+      return
+    }
+    let cancelled = false
+    setDonorsLoading(true)
+    setDonorsError(null)
+    void listCampaignGroupDonorsAction(selectedGroupId).then((result) => {
+      if (cancelled) return
+      setDonorsLoading(false)
+      if (!result.success) {
+        setDonors([])
+        setDonorsError(result.error)
+        return
+      }
+      setDonors(result.donors)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [selectedGroupId])
 
   useEffect(() => {
     if (orgGroupSearch.trim().length < 2) {
@@ -202,10 +184,26 @@ export function CampaignGroupsTab({
     [metrics, selectedGroupId]
   )
 
-  const qrMetric = useMemo(
-    () => metrics.find((row) => row.groupId === qrGroupId) || null,
-    [metrics, qrGroupId]
+  const sortedMetrics = useMemo(
+    () =>
+      [...metrics].sort((left, right) => {
+        if (right.groupTotal !== left.groupTotal) return right.groupTotal - left.groupTotal
+        return left.name.localeCompare(right.name)
+      }),
+    [metrics]
   )
+
+  const groupSummary = useMemo(() => {
+    const totalRaised = sortedMetrics.reduce((sum, row) => sum + row.groupTotal, 0)
+    const outstanding = sortedMetrics.reduce((sum, row) => sum + row.outstanding, 0)
+    return {
+      totalRaised,
+      outstanding,
+      largest: sortedMetrics[0] ?? null,
+    }
+  }, [sortedMetrics])
+
+  const donationUrl = donateToken ? buildCampaignGroupDonationUrl(donateToken) : ""
 
   function openCreate() {
     setEditingGroupId(null)
@@ -217,14 +215,11 @@ export function CampaignGroupsTab({
     setEditingGroupId(row.groupId)
     setForm({
       name: row.name,
-      description: row.description || "",
       status: row.status,
       leadContactId: row.leadContactId || "",
       leadLabel: row.leadName || "",
       organizationalGroupId: row.organizationalGroupId || "",
       organizationalGroupLabel: row.organizationalGroupName || "",
-      publicProgressEnabled: row.publicProgressEnabled,
-      linkActive: row.linkActive,
     })
     setShowDialog(true)
   }
@@ -239,12 +234,9 @@ export function CampaignGroupsTab({
     const payload = {
       name: form.name,
       goal_amount: null,
-      description: form.description || null,
       status: form.status,
       lead_contact_id: form.leadContactId || null,
       organizational_group_id: form.organizationalGroupId || null,
-      public_progress_enabled: form.publicProgressEnabled,
-      link_active: form.linkActive,
     }
 
     const result = editingGroupId
@@ -262,112 +254,52 @@ export function CampaignGroupsTab({
     onChanged?.()
   }
 
-  async function copyLink(token: string) {
-    const url = buildCampaignGroupDonationUrl(token)
+  async function copyLink() {
+    if (!donationUrl) return
     try {
-      await navigator.clipboard.writeText(url)
+      await navigator.clipboard.writeText(donationUrl)
     } catch {
-      prompt("Copy this donation link:", url)
+      prompt("Copy this donation link:", donationUrl)
     }
   }
-
-  async function copyQrCode(row: CampaignGroupMetrics) {
-    const imageUrl = buildCampaignGroupQrImageUrl(
-      buildCampaignGroupDonationUrl(row.publicToken),
-      512
-    )
-    try {
-      const response = await fetch(imageUrl)
-      if (!response.ok) throw new Error("Could not load QR code")
-      const blob = await response.blob()
-      const pngBlob = blob.type === "image/png" ? blob : new Blob([blob], { type: "image/png" })
-      await navigator.clipboard.write([new ClipboardItem({ "image/png": pngBlob })])
-    } catch {
-      setQrGroupId(row.groupId)
-    }
-  }
-
-  async function handleDeactivate(groupId: string) {
-    const result = await updateCampaignGroupAction(groupId, { link_active: false })
-    if (!result.success) {
-      alert(result.error)
-      return
-    }
-    await loadGroups()
-    onChanged?.()
-  }
-
-  async function handleRegenerate(groupId: string) {
-    if (!confirm("Regenerate this donation link? The old link will stop working.")) return
-    const result = await regenerateCampaignGroupLinkAction(groupId)
-    if (!result.success) {
-      alert(result.error)
-      return
-    }
-    await loadGroups()
-    onChanged?.()
-  }
-
-  async function handleDelete(groupId: string) {
-    if (!confirm("Delete this campaign group? Only empty groups can be deleted.")) return
-    const result = await deleteCampaignGroupAction(groupId)
-    if (!result.success) {
-      alert(result.error)
-      return
-    }
-    if (selectedGroupId === groupId) {
-      router.replace(donationCampaignWorkspaceHref(campaignId, { tab: "groups" }))
-    }
-    await loadGroups()
-    onChanged?.()
-  }
-
-  async function openDonors(groupId: string) {
-    setDonorsOpen(true)
-    setDonorsLoading(true)
-    setDonorsError(null)
-    const result = await listCampaignGroupDonorsAction(groupId)
-    setDonorsLoading(false)
-    if (!result.success) {
-      setDonors([])
-      setDonorsTotal(0)
-      setDonorsError(result.error)
-      return
-    }
-    setDonors(result.donors)
-    setDonorsTotal(result.totalAmount)
-  }
-
-  const donationUrlForSelected = selectedMetric
-    ? buildCampaignGroupDonationUrl(selectedMetric.publicToken)
-    : null
 
   return (
-    <div className="flex flex-col gap-4">
-      {selectedMetric && donationUrlForSelected ? (
+    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
+      {selectedMetric ? (
         <>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  router.replace(donationCampaignWorkspaceHref(campaignId, { tab: "groups" }))
-                }
-              >
-                Back to Groups
-              </Button>
-              <h2 className="mt-3 text-xl font-semibold">{selectedMetric.name}</h2>
-              <p className="text-sm text-muted-foreground">{campaignName}</p>
-            </div>
+          <div className="shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                router.replace(donationCampaignWorkspaceHref(campaignId, { tab: "groups" }))
+              }
+            >
+              Back to Groups
+            </Button>
             {canManage ? (
-              <Button variant="outline" onClick={() => openEdit(selectedMetric)}>
-                Edit Group
-              </Button>
-            ) : null}
+              <button
+                type="button"
+                className="mt-3 block text-left text-xl font-semibold text-primary hover:underline"
+                onClick={() => openEdit(selectedMetric)}
+              >
+                {selectedMetric.name}
+              </button>
+            ) : (
+              <h2 className="mt-3 text-xl font-semibold text-primary">{selectedMetric.name}</h2>
+            )}
+            <p className="mt-1 text-sm text-muted-foreground">
+              Primary Contact:{" "}
+              <span className="text-foreground">{selectedMetric.leadName || "—"}</span>
+              <span className="px-2">·</span>
+              Status:{" "}
+              <span className="text-foreground">
+                {CAMPAIGN_GROUP_STATUS_LABELS[selectedMetric.status]}
+              </span>
+            </p>
           </div>
 
-          <StatCardsRow equal columns={4} className="gap-3">
+          <StatCardsRow equal columns={4} className="shrink-0 gap-3">
             <StatCard
               fill
               className="h-full"
@@ -391,7 +323,7 @@ export function CampaignGroupsTab({
               className="h-full"
               tone="amber"
               icon={Trophy}
-              label="Group total"
+              label="Total Raised"
               value={formatDonationCurrency(selectedMetric.groupTotal)}
               valueClassName="text-xl"
             />
@@ -401,126 +333,112 @@ export function CampaignGroupsTab({
               tone="sky"
               icon={Users}
               label="Donors"
-              hint={selectedMetric.donorCount > 0 ? "Click to view names and amounts" : undefined}
-              value={
-                selectedMetric.donorCount > 0 ? (
-                  <button
-                    type="button"
-                    className="text-left hover:underline"
-                    onClick={() => void openDonors(selectedMetric.groupId)}
-                  >
-                    {selectedMetric.donorCount.toLocaleString()}
-                  </button>
-                ) : (
-                  "0"
-                )
-              }
+              value={selectedMetric.donorCount.toLocaleString()}
               valueClassName="text-xl"
             />
           </StatCardsRow>
 
-          <Card className="border border-border shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-base">Donation Link</CardTitle>
+          <Card className="mr-16 min-h-0 w-full max-w-[calc(100%-4rem)] flex-1 gap-0 overflow-hidden border border-border py-0 shadow-sm">
+            <CardHeader className="shrink-0 border-b py-4">
+              <CardTitle className="text-base">Donors</CardTitle>
             </CardHeader>
-            <CardContent className="flex flex-col gap-3">
-              <p className="break-all font-mono text-sm">{donationUrlForSelected}</p>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => void copyLink(selectedMetric.publicToken)}
-                >
-                  <Copy className="mr-2 h-4 w-4" />
-                  Copy Link
-                </Button>
-                <Button variant="outline" size="sm" asChild>
-                  <a href={donationUrlForSelected} target="_blank" rel="noreferrer">
-                    <ExternalLink className="mr-2 h-4 w-4" />
-                    Open Page
-                  </a>
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setQrGroupId(selectedMetric.groupId)}
-                >
-                  <QrCode className="mr-2 h-4 w-4" />
-                  QR Code
-                </Button>
-                {canManage ? (
-                  <>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => void handleRegenerate(selectedMetric.groupId)}
-                    >
-                      Regenerate Link
-                    </Button>
-                    {selectedMetric.linkActive ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => void handleDeactivate(selectedMetric.groupId)}
-                      >
-                        Deactivate Link
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          void updateCampaignGroupAction(selectedMetric.groupId, {
-                            link_active: true,
-                          }).then(() => loadGroups())
-                        }
-                      >
-                        Activate Link
-                      </Button>
-                    )}
-                  </>
-                ) : null}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Link status: {selectedMetric.linkActive ? "Active" : "Inactive"}. Public donors can
-                give at this URL; payments land on the same ledger with campaign + group attribution.
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="border border-border shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-base">Group Overview</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-2 text-sm sm:grid-cols-2">
-              <p>
-                <span className="text-muted-foreground">Lead: </span>
-                {selectedMetric.leadName || "—"}
-              </p>
-              <p>
-                <span className="text-muted-foreground">Org group: </span>
-                {selectedMetric.organizationalGroupName || "Campaign-only"}
-              </p>
-              <p>
-                <span className="text-muted-foreground">Status: </span>
-                {CAMPAIGN_GROUP_STATUS_LABELS[selectedMetric.status]}
-              </p>
-              {selectedMetric.description ? (
-                <p className="sm:col-span-2">{selectedMetric.description}</p>
-              ) : null}
+            <CardContent className="min-h-0 flex-1 p-0">
+              {donorsLoading ? (
+                <p className="px-6 py-6 text-sm text-muted-foreground">Loading donors…</p>
+              ) : donorsError ? (
+                <p className="px-6 py-6 text-sm text-red-600">{donorsError}</p>
+              ) : donors.length === 0 ? (
+                <p className="px-6 py-6 text-sm text-muted-foreground">No gifts yet for this group.</p>
+              ) : (
+                <Table className="w-full table-fixed" containerClassName="h-full overflow-auto">
+                  <colgroup>
+                    <col className="w-1/6" />
+                    <col className="w-1/6" />
+                    <col className="w-1/6" />
+                    <col className="w-1/6" />
+                    <col className="w-1/6" />
+                    <col className="w-1/6" />
+                  </colgroup>
+                  <TableHeader className="sticky top-0 z-10 bg-card [&_th]:bg-card">
+                    <TableRow>
+                      <TableHead className="px-4">Donor</TableHead>
+                      <TableHead className="px-4">Amount</TableHead>
+                      <TableHead className="px-4">Type</TableHead>
+                      <TableHead className="px-4">Pledged</TableHead>
+                      <TableHead className="px-4">Received</TableHead>
+                      <TableHead className="px-4">Outstanding</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {donors.map((donor) => (
+                      <TableRow key={donor.key}>
+                        <TableCell className="px-4">
+                          {donor.contactId ? (
+                            <a
+                              href={contactProfileHref(donor.contactId, "financial")}
+                              className="font-medium text-primary hover:underline"
+                            >
+                              {donor.name}
+                            </a>
+                          ) : (
+                            donor.name
+                          )}
+                        </TableCell>
+                        <TableCell className="px-4 tabular-nums">
+                          {donor.amount != null ? formatDonationCurrency(donor.amount) : "—"}
+                        </TableCell>
+                        <TableCell className="px-4">
+                          {donor.kind === "pledge" ? "Pledge" : "One-time donation"}
+                        </TableCell>
+                        <TableCell className="px-4 tabular-nums">
+                          {donor.pledged != null ? formatDonationCurrency(donor.pledged) : "—"}
+                        </TableCell>
+                        <TableCell className="px-4 tabular-nums">
+                          {donor.received != null ? formatDonationCurrency(donor.received) : "—"}
+                        </TableCell>
+                        <TableCell className="px-4 tabular-nums">
+                          {donor.outstanding != null
+                            ? formatDonationCurrency(donor.outstanding)
+                            : "—"}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </>
       ) : (
         <>
-          <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex shrink-0 flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="text-base font-semibold">Groups</h2>
               <p className="text-sm text-muted-foreground">
-                Competition score is money received plus pledges not yet received. The public link shows received only.
+                Total raised is money received plus pledges not yet received. The shared link shows received only, and the donor chooses a group.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                disabled={!donationUrl}
+                onClick={() => void copyLink()}
+              >
+                <Copy className="mr-2 h-4 w-4" />
+                Copy link
+              </Button>
+              {donationUrl ? (
+                <Button variant="outline" asChild>
+                  <a href={donationUrl} target="_blank" rel="noreferrer">
+                    <ExternalLink className="mr-2 h-4 w-4" />
+                    Open page
+                  </a>
+                </Button>
+              ) : null}
+              <Button variant="outline" disabled={!donationUrl} onClick={() => setShowQr(true)}>
+                <QrCode className="mr-2 h-4 w-4" />
+                QR code
+              </Button>
               <Button
                 variant="outline"
                 disabled={loading || metrics.length === 0}
@@ -530,22 +448,22 @@ export function CampaignGroupsTab({
                     [
                       "Group",
                       "Org group",
-                      "Lead",
+                      "Primary Contact",
                       "Status",
                       "Donors",
+                      "Total Raised",
                       "Received",
-                      "Pledged, not received",
-                      "Group total",
+                      "Outstanding Balance",
                     ],
-                    metrics.map((row) => [
+                    sortedMetrics.map((row) => [
                       row.name,
                       row.organizationalGroupName || "",
                       row.leadName || "",
                       CAMPAIGN_GROUP_STATUS_LABELS[row.status],
                       row.donorCount,
+                      row.groupTotal,
                       row.collected,
                       row.outstanding,
-                      row.groupTotal,
                     ])
                   )
                 }
@@ -562,28 +480,78 @@ export function CampaignGroupsTab({
             </div>
           </div>
 
-          {errorMessage ? <p className="text-sm text-red-600">{errorMessage}</p> : null}
+          <StatCardsRow equal columns={4} className="shrink-0 gap-3">
+            <StatCard
+              fill
+              className="h-full"
+              tone="sky"
+              icon={Users}
+              label="Groups"
+              value={sortedMetrics.length.toLocaleString()}
+              valueClassName="text-xl"
+            />
+            <StatCard
+              fill
+              className="h-full"
+              tone="amber"
+              icon={Trophy}
+              label="Total Raised"
+              value={formatDonationCurrency(groupSummary.totalRaised)}
+              valueClassName="text-xl"
+            />
+            <StatCard
+              fill
+              className="h-full"
+              tone="violet"
+              icon={HeartHandshake}
+              label="Outstanding Balance"
+              value={formatDonationCurrency(groupSummary.outstanding)}
+              valueClassName="text-xl"
+            />
+            <StatCard
+              fill
+              className="h-full"
+              tone="emerald"
+              icon={Crown}
+              label="Largest total raised"
+              value={groupSummary.largest?.name || "—"}
+              hint={
+                groupSummary.largest
+                  ? formatDonationCurrency(groupSummary.largest.groupTotal)
+                  : undefined
+              }
+              valueClassName="text-lg leading-tight"
+            />
+          </StatCardsRow>
 
-          <Card className="border border-border shadow-sm">
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
+          {errorMessage ? <p className="shrink-0 text-sm text-red-600">{errorMessage}</p> : null}
+
+          <Card className="min-h-0 flex-1 gap-0 overflow-hidden border border-border py-0 shadow-sm">
+            <CardContent className="h-full min-h-0 p-0">
+              <Table className="w-full table-fixed" containerClassName="h-full overflow-auto">
+                <colgroup>
+                  <col className="w-1/6" />
+                  <col className="w-1/6" />
+                  <col className="w-1/6" />
+                  <col className="w-1/6" />
+                  <col className="w-1/6" />
+                  <col className="w-1/6" />
+                </colgroup>
+                <TableHeader className="sticky top-0 z-10 bg-card [&_th]:bg-card">
                   <TableRow>
-                    <TableHead>Group</TableHead>
-                    <TableHead>Lead</TableHead>
-                    <TableHead className="text-right">Donors</TableHead>
-                    <TableHead className="text-right">Received</TableHead>
-                    <TableHead className="text-right">Pledged, not received</TableHead>
-                    <TableHead className="text-right">Group total</TableHead>
-                    <TableHead>Link</TableHead>
-                    {canManage ? <TableHead>Actions</TableHead> : null}
+                    <TableHead className="px-4">Group</TableHead>
+                    <TableHead className="px-4">Primary Contact</TableHead>
+                    <TableHead className="px-4">Donors</TableHead>
+                    <TableHead className="px-4">Total Raised</TableHead>
+                    <TableHead className="px-4">Received</TableHead>
+                    <TableHead className="px-4">Outstanding Balance</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {loading ? (
                     <TableRow>
                       <TableCell
-                        colSpan={canManage ? 8 : 7}
+                        colSpan={6}
                         className="py-8 text-center text-muted-foreground"
                       >
                         Loading groups…
@@ -592,16 +560,16 @@ export function CampaignGroupsTab({
                   ) : metrics.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={canManage ? 8 : 7}
+                        colSpan={6}
                         className="py-8 text-center text-muted-foreground"
                       >
                         No campaign groups yet.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    metrics.map((row) => (
+                    sortedMetrics.map((row) => (
                       <TableRow key={row.groupId}>
-                        <TableCell>
+                        <TableCell className="px-4">
                           <button
                             type="button"
                             className="font-medium text-primary hover:underline"
@@ -617,50 +585,17 @@ export function CampaignGroupsTab({
                             {row.name}
                           </button>
                         </TableCell>
-                        <TableCell>{row.leadName || "—"}</TableCell>
-                        <TableCell className="text-right tabular-nums">{row.donorCount}</TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {formatDonationCurrency(row.collected)}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {formatDonationCurrency(row.outstanding)}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums font-medium">
+                        <TableCell className="px-4">{row.leadName || "—"}</TableCell>
+                        <TableCell className="px-4 tabular-nums">{row.donorCount}</TableCell>
+                        <TableCell className="px-4 tabular-nums font-medium">
                           {formatDonationCurrency(row.groupTotal)}
                         </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-0.5">
-                            <GroupLinkIconButton
-                              label="Copy link"
-                              onClick={() => void copyLink(row.publicToken)}
-                            >
-                              <Copy className="h-4 w-4" />
-                            </GroupLinkIconButton>
-                            <GroupLinkIconButton
-                              label="Copy QR code"
-                              onClick={() => void copyQrCode(row)}
-                            >
-                              <QrCode className="h-4 w-4" />
-                            </GroupLinkIconButton>
-                          </div>
+                        <TableCell className="px-4 tabular-nums">
+                          {formatDonationCurrency(row.collected)}
                         </TableCell>
-                        {canManage ? (
-                          <TableCell>
-                            <div className="flex flex-wrap gap-1">
-                              <Button variant="ghost" size="sm" onClick={() => openEdit(row)}>
-                                Edit
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-red-600"
-                                onClick={() => void handleDelete(row.groupId)}
-                              >
-                                Delete
-                              </Button>
-                            </div>
-                          </TableCell>
-                        ) : null}
+                        <TableCell className="px-4 tabular-nums">
+                          {formatDonationCurrency(row.outstanding)}
+                        </TableCell>
                       </TableRow>
                     ))
                   )}
@@ -694,7 +629,7 @@ export function CampaignGroupsTab({
               organizationId={organizationId}
               contactId={form.leadContactId}
               contactLabel={form.leadLabel}
-              label="Group Lead"
+              label="Primary Contact"
               inputId="group-lead-picker"
               onChange={(contactId, label) =>
                 setForm((prev) => ({
@@ -771,44 +706,6 @@ export function CampaignGroupsTab({
               </Select>
             </div>
 
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="group-description">Public Description</Label>
-              <Textarea
-                id="group-description"
-                rows={2}
-                value={form.description}
-                onChange={(event) =>
-                  setForm((prev) => ({ ...prev, description: event.target.value }))
-                }
-              />
-            </div>
-
-            <div className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2">
-              <div>
-                <p className="text-sm font-medium">Show public progress</p>
-                <p className="text-xs text-muted-foreground">
-                  When enabled, the public donation page may show group progress.
-                </p>
-              </div>
-              <Switch
-                checked={form.publicProgressEnabled}
-                onCheckedChange={(checked) =>
-                  setForm((prev) => ({ ...prev, publicProgressEnabled: checked }))
-                }
-              />
-            </div>
-
-            <div className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2">
-              <div>
-                <p className="text-sm font-medium">Donation link active</p>
-              </div>
-              <Switch
-                checked={form.linkActive}
-                onCheckedChange={(checked) =>
-                  setForm((prev) => ({ ...prev, linkActive: checked }))
-                }
-              />
-            </div>
           </div>
 
           <DialogFooter>
@@ -822,95 +719,29 @@ export function CampaignGroupsTab({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={donorsOpen} onOpenChange={setDonorsOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Donors</DialogTitle>
-            <DialogDescription>
-              {selectedMetric
-                ? `${selectedMetric.name} — gifts attributed to this group.`
-                : "Gifts attributed to this group."}
-            </DialogDescription>
-          </DialogHeader>
-          {donorsLoading ? (
-            <p className="py-6 text-sm text-muted-foreground">Loading donors…</p>
-          ) : donorsError ? (
-            <p className="py-6 text-sm text-red-600">{donorsError}</p>
-          ) : donors.length === 0 ? (
-            <p className="py-6 text-sm text-muted-foreground">No gifts yet for this group.</p>
-          ) : (
-            <div className="max-h-[60vh] overflow-y-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Donor</TableHead>
-                    <TableHead className="text-right">Gifts</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {donors.map((donor) => (
-                    <TableRow key={donor.key}>
-                      <TableCell>
-                        {donor.contactId ? (
-                          <a
-                            href={contactProfileHref(donor.contactId, "financial")}
-                            className="font-medium text-primary hover:underline"
-                          >
-                            {donor.name}
-                          </a>
-                        ) : (
-                          donor.name
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">{donor.giftCount}</TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatDonationCurrency(donor.amount)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  <TableRow>
-                    <TableCell className="font-medium">Total</TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {donors.reduce((sum, row) => sum + row.giftCount, 0)}
-                    </TableCell>
-                    <TableCell className="text-right font-medium tabular-nums">
-                      {formatDonationCurrency(donorsTotal)}
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={Boolean(qrMetric)} onOpenChange={(open) => !open && setQrGroupId(null)}>
+      <Dialog open={showQr} onOpenChange={setShowQr}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>QR Code</DialogTitle>
             <DialogDescription>
-              {qrMetric?.name} — scans open the group donation link.
+              One code for every group. The donor chooses a group on the page.
             </DialogDescription>
           </DialogHeader>
-          {qrMetric ? (
+          {donationUrl ? (
             <div className="flex flex-col items-center gap-3 py-2">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={buildCampaignGroupQrImageUrl(
-                  buildCampaignGroupDonationUrl(qrMetric.publicToken),
-                  280
-                )}
-                alt={`QR code for ${qrMetric.name}`}
+                src={buildCampaignGroupQrImageUrl(donationUrl, 280)}
+                alt={`QR code for ${campaignName}`}
                 className="h-64 w-64 rounded-md border border-border bg-white p-2"
               />
+              <p className="break-all text-center font-mono text-xs text-muted-foreground">
+                {donationUrl}
+              </p>
               <Button variant="outline" size="sm" asChild>
                 <a
-                  href={buildCampaignGroupQrImageUrl(
-                    buildCampaignGroupDonationUrl(qrMetric.publicToken),
-                    512
-                  )}
-                  download={`${qrMetric.name.replace(/\s+/g, "-").toLowerCase()}-qr.png`}
+                  href={buildCampaignGroupQrImageUrl(donationUrl, 512)}
+                  download={`${campaignName.replace(/\s+/g, "-").toLowerCase()}-groups-qr.png`}
                   target="_blank"
                   rel="noreferrer"
                 >

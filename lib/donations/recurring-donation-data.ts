@@ -62,6 +62,7 @@ export async function fetchRecurringPlans(
     donor_id: row.donor_id,
     contact_id: row.contact_id,
     campaign_id: row.campaign_id,
+    campaign_group_id: (row.campaign_group_id as string | null) ?? null,
     category_id: row.category_id,
     subcategory_id: row.subcategory_id,
     payment_method_id: row.payment_method_id,

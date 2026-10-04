@@ -121,8 +121,8 @@ export function CampaignOverviewMetricsEditor({
             <div>
               <p className="font-medium">Automatic</p>
               <p className="text-sm text-muted-foreground">
-                Show source rows only when they have a balance. Always show Donors, Largest Gift,
-                and Pledges.
+                Show source rows only when they have a balance. Campaign Goal, Total Raised, Total
+                Collected, Outstanding, Donors, and Largest Gift always stay at the top.
               </p>
             </div>
           </label>
@@ -131,7 +131,9 @@ export function CampaignOverviewMetricsEditor({
             <div className="flex flex-col gap-2">
               <Label>Visible metrics</Label>
               <div className="max-h-80 space-y-2 overflow-y-auto rounded-lg border p-2">
-                {CAMPAIGN_OVERVIEW_METRIC_CATALOG.map((metric) => {
+                {CAMPAIGN_OVERVIEW_METRIC_CATALOG.filter(
+                  (metric) => metric.key !== "donors" && metric.key !== "largest-gift"
+                ).map((metric) => {
                   const checked = enabledKeys.has(metric.key)
                   const orderIndex = orderedKeys.indexOf(metric.key)
 

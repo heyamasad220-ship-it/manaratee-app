@@ -1,120 +1,31 @@
 "use client"
 
-import { AlertCircle, DollarSign, Gift, Heart, Target, Users } from "lucide-react"
+import { useMemo, useState } from "react"
 
 import { CampaignDonorsDialog } from "@/components/donations/campaign-donors-dialog"
-import { CampaignOutstandingPledgesTable } from "@/components/donations/campaign-outstanding-pledges-table"
-import { CampaignOverviewInsightsPanel, CampaignOverviewGroupsCard } from "@/components/donations/campaign-overview-insights"
+import { CampaignOverviewInsightsPanel } from "@/components/donations/campaign-overview-insights"
+import { CampaignOverviewMetricDialog } from "@/components/donations/campaign-overview-metric-dialog"
 import { CampaignOverviewMetricsEditor } from "@/components/donations/campaign-overview-metrics-editor"
 import { CampaignProgressBar } from "@/components/donations/campaign-progress-bar"
 import { CampaignProgressGauge } from "@/components/donations/campaign-progress-gauge"
 import { CampaignOverviewMetricsTable } from "@/components/donations/campaign-source-breakdown-cards"
+import { Card, CardContent } from "@/components/ui/card"
 import {
-  DonationMetricCard,
-  DonationMetricCardGrid,
-} from "@/components/donations/donation-metric-card"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import {
-  computeCampaignHeadlineTotals,
+  campaignCommitmentRaised,
   formatDonationCurrency,
   type CampaignAnalyticsEntry,
   type CampaignDonorInsights,
   type CampaignOutstandingPledgeRow,
+  type CampaignPaymentRow,
   type CampaignRow,
   type CampaignSourceBreakdown,
 } from "@/lib/donations/campaign-analytics"
+import { buildCampaignOverviewMetricDetail } from "@/lib/donations/campaign-overview-metric-details"
 import type { CampaignOverviewMetricKey } from "@/lib/donations/campaign-overview-metrics"
-import { donationPledgesHref } from "@/lib/donations/donation-pledge-paths"
 
 type ContactProfileTarget = {
   contactId?: string | null
   donorId?: string | null
-}
-
-type CampaignOverviewSummaryProps = {
-  campaign: CampaignRow
-  entry: CampaignAnalyticsEntry
-  insights: CampaignDonorInsights | null
-  onShowDonorsDialogChange: (open: boolean) => void
-  onOpenContactProfile: (target: ContactProfileTarget) => void
-}
-
-export function CampaignOverviewSummary({
-  campaign,
-  entry,
-  insights,
-  onShowDonorsDialogChange,
-  onOpenContactProfile,
-}: CampaignOverviewSummaryProps) {
-  const { metrics } = entry
-  const goalAmount = Number(campaign.goal_amount || 0) || null
-  const { committed, collected, outstanding } = computeCampaignHeadlineTotals(metrics)
-
-  return (
-    <Card className="border border-border shadow-sm">
-      <CardHeader className="flex flex-row flex-wrap items-center gap-x-3 gap-y-1 space-y-0 pb-2">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Target className="h-4 w-4" />
-          Campaign Goal
-        </CardTitle>
-        <p className="text-2xl font-semibold tabular-nums text-foreground">
-          {goalAmount != null ? formatDonationCurrency(goalAmount) : "No goal set"}
-        </p>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <DonationMetricCardGrid colorful columns={5} compact>
-          <DonationMetricCard
-            compact
-            title="Total Committed"
-            value={formatDonationCurrency(committed)}
-            icon={Heart}
-            accent="blue"
-            description="Valid pledge commitments"
-          />
-          <DonationMetricCard
-            compact
-            title="Total Collected"
-            value={formatDonationCurrency(collected)}
-            icon={DollarSign}
-            accent="emerald"
-            description="Payments received"
-          />
-          <DonationMetricCard
-            compact
-            title="Outstanding"
-            value={formatDonationCurrency(outstanding)}
-            icon={AlertCircle}
-            accent="amber"
-            description="Committed minus payments received"
-          />
-          <DonationMetricCard
-            compact
-            title="Donors"
-            value={String(metrics.donorCount)}
-            icon={Users}
-            accent="purple"
-            onValueClick={() => onShowDonorsDialogChange(true)}
-          />
-          <DonationMetricCard
-            compact
-            title="Largest Gift"
-            value={formatDonationCurrency(metrics.largestGift)}
-            icon={Gift}
-            accent="rose"
-            onValueClick={
-              insights?.largestGift?.contactId || insights?.largestGift?.donorId
-                ? () =>
-                    onOpenContactProfile({
-                      contactId: insights?.largestGift?.contactId,
-                      donorId: insights?.largestGift?.donorId,
-                    })
-                : undefined
-            }
-          />
-        </DonationMetricCardGrid>
-      </CardContent>
-    </Card>
-  )
 }
 
 type CampaignOverviewTabProps = {
@@ -122,7 +33,8 @@ type CampaignOverviewTabProps = {
   entry: CampaignAnalyticsEntry
   insights: CampaignDonorInsights | null
   sourceBreakdown: CampaignSourceBreakdown
-  outstandingPledges: CampaignOutstandingPledgeRow[]
+  payments: CampaignPaymentRow[]
+  pledges: CampaignOutstandingPledgeRow[]
   overviewMetricKeys: CampaignOverviewMetricKey[] | null
   canManage: boolean
   showMetricsEditor: boolean
@@ -131,9 +43,7 @@ type CampaignOverviewTabProps = {
   onShowDonorsDialogChange: (open: boolean) => void
   onOverviewMetricKeysSaved: (keys: CampaignOverviewMetricKey[] | null) => void
   onOpenContactProfile: (target: ContactProfileTarget) => void
-  onPledgeClick?: (pledgeId: string) => void
   onReload: () => void
-  showSummary?: boolean
 }
 
 export function CampaignOverviewTab({
@@ -141,7 +51,8 @@ export function CampaignOverviewTab({
   entry,
   insights,
   sourceBreakdown,
-  outstandingPledges,
+  payments,
+  pledges,
   overviewMetricKeys,
   canManage,
   showMetricsEditor,
@@ -150,74 +61,60 @@ export function CampaignOverviewTab({
   onShowDonorsDialogChange,
   onOverviewMetricKeysSaved,
   onOpenContactProfile,
-  onPledgeClick,
   onReload,
-  showSummary = true,
 }: CampaignOverviewTabProps) {
   const { metrics } = entry
   const goalAmount = Number(campaign.goal_amount || 0) || null
-  const { committed, collected, outstanding } = computeCampaignHeadlineTotals(metrics)
-  const committedProgressPercent =
-    goalAmount != null && goalAmount > 0
-      ? Math.min((committed / goalAmount) * 100, 100)
-      : null
+  const totalRaised = campaignCommitmentRaised(metrics)
+  const raisedProgressPercent =
+    goalAmount != null && goalAmount > 0 ? Math.min((totalRaised / goalAmount) * 100, 100) : null
+  const [detailKey, setDetailKey] = useState<string | null>(null)
+  const detail = useMemo(
+    () =>
+      detailKey
+        ? buildCampaignOverviewMetricDetail({
+            key: detailKey,
+            metrics,
+            payments,
+            pledges,
+          })
+        : null,
+    [detailKey, metrics, payments, pledges]
+  )
 
   return (
     <>
       <div className="flex flex-col gap-6">
-        {showSummary ? (
-          <CampaignOverviewSummary
-            campaign={campaign}
-            entry={entry}
-            insights={insights}
-            onShowDonorsDialogChange={onShowDonorsDialogChange}
-            onOpenContactProfile={onOpenContactProfile}
-          />
-        ) : null}
-
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,0.9fr)] xl:items-stretch">
           <CampaignOverviewMetricsTable
             breakdown={sourceBreakdown}
             metrics={metrics}
-            insights={insights}
+            goalAmount={goalAmount}
             visibleMetricKeys={overviewMetricKeys}
             canCustomize={canManage}
             onCustomizeClick={() => onShowMetricsEditorChange(true)}
-            onDonorsClick={() => onShowDonorsDialogChange(true)}
-            onLargestGiftClick={
-              insights?.largestGift?.contactId || insights?.largestGift?.donorId
-                ? () =>
-                    onOpenContactProfile({
-                      contactId: insights?.largestGift?.contactId,
-                      donorId: insights?.largestGift?.donorId,
-                    })
-                : undefined
-            }
+            onMetricClick={(key) => {
+              if (key === "donors") {
+                onShowDonorsDialogChange(true)
+                return
+              }
+              setDetailKey(key)
+            }}
           />
 
           <Card className="flex h-full w-full flex-col pt-4 pb-6" aria-label="Goal progress">
             <CardContent className="flex flex-1 flex-col items-center justify-start gap-3 px-4 pb-2 pt-0">
-              <CampaignProgressGauge
-                raised={committed}
-                goal={goalAmount}
-                size="lg"
-                fluid
-                className="max-w-none"
-              />
-              {committedProgressPercent != null ? (
+              <CampaignProgressGauge raised={totalRaised} goal={goalAmount} size="lg" fluid className="max-w-none" />
+              {raisedProgressPercent != null ? (
                 <>
-                  <CampaignProgressBar
-                    progressPercent={committedProgressPercent}
-                    className="w-full"
-                  />
+                  <CampaignProgressBar progressPercent={raisedProgressPercent} className="w-full" />
                   <p className="text-center text-sm text-muted-foreground">
-                    {formatDonationCurrency(committed)} committed of{" "}
-                    {formatDonationCurrency(goalAmount ?? 0)} goal (
-                    {Math.round(committedProgressPercent)}%)
+                    {formatDonationCurrency(totalRaised)} raised of {formatDonationCurrency(goalAmount ?? 0)} goal (
+                    {Math.round(raisedProgressPercent)}%)
                   </p>
                   <p className="text-center text-xs text-muted-foreground">
-                    {formatDonationCurrency(collected)} collected ·{" "}
-                    {formatDonationCurrency(outstanding)} outstanding
+                    {formatDonationCurrency(metrics.raised)} collected · {formatDonationCurrency(metrics.outstanding)}{" "}
+                    outstanding pledges
                   </p>
                 </>
               ) : (
@@ -230,20 +127,6 @@ export function CampaignOverviewTab({
         </div>
 
         <CampaignOverviewInsightsPanel campaignId={campaign.id} />
-
-        <CampaignOutstandingPledgesTable
-          pledges={outstandingPledges}
-          pledgesPageHref={donationPledgesHref({ campaignId: campaign.id })}
-          onDonorClick={(pledge) =>
-            onOpenContactProfile({
-              contactId: pledge.contactId,
-              donorId: pledge.donorId,
-            })
-          }
-          onPledgeClick={onPledgeClick}
-        />
-
-        <CampaignOverviewGroupsCard campaignId={campaign.id} />
       </div>
 
       {canManage ? (
@@ -268,6 +151,19 @@ export function CampaignOverviewTab({
           onOpenContactProfile({
             contactId: donor.contactId,
             donorId: donor.donorId,
+          })
+        }
+      />
+      <CampaignOverviewMetricDialog
+        detail={detail}
+        open={detailKey != null}
+        onOpenChange={(open) => {
+          if (!open) setDetailKey(null)
+        }}
+        onLineClick={(line) =>
+          onOpenContactProfile({
+            contactId: line.contactId,
+            donorId: line.donorId,
           })
         }
       />

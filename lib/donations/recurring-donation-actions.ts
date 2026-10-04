@@ -18,6 +18,7 @@ import type {
   RecurringFrequency,
   RecurringStatus,
 } from "@/lib/donations/recurring-donation-types"
+import { campaignGroupIdForCampaign } from "@/lib/donations/campaign-group-helpers"
 import { validateOpenDonationFund } from "@/lib/donations/donation-fund-status"
 
 export async function getRecurringDashboardAction() {
@@ -49,6 +50,7 @@ export async function createRecurringDonationPlanAction(input: {
   numberOfPayments?: number | null
   endDate?: string | null
   notes?: string | null
+  campaignGroupId?: string | null
 }) {
   const access = await requireDonationStaffAccess("manage")
   if (!access.ok) return { success: false as const, error: access.error }
@@ -74,6 +76,14 @@ export async function createRecurringDonationPlanAction(input: {
     return { success: false as const, error: fundCheck.error }
   }
 
+  const group = await campaignGroupIdForCampaign(
+    supabase,
+    orgId,
+    input.campaignId,
+    input.campaignGroupId
+  )
+  if (!group.ok) return { success: false as const, error: group.error }
+
   let contactId = input.contactId ?? null
   if (!contactId) {
     const { data: donor } = await supabase
@@ -92,6 +102,7 @@ export async function createRecurringDonationPlanAction(input: {
       donor_id: input.donorId,
       contact_id: contactId,
       campaign_id: input.campaignId ?? null,
+      campaign_group_id: group.campaignGroupId,
       category_id: input.categoryId ?? null,
       subcategory_id: input.subcategoryId ?? null,
       payment_method_id: input.paymentMethodId ?? null,
@@ -169,6 +180,7 @@ export async function recordRecurringDonationPaymentAction(input: {
   paymentDate?: string
   source?: string
   memo?: string
+  campaignGroupId?: string | null
   attributedGroupContactId?: string | null
 }) {
   const access = await requireDonationStaffAccess("manage")
@@ -201,6 +213,16 @@ export async function recordRecurringDonationPaymentAction(input: {
     .eq("id", plan.donor_id)
     .maybeSingle()
 
+  const group = await campaignGroupIdForCampaign(
+    supabase,
+    orgId,
+    plan.campaign_id as string | null,
+    input.campaignGroupId === undefined
+      ? ((plan.campaign_group_id as string | null) ?? null)
+      : input.campaignGroupId
+  )
+  if (!group.ok) return { success: false as const, error: group.error }
+
   const { data: payment, error: paymentError } = await supabase
     .from("payments")
     .insert({
@@ -208,6 +230,7 @@ export async function recordRecurringDonationPaymentAction(input: {
       donor_id: plan.donor_id,
       contact_id: plan.contact_id ?? donor?.contact_id ?? null,
       attributed_group_contact_id: input.attributedGroupContactId || null,
+      campaign_group_id: group.campaignGroupId,
       campaign_id: plan.campaign_id,
       category_id: plan.category_id,
       subcategory_id: plan.subcategory_id,
@@ -347,6 +370,7 @@ export async function updateRecurringDonationPlanAction(input: {
   paymentsMade?: number | null
   nextPaymentDate?: string | null
   campaignId?: string | null
+  campaignGroupId?: string | null
   categoryId?: string | null
   subcategoryId?: string | null
   notes?: string | null
@@ -357,7 +381,7 @@ export async function updateRecurringDonationPlanAction(input: {
 
   const { data: existing, error: existingError } = await supabase
     .from("recurring_donation_plans")
-    .select("id, status, subcategory_id")
+    .select("id, status, subcategory_id, campaign_id")
     .eq("id", input.planId)
     .eq("organization_id", orgId)
     .maybeSingle()
@@ -388,6 +412,20 @@ export async function updateRecurringDonationPlanAction(input: {
   if (input.paymentsMade !== undefined) patch.payments_made = parseOptionalCount(input.paymentsMade)
   if (input.nextPaymentDate !== undefined) patch.next_payment_date = input.nextPaymentDate
   if (input.campaignId !== undefined) patch.campaign_id = input.campaignId
+  if (input.campaignGroupId !== undefined) {
+    const campaignId =
+      input.campaignId !== undefined
+        ? input.campaignId
+        : ((existing.campaign_id as string | null) ?? null)
+    const group = await campaignGroupIdForCampaign(
+      supabase,
+      orgId,
+      campaignId,
+      input.campaignGroupId
+    )
+    if (!group.ok) return { success: false as const, error: group.error }
+    patch.campaign_group_id = group.campaignGroupId
+  }
   if (input.categoryId !== undefined) patch.category_id = input.categoryId
   if (input.subcategoryId !== undefined) patch.subcategory_id = input.subcategoryId
   if (input.notes !== undefined) patch.notes = input.notes

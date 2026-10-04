@@ -11,7 +11,7 @@ export default async function DonationsCampaignsOverviewPage() {
   }
 
   return (
-    <div className="p-6">
+    <div className="min-h-0 flex-1 overflow-y-auto p-6">
       <Suspense fallback={<p className="text-sm text-muted-foreground">Loading campaigns...</p>}>
         <DonationCampaignsHome canManage={access.canManageCampaigns} />
       </Suspense>

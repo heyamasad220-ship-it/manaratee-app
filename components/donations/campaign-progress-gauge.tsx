@@ -8,6 +8,7 @@ type CampaignProgressGaugeProps = {
   className?: string
   size?: "xs" | "sm" | "md" | "lg"
   fluid?: boolean
+  valueLabel?: string
 }
 
 const SIZE_CONFIG = {
@@ -59,6 +60,7 @@ export function CampaignProgressGauge({
   className,
   size = "md",
   fluid = false,
+  valueLabel = "Total Raised",
 }: CampaignProgressGaugeProps) {
   const config = SIZE_CONFIG[size]
   const normalizedGoal = goal && goal > 0 ? goal : null
@@ -98,8 +100,8 @@ export function CampaignProgressGauge({
         role="img"
         aria-label={
           normalizedGoal
-            ? `${formatDonationCurrency(raised)} raised of ${formatDonationCurrency(normalizedGoal)} goal`
-            : `${formatDonationCurrency(raised)} raised`
+            ? `${formatDonationCurrency(raised)} ${valueLabel.toLowerCase()} of ${formatDonationCurrency(normalizedGoal)} goal`
+            : `${formatDonationCurrency(raised)} ${valueLabel.toLowerCase()}`
         }
       >
         <circle
@@ -154,7 +156,7 @@ export function CampaignProgressGauge({
           textAnchor="middle"
           className="fill-muted-foreground text-[11px] font-medium"
         >
-          Total Raised
+          {valueLabel}
         </text>
 
         {normalizedGoal ? (

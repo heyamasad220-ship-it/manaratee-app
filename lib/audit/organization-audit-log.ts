@@ -8,6 +8,7 @@ export const ORGANIZATION_AUDIT_ACTIONS = {
   PAYMENT_REFUNDED: "payment.refunded",
   PAYMENT_STRIPE_REFUNDED: "payment.stripe_refunded",
   PAYMENT_ALLOCATED: "payment.allocated",
+  PAYMENT_UNALLOCATED: "payment.unallocated",
   PLEDGE_CREATED: "pledge.created",
   PLEDGE_UPDATED: "pledge.updated",
   PLEDGE_DELETED: "pledge.deleted",

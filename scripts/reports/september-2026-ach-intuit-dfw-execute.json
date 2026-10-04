@@ -1,0 +1,28 @@
+{
+  "mode": "execute",
+  "fileRows": 3,
+  "fileAmount": 8500,
+  "paymentsCreated": 3,
+  "alreadyImported": 0,
+  "applications": [
+    {
+      "name": "Orphans in Need USA (OINUSA)",
+      "amount": 5000,
+      "source": "ach",
+      "pledgeId": "9aaa03fb-caec-4903-a149-7c5752e0de6f"
+    },
+    {
+      "name": "Muslim Legal Fund of America (MLFA)",
+      "amount": 2500,
+      "source": "ach",
+      "pledgeId": "fee09aac-0c38-40b6-aa90-a93434ca98f6"
+    },
+    {
+      "name": "Baraka Mortgage",
+      "amount": 1000,
+      "source": "intuit",
+      "pledgeId": "7117db11-9a79-49bd-9f2c-82f0183bedbe"
+    }
+  ],
+  "errors": []
+}

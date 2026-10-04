@@ -47,6 +47,25 @@ async function loadContactNames(orgId: string, ids: string[]) {
   return map
 }
 
+export async function listCampaignGroupOptionsAction(campaignId: string) {
+  const access = await requireDonationStaffAccess("view")
+  if (!access.ok) return { success: false as const, error: access.error }
+  if (!campaignId) return { success: true as const, groups: [] as Array<{ id: string; name: string }> }
+
+  try {
+    const groups = await fetchCampaignGroups(access.supabase, access.orgId, campaignId)
+    return {
+      success: true as const,
+      groups: groups
+        .filter((group) => group.status !== "archived")
+        .map((group) => ({ id: group.id, name: group.name }))
+        .sort((left, right) => left.name.localeCompare(right.name)),
+    }
+  } catch (error) {
+    return { success: false as const, error: error instanceof Error ? error.message : "Could not load campaign groups." }
+  }
+}
+
 export async function listCampaignGroupsAction(campaignId: string) {
   const access = await requireDonationStaffAccess("view")
   if (!access.ok) return { success: false as const, error: access.error }
@@ -114,10 +133,29 @@ export async function listCampaignGroupsAction(campaignId: string) {
       contactNames,
     })
 
+    const { data: campaignRow, error: tokenError } = await writeClient
+      .from("campaigns")
+      .select("group_donate_token")
+      .eq("organization_id", access.orgId)
+      .eq("id", campaignId)
+      .maybeSingle()
+
+    if (tokenError) {
+      if (tokenError.code === "42703" || /group_donate_token/i.test(tokenError.message || "")) {
+        return {
+          success: false as const,
+          error:
+            "The shared group donation link is not available yet. Run scripts/309_campaign_group_donate_token.sql in Supabase.",
+        }
+      }
+      return { success: false as const, error: tokenError.message }
+    }
+
     return {
       success: true as const,
       groups,
       metrics,
+      donateToken: (campaignRow?.group_donate_token as string | null) || "",
       canManage: access.canManageCampaigns,
     }
   } catch (error) {
@@ -204,9 +242,13 @@ export async function getCampaignGroupDetailAction(groupId: string) {
 export type CampaignGroupDonorRow = {
   key: string
   name: string
-  amount: number
-  giftCount: number
   contactId: string | null
+  kind: "one_time" | "pledge"
+  /** One-time gifts. Empty on a pledge row. */
+  amount: number | null
+  pledged: number | null
+  received: number | null
+  outstanding: number | null
 }
 
 export async function listCampaignGroupDonorsAction(groupId: string) {
@@ -234,7 +276,7 @@ export async function listCampaignGroupDonorsAction(groupId: string) {
       const { data, error } = await writeClient
         .from("payments")
         .select(
-          "id, amount, refunded_amount, status, sender_name, contact_id, donor_id"
+          "id, amount, refunded_amount, status, sender_name, contact_id, donor_id, pledge_id"
         )
         .eq("organization_id", access.orgId)
         .eq("campaign_group_id", id)
@@ -247,12 +289,80 @@ export async function listCampaignGroupDonorsAction(groupId: string) {
       from += 1000
     }
 
-    const countable = payments.filter((payment) => isCountableCampaignPayment(payment))
+    const oneTimePayments = payments.filter(
+      (payment) => isCountableCampaignPayment(payment) && !payment.pledge_id
+    )
+
+    const { data: pledgeLinks, error: pledgeLinkError } = await writeClient
+      .from("pledges")
+      .select("id")
+      .eq("organization_id", access.orgId)
+      .eq("campaign_group_id", id)
+
+    if (pledgeLinkError) return { success: false as const, error: pledgeLinkError.message }
+
+    const pledgeIds = (pledgeLinks || []).map((row) => row.id as string)
+    const pledgeRows: Array<{
+      id: string
+      donor_id: string | null
+      donor_name: string | null
+      amount_pledged: number
+      amount_paid: number
+      balance_remaining: number
+      calculated_status: string | null
+    }> = []
+    if (pledgeIds.length > 0) {
+      const { data: pledgeStatus, error: pledgeStatusError } = await writeClient
+        .from("pledge_status_view")
+        .select(
+          "id, donor_id, donor_name, amount_pledged, amount_paid, balance_remaining, calculated_status"
+        )
+        .eq("organization_id", access.orgId)
+        .in("id", pledgeIds)
+      if (pledgeStatusError) return { success: false as const, error: pledgeStatusError.message }
+      for (const row of pledgeStatus || []) {
+        if (String(row.calculated_status || "").toLowerCase() === "cancelled") continue
+        pledgeRows.push({
+          id: row.id as string,
+          donor_id: (row.donor_id as string | null) ?? null,
+          donor_name: (row.donor_name as string | null) ?? null,
+          amount_pledged: Number(row.amount_pledged || 0),
+          amount_paid: Number(row.amount_paid || 0),
+          balance_remaining: Number(row.balance_remaining || 0),
+          calculated_status: (row.calculated_status as string | null) ?? null,
+        })
+      }
+    }
+
+    const donorIds = [
+      ...new Set(
+        [
+          ...oneTimePayments.map((payment) => payment.donor_id),
+          ...pledgeRows.map((pledge) => pledge.donor_id),
+        ].filter((value): value is string => Boolean(value))
+      ),
+    ]
+    const donorContacts = new Map<string, { contactId: string | null; name: string }>()
+    if (donorIds.length > 0) {
+      const { data: donorRows } = await writeClient
+        .from("donors")
+        .select("id, contact_id, full_name")
+        .eq("organization_id", access.orgId)
+        .in("id", donorIds)
+      for (const row of donorRows || []) {
+        donorContacts.set(row.id as string, {
+          contactId: (row.contact_id as string | null) ?? null,
+          name: String(row.full_name || "").trim(),
+        })
+      }
+    }
+
     const contactIds = [
       ...new Set(
-        countable
-          .map((payment) => payment.contact_id)
-          .filter((value): value is string => Boolean(value))
+        [
+          ...oneTimePayments.map((payment) => payment.contact_id),
+          ...[...donorContacts.values()].map((donor) => donor.contactId),
+        ].filter((value): value is string => Boolean(value))
       ),
     ]
     const contactNames = new Map<string, string>()
@@ -269,38 +379,63 @@ export async function listCampaignGroupDonorsAction(groupId: string) {
     }
 
     const grouped = new Map<string, CampaignGroupDonorRow>()
-    for (const payment of countable) {
+    for (const payment of oneTimePayments) {
       const net = campaignPaymentNetAmount(payment)
+      const donor = payment.donor_id ? donorContacts.get(payment.donor_id) : undefined
+      const contactId = payment.contact_id || donor?.contactId || null
       const key = payment.donor_id
-        ? `donor:${payment.donor_id}`
-        : payment.contact_id
-          ? `contact:${payment.contact_id}`
-          : `name:${String(payment.sender_name || "").trim().toLowerCase() || "anonymous"}`
-      const existing = grouped.get(key)
+        ? `one-time:donor:${payment.donor_id}`
+        : contactId
+          ? `one-time:contact:${contactId}`
+          : `one-time:name:${String(payment.sender_name || "").trim().toLowerCase() || "anonymous"}`
       const name =
-        (payment.contact_id && contactNames.get(payment.contact_id)) ||
+        (contactId && contactNames.get(contactId)) ||
+        donor?.name ||
         String(payment.sender_name || "").trim() ||
-        existing?.name ||
         "Anonymous donor"
-
+      const existing = grouped.get(key)
       if (existing) {
-        existing.amount += net
-        existing.giftCount += 1
-        if (!existing.contactId && payment.contact_id) existing.contactId = payment.contact_id
+        existing.amount = (existing.amount || 0) + net
+        if (!existing.contactId && contactId) existing.contactId = contactId
         if (name && existing.name === "Anonymous donor") existing.name = name
       } else {
         grouped.set(key, {
           key,
           name,
+          contactId,
+          kind: "one_time",
           amount: net,
-          giftCount: 1,
-          contactId: payment.contact_id ?? null,
+          pledged: null,
+          received: null,
+          outstanding: null,
         })
       }
     }
 
+    for (const pledge of pledgeRows) {
+      const donor = pledge.donor_id ? donorContacts.get(pledge.donor_id) : undefined
+      const contactId = donor?.contactId || null
+      const name =
+        (contactId && contactNames.get(contactId)) ||
+        donor?.name ||
+        String(pledge.donor_name || "").trim() ||
+        "Anonymous donor"
+      grouped.set(`pledge:${pledge.id}`, {
+        key: `pledge:${pledge.id}`,
+        name,
+        contactId,
+        kind: "pledge",
+        amount: null,
+        pledged: pledge.amount_pledged,
+        received: pledge.amount_paid,
+        outstanding: pledge.balance_remaining,
+      })
+    }
+
     const donors = [...grouped.values()].sort((left, right) => {
-      if (right.amount !== left.amount) return right.amount - left.amount
+      const leftAmount = left.kind === "pledge" ? left.pledged || 0 : left.amount || 0
+      const rightAmount = right.kind === "pledge" ? right.pledged || 0 : right.amount || 0
+      if (rightAmount !== leftAmount) return rightAmount - leftAmount
       return left.name.localeCompare(right.name)
     })
 
@@ -308,7 +443,7 @@ export async function listCampaignGroupDonorsAction(groupId: string) {
       success: true as const,
       groupName: group.name as string,
       donors,
-      totalAmount: donors.reduce((sum, row) => sum + row.amount, 0),
+      totalAmount: donors.reduce((sum, row) => sum + (row.amount || 0), 0),
     }
   } catch (error) {
     return { success: false as const, error: (error as Error).message }
@@ -440,44 +575,6 @@ export async function updateCampaignGroupAction(
         }
       }
       return { success: false as const, error: error?.message || "Failed to update group" }
-    }
-
-    revalidateGroupPaths(existing.campaign_id as string)
-    return { success: true as const, group: mapCampaignGroupRow(data as Record<string, unknown>) }
-  } catch (error) {
-    return { success: false as const, error: (error as Error).message }
-  }
-}
-
-export async function regenerateCampaignGroupLinkAction(groupId: string) {
-  const access = await requireDonationStaffAccess("campaigns")
-  if (!access.ok) return { success: false as const, error: access.error }
-
-  try {
-    const writeClient = createServiceRoleClient()
-    const { data: existing, error: existingError } = await writeClient
-      .from("campaign_groups")
-      .select("id, campaign_id")
-      .eq("organization_id", access.orgId)
-      .eq("id", groupId)
-      .maybeSingle()
-
-    if (existingError) return { success: false as const, error: existingError.message }
-    if (!existing) return { success: false as const, error: "Group not found" }
-
-    const { data, error } = await writeClient
-      .from("campaign_groups")
-      .update({
-        public_token: createPublicToken(),
-        link_active: true,
-      })
-      .eq("organization_id", access.orgId)
-      .eq("id", groupId)
-      .select(CAMPAIGN_GROUP_SELECT)
-      .maybeSingle()
-
-    if (error || !data) {
-      return { success: false as const, error: error?.message || "Failed to regenerate link" }
     }
 
     revalidateGroupPaths(existing.campaign_id as string)

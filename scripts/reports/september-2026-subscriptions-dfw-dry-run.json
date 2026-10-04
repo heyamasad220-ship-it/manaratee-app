@@ -1,0 +1,58 @@
+{
+  "execute": false,
+  "file": "C:/Users/danan/Downloads/PAYMENT_SUBSCRIPTION_REPORT_2026-10-03.csv",
+  "campaignId": "fa15246a-e80d-4d65-9bf4-a5af4051b821",
+  "campaignName": "Annual Fundraiser - September 2026",
+  "rows": 21,
+  "skippedPledge": [
+    {
+      "name": "Tariq Alsmadi",
+      "amount": 250,
+      "frequency": "monthly",
+      "matchedPledge": "Dr. Tariq Smadi",
+      "pledgeAmount": 5000
+    },
+    {
+      "name": "Ahmed Taha",
+      "amount": 250,
+      "frequency": "monthly",
+      "matchedPledge": "Ahmed Taha",
+      "pledgeAmount": 600
+    },
+    {
+      "name": "Nahla Hosny",
+      "amount": 500,
+      "frequency": "monthly",
+      "matchedPledge": "Dr. Nahla Hosny",
+      "pledgeAmount": 5000
+    },
+    {
+      "name": "Raed Sbeit",
+      "amount": 200,
+      "frequency": "monthly",
+      "matchedPledge": "Raed Sbeit",
+      "pledgeAmount": 2500
+    },
+    {
+      "name": "Maheeb jaouni",
+      "amount": 500,
+      "frequency": "monthly",
+      "matchedPledge": "Dr. Maheeb Jaouni",
+      "pledgeAmount": 6000
+    },
+    {
+      "name": "Shayma Alzubi",
+      "amount": 100,
+      "frequency": "monthly",
+      "matchedPledge": "Shayma Alzubi",
+      "pledgeAmount": 1000
+    }
+  ],
+  "plansCreated": 15,
+  "plansSkipped": 0,
+  "contactsCreated": 15,
+  "donorsCreated": 15,
+  "monthlyAmount": 2746.82,
+  "dailyAmount": 1.32,
+  "errors": []
+}

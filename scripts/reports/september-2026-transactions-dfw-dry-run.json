@@ -1,0 +1,1236 @@
+{
+  "tag": "SEP2026_TRANSACTIONS_DFW_V1",
+  "campaign": "Annual Fundraiser - September 2026",
+  "fileRows": 285,
+  "oneTime": 154,
+  "oneTimeAmount": 63891.27,
+  "pledgePayments": 17,
+  "pledgeAmount": 29982.6,
+  "planPayments": 30,
+  "planAmount": 2866.62,
+  "skippedOlder": 84,
+  "skippedOlderAmount": 6015.72,
+  "alreadyImported": 0,
+  "contactsCreated": 133,
+  "contactsMatched": 21,
+  "donorsCreated": 133,
+  "groupsCreated": 6,
+  "fundsCreated": 6,
+  "categoriesCreated": 2,
+  "paymentsCreated": 201,
+  "pledgesFulfilled": [
+    "Syrian Forum $5000",
+    "Said Adem $500",
+    "Huda Gadid $500",
+    "Aman Memorial $1000",
+    "Dr. Hussien Elsiesy $10000",
+    "Abdelrahman Elarja $500",
+    "Malik Marouf $500"
+  ],
+  "ambiguousPledges": [
+    {
+      "name": "Ahmed Taha",
+      "amount": 250,
+      "reason": "Annual Fundraiser - September 12, 2026",
+      "chosen": "Ahmed Taha $600",
+      "how": "closest",
+      "options": [
+        "Ahmed Taha $600",
+        "Ahmed Taha $1000"
+      ]
+    }
+  ],
+  "renames": [],
+  "pledgeApplications": [
+    {
+      "name": "Ammar Zalatimo",
+      "amount": 5000,
+      "date": "2026-09-09",
+      "reason": "Annual Fundraiser - September 12, 2026",
+      "pledge": "Syrian Forum $5000",
+      "how": "only",
+      "remainingAfter": 0
+    },
+    {
+      "name": "Tariq Alsmadi",
+      "amount": 250,
+      "date": "2026-09-12",
+      "reason": "Sadaqah/Donation",
+      "pledge": "Dr. Tariq Smadi $5000",
+      "how": "only",
+      "remainingAfter": 4750
+    },
+    {
+      "name": "Said Adem",
+      "amount": 511.3,
+      "date": "2026-09-12",
+      "reason": "Sadaqah/Donation",
+      "pledge": "Said Adem $500",
+      "how": "only",
+      "remainingAfter": -11.3
+    },
+    {
+      "name": "Adam Aly",
+      "amount": 10,
+      "date": "2026-09-12",
+      "reason": "The Marouf Community",
+      "pledge": "Adam Aly $500",
+      "how": "only",
+      "remainingAfter": 490
+    },
+    {
+      "name": "Huda Gadid",
+      "amount": 500,
+      "date": "2026-09-15",
+      "reason": "Annual Fundraiser - September 12, 2026",
+      "pledge": "Huda Gadid $500",
+      "how": "only",
+      "remainingAfter": 0
+    },
+    {
+      "name": "Raed Sbeit",
+      "amount": 100,
+      "date": "2026-09-15",
+      "reason": "The Marouf Community",
+      "pledge": "Raed Sbeit $2500",
+      "how": "only",
+      "remainingAfter": 2400
+    },
+    {
+      "name": "Ahmed Taha",
+      "amount": 250,
+      "date": "2026-09-18",
+      "reason": "Annual Fundraiser - September 12, 2026",
+      "pledge": "Ahmed Taha $600",
+      "how": "closest",
+      "remainingAfter": 350
+    },
+    {
+      "name": "Jehad Alzyoud",
+      "amount": 50,
+      "date": "2026-09-19",
+      "reason": "Sadaqah/Donation",
+      "pledge": "Dr. Jehad Alzyoud $1000",
+      "how": "only",
+      "remainingAfter": 950
+    },
+    {
+      "name": "Abdullah Shawky",
+      "amount": 1000,
+      "date": "2026-09-20",
+      "reason": "Annual Fundraiser - September 12, 2026",
+      "pledge": "Aman Memorial $1000",
+      "how": "only",
+      "remainingAfter": 0
+    },
+    {
+      "name": "Raed Sbeit",
+      "amount": 200,
+      "date": "2026-09-21",
+      "reason": "Annual Fundraiser - September 12, 2026",
+      "pledge": "Raed Sbeit $2500",
+      "how": "only",
+      "remainingAfter": 2200
+    },
+    {
+      "name": "Nahla Hosny",
+      "amount": 500,
+      "date": "2026-09-21",
+      "reason": "Annual Fundraiser 26 - Ladies Thursday Halaqa",
+      "pledge": "Dr. Nahla Hosny $5000",
+      "how": "group",
+      "remainingAfter": 4500
+    },
+    {
+      "name": "Maheeb jaouni",
+      "amount": 500,
+      "date": "2026-09-22",
+      "reason": "Annual Fundraiser - September 12, 2026",
+      "pledge": "Dr. Maheeb Jaouni $6000",
+      "how": "only",
+      "remainingAfter": 5500
+    },
+    {
+      "name": "Hussien Elsiesy",
+      "amount": 10000,
+      "date": "2026-09-22",
+      "reason": "Annual Fundraiser - September 12, 2026",
+      "pledge": "Dr. Hussien Elsiesy $10000",
+      "how": "only",
+      "remainingAfter": 0
+    },
+    {
+      "name": "Abdelrahman Elarja",
+      "amount": 500,
+      "date": "2026-09-23",
+      "reason": "Annual Fundraiser - September 12, 2026",
+      "pledge": "Abdelrahman Elarja $500",
+      "how": "only",
+      "remainingAfter": 0
+    },
+    {
+      "name": "HAROON RASHEED",
+      "amount": 10000,
+      "date": "2026-09-24",
+      "reason": "Annual Fundraiser - September 12, 2026",
+      "pledge": "Dr. Haroon Rasheed $20000",
+      "how": "only",
+      "remainingAfter": 10000
+    },
+    {
+      "name": "Shayma Alzubi",
+      "amount": 100,
+      "date": "2026-09-25",
+      "reason": "Annual Fundraiser - September 12, 2026",
+      "pledge": "Shayma Alzubi $1000",
+      "how": "only",
+      "remainingAfter": 900
+    },
+    {
+      "name": "Malik Marouf",
+      "amount": 511.3,
+      "date": "2026-09-29",
+      "reason": "Sadaqah/Donation",
+      "pledge": "Malik Marouf $500",
+      "how": "only",
+      "remainingAfter": -11.3
+    }
+  ],
+  "planApplications": [
+    {
+      "name": "Usamah Ali",
+      "planName": "Usamah Ali",
+      "amount": 100,
+      "date": "2026-09-03",
+      "reason": "Sadaqah/Donation"
+    },
+    {
+      "name": "ghabofarag",
+      "planName": "Gh Abo Farag",
+      "amount": 30,
+      "date": "2026-09-04",
+      "reason": "Annual Fundraiser 26 - Quran Institute for Ladies"
+    },
+    {
+      "name": "ALKHAWALDEH ABDERRAOOF",
+      "planName": "ALKHAWALDEH ABDERRAOOF",
+      "amount": 100,
+      "date": "2026-09-12",
+      "reason": "Annual Fundraiser - September 12, 2026"
+    },
+    {
+      "name": "Omar Taha",
+      "planName": "Omar Taha",
+      "amount": 170.97,
+      "date": "2026-09-12",
+      "reason": "Sadaqah/Donation"
+    },
+    {
+      "name": "Abdelrahman Hassan",
+      "planName": "Abdelrahman Hassan",
+      "amount": 20,
+      "date": "2026-09-14",
+      "reason": "The Marouf Community"
+    },
+    {
+      "name": "Nabil M Zahra",
+      "planName": "Nabil M Zahra",
+      "amount": 500,
+      "date": "2026-09-15",
+      "reason": "Annual Fundraiser - September 12, 2026"
+    },
+    {
+      "name": "Husam Barham",
+      "planName": "Husam Barham",
+      "amount": 1250,
+      "date": "2026-09-15",
+      "reason": "Annual Fundraiser - September 12, 2026"
+    },
+    {
+      "name": "Muhammad Almahayni",
+      "planName": "Muhammad Almahayni",
+      "amount": 100,
+      "date": "2026-09-15",
+      "reason": "Annual Fundraiser - September 12, 2026"
+    },
+    {
+      "name": "Hussam Saleem",
+      "planName": "Hussam Saleem",
+      "amount": 100,
+      "date": "2026-09-15",
+      "reason": "Annual Fundraiser - September 12, 2026"
+    },
+    {
+      "name": "Luay Abdeljaber",
+      "planName": "Luay Abdeljaber",
+      "amount": 50,
+      "date": "2026-09-15",
+      "reason": "Annual Fundraiser - September 12, 2026"
+    },
+    {
+      "name": "Usamah Ali",
+      "planName": "Usamah Ali",
+      "amount": 100,
+      "date": "2026-09-16",
+      "reason": "Annual Fundraiser - September 12, 2026"
+    },
+    {
+      "name": "Pioneer Diagnostic Labs",
+      "planName": "Pioneer Diagnostic Labs",
+      "amount": 200,
+      "date": "2026-09-17",
+      "reason": "Annual Fundraiser - September 12, 2026"
+    },
+    {
+      "name": "Mohammed Rskhan",
+      "planName": "Mohammed Rskhan",
+      "amount": 1.32,
+      "date": "2026-09-18",
+      "reason": "Sadaqah/Donation"
+    },
+    {
+      "name": "Mohammed Rskhan",
+      "planName": "Mohammed Rskhan",
+      "amount": 1.32,
+      "date": "2026-09-19",
+      "reason": "Sadaqah/Donation"
+    },
+    {
+      "name": "Ghadeer iPhone Zarkani",
+      "planName": "Ghadeer iPhone Zarkani",
+      "amount": 50,
+      "date": "2026-09-22",
+      "reason": "Sustainers Campaign"
+    },
+    {
+      "name": "Mohammed Rskhan",
+      "planName": "Mohammed Rskhan",
+      "amount": 1.32,
+      "date": "2026-09-23",
+      "reason": "Sadaqah/Donation"
+    },
+    {
+      "name": "Mohammed Rskhan",
+      "planName": "Mohammed Rskhan",
+      "amount": 1.32,
+      "date": "2026-09-24",
+      "reason": "Sadaqah/Donation"
+    },
+    {
+      "name": "Mohammed Rskhan",
+      "planName": "Mohammed Rskhan",
+      "amount": 1.32,
+      "date": "2026-09-25",
+      "reason": "Sadaqah/Donation"
+    },
+    {
+      "name": "Abdelwadoud Ald",
+      "planName": "Abdelwadoud Ald",
+      "amount": 50,
+      "date": "2026-09-26",
+      "reason": "Annual Fundraiser - September 12, 2026"
+    },
+    {
+      "name": "Mohammed Rskhan",
+      "planName": "Mohammed Rskhan",
+      "amount": 1.32,
+      "date": "2026-09-27",
+      "reason": "Sadaqah/Donation"
+    },
+    {
+      "name": "Mohammed Rskhan",
+      "planName": "Mohammed Rskhan",
+      "amount": 1.32,
+      "date": "2026-09-28",
+      "reason": "Sadaqah/Donation"
+    },
+    {
+      "name": "Mohammed Rskhan",
+      "planName": "Mohammed Rskhan",
+      "amount": 1.32,
+      "date": "2026-09-29",
+      "reason": "Sadaqah/Donation"
+    },
+    {
+      "name": "Mohammed Rskhan",
+      "planName": "Mohammed Rskhan",
+      "amount": 1.32,
+      "date": "2026-09-30",
+      "reason": "Sadaqah/Donation"
+    },
+    {
+      "name": "Mohammed Rskhan",
+      "planName": "Mohammed Rskhan",
+      "amount": 1.32,
+      "date": "2026-10-01",
+      "reason": "Sadaqah/Donation"
+    },
+    {
+      "name": "Andrew Greenberg",
+      "planName": "Andrew Greenberg",
+      "amount": 25.85,
+      "date": "2026-10-02",
+      "reason": "Sadaqah/Donation"
+    },
+    {
+      "name": "Mohammed Rskhan",
+      "planName": "Mohammed Rskhan",
+      "amount": 1.32,
+      "date": "2026-10-02",
+      "reason": "Sadaqah/Donation"
+    },
+    {
+      "name": "Mohammed Rskhan",
+      "planName": "Mohammed Rskhan",
+      "amount": 1.32,
+      "date": "2026-10-02",
+      "reason": "Sadaqah/Donation"
+    },
+    {
+      "name": "Mohammed Rskhan",
+      "planName": "Mohammed Rskhan",
+      "amount": 1.32,
+      "date": "2026-10-02",
+      "reason": "Sadaqah/Donation"
+    },
+    {
+      "name": "Mohammed Rskhan",
+      "planName": "Mohammed Rskhan",
+      "amount": 1.32,
+      "date": "2026-10-02",
+      "reason": "Sadaqah/Donation"
+    },
+    {
+      "name": "Mohammed Rskhan",
+      "planName": "Mohammed Rskhan",
+      "amount": 1.32,
+      "date": "2026-10-02",
+      "reason": "Sadaqah/Donation"
+    }
+  ],
+  "skipped": [
+    {
+      "name": "adweikpersonal@gmail.com",
+      "amount": 1.32,
+      "date": "2026-09-01",
+      "reason": "Sadaqah/Donation",
+      "frequency": "weekly"
+    },
+    {
+      "name": "Abdallah Emran",
+      "amount": 10,
+      "date": "2026-09-02",
+      "reason": "The Marouf Community",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Hamza Jadallah",
+      "amount": 10.52,
+      "date": "2026-09-03",
+      "reason": "Masjid Operations",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Mohamed Ashurbaji",
+      "amount": 100,
+      "date": "2026-09-03",
+      "reason": "Sadaqah/Donation",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Emma Soliman",
+      "amount": 20.74,
+      "date": "2026-09-03",
+      "reason": "Sadaqah/Donation",
+      "frequency": "monthly"
+    },
+    {
+      "name": "aida Ammuss",
+      "amount": 25.85,
+      "date": "2026-09-03",
+      "reason": "Sadaqah/Donation",
+      "frequency": "monthly"
+    },
+    {
+      "name": ".......",
+      "amount": 25.85,
+      "date": "2026-09-04",
+      "reason": "Masjid Operations",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Ghassan Zahra",
+      "amount": 51.4,
+      "date": "2026-09-04",
+      "reason": "Masjid Operations",
+      "frequency": "weekly"
+    },
+    {
+      "name": "Angie Hasan",
+      "amount": 20.74,
+      "date": "2026-09-04",
+      "reason": "Sadaqah/Donation",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Malaka Ibrahim",
+      "amount": 10.52,
+      "date": "2026-09-04",
+      "reason": "Sadaqah/Donation",
+      "frequency": "weekly"
+    },
+    {
+      "name": "RASUL KASHIF",
+      "amount": 255.8,
+      "date": "2026-09-05",
+      "reason": "Masjid Operations",
+      "frequency": "monthly"
+    },
+    {
+      "name": "ELSEHETY ALI",
+      "amount": 25.85,
+      "date": "2026-09-05",
+      "reason": "Sadaqah/Donation",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Reyhan Yimam",
+      "amount": 25.85,
+      "date": "2026-09-06",
+      "reason": "Masjid Operations",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Ihsan Medhat Elashyi",
+      "amount": 10,
+      "date": "2026-09-06",
+      "reason": "The Marouf Community",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Ibrahim Shinwar",
+      "amount": 25.85,
+      "date": "2026-09-07",
+      "reason": "Sadaqah/Donation",
+      "frequency": "monthly"
+    },
+    {
+      "name": "niana mahrouq",
+      "amount": 25.85,
+      "date": "2026-09-08",
+      "reason": "Sadaqah/Donation",
+      "frequency": "monthly"
+    },
+    {
+      "name": "adweikpersonal@gmail.com",
+      "amount": 1.32,
+      "date": "2026-09-08",
+      "reason": "Sadaqah/Donation",
+      "frequency": "weekly"
+    },
+    {
+      "name": "Khaled Hashem",
+      "amount": 100,
+      "date": "2026-09-09",
+      "reason": "Sustainers Campaign",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Hamza Jadallah",
+      "amount": 20,
+      "date": "2026-09-09",
+      "reason": "The Marouf Community",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Ahmad n chehade",
+      "amount": 100,
+      "date": "2026-09-09",
+      "reason": "The Marouf Community",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Ibrahim Mustafa",
+      "amount": 100,
+      "date": "2026-09-09",
+      "reason": "The Marouf Community",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Nour Abu salih",
+      "amount": 100,
+      "date": "2026-09-09",
+      "reason": "The Marouf Community",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Aliya Asdi",
+      "amount": 10,
+      "date": "2026-09-09",
+      "reason": "The Marouf Community",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Qays Hawwar",
+      "amount": 51.4,
+      "date": "2026-09-10",
+      "reason": "Masjid Operations",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Qays Hawwar",
+      "amount": 51.4,
+      "date": "2026-09-10",
+      "reason": "Sadaqah/Donation",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Ayman Hammous",
+      "amount": 185,
+      "date": "2026-09-10",
+      "reason": "Sadaqah/Donation",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Zayd Hammous",
+      "amount": 100,
+      "date": "2026-09-10",
+      "reason": "Sustainers Campaign",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Omar Abdalla",
+      "amount": 100,
+      "date": "2026-09-10",
+      "reason": "Sustainers Campaign",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Declan Cherico",
+      "amount": 34.03,
+      "date": "2026-09-11",
+      "reason": "Masjid Operations",
+      "frequency": "weekly"
+    },
+    {
+      "name": "Ghassan Zahra",
+      "amount": 51.4,
+      "date": "2026-09-11",
+      "reason": "Masjid Operations",
+      "frequency": "weekly"
+    },
+    {
+      "name": "Ahmed Aly Taha",
+      "amount": 87.17,
+      "date": "2026-09-11",
+      "reason": "Sadaqah/Donation",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Malaka Ibrahim",
+      "amount": 10.52,
+      "date": "2026-09-11",
+      "reason": "Sadaqah/Donation",
+      "frequency": "weekly"
+    },
+    {
+      "name": "Yousuf AlMakhamreh",
+      "amount": 100,
+      "date": "2026-09-12",
+      "reason": "The Marouf Community",
+      "frequency": "monthly"
+    },
+    {
+      "name": "OneRehab",
+      "amount": 100,
+      "date": "2026-09-12",
+      "reason": "The Marouf Community",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Helwa Aburas",
+      "amount": 20.74,
+      "date": "2026-09-13",
+      "reason": "Sadaqah/Donation",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Amir Shuaib",
+      "amount": 500,
+      "date": "2026-09-13",
+      "reason": "Sadaqah/Donation",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Yasmeen Hanif",
+      "amount": 100,
+      "date": "2026-09-13",
+      "reason": "The Marouf Community",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Seiny Seck",
+      "amount": 10,
+      "date": "2026-09-13",
+      "reason": "The Marouf Community",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Declan Cherico",
+      "amount": 34.03,
+      "date": "2026-09-14",
+      "reason": "Masjid Operations",
+      "frequency": "weekly"
+    },
+    {
+      "name": "RANDHAWA HAROON",
+      "amount": 102.5,
+      "date": "2026-09-14",
+      "reason": "Masjid Operations",
+      "frequency": "monthly"
+    },
+    {
+      "name": "adweikpersonal@gmail.com",
+      "amount": 1.32,
+      "date": "2026-09-15",
+      "reason": "Sadaqah/Donation",
+      "frequency": "weekly"
+    },
+    {
+      "name": "Hamzah Abdullah",
+      "amount": 100,
+      "date": "2026-09-15",
+      "reason": "Sustainers Campaign",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Abdelouahed MANAA",
+      "amount": 102.5,
+      "date": "2026-09-16",
+      "reason": "Masjid Operations",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Amaal Aref",
+      "amount": 10,
+      "date": "2026-09-16",
+      "reason": "The Marouf Community",
+      "frequency": "monthly"
+    },
+    {
+      "name": "SYED MANSOOR",
+      "amount": 10.52,
+      "date": "2026-09-17",
+      "reason": "Masjid Operations",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Mostafa Taleb",
+      "amount": 100,
+      "date": "2026-09-17",
+      "reason": "Sadaqah/Donation",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Rami Kawas",
+      "amount": 50,
+      "date": "2026-09-17",
+      "reason": "The Marouf Community",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Khalil Abu AbuSamrah",
+      "amount": 25.85,
+      "date": "2026-09-18",
+      "reason": "Masjid Operations",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Declan Cherico",
+      "amount": 34.03,
+      "date": "2026-09-18",
+      "reason": "Masjid Operations",
+      "frequency": "weekly"
+    },
+    {
+      "name": "Ghassan Zahra",
+      "amount": 51.4,
+      "date": "2026-09-18",
+      "reason": "Masjid Operations",
+      "frequency": "weekly"
+    },
+    {
+      "name": "Abdallah Emran",
+      "amount": 20.74,
+      "date": "2026-09-18",
+      "reason": "Masjid Operations",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Malaka Ibrahim",
+      "amount": 10.52,
+      "date": "2026-09-18",
+      "reason": "Sadaqah/Donation",
+      "frequency": "weekly"
+    },
+    {
+      "name": "Israa Ali",
+      "amount": 50,
+      "date": "2026-09-18",
+      "reason": "The Marouf Community",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Ghassan Farra",
+      "amount": 102.5,
+      "date": "2026-09-18",
+      "reason": "Zakat",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Jawad Zahra",
+      "amount": 1.83,
+      "date": "2026-09-19",
+      "reason": "Sadaqah/Donation",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Ibrahim Najjar",
+      "amount": 100,
+      "date": "2026-09-19",
+      "reason": "Sadaqah/Donation",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Fadi Alass",
+      "amount": 170,
+      "date": "2026-09-19",
+      "reason": "Sadaqah/Donation",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Mohammed J Mansour",
+      "amount": 80,
+      "date": "2026-09-19",
+      "reason": "Sadaqah/Donation",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Ammar Elmezayen",
+      "amount": 10,
+      "date": "2026-09-19",
+      "reason": "Sadaqah/Donation",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Mohd Hozain",
+      "amount": 50,
+      "date": "2026-09-19",
+      "reason": "Sadaqah/Donation",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Mahmoud Abdellatif",
+      "amount": 50,
+      "date": "2026-09-19",
+      "reason": "Sadaqah/Donation",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Zeyad Yahia",
+      "amount": 100,
+      "date": "2026-09-19",
+      "reason": "Sustainers Campaign",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Amir Muriby",
+      "amount": 50,
+      "date": "2026-09-19",
+      "reason": "The Marouf Community",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Awab Hammous",
+      "amount": 102.5,
+      "date": "2026-09-20",
+      "reason": "Sadaqah/Donation",
+      "frequency": "monthly"
+    },
+    {
+      "name": "adweikpersonal@gmail.com",
+      "amount": 1.32,
+      "date": "2026-09-22",
+      "reason": "Sadaqah/Donation",
+      "frequency": "weekly"
+    },
+    {
+      "name": "Khalid Shaheed",
+      "amount": 25.85,
+      "date": "2026-09-24",
+      "reason": "Zakat",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Declan Cherico",
+      "amount": 34.03,
+      "date": "2026-09-25",
+      "reason": "Masjid Operations",
+      "frequency": "weekly"
+    },
+    {
+      "name": "Ghassan Zahra",
+      "amount": 51.4,
+      "date": "2026-09-25",
+      "reason": "Masjid Operations",
+      "frequency": "weekly"
+    },
+    {
+      "name": "Malaka Ibrahim",
+      "amount": 10.52,
+      "date": "2026-09-25",
+      "reason": "Sadaqah/Donation",
+      "frequency": "weekly"
+    },
+    {
+      "name": "Aly Taha",
+      "amount": 50,
+      "date": "2026-09-25",
+      "reason": "The Marouf Community",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Uthman Apatira",
+      "amount": 34.03,
+      "date": "2026-09-26",
+      "reason": "Masjid Operations",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Manzur Mahmud",
+      "amount": 100,
+      "date": "2026-09-26",
+      "reason": "Sadaqah/Donation",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Hana Saleh",
+      "amount": 30.96,
+      "date": "2026-09-27",
+      "reason": "Masjid Operations",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Iyad Ashour",
+      "amount": 209,
+      "date": "2026-09-27",
+      "reason": "Sadaqah/Donation",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Amr Marawan",
+      "amount": 1000,
+      "date": "2026-09-27",
+      "reason": "Sadaqah/Donation",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Omar Raslan",
+      "amount": 50,
+      "date": "2026-09-27",
+      "reason": "Sadaqah/Donation",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Imane",
+      "amount": 10,
+      "date": "2026-09-28",
+      "reason": "The Marouf Community",
+      "frequency": "monthly"
+    },
+    {
+      "name": "adweikpersonal@gmail.com",
+      "amount": 1.32,
+      "date": "2026-09-29",
+      "reason": "Sadaqah/Donation",
+      "frequency": "weekly"
+    },
+    {
+      "name": "Ibrahem Flooring Almallah",
+      "amount": 102.5,
+      "date": "2026-10-02",
+      "reason": "Masjid Operations",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Declan Cherico",
+      "amount": 34.03,
+      "date": "2026-10-02",
+      "reason": "Masjid Operations",
+      "frequency": "weekly"
+    },
+    {
+      "name": "Ghassan Zahra",
+      "amount": 51.4,
+      "date": "2026-10-02",
+      "reason": "Masjid Operations",
+      "frequency": "weekly"
+    },
+    {
+      "name": "Mostafa Taleb",
+      "amount": 100,
+      "date": "2026-10-02",
+      "reason": "Sadaqah/Donation",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Seiny Seck",
+      "amount": 10,
+      "date": "2026-10-02",
+      "reason": "The Marouf Community",
+      "frequency": "monthly"
+    },
+    {
+      "name": "Abdallah Emran",
+      "amount": 10,
+      "date": "2026-10-02",
+      "reason": "The Marouf Community",
+      "frequency": "monthly"
+    }
+  ],
+  "reasonTotals": {
+    "Annual Fundraiser 26 - Education Dept.": {
+      "n": 4,
+      "amount": 350,
+      "buckets": {
+        "one_time": 4
+      }
+    },
+    "Annual Fundraiser 26 - Ladies Thursday Halaqa": {
+      "n": 12,
+      "amount": 8400,
+      "buckets": {
+        "one_time": 11,
+        "pledge": 1
+      }
+    },
+    "Sadaqah/Donation": {
+      "n": 109,
+      "amount": 32605.21,
+      "buckets": {
+        "one_time": 52,
+        "skipped": 35,
+        "plan": 18,
+        "pledge": 4
+      }
+    },
+    "Annual Fundraiser 26 - Ladies Wednesday Halaqa": {
+      "n": 17,
+      "amount": 9775,
+      "buckets": {
+        "one_time": 17
+      }
+    },
+    "Annual Fundraiser 26 - Quran Institute for Ladies": {
+      "n": 41,
+      "amount": 5686,
+      "buckets": {
+        "one_time": 40,
+        "plan": 1
+      }
+    },
+    "The Marouf Community": {
+      "n": 22,
+      "amount": 1030,
+      "buckets": {
+        "skipped": 19,
+        "pledge": 2,
+        "plan": 1
+      }
+    },
+    "Masjid Operations": {
+      "n": 24,
+      "amount": 1231.58,
+      "buckets": {
+        "skipped": 23,
+        "one_time": 1
+      }
+    },
+    "Annual Fundraiser 26 - Center": {
+      "n": 1,
+      "amount": 100,
+      "buckets": {
+        "one_time": 1
+      }
+    },
+    "Annual Fundraiser 26 - Tarbiya Dept.": {
+      "n": 5,
+      "amount": 1100,
+      "buckets": {
+        "one_time": 5
+      }
+    },
+    "MAS Renovations": {
+      "n": 1,
+      "amount": 20,
+      "buckets": {
+        "one_time": 1
+      }
+    },
+    "Annual Fundraiser - September 12, 2026": {
+      "n": 31,
+      "amount": 35723.17,
+      "buckets": {
+        "pledge": 10,
+        "plan": 9,
+        "one_time": 12
+      }
+    },
+    "Sustainers Campaign": {
+      "n": 6,
+      "amount": 550,
+      "buckets": {
+        "skipped": 5,
+        "plan": 1
+      }
+    },
+    "Annual Fundraiser 26 - CYP Usrat Al-Islah": {
+      "n": 9,
+      "amount": 5750,
+      "buckets": {
+        "one_time": 9
+      }
+    },
+    "Zakat": {
+      "n": 3,
+      "amount": 435.25,
+      "buckets": {
+        "skipped": 2,
+        "one_time": 1
+      }
+    }
+  },
+  "errors": [],
+  "planSummaries": [
+    {
+      "name": "Gh Abo Farag",
+      "amount": 30,
+      "frequency": "monthly",
+      "paymentsMade": 1,
+      "latest": "2026-09-04",
+      "status": "active"
+    },
+    {
+      "name": "Husam Barham",
+      "amount": 1250,
+      "frequency": "monthly",
+      "paymentsMade": 1,
+      "latest": "2026-09-15",
+      "status": "active"
+    },
+    {
+      "name": "Pioneer Diagnostic Labs",
+      "amount": 200,
+      "frequency": "monthly",
+      "paymentsMade": 1,
+      "latest": "2026-09-17",
+      "status": "active"
+    },
+    {
+      "name": "Omar Taha",
+      "amount": 170.97,
+      "frequency": "monthly",
+      "paymentsMade": 1,
+      "latest": "2026-09-12",
+      "status": "active"
+    },
+    {
+      "name": "Muhammad Almahayni",
+      "amount": 100,
+      "frequency": "monthly",
+      "paymentsMade": 1,
+      "latest": "2026-09-15",
+      "status": "active"
+    },
+    {
+      "name": "Mohammed Rskhan",
+      "amount": 1.32,
+      "frequency": "daily",
+      "paymentsMade": 15,
+      "latest": "2026-10-02",
+      "status": "active"
+    },
+    {
+      "name": "ALKHAWALDEH ABDERRAOOF",
+      "amount": 100,
+      "frequency": "monthly",
+      "paymentsMade": 1,
+      "latest": "2026-09-12",
+      "status": "active"
+    },
+    {
+      "name": "Hussam Saleem",
+      "amount": 100,
+      "frequency": "monthly",
+      "paymentsMade": 1,
+      "latest": "2026-09-15",
+      "status": "active"
+    },
+    {
+      "name": "Ghadeer iPhone Zarkani",
+      "amount": 50,
+      "frequency": "monthly",
+      "paymentsMade": 1,
+      "latest": "2026-09-22",
+      "status": "active"
+    },
+    {
+      "name": "Abdelrahman Hassan",
+      "amount": 20,
+      "frequency": "monthly",
+      "paymentsMade": 1,
+      "latest": "2026-09-14",
+      "status": "active"
+    },
+    {
+      "name": "Luay Abdeljaber",
+      "amount": 50,
+      "frequency": "monthly",
+      "paymentsMade": 1,
+      "latest": "2026-09-15",
+      "status": "active"
+    },
+    {
+      "name": "Abdelwadoud Ald",
+      "amount": 50,
+      "frequency": "monthly",
+      "paymentsMade": 1,
+      "latest": "2026-09-26",
+      "status": "active"
+    },
+    {
+      "name": "Nabil M Zahra",
+      "amount": 500,
+      "frequency": "monthly",
+      "paymentsMade": 1,
+      "latest": "2026-09-15",
+      "status": "active"
+    },
+    {
+      "name": "Usamah Ali",
+      "amount": 100,
+      "frequency": "monthly",
+      "paymentsMade": 2,
+      "latest": "2026-09-16",
+      "status": "active"
+    },
+    {
+      "name": "Andrew Greenberg",
+      "amount": 25.85,
+      "frequency": "monthly",
+      "paymentsMade": 1,
+      "latest": "2026-10-02",
+      "status": "active"
+    }
+  ]
+}

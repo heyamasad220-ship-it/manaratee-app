@@ -1,5 +1,7 @@
 import { Fragment } from "react"
 
+import { Button } from "@/components/ui/button"
+
 type Payment = {
   id: string
   amount: number | string
@@ -27,7 +29,17 @@ function formatDate(date: string | null) {
   })
 }
 
-export function PaymentHistory({ payments }: { payments: Payment[] }) {
+export function PaymentHistory({
+  payments,
+  canUnallocate = false,
+  unallocatingId = null,
+  onUnallocate,
+}: {
+  payments: Payment[]
+  canUnallocate?: boolean
+  unallocatingId?: string | null
+  onUnallocate?: (paymentId: string) => void
+}) {
   if (!payments || payments.length === 0) {
     return (
       <div className="rounded-md border p-4 text-sm text-muted-foreground">
@@ -63,6 +75,7 @@ export function PaymentHistory({ payments }: { payments: Payment[] }) {
               <th className="p-3 text-left font-medium">Date</th>
               <th className="p-3 text-left font-medium">Amount</th>
               <th className="p-3 text-left font-medium">Method</th>
+              {canUnallocate ? <th className="p-3 text-right font-medium"> </th> : null}
             </tr>
           </thead>
           <tbody>
@@ -74,9 +87,22 @@ export function PaymentHistory({ payments }: { payments: Payment[] }) {
                     {formatCurrency(payment.amount)}
                   </td>
                   <td className="p-3 pb-2 align-top capitalize">{payment.source || "—"}</td>
+                  {canUnallocate ? (
+                    <td className="p-3 pb-2 text-right align-top">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={unallocatingId === payment.id}
+                        onClick={() => onUnallocate?.(payment.id)}
+                      >
+                        {unallocatingId === payment.id ? "Removing…" : "Unallocate"}
+                      </Button>
+                    </td>
+                  ) : null}
                 </tr>
                 <tr className="border-b last:border-b-0">
-                  <td colSpan={3} className="px-3 pb-3 pt-0">
+                  <td colSpan={canUnallocate ? 4 : 3} className="px-3 pb-3 pt-0">
                     <div className="border-t border-border pt-3">
                       <p className="text-sm font-semibold text-foreground">Memo</p>
                       <p className="mt-1.5 break-all text-sm text-muted-foreground">

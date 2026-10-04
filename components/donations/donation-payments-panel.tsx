@@ -68,8 +68,7 @@ import {
 } from "@/lib/donations/donation-date-range";
 import { downloadPaymentsReportCsv } from "@/lib/donations/payment-report-csv";
 import { ensureDonorExtensionForContact } from "@/lib/donations/donor-contact-bridge";
-import { ensureGroupMembershipForDonationAction } from "@/lib/contacts/group-giving-actions";
-import { DonationGroupPicker } from "@/components/donations/donation-group-picker";
+import { CampaignGroupPicker } from "@/components/donations/campaign-group-picker";
 import { DONATIONS_PAGE_SIZE } from "@/lib/donations/donation-pagination";
 import {
   Pagination,
@@ -267,8 +266,8 @@ export function DonationPaymentsPanel({
     EMPTY_DONATION_ATTRIBUTION_VALUE
   );
   const [wishlistItemId, setWishlistItemId] = useState<string | null>(null);
-  const [selectedGroupContactId, setSelectedGroupContactId] = useState<string | null>(null);
-  const [selectedGroupLabel, setSelectedGroupLabel] = useState("");
+  const [selectedCampaignGroupId, setSelectedCampaignGroupId] = useState<string | null>(null);
+  const [selectedCampaignGroupLabel, setSelectedCampaignGroupLabel] = useState("");
 
   const [showAllocateDialog, setShowAllocateDialog] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
@@ -558,8 +557,8 @@ export function DonationPaymentsPanel({
     setMemo("");
     setAttribution(EMPTY_DONATION_ATTRIBUTION_VALUE);
     setWishlistItemId(null);
-    setSelectedGroupContactId(null);
-    setSelectedGroupLabel("");
+    setSelectedCampaignGroupId(null);
+    setSelectedCampaignGroupLabel("");
   }
 
   async function handleAddPayment() {
@@ -579,25 +578,7 @@ export function DonationPaymentsPanel({
       ? contacts.find((contact) => contact.contactId === selectedContactId)
       : null;
 
-    if (selectedGroupContactId && !selectedContactId) {
-      alert("Select a contact when counting a gift toward a group.");
-      return;
-    }
-
     setSaving(true);
-
-    if (selectedGroupContactId && selectedContactId) {
-      const groupResult = await ensureGroupMembershipForDonationAction({
-        memberContactId: selectedContactId,
-        groupContactId: selectedGroupContactId,
-      });
-
-      if (!groupResult.success) {
-        setSaving(false);
-        alert(groupResult.error);
-        return;
-      }
-    }
 
     let resolvedDonorId: string | null = null;
 
@@ -615,7 +596,7 @@ export function DonationPaymentsPanel({
       organization_id: orgId,
       donor_id: resolvedDonorId,
       contact_id: selectedContactId,
-      attributed_group_contact_id: selectedGroupContactId,
+      campaign_group_id: attribution.campaignId ? selectedCampaignGroupId : null,
       pledge_id: null,
       sender_name: selectedContact?.full_name || selectedContact?.email || null,
       amount: Number(amount),
@@ -1059,8 +1040,6 @@ export function DonationPaymentsPanel({
                           value="No contact selected"
                           onSelect={() => {
                             setSelectedContactId(null);
-                            setSelectedGroupContactId(null);
-                            setSelectedGroupLabel("");
                             setDonorOpen(false);
                             setDonorSearch("");
                           }}
@@ -1080,8 +1059,6 @@ export function DonationPaymentsPanel({
                             value={contact.full_name || contact.email || contact.contactId}
                             onSelect={() => {
                               setSelectedContactId(contact.contactId);
-                              setSelectedGroupContactId(null);
-                              setSelectedGroupLabel("");
                               setDonorOpen(false);
                               setDonorSearch("");
                             }}
@@ -1103,17 +1080,6 @@ export function DonationPaymentsPanel({
                 </PopoverContent>
               </Popover>
             </div>
-
-            <DonationGroupPicker
-              groupContactId={selectedGroupContactId}
-              groupLabel={selectedGroupLabel}
-              memberContactId={selectedContactId}
-              onChange={(groupContactId, label) => {
-                setSelectedGroupContactId(groupContactId);
-                setSelectedGroupLabel(label);
-              }}
-              disabled={saving}
-            />
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-2">
@@ -1160,7 +1126,21 @@ export function DonationPaymentsPanel({
               onChange={(value) => {
                 setAttribution(value);
                 if (!value.campaignId) setWishlistItemId(null);
+                if (value.campaignId !== attribution.campaignId) {
+                  setSelectedCampaignGroupId(null);
+                  setSelectedCampaignGroupLabel("");
+                }
               }}
+            />
+            <CampaignGroupPicker
+              campaignId={attribution.campaignId || null}
+              groupId={selectedCampaignGroupId}
+              groupLabel={selectedCampaignGroupLabel}
+              onChange={(nextGroupId, label) => {
+                setSelectedCampaignGroupId(nextGroupId);
+                setSelectedCampaignGroupLabel(label);
+              }}
+              disabled={saving}
             />
             <WishlistItemPicker
               campaignId={attribution.campaignId || null}

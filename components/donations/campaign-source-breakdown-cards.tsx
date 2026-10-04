@@ -1,11 +1,16 @@
 import type { ReactNode } from "react"
 import {
+  AlertCircle,
   Banknote,
   CreditCard,
+  DollarSign,
+  Gift,
   Heart,
+  Landmark,
   RefreshCw,
   ScanLine,
   Settings2,
+  Target,
   Ticket,
   TrendingUp,
   Users,
@@ -21,8 +26,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table"
 import {
+  campaignCommitmentRaised,
   formatDonationCurrency,
-  type CampaignDonorInsights,
   type CampaignMetrics,
   type CampaignSourceBreakdown,
 } from "@/lib/donations/campaign-analytics"
@@ -33,25 +38,26 @@ import {
 import { cn } from "@/lib/utils"
 
 type MetricTableRow = {
-  key: CampaignOverviewMetricKey
+  key: string
   title: string
   value: ReactNode
   icon: LucideIcon
   accent: DonationMetricAccent
   description?: ReactNode
   highlight?: boolean
-  onValueClick?: () => void
+  onClick?: () => void
 }
+
+const PINNED_OVERVIEW_KEYS = new Set<CampaignOverviewMetricKey>(["donors", "largest-gift"])
 
 type CampaignOverviewMetricsTableProps = {
   breakdown: CampaignSourceBreakdown
   metrics: CampaignMetrics
-  insights: CampaignDonorInsights | null
+  goalAmount?: number | null
   visibleMetricKeys?: CampaignOverviewMetricKey[] | null
   canCustomize?: boolean
   onCustomizeClick?: () => void
-  onDonorsClick?: () => void
-  onLargestGiftClick?: () => void
+  onMetricClick?: (key: string) => void
 }
 
 function MetricTableRowCell({
@@ -60,20 +66,30 @@ function MetricTableRowCell({
   row: MetricTableRow
 }) {
   const styles = ACCENT_STYLES[row.accent]
-  const valueClassName = cn(
-    "text-right text-xl font-bold tabular-nums",
-    row.highlight && "text-2xl",
-    styles.value,
-    row.onValueClick && "cursor-pointer transition hover:underline"
-  )
+  const clickable = Boolean(row.onClick)
 
   return (
     <TableRow
       className={cn(
         "hover:bg-muted/30",
         styles.card,
-        row.highlight && "bg-rose-50/70 dark:bg-rose-950/20"
+        row.highlight && "bg-rose-50/70 dark:bg-rose-950/20",
+        clickable && "cursor-pointer"
       )}
+      onClick={row.onClick}
+      onKeyDown={
+        clickable
+          ? (event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault()
+                row.onClick?.()
+              }
+            }
+          : undefined
+      }
+      tabIndex={clickable ? 0 : undefined}
+      role={clickable ? "button" : undefined}
+      aria-label={clickable ? `View ${row.title}` : undefined}
     >
       <TableCell className="w-14 py-3">
         <div className={cn(styles.iconWrap, "inline-flex")}>
@@ -89,36 +105,97 @@ function MetricTableRowCell({
         ) : null}
       </TableCell>
       <TableCell className="py-3">
-        {row.onValueClick ? (
-          <button type="button" onClick={row.onValueClick} className={cn(valueClassName, "ml-auto block")}>
-            {row.value}
-          </button>
-        ) : (
-          <div className={cn(valueClassName, "ml-auto")}>{row.value}</div>
-        )}
+        <div className={cn("ml-auto text-right text-xl font-bold tabular-nums", row.highlight && "text-2xl", styles.value)}>
+          {row.value}
+        </div>
       </TableCell>
     </TableRow>
   )
 }
 
+function buildPinnedOverviewRows(input: {
+  metrics: CampaignMetrics
+  goalAmount?: number | null
+  onMetricClick?: (key: string) => void
+}): MetricTableRow[] {
+  const { metrics, goalAmount, onMetricClick } = input
+  const goal = goalAmount && goalAmount > 0 ? goalAmount : null
+  const open = (key: string) => (onMetricClick ? () => onMetricClick(key) : undefined)
+
+  return [
+    {
+      key: "goal",
+      title: "Campaign Goal",
+      value: goal != null ? formatDonationCurrency(goal) : "No goal set",
+      icon: Target,
+      accent: "blue",
+    },
+    {
+      key: "total-raised",
+      title: "Total Raised",
+      value: formatDonationCurrency(campaignCommitmentRaised(metrics)),
+      icon: TrendingUp,
+      accent: "blue",
+      description: "Collected plus open pledge balances",
+      onClick: open("total-raised"),
+    },
+    {
+      key: "total-collected",
+      title: "Total Collected",
+      value: formatDonationCurrency(metrics.raised),
+      icon: DollarSign,
+      accent: "emerald",
+      description: "Every payment received",
+      onClick: open("total-collected"),
+    },
+    {
+      key: "outstanding",
+      title: "Outstanding",
+      value: formatDonationCurrency(metrics.outstanding),
+      icon: AlertCircle,
+      accent: "amber",
+      description: "Open pledge balances",
+      onClick: open("outstanding"),
+    },
+    {
+      key: "donors",
+      title: "Donors",
+      value: metrics.donorCount,
+      icon: Users,
+      accent: "purple",
+      description: "Unique donors",
+      onClick: open("donors"),
+    },
+    {
+      key: "largest-gift",
+      title: "Largest Gift",
+      value: formatDonationCurrency(metrics.largestGift),
+      icon: Gift,
+      accent: "rose",
+      description: "Largest pledge or payment",
+      onClick: open("largest-gift"),
+    },
+  ]
+}
+
 function buildCampaignOverviewMetricRows(input: {
   breakdown: CampaignSourceBreakdown
   metrics: CampaignMetrics
-  insights: CampaignDonorInsights | null
-  onDonorsClick?: () => void
-  onLargestGiftClick?: () => void
+  onMetricClick?: (key: string) => void
 }): MetricTableRow[] {
-  const { breakdown, metrics, insights, onDonorsClick, onLargestGiftClick } = input
-  const largestGift = insights?.largestGift
-  const largestGiftAmount = formatDonationCurrency(largestGift?.amount ?? metrics.largestGift)
-  const largestGiftDonorLabel =
-    largestGift?.displayName && (largestGift?.amount ?? metrics.largestGift) > 0
-      ? `From ${largestGift.displayName}`
-      : undefined
+  const { breakdown, metrics, onMetricClick } = input
+  const open = (key: string) => (onMetricClick ? () => onMetricClick(key) : undefined)
 
   return [
     { key: "cash", title: "Cash", value: formatDonationCurrency(breakdown.cash), icon: Banknote, accent: "emerald" },
     { key: "checks", title: "Checks", value: formatDonationCurrency(breakdown.checks), icon: Wallet, accent: "blue" },
+    {
+      key: "ach",
+      title: "ACH",
+      value: formatDonationCurrency(breakdown.ach),
+      icon: Landmark,
+      accent: "blue",
+    },
     {
       key: "square",
       title: "Square",
@@ -155,43 +232,6 @@ function buildCampaignOverviewMetricRows(input: {
       accent: "amber",
     },
     {
-      key: "donors",
-      title: "Donors",
-      value: metrics.donorCount,
-      icon: Users,
-      accent: "cyan",
-      onValueClick: onDonorsClick,
-    },
-    {
-      key: "largest-gift",
-      title: "Largest Gift",
-      value: onLargestGiftClick ? (
-        <button
-          type="button"
-          onClick={onLargestGiftClick}
-          className="cursor-pointer transition hover:underline"
-        >
-          {largestGiftAmount}
-        </button>
-      ) : (
-        largestGiftAmount
-      ),
-      icon: TrendingUp,
-      accent: "rose",
-      description:
-        largestGiftDonorLabel && onLargestGiftClick ? (
-          <button
-            type="button"
-            onClick={onLargestGiftClick}
-            className="cursor-pointer transition hover:underline"
-          >
-            {largestGiftDonorLabel}
-          </button>
-        ) : (
-          largestGiftDonorLabel
-        ),
-    },
-    {
       key: "pledges",
       title: "Pledges",
       value: formatDonationCurrency(breakdown.remainingPledges),
@@ -205,18 +245,17 @@ function buildCampaignOverviewMetricRows(input: {
         </>
       ),
     },
-  ]
+  ].map((row) => ({ ...row, onClick: open(row.key) }))
 }
 
 export function CampaignOverviewMetricsTable({
   breakdown,
   metrics,
-  insights,
+  goalAmount = null,
   visibleMetricKeys,
   canCustomize = false,
   onCustomizeClick,
-  onDonorsClick,
-  onLargestGiftClick,
+  onMetricClick,
 }: CampaignOverviewMetricsTableProps) {
   const resolvedKeys = resolveCampaignOverviewMetricKeys({
     savedKeys: visibleMetricKeys ?? null,
@@ -226,14 +265,16 @@ export function CampaignOverviewMetricsTable({
     buildCampaignOverviewMetricRows({
       breakdown,
       metrics,
-      insights,
-      onDonorsClick,
-      onLargestGiftClick,
+      onMetricClick,
     }).map((row) => [row.key, row])
   )
-  const rows = resolvedKeys
-    .map((key) => rowByKey.get(key))
-    .filter((row): row is MetricTableRow => Boolean(row))
+  const rows = [
+    ...buildPinnedOverviewRows({ metrics, goalAmount, onMetricClick }),
+    ...resolvedKeys
+      .filter((key) => !PINNED_OVERVIEW_KEYS.has(key))
+      .map((key) => rowByKey.get(key))
+      .filter((row): row is MetricTableRow => Boolean(row)),
+  ]
 
   return (
     <Card className="h-full">

@@ -256,7 +256,7 @@ export async function getDonorPledgesAction(donorId: string) {
     const { data: pledgeRows, error } = await supabase
       .from("pledge_status_view")
       .select(
-        "id, campaign_name, amount_pledged, amount_paid, balance_remaining, calculated_status, pledge_date, frequency, installment_amount, total_payments, first_payment_date, next_payment_date"
+        "id, campaign_id, campaign_name, amount_pledged, amount_paid, balance_remaining, calculated_status, pledge_date, frequency, installment_amount, total_payments, first_payment_date, next_payment_date"
       )
       .eq("organization_id", orgId)
       .eq("donor_id", donorId)
@@ -264,11 +264,51 @@ export async function getDonorPledgesAction(donorId: string) {
 
     if (error) throw new Error(error.message)
 
+    const pledgeIds = (pledgeRows || []).map((row) => row.id as string)
+    const groupByPledge = new Map<string, { campaignGroupId: string | null; campaignGroupName: string | null }>()
+    if (pledgeIds.length > 0) {
+      const { data: groupRows, error: groupError } = await supabase
+        .from("pledges")
+        .select("id, campaign_group_id")
+        .eq("organization_id", orgId)
+        .in("id", pledgeIds)
+      if (groupError) throw new Error(groupError.message)
+      const groupIds = [
+        ...new Set(
+          (groupRows || [])
+            .map((row) => row.campaign_group_id as string | null)
+            .filter((id): id is string => Boolean(id))
+        ),
+      ]
+      const groupNames = new Map<string, string>()
+      if (groupIds.length > 0) {
+        const { data: nameRows, error: nameError } = await supabase
+          .from("campaign_groups")
+          .select("id, name")
+          .eq("organization_id", orgId)
+          .in("id", groupIds)
+        if (nameError) throw new Error(nameError.message)
+        for (const row of nameRows || []) {
+          groupNames.set(row.id as string, (row.name as string) || "Group")
+        }
+      }
+      for (const row of groupRows || []) {
+        const groupId = (row.campaign_group_id as string | null) ?? null
+        groupByPledge.set(row.id as string, {
+          campaignGroupId: groupId,
+          campaignGroupName: groupId ? groupNames.get(groupId) || "" : null,
+        })
+      }
+    }
+
     return {
       success: true as const,
       pledges: (pledgeRows || []).map((row) => ({
         id: row.id,
+        campaignId: (row.campaign_id as string | null) ?? null,
         campaignName: row.campaign_name,
+        campaignGroupId: groupByPledge.get(row.id as string)?.campaignGroupId ?? null,
+        campaignGroupName: groupByPledge.get(row.id as string)?.campaignGroupName ?? null,
         amountPledged: Number(row.amount_pledged || 0),
         amountPaid: Number(row.amount_paid || 0),
         balanceRemaining: Number(row.balance_remaining || 0),

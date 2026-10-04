@@ -18,7 +18,6 @@ import {
   Users,
   Home,
   GraduationCap,
-  Menu,
   X,
   Ticket,
   Boxes,
@@ -1135,21 +1134,6 @@ export function SidebarNavigationSync() {
     <Suspense fallback={null}>
       <SidebarSelectionSync />
     </Suspense>
-  )
-}
-
-export function MobileMenuTrigger() {
-  const { setMobileOpen } = useSidebarContext()
-  return (
-    <Button
-      variant="ghost"
-      size="icon"
-      className="h-10 w-10 lg:hidden"
-      onClick={() => setMobileOpen(true)}
-      aria-label="Open menu"
-    >
-      <Menu className="h-5 w-5" />
-    </Button>
   )
 }
 

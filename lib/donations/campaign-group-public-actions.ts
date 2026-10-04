@@ -13,130 +13,143 @@ import { loadOrganizationStripeConnect } from "@/lib/stripe/stripe-connect-queri
 import { isOrganizationStripeConnectReady } from "@/lib/stripe/stripe-connect-types"
 import { createServiceRoleClient } from "@/lib/supabase/service-role"
 
+export type PublicCampaignGroupChoice = {
+  id: string
+  name: string
+  received: number
+}
+
 export type PublicCampaignGroupDonateInfo = {
   token: string
-  groupId: string
-  groupName: string
-  description: string | null
-  goalAmount: number | null
-  publicProgressEnabled: boolean
   campaignId: string
   campaignName: string
   organizationId: string
   organizationName: string
-  collected: number | null
-  progressPercent: number | null
+  groups: PublicCampaignGroupChoice[]
   onlineDonationsReady: boolean
 }
 
-async function loadActiveGroupByToken(token: string) {
+async function loadCampaignByDonateToken(token: string) {
   const supabase = createServiceRoleClient()
   const trimmed = token.trim()
   if (!trimmed) return { ok: false as const, error: "Invalid donation link" }
 
-  const { data: group, error } = await supabase
-    .from("campaign_groups")
-    .select(
-      "id, name, description, goal_amount, status, link_active, public_progress_enabled, campaign_id, organization_id, organizational_group_id, public_token"
-    )
-    .eq("public_token", trimmed)
+  const { data: campaign, error } = await supabase
+    .from("campaigns")
+    .select("id, name, organization_id, group_donate_token")
+    .eq("group_donate_token", trimmed)
     .maybeSingle()
 
   if (error) {
-    if (error.code === "42P01" || /campaign_groups/i.test(error.message || "")) {
+    if (error.code === "42703" || /group_donate_token/i.test(error.message || "")) {
       return {
         ok: false as const,
         error:
-          "Campaign groups are not available yet. Run scripts/263_campaign_groups.sql in Supabase.",
+          "The shared group donation link is not available yet. Run scripts/309_campaign_group_donate_token.sql in Supabase.",
       }
     }
     return { ok: false as const, error: error.message }
   }
 
-  if (!group) return { ok: false as const, error: "Donation link not found" }
-  if (!group.link_active || String(group.status).toLowerCase() !== "active") {
-    return { ok: false as const, error: "This donation link is inactive" }
+  if (!campaign?.group_donate_token) {
+    return { ok: false as const, error: "Donation link not found" }
   }
 
-  return { ok: true as const, supabase, group }
+  return { ok: true as const, supabase, campaign }
 }
 
-async function computeGroupCollected(
+async function loadSelectableGroup(
   supabase: ReturnType<typeof createServiceRoleClient>,
-  organizationId: string,
-  campaignGroupId: string
+  campaign: { id: string; organization_id: string },
+  groupId: string
 ) {
-  const { data: payments } = await supabase
-    .from("payments")
-    .select("amount, refunded_amount, status")
-    .eq("organization_id", organizationId)
-    .eq("campaign_group_id", campaignGroupId)
+  const { data: group, error } = await supabase
+    .from("campaign_groups")
+    .select("id, name, status, organizational_group_id")
+    .eq("id", groupId)
+    .eq("campaign_id", campaign.id)
+    .eq("organization_id", campaign.organization_id)
+    .maybeSingle()
 
-  return (payments || []).reduce(
-    (sum, payment) =>
-      sum +
-      campaignPaymentNetAmount({
-        id: "tmp",
-        amount: payment.amount,
-        refunded_amount: payment.refunded_amount,
-        status: payment.status,
-      }),
-    0
-  )
+  if (error) return { ok: false as const, error: error.message }
+  if (!group || String(group.status).toLowerCase() !== "active") {
+    return { ok: false as const, error: "Choose a group" }
+  }
+  return { ok: true as const, group }
 }
 
 export async function getPublicCampaignGroupDonateInfoAction(
   token: string
 ): Promise<{ success: true; info: PublicCampaignGroupDonateInfo } | { success: false; error: string }> {
-  const loaded = await loadActiveGroupByToken(token)
+  const loaded = await loadCampaignByDonateToken(token)
   if (!loaded.ok) return { success: false, error: loaded.error }
 
-  const { supabase, group } = loaded
+  const { supabase, campaign } = loaded
 
-  const [{ data: campaign }, { data: organization }] = await Promise.all([
+  const [{ data: organization }, { data: groups, error: groupsError }] = await Promise.all([
+    supabase.from("organizations").select("id, name").eq("id", campaign.organization_id).maybeSingle(),
     supabase
-      .from("campaigns")
-      .select("id, name, description, status")
-      .eq("id", group.campaign_id)
-      .maybeSingle(),
-    supabase
-      .from("organizations")
-      .select("id, name")
-      .eq("id", group.organization_id)
-      .maybeSingle(),
+      .from("campaign_groups")
+      .select("id, name, status")
+      .eq("organization_id", campaign.organization_id)
+      .eq("campaign_id", campaign.id)
+      .eq("status", "active"),
   ])
 
-  let collected: number | null = null
-  let progressPercent: number | null = null
-  if (group.public_progress_enabled) {
-    collected = await computeGroupCollected(supabase, group.organization_id, group.id)
-    const goal = group.goal_amount == null ? null : Number(group.goal_amount)
-    if (goal != null && goal > 0) {
-      progressPercent = Math.min((collected / goal) * 100, 100)
+  if (groupsError) return { success: false, error: groupsError.message }
+
+  const activeGroups = groups || []
+  const receivedByGroup = new Map<string, number>()
+  if (activeGroups.length > 0) {
+    const { data: payments } = await supabase
+      .from("payments")
+      .select("campaign_group_id, amount, refunded_amount, status")
+      .eq("organization_id", campaign.organization_id)
+      .eq("campaign_id", campaign.id)
+      .in(
+        "campaign_group_id",
+        activeGroups.map((group) => group.id as string)
+      )
+
+    for (const payment of payments || []) {
+      const groupId = payment.campaign_group_id as string | null
+      if (!groupId) continue
+      const net = campaignPaymentNetAmount({
+        id: "tmp",
+        amount: payment.amount,
+        refunded_amount: payment.refunded_amount,
+        status: payment.status,
+      })
+      receivedByGroup.set(groupId, (receivedByGroup.get(groupId) || 0) + net)
     }
   }
 
+  const choices: PublicCampaignGroupChoice[] = activeGroups
+    .map((group) => ({
+      id: group.id as string,
+      name: (group.name as string) || "Group",
+      received: receivedByGroup.get(group.id as string) || 0,
+    }))
+    .sort((left, right) => {
+      if (right.received !== left.received) return right.received - left.received
+      return left.name.localeCompare(right.name)
+    })
+
   let onlineDonationsReady = false
   if (isStripeConfigured()) {
-    const connectStatus = await loadOrganizationStripeConnect(supabase, group.organization_id)
+    const connectStatus = await loadOrganizationStripeConnect(supabase, campaign.organization_id)
     onlineDonationsReady = isOrganizationStripeConnectReady(connectStatus)
   }
 
   return {
     success: true,
     info: {
-      token: group.public_token,
-      groupId: group.id,
-      groupName: group.name,
-      description: group.description || campaign?.description || null,
-      goalAmount: group.goal_amount == null ? null : Number(group.goal_amount),
-      publicProgressEnabled: Boolean(group.public_progress_enabled),
-      campaignId: group.campaign_id,
-      campaignName: campaign?.name || "Campaign",
-      organizationId: group.organization_id,
+      token: campaign.group_donate_token as string,
+      campaignId: campaign.id as string,
+      campaignName: (campaign.name as string) || "Campaign",
+      organizationId: campaign.organization_id as string,
       organizationName: organization?.name || "Organization",
-      collected,
-      progressPercent,
+      groups: choices,
       onlineDonationsReady,
     },
   }
@@ -206,6 +219,7 @@ async function ensureOrgGroupMembership(input: {
 
 export async function createPublicCampaignGroupDonationCheckoutAction(input: {
   token: string
+  groupId: string
   amount: number
   donorName: string
   donorEmail: string
@@ -218,10 +232,13 @@ export async function createPublicCampaignGroupDonationCheckoutAction(input: {
   mode?: "one_time" | "recurring" | "pledge_pay" | "pledge_only"
   frequency?: RecurringStripeFrequency
 }) {
-  const loaded = await loadActiveGroupByToken(input.token)
+  const loaded = await loadCampaignByDonateToken(input.token)
   if (!loaded.ok) return { success: false as const, error: loaded.error }
 
-  const { supabase, group } = loaded
+  const { supabase, campaign } = loaded
+  const selected = await loadSelectableGroup(supabase, campaign, input.groupId)
+  if (!selected.ok) return { success: false as const, error: selected.error }
+  const group = selected.group
   const mode = input.mode || "one_time"
   const frequency: RecurringStripeFrequency =
     input.frequency === "quarterly" || input.frequency === "annually"
@@ -238,7 +255,7 @@ export async function createPublicCampaignGroupDonationCheckoutAction(input: {
       return { success: false as const, error: "Online payments are not configured" }
     }
 
-    const connectStatus = await loadOrganizationStripeConnect(supabase, group.organization_id)
+    const connectStatus = await loadOrganizationStripeConnect(supabase, campaign.organization_id)
     if (!isOrganizationStripeConnectReady(connectStatus)) {
       return {
         success: false as const,
@@ -249,7 +266,7 @@ export async function createPublicCampaignGroupDonationCheckoutAction(input: {
 
   try {
     const donor = await ensurePublicDonorContact({
-      organizationId: group.organization_id,
+      organizationId: campaign.organization_id,
       fullName: input.donorName,
       email: input.donorEmail,
     })
@@ -257,28 +274,22 @@ export async function createPublicCampaignGroupDonationCheckoutAction(input: {
     const attributedGroupContactId = group.organizational_group_id || null
     if (attributedGroupContactId) {
       await ensureOrgGroupMembership({
-        organizationId: group.organization_id,
+        organizationId: campaign.organization_id,
         groupContactId: attributedGroupContactId,
         memberContactId: donor.contactId,
       })
     }
 
-    const { data: campaign } = await supabase
-      .from("campaigns")
-      .select("name")
-      .eq("id", group.campaign_id)
-      .maybeSingle()
-
     const { data: organization } = await supabase
       .from("organizations")
       .select("name")
-      .eq("id", group.organization_id)
+      .eq("id", campaign.organization_id)
       .maybeSingle()
 
-    const campaignName = campaign?.name || "Campaign"
+    const campaignName = campaign.name || "Campaign"
     const organizationName = organization?.name || "Organization"
     const baseUrl = getAppBaseUrl()
-    const path = buildCampaignGroupDonationPath(group.public_token)
+    const path = buildCampaignGroupDonationPath(campaign.group_donate_token)
 
     let pledgeId: string | null = null
     if (mode === "pledge_pay" || mode === "pledge_only") {
@@ -286,9 +297,9 @@ export async function createPublicCampaignGroupDonationCheckoutAction(input: {
       const { data: pledge, error: pledgeError } = await supabase
         .from("pledges")
         .insert({
-          organization_id: group.organization_id,
+          organization_id: campaign.organization_id,
           donor_id: donor.donorId,
-          campaign_id: group.campaign_id,
+          campaign_id: campaign.id,
           campaign_group_id: group.id,
           category_id: null,
           subcategory_id: null,
@@ -316,7 +327,7 @@ export async function createPublicCampaignGroupDonationCheckoutAction(input: {
 
       try {
         await sendGroupPledgeConfirmationEmail(supabase, {
-          organizationId: group.organization_id,
+          organizationId: campaign.organization_id,
           pledgeId,
           donorId: donor.donorId,
           contactId: donor.contactId,
@@ -347,12 +358,12 @@ export async function createPublicCampaignGroupDonationCheckoutAction(input: {
 
     if (mode === "recurring") {
       const checkout = await createRecurringDonationCheckout(supabase, {
-        organizationId: group.organization_id,
+        organizationId: campaign.organization_id,
         donorId: donor.donorId,
         contactId: donor.contactId,
         amount,
         frequency,
-        campaignId: group.campaign_id,
+        campaignId: campaign.id,
         campaignGroupId: group.id,
         attributedGroupContactId,
         donorEmail: donor.email,
@@ -373,11 +384,11 @@ export async function createPublicCampaignGroupDonationCheckoutAction(input: {
 
     const isPledgePay = mode === "pledge_pay"
     const checkout = await createOneTimeDonationCheckout(supabase, {
-      organizationId: group.organization_id,
+      organizationId: campaign.organization_id,
       donorId: donor.donorId,
       contactId: donor.contactId,
       amount,
-      campaignId: group.campaign_id,
+      campaignId: campaign.id,
       campaignGroupId: group.id,
       attributedGroupContactId,
       pledgeId,
@@ -414,7 +425,7 @@ export async function getPublicCampaignGroupCheckoutStatusAction(input: {
   token: string
   stripeCheckoutSessionId: string
 }) {
-  const loaded = await loadActiveGroupByToken(input.token)
+  const loaded = await loadCampaignByDonateToken(input.token)
   if (!loaded.ok) return { success: false as const, error: loaded.error }
 
   const sessionId = input.stripeCheckoutSessionId.trim()
@@ -422,15 +433,29 @@ export async function getPublicCampaignGroupCheckoutStatusAction(input: {
 
   const { data, error } = await loaded.supabase
     .from("donation_checkout_sessions")
-    .select("id, status, payment_id, campaign_group_id, amount")
-    .eq("organization_id", loaded.group.organization_id)
+    .select("id, status, payment_id, campaign_id, campaign_group_id, amount")
+    .eq("organization_id", loaded.campaign.organization_id)
     .eq("stripe_checkout_session_id", sessionId)
     .maybeSingle()
 
   if (error) return { success: false as const, error: error.message }
   if (!data) return { success: false as const, error: "Checkout session not found" }
-  if (data.campaign_group_id && data.campaign_group_id !== loaded.group.id) {
-    return { success: false as const, error: "Checkout session does not match this group" }
+  if (data.campaign_id && data.campaign_id !== loaded.campaign.id) {
+    return { success: false as const, error: "Checkout session does not match this campaign" }
+  }
+
+  let groupName: string | null = null
+  if (data.campaign_group_id) {
+    const { data: group } = await loaded.supabase
+      .from("campaign_groups")
+      .select("id, name")
+      .eq("id", data.campaign_group_id)
+      .eq("campaign_id", loaded.campaign.id)
+      .maybeSingle()
+    if (!group) {
+      return { success: false as const, error: "Checkout session does not match this campaign" }
+    }
+    groupName = group.name as string
   }
 
   return {
@@ -438,5 +463,6 @@ export async function getPublicCampaignGroupCheckoutStatusAction(input: {
     status: data.status as string,
     paymentId: (data.payment_id as string | null) ?? null,
     amount: data.amount == null ? null : Number(data.amount),
+    groupName,
   }
 }

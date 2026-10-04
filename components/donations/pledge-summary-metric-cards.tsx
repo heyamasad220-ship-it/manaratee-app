@@ -20,7 +20,7 @@ type PledgeSummaryMetricCardsProps = {
   className?: string
   statusFilter?: string
   overdueCount?: number
-  /** Campaign tab: three cards for every pledge on the campaign, ignoring the table status filter. */
+  /** Three cards for every non-cancelled pledge in scope, ignoring the table status filter. */
   variant?: "default" | "campaign"
 }
 

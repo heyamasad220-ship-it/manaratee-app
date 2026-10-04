@@ -1,0 +1,50 @@
+{
+  "mode": "execute",
+  "fileRows": 8,
+  "fileAmount": 52000,
+  "paymentsCreated": 8,
+  "alreadyImported": 0,
+  "applications": [
+    {
+      "name": "Baitulmaal",
+      "amount": 20000,
+      "pledgeId": "a0e279b1-dbf0-4865-a6f0-472794c21609"
+    },
+    {
+      "name": "Dr. Musa Wadi",
+      "amount": 15000,
+      "pledgeId": "9788fe99-1302-4890-ad84-d55789958b10"
+    },
+    {
+      "name": "Dr. Eaman Attia",
+      "amount": 5000,
+      "pledgeId": "3e451af7-19f3-4a0a-9cc1-934cacb29977"
+    },
+    {
+      "name": "Live Oak Pharmacy",
+      "amount": 5000,
+      "pledgeId": "11ba42b3-8f23-45f1-a237-7569abfcbae3"
+    },
+    {
+      "name": "Blue Fig Jerusalem Market",
+      "amount": 5000,
+      "pledgeId": "d93b6119-92b7-406b-a160-7a19e7026424"
+    },
+    {
+      "name": "Rania Kabbani Housini",
+      "amount": 1000,
+      "pledgeId": "1bcc79c6-c55a-4677-b550-5222c686f78a"
+    },
+    {
+      "name": "Mona Alkhateeb",
+      "amount": 500,
+      "pledgeId": "80e1e97d-7f7c-46a4-8cc3-60ff2da276db"
+    },
+    {
+      "name": "Haya Zalloum",
+      "amount": 500,
+      "pledgeId": "e7350306-0aaf-4bb1-ad1a-abb076f0986c"
+    }
+  ],
+  "errors": []
+}
