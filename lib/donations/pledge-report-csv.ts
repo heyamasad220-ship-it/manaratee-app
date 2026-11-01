@@ -1,10 +1,16 @@
+import * as XLSX from "xlsx"
+
 import type { PledgeExportRow } from "@/lib/donations/donation-list-actions"
 import { pledgeDisplayStatus } from "@/lib/donations/donation-status"
-import { formatPledgeReminderStatusLabel } from "@/lib/donations/pledge-reminder-types"
-
-function escapeCsvValue(value: unknown) {
-  return `"${String(value ?? "").replaceAll('"', '""')}"`
-}
+import {
+  type PledgeLedgerColumnId,
+  pledgeLedgerColumnOptions,
+} from "@/lib/donations/pledge-ledger-columns"
+import {
+  callTextReminderLines,
+  formatPledgeReminderStatusLabel,
+} from "@/lib/donations/pledge-reminder-types"
+import { formatPhoneDisplay } from "@/lib/ui/format-phone"
 
 function formatReportDate(value: string | null | undefined) {
   if (!value) return ""
@@ -15,42 +21,82 @@ function formatReportDate(value: string | null | undefined) {
   })
 }
 
-export function downloadPledgesReportCsv(pledges: PledgeExportRow[], generatedAt: string) {
+function emailReminderLabel(pledge: PledgeExportRow) {
+  if (!pledge.last_reminder_at) return ""
+  const status = formatPledgeReminderStatusLabel(pledge.last_reminder_status)
+  const date = formatReportDate(pledge.last_reminder_at)
+  return status ? `${status} — ${date}` : date
+}
+
+function pledgeExportCell(pledge: PledgeExportRow, columnId: PledgeLedgerColumnId) {
+  switch (columnId) {
+    case "donor":
+      return pledge.donor_name ?? ""
+    case "email":
+      return pledge.email ?? ""
+    case "phone":
+      return formatPhoneDisplay(pledge.phone)
+    case "pledged":
+      return Number(pledge.amount_pledged || 0)
+    case "paid":
+      return Number(pledge.amount_paid || 0)
+    case "balance":
+      return Number(pledge.balance_remaining || 0)
+    case "status":
+      return pledgeDisplayStatus(
+        pledge.calculated_status,
+        Number(pledge.amount_pledged || 0),
+        Number(pledge.amount_paid || 0)
+      )
+    case "campaign":
+      return pledge.campaign_name || "Unassigned"
+    case "emailReminder":
+      return emailReminderLabel(pledge)
+    case "callText":
+      return callTextReminderLines(
+        {
+          lastCallAt: pledge.last_call_at,
+          lastTextAt: pledge.last_text_at,
+          lastContactedAt: pledge.last_contacted_at,
+        },
+        formatReportDate
+      ).join("\n")
+    case "notes":
+      return pledge.contact_notes || ""
+  }
+}
+
+const COLUMN_WIDTHS: Record<PledgeLedgerColumnId, number> = {
+  donor: 28,
+  email: 32,
+  phone: 18,
+  pledged: 16,
+  paid: 14,
+  balance: 14,
+  status: 12,
+  campaign: 36,
+  emailReminder: 28,
+  callText: 22,
+  notes: 40,
+}
+
+export function downloadPledgesReportExcel(
+  pledges: PledgeExportRow[],
+  generatedAt: string,
+  visibleColumns: PledgeLedgerColumnId[]
+) {
   if (pledges.length === 0) return
 
-  const rows = pledges.map((pledge) => ({
-    "Donor Name": pledge.donor_name ?? "",
-    "Amount Pledged": Number(pledge.amount_pledged || 0).toFixed(2),
-    "Amount Paid": Number(pledge.amount_paid || 0).toFixed(2),
-    Balance: Number(pledge.balance_remaining || 0).toFixed(2),
-    Status: pledgeDisplayStatus(
-      pledge.calculated_status,
-      Number(pledge.amount_pledged || 0),
-      Number(pledge.amount_paid || 0)
-    ),
-    Campaign: pledge.campaign_name || "Unassigned",
-    "Last Reminder": pledge.last_reminder_at
-      ? formatPledgeReminderStatusLabel(pledge.last_reminder_status)
-      : "",
-    "Last Reminder Date": formatReportDate(pledge.last_reminder_at),
-    "Last Contacted": formatReportDate(pledge.last_contacted_at),
-  }))
+  const columns = pledgeLedgerColumnOptions(true).filter((column) =>
+    visibleColumns.includes(column.id)
+  )
+  if (columns.length === 0) return
 
-  const headers = Object.keys(rows[0])
-  const csv = [
-    `# Pledges`,
-    `# Generated ${generatedAt}`,
-    headers.join(","),
-    ...rows.map((row) =>
-      headers.map((header) => escapeCsvValue(row[header as keyof typeof row])).join(",")
-    ),
-  ].join("\n")
-
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement("a")
-  link.href = url
-  link.download = `pledges-${generatedAt.slice(0, 10)}.csv`
-  link.click()
-  URL.revokeObjectURL(url)
+  const header = columns.map((column) => column.label)
+  const body = pledges.map((pledge) => columns.map((column) => pledgeExportCell(pledge, column.id)))
+  const sheet = XLSX.utils.aoa_to_sheet([header, ...body])
+  sheet["!cols"] = columns.map((column) => ({ wch: COLUMN_WIDTHS[column.id] }))
+  const workbook = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(workbook, sheet, "Pledges")
+  XLSX.writeFile(workbook, `pledges-${generatedAt.slice(0, 10)}.xlsx`)
 }

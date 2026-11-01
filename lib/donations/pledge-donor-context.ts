@@ -197,3 +197,65 @@ export async function attachPledgeDonorContext<T extends PledgeWithDonorContext>
 export function showsPrimaryContactSubline(contactType: ContactRecordType | null) {
   return isEntityContactType(contactType)
 }
+
+export async function lookupDonorEmailPhone(
+  supabase: SupabaseClient,
+  organizationId: string,
+  donorIds: string[]
+) {
+  const map = new Map<string, { email: string | null; phone: string | null }>()
+  const unique = [...new Set(donorIds.filter(Boolean))]
+  if (unique.length === 0) return map
+
+  const donorRows: Array<{
+    id: string
+    email: string | null
+    phone: string | null
+    contact_id: string | null
+  }> = []
+
+  for (let index = 0; index < unique.length; index += 200) {
+    const slice = unique.slice(index, index + 200)
+    const { data } = await supabase
+      .from("donors")
+      .select("id, email, phone, contact_id")
+      .eq("organization_id", organizationId)
+      .in("id", slice)
+    for (const row of data || []) {
+      donorRows.push({
+        id: row.id as string,
+        email: (row.email as string | null) ?? null,
+        phone: (row.phone as string | null) ?? null,
+        contact_id: (row.contact_id as string | null) ?? null,
+      })
+    }
+  }
+
+  const contactIds = [...new Set(donorRows.map((row) => row.contact_id).filter(Boolean))] as string[]
+  const contactById = new Map<string, { email: string | null; phone: string | null }>()
+
+  for (let index = 0; index < contactIds.length; index += 200) {
+    const slice = contactIds.slice(index, index + 200)
+    const { data } = await supabase
+      .from("contacts")
+      .select("id, email, phone")
+      .eq("organization_id", organizationId)
+      .in("id", slice)
+    for (const row of data || []) {
+      contactById.set(row.id as string, {
+        email: (row.email as string | null) ?? null,
+        phone: (row.phone as string | null) ?? null,
+      })
+    }
+  }
+
+  for (const donor of donorRows) {
+    const contact = donor.contact_id ? contactById.get(donor.contact_id) : undefined
+    map.set(donor.id, {
+      email: (contact?.email || donor.email || "").trim() || null,
+      phone: (contact?.phone || donor.phone || "").trim() || null,
+    })
+  }
+
+  return map
+}

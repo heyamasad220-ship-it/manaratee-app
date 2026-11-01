@@ -1001,6 +1001,7 @@ export function selectCampaignLargestGift(input: {
   for (const payment of input.payments) {
     if (payment.pledge_id) continue
     if (isCampaignBatchDepositPayment(payment)) continue
+    if (isAnonymousBulkSender(payment.sender_name)) continue
     const meta = payment.donor_id ? input.donorMeta?.get(payment.donor_id) : undefined
     consider({
       amount: campaignPaymentNetAmount(payment),

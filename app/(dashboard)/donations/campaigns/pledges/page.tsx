@@ -1,11 +1,20 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -21,28 +30,42 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, ArrowUpDown, Download } from "lucide-react";
+import { Plus, Columns3, Download } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { PledgeDonorSubline } from "@/components/donations/pledge-donor-subline";
 import { PledgeDetailsDialog } from "@/components/donations/pledge-details-dialog";
+import { PledgeOutreachDialog } from "@/components/donations/pledge-reminder-actions";
 import {
   PledgeSummaryMetricCards,
   type PledgeSummaryMetrics,
 } from "@/components/donations/pledge-summary-metric-cards";
-import { formatPledgeReminderStatusLabel } from "@/lib/donations/pledge-reminder-types";
+import {
+  applyContactedReminder,
+  callTextReminderLines,
+  formatPledgeReminderStatusLabel,
+} from "@/lib/donations/pledge-reminder-types";
 import { pledgeDisplayStatus, type PledgeDisplayStatus } from "@/lib/donations/donation-status";
 import {
   fetchPledgesExportAction,
   fetchPledgesPageAction,
   fetchPledgeSummaryMetricsAction,
 } from "@/lib/donations/donation-list-actions";
-import { downloadPledgesReportCsv } from "@/lib/donations/pledge-report-csv";
+import { downloadPledgesReportExcel } from "@/lib/donations/pledge-report-csv";
 import { DONATIONS_PAGE_SIZE } from "@/lib/donations/donation-pagination";
 import {
   attachPledgeDonorContext,
   emptyPledgeDonorContext,
+  lookupDonorEmailPhone,
   type PledgeMemberGroup,
 } from "@/lib/donations/pledge-donor-context";
+import {
+  defaultPledgeLedgerColumns,
+  loadPledgeLedgerColumns,
+  pledgeLedgerColumnOptions,
+  savePledgeLedgerColumns,
+  type PledgeLedgerColumnId,
+} from "@/lib/donations/pledge-ledger-columns";
+import { formatPhoneDisplayOrDash } from "@/lib/ui/format-phone";
 import { DONATION_PLEDGES_PATH } from "@/lib/donations/donation-pledge-paths";
 import type { ContactRecordType } from "@/lib/contacts/contact-constants";
 import {
@@ -60,6 +83,8 @@ interface Pledge {
   donorId: string | null;
   contactId: string | null;
   donorName: string;
+  email: string | null;
+  phone: string | null;
   contactType: ContactRecordType | null;
   primaryContactName: string | null;
   memberGroups: PledgeMemberGroup[];
@@ -82,6 +107,9 @@ interface Pledge {
   lastReminderAt: string | null;
   lastReminderStatus: string | null;
   lastContactedAt: string | null;
+  lastCallAt: string | null;
+  lastTextAt: string | null;
+  contactNotes: string | null;
 }
 
 type CampaignOption = {
@@ -117,7 +145,7 @@ async function attachReminderSummaries(
 
   const { data } = await supabase
     .from("pledge_reminders")
-    .select("pledge_id, status, reminder_type, sent_at, created_at")
+    .select("pledge_id, status, reminder_type, contact_method, sent_at, created_at, contact_notes")
     .eq("organization_id", orgId)
     .in("pledge_id", pledgeIds)
     .order("created_at", { ascending: false });
@@ -128,6 +156,10 @@ async function attachReminderSummaries(
       lastReminderAt: string | null;
       lastReminderStatus: string | null;
       lastContactedAt: string | null;
+      lastCallAt: string | null;
+      lastTextAt: string | null;
+      contactNotes: string | null;
+      contactNotesAt: string | null;
     }
   >();
 
@@ -137,11 +169,25 @@ async function attachReminderSummaries(
       lastReminderAt: null,
       lastReminderStatus: null,
       lastContactedAt: null,
+      lastCallAt: null,
+      lastTextAt: null,
+      contactNotes: null,
+      contactNotesAt: null,
     };
 
-    if (row.reminder_type === "contacted" && !existing.lastContactedAt) {
-      existing.lastContactedAt = (row.sent_at || row.created_at) as string;
-    }
+    const contacted = {
+      lastCallAt: existing.lastCallAt,
+      lastTextAt: existing.lastTextAt,
+      lastContactedAt: existing.lastContactedAt,
+      contactNotes: existing.contactNotes,
+      contactNotesAt: existing.contactNotesAt,
+    };
+    applyContactedReminder(contacted, row);
+    existing.lastCallAt = contacted.lastCallAt;
+    existing.lastTextAt = contacted.lastTextAt;
+    existing.lastContactedAt = contacted.lastContactedAt;
+    existing.contactNotes = contacted.contactNotes;
+    existing.contactNotesAt = contacted.contactNotesAt;
 
     if (row.reminder_type !== "contacted" && !existing.lastReminderAt) {
       existing.lastReminderAt = (row.sent_at || row.created_at) as string;
@@ -158,6 +204,9 @@ async function attachReminderSummaries(
       lastReminderAt: summary?.lastReminderAt ?? null,
       lastReminderStatus: summary?.lastReminderStatus ?? null,
       lastContactedAt: summary?.lastContactedAt ?? null,
+      lastCallAt: summary?.lastCallAt ?? null,
+      lastTextAt: summary?.lastTextAt ?? null,
+      contactNotes: summary?.contactNotes ?? null,
     };
   });
 }
@@ -171,6 +220,8 @@ function pledgeFromRow(row: any): Pledge {
     donorId: row.donor_id || null,
     contactId: row.contact_id || null,
     donorName: row.donor_name || "Unknown donor",
+    email: null,
+    phone: null,
     ...emptyPledgeDonorContext(),
     amount_pledged: amountPledged,
     amount_paid: amountPaid,
@@ -191,6 +242,9 @@ function pledgeFromRow(row: any): Pledge {
     lastReminderAt: null,
     lastReminderStatus: null,
     lastContactedAt: null,
+    lastCallAt: null,
+    lastTextAt: null,
+    contactNotes: null,
   };
 }
 
@@ -229,8 +283,18 @@ export function PledgesLedger({
   const [handledPledgeQuery, setHandledPledgeQuery] = useState<string | null>(null);
   const [handledAddQuery, setHandledAddQuery] = useState(false);
 
+  const includeCampaignColumn = !lockedCampaignId;
+  const [columnsOpen, setColumnsOpen] = useState(false);
+  const [visibleColumns, setVisibleColumns] = useState<PledgeLedgerColumnId[]>(() =>
+    defaultPledgeLedgerColumns(includeCampaignColumn)
+  );
+  const visibleColumnSet = useMemo(() => new Set(visibleColumns), [visibleColumns]);
+
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [detailsPledgeId, setDetailsPledgeId] = useState<string | null>(null);
+  const [outreachPledge, setOutreachPledge] = useState<{ id: string; donorName: string } | null>(
+    null
+  );
   const [detailsProspectId, setDetailsProspectId] = useState<string | null>(null);
   const [detailsCampaignId, setDetailsCampaignId] = useState<string | null>(null);
   const [detailsContactId, setDetailsContactId] = useState<string | null>(null);
@@ -315,6 +379,8 @@ export function PledgesLedger({
       fetchPledgesPageAction({
         page: nextPage,
         pageSize: DONATIONS_PAGE_SIZE,
+        sortBy: "amount_pledged",
+        sortAsc: false,
         ...filters,
       }),
       fetchPledgeSummaryMetricsAction(
@@ -364,6 +430,13 @@ export function PledgesLedger({
       }
     }
 
+    const contactChannels = await lookupDonorEmailPhone(supabase, orgId, donorIds);
+    for (const pledge of mapped) {
+      const channel = pledge.donorId ? contactChannels.get(pledge.donorId) : undefined;
+      pledge.email = channel?.email ?? null;
+      pledge.phone = channel?.phone ?? null;
+    }
+
     const pledgeIds = mapped.map((pledge) => pledge.id);
     if (pledgeIds.length > 0) {
       const { data: attributionRows } = await supabase
@@ -394,6 +467,19 @@ export function PledgesLedger({
     );
     setLoading(false);
   };
+
+  useEffect(() => {
+    setVisibleColumns(loadPledgeLedgerColumns(includeCampaignColumn));
+  }, [includeCampaignColumn]);
+
+  function applyVisibleColumns(next: PledgeLedgerColumnId[]) {
+    const allowed = defaultPledgeLedgerColumns(includeCampaignColumn);
+    const selected = new Set(next);
+    selected.add("donor");
+    const ordered = allowed.filter((id) => selected.has(id));
+    setVisibleColumns(ordered);
+    savePledgeLedgerColumns(ordered);
+  }
 
   useEffect(() => {
     const timer = setTimeout(() => setDonorNameFilter(donorNameFilterInput), 300);
@@ -490,7 +576,7 @@ export function PledgesLedger({
       alert("No pledges to export for the current filters.");
       return;
     }
-    downloadPledgesReportCsv(result.pledges, new Date().toISOString());
+    downloadPledgesReportExcel(result.pledges, new Date().toISOString(), visibleColumns);
   }
 
   function closeDetails(open: boolean) {
@@ -524,9 +610,13 @@ export function PledgesLedger({
         }
       >
         <div className="mb-4 flex shrink-0 justify-end gap-2">
+          <Button variant="outline" onClick={() => setColumnsOpen(true)}>
+            <Columns3 className="mr-2 h-4 w-4" />
+            Columns
+          </Button>
           <Button variant="outline" onClick={() => void handleExport()} disabled={exporting}>
             <Download className="mr-2 h-4 w-4" />
-            {exporting ? "Exporting..." : "Export CSV"}
+            {exporting ? "Exporting..." : "Export Excel"}
           </Button>
           <Button onClick={openAddPledge}>
             <Plus className="mr-2 h-4 w-4" />
@@ -548,18 +638,11 @@ export function PledgesLedger({
             <Table containerClassName="overflow-visible">
               <TableHeader className="sticky top-0 z-20 bg-card [&_th]:bg-card">
                 <TableRow className="hover:bg-transparent">
+                  {visibleColumnSet.has("donor") ? (
                   <TableHead>
                     <TableColumnHeaderFilter
                       label="Donor Name"
                       active={Boolean(donorNameFilter.trim())}
-                      trailing={
-                        <Button
-                          variant="ghost"
-                          className="h-auto p-0 font-medium hover:bg-transparent"
-                        >
-                          <ArrowUpDown className="h-4 w-4" />
-                        </Button>
-                      }
                     >
                       {({ close }) => (
                         <Input
@@ -576,9 +659,13 @@ export function PledgesLedger({
                       )}
                     </TableColumnHeaderFilter>
                   </TableHead>
-                  <TableHead>Amount Pledged</TableHead>
-                  <TableHead>Amount Paid</TableHead>
-                  <TableHead>Balance</TableHead>
+                  ) : null}
+                  {visibleColumnSet.has("email") ? <TableHead>Email</TableHead> : null}
+                  {visibleColumnSet.has("phone") ? <TableHead>Phone</TableHead> : null}
+                  {visibleColumnSet.has("pledged") ? <TableHead>Amount Pledged</TableHead> : null}
+                  {visibleColumnSet.has("paid") ? <TableHead>Amount Paid</TableHead> : null}
+                  {visibleColumnSet.has("balance") ? <TableHead>Balance</TableHead> : null}
+                  {visibleColumnSet.has("status") ? (
                   <TableHead>
                     <TableColumnHeaderFilter
                       label="Status"
@@ -604,7 +691,8 @@ export function PledgesLedger({
                       )}
                     </TableColumnHeaderFilter>
                   </TableHead>
-                  {lockedCampaignId ? null : (
+                  ) : null}
+                  {lockedCampaignId || !visibleColumnSet.has("campaign") ? null : (
                     <TableHead>
                       <TableColumnHeaderFilter
                         label="Campaign"
@@ -635,8 +723,11 @@ export function PledgesLedger({
                       </TableColumnHeaderFilter>
                     </TableHead>
                   )}
-                  <TableHead>Last Reminder</TableHead>
-                  <TableHead>Last Contacted</TableHead>
+                  {visibleColumnSet.has("emailReminder") ? (
+                    <TableHead>Email reminder</TableHead>
+                  ) : null}
+                  {visibleColumnSet.has("callText") ? <TableHead>Call / text</TableHead> : null}
+                  {visibleColumnSet.has("notes") ? <TableHead>Notes</TableHead> : null}
                 </TableRow>
               </TableHeader>
 
@@ -644,7 +735,7 @@ export function PledgesLedger({
                 {loading ? (
                   <TableRow>
                     <TableCell
-                      colSpan={lockedCampaignId ? 7 : 8}
+                      colSpan={visibleColumns.length}
                       className="text-center text-muted-foreground"
                     >
                       Loading pledges...
@@ -653,7 +744,7 @@ export function PledgesLedger({
                 ) : pledges.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={lockedCampaignId ? 7 : 8}
+                      colSpan={visibleColumns.length}
                       className="text-center text-muted-foreground"
                     >
                       No pledges found.
@@ -666,6 +757,7 @@ export function PledgesLedger({
                       className="cursor-pointer hover:bg-muted/50"
                       onClick={() => openPledge(pledge.id)}
                     >
+                      {visibleColumnSet.has("donor") ? (
                       <TableCell>
                         <div>
                           <span className="font-medium text-primary">{pledge.donorName}</span>
@@ -676,15 +768,33 @@ export function PledgesLedger({
                           />
                         </div>
                       </TableCell>
+                      ) : null}
 
+                      {visibleColumnSet.has("email") ? (
+                        <TableCell className="max-w-[220px] truncate text-sm" title={pledge.email || undefined}>
+                          {pledge.email || "—"}
+                        </TableCell>
+                      ) : null}
+
+                      {visibleColumnSet.has("phone") ? (
+                        <TableCell className="whitespace-nowrap text-sm">
+                          {formatPhoneDisplayOrDash(pledge.phone)}
+                        </TableCell>
+                      ) : null}
+
+                      {visibleColumnSet.has("pledged") ? (
                       <TableCell className="font-medium">
                         {formatCurrency(pledge.amount_pledged)}
                       </TableCell>
+                      ) : null}
 
+                      {visibleColumnSet.has("paid") ? (
                       <TableCell className="font-medium text-emerald-600">
                         {formatCurrency(pledge.amount_paid)}
                       </TableCell>
+                      ) : null}
 
+                      {visibleColumnSet.has("balance") ? (
                       <TableCell
                         className={
                           pledge.balance_remaining > 0
@@ -694,15 +804,19 @@ export function PledgesLedger({
                       >
                         {formatCurrency(pledge.balance_remaining)}
                       </TableCell>
+                      ) : null}
 
+                      {visibleColumnSet.has("status") ? (
                       <TableCell>{getStatusBadge(pledge.status)}</TableCell>
+                      ) : null}
 
-                      {lockedCampaignId ? null : (
+                      {lockedCampaignId || !visibleColumnSet.has("campaign") ? null : (
                         <TableCell>
                           <Badge variant="outline">{pledge.campaignName}</Badge>
                         </TableCell>
                       )}
 
+                      {visibleColumnSet.has("emailReminder") ? (
                       <TableCell className="text-sm text-muted-foreground">
                         {pledge.lastReminderAt ? (
                           <div>
@@ -713,8 +827,48 @@ export function PledgesLedger({
                           "—"
                         )}
                       </TableCell>
+                      ) : null}
 
-                      <TableCell>{formatDisplayDate(pledge.lastContactedAt)}</TableCell>
+                      {visibleColumnSet.has("callText") ? (
+                      <TableCell className="text-sm text-muted-foreground">
+                        {(() => {
+                          const lines = callTextReminderLines(pledge, formatDisplayDate);
+                          return (
+                            <div className="flex flex-col items-start gap-1">
+                              {lines.length === 0
+                                ? null
+                                : lines.map((line) => <div key={line}>{line}</div>)}
+                              <Button
+                                type="button"
+                                variant="link"
+                                size="sm"
+                                className="h-auto px-0"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setOutreachPledge({
+                                    id: pledge.id,
+                                    donorName: pledge.donorName,
+                                  });
+                                }}
+                              >
+                                Log contact
+                              </Button>
+                            </div>
+                          );
+                        })()}
+                      </TableCell>
+                      ) : null}
+                      {visibleColumnSet.has("notes") ? (
+                      <TableCell className="max-w-xs text-sm text-muted-foreground">
+                        {pledge.contactNotes ? (
+                          <span className="line-clamp-2" title={pledge.contactNotes}>
+                            {pledge.contactNotes}
+                          </span>
+                        ) : (
+                          "—"
+                        )}
+                      </TableCell>
+                      ) : null}
                     </TableRow>
                   ))
                 )}
@@ -761,6 +915,58 @@ export function PledgesLedger({
           </Pagination>
         ) : null}
       </div>
+
+      <Dialog open={columnsOpen} onOpenChange={setColumnsOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Choose columns</DialogTitle>
+            <DialogDescription>
+              Checked columns stay on the pledges table. Export Excel uses the same columns.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 py-1">
+            {pledgeLedgerColumnOptions(includeCampaignColumn).map((column) => (
+              <label key={column.id} className="flex items-center gap-3 text-sm">
+                <Checkbox
+                  checked={visibleColumnSet.has(column.id)}
+                  disabled={column.locked}
+                  onCheckedChange={(value) => {
+                    const next = value
+                      ? [...visibleColumns, column.id]
+                      : visibleColumns.filter((id) => id !== column.id);
+                    applyVisibleColumns(next);
+                  }}
+                />
+                <span>{column.label}</span>
+              </label>
+            ))}
+          </div>
+          <DialogFooter className="gap-2 sm:justify-between">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => applyVisibleColumns(defaultPledgeLedgerColumns(includeCampaignColumn))}
+            >
+              Reset
+            </Button>
+            <Button type="button" onClick={() => setColumnsOpen(false)}>
+              Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <PledgeOutreachDialog
+        open={outreachPledge != null}
+        onOpenChange={(open) => {
+          if (!open) setOutreachPledge(null);
+        }}
+        pledgeId={outreachPledge?.id ?? null}
+        donorName={outreachPledge?.donorName || "this donor"}
+        onUpdated={() => {
+          void fetchPledges();
+        }}
+      />
 
       <PledgeDetailsDialog
         open={detailsOpen}

@@ -17,7 +17,10 @@ import {
   getDonorPledgeCollectionSummaryAction,
   getDonorPledgesAction,
 } from "@/lib/donations/pledge-reminder-actions"
-import { type PledgeReminderRecord } from "@/lib/donations/pledge-reminder-types"
+import {
+  pledgeContactMethodLabel,
+  type PledgeReminderRecord,
+} from "@/lib/donations/pledge-reminder-types"
 import { donationPledgesHref } from "@/lib/donations/donation-pledge-paths"
 
 type DonorPledgeRow = {
@@ -221,7 +224,11 @@ export function DonorPledgesTab({
               {reminderHistory.slice(0, 10).map((row) => (
                 <div key={row.id} className="rounded-md border p-3 text-sm">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-medium capitalize">{row.reminder_type}</span>
+                    <span className="font-medium capitalize">
+                      {row.reminder_type === "contacted"
+                        ? pledgeContactMethodLabel(row.contact_method) || "Contacted"
+                        : row.reminder_type}
+                    </span>
                     <span className="text-muted-foreground">
                       {formatDate(row.sent_at || row.created_at)}
                     </span>

@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache"
 import { requireDonationStaffAccess } from "@/lib/donations/donation-action-auth"
 import {
   campaignPaymentNetAmount,
+  isAnonymousBulkSender,
   isCountableCampaignPayment,
   type CampaignPaymentRow,
   type CampaignPledgeRow,
@@ -290,7 +291,10 @@ export async function listCampaignGroupDonorsAction(groupId: string) {
     }
 
     const oneTimePayments = payments.filter(
-      (payment) => isCountableCampaignPayment(payment) && !payment.pledge_id
+      (payment) =>
+        isCountableCampaignPayment(payment) &&
+        !payment.pledge_id &&
+        !isAnonymousBulkSender(payment.sender_name)
     )
 
     const { data: pledgeLinks, error: pledgeLinkError } = await writeClient

@@ -254,7 +254,7 @@ export async function fetchPledgeReminderHistory(
   let query = supabase
     .from("pledge_reminders")
     .select(
-      "id, pledge_id, donor_id, contact_id, reminder_type, status, message_subject, message_body, delivered_externally, contact_notes, sent_at, sent_by, created_at"
+      "id, pledge_id, donor_id, contact_id, reminder_type, status, message_subject, message_body, delivered_externally, contact_notes, contact_method, sent_at, sent_by, created_at"
     )
     .eq("organization_id", organizationId)
     .order("created_at", { ascending: false })

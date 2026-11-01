@@ -4,6 +4,77 @@ export type PledgeReminderSchedule = (typeof PLEDGE_REMINDER_SCHEDULES)[number]
 export const PLEDGE_REMINDER_TYPES = ["manual", "monthly", "days_before_due", "contacted"] as const
 export type PledgeReminderType = (typeof PLEDGE_REMINDER_TYPES)[number]
 
+export const PLEDGE_CONTACT_METHODS = ["call", "text"] as const
+export type PledgeContactMethod = (typeof PLEDGE_CONTACT_METHODS)[number]
+
+export function pledgeContactMethodLabel(method: string | null | undefined) {
+  if (method === "call") return "Call"
+  if (method === "text") return "Text"
+  return ""
+}
+
+export function callTextReminderLines(
+  input: {
+    lastCallAt: string | null
+    lastTextAt: string | null
+    lastContactedAt: string | null
+  },
+  formatDate: (value: string) => string
+) {
+  const lines: { at: string; text: string }[] = []
+  if (input.lastTextAt) {
+    lines.push({ at: input.lastTextAt, text: `Text · ${formatDate(input.lastTextAt)}` })
+  }
+  if (input.lastCallAt) {
+    lines.push({ at: input.lastCallAt, text: `Call · ${formatDate(input.lastCallAt)}` })
+  }
+  lines.sort((left, right) => Date.parse(left.at) - Date.parse(right.at))
+  if (lines.length > 0) return lines.map((line) => line.text)
+  if (input.lastContactedAt) return [formatDate(input.lastContactedAt)]
+  return []
+}
+
+type ContactedReminderSummary = {
+  lastCallAt: string | null
+  lastTextAt: string | null
+  lastContactedAt: string | null
+  contactNotes: string | null
+  contactNotesAt: string | null
+}
+
+export function applyContactedReminder(
+  existing: ContactedReminderSummary,
+  row: {
+    reminder_type: string | null
+    contact_method?: string | null
+    sent_at?: string | null
+    created_at?: string | null
+    contact_notes?: string | null
+  }
+) {
+  if (row.reminder_type !== "contacted") return
+  const at = row.sent_at || row.created_at || null
+  if (!at) return
+  const atTime = Date.parse(at)
+  if (Number.isNaN(atTime)) return
+
+  if (row.contact_method === "call") {
+    const current = existing.lastCallAt ? Date.parse(existing.lastCallAt) : 0
+    if (atTime > current) existing.lastCallAt = at
+  }
+  if (row.contact_method === "text") {
+    const current = existing.lastTextAt ? Date.parse(existing.lastTextAt) : 0
+    if (atTime > current) existing.lastTextAt = at
+  }
+
+  const notesTime = existing.contactNotesAt ? Date.parse(existing.contactNotesAt) : 0
+  if (atTime > notesTime) {
+    existing.contactNotesAt = at
+    existing.contactNotes = row.contact_notes || null
+    existing.lastContactedAt = at
+  }
+}
+
 export const PLEDGE_REMINDER_STATUSES = ["draft", "sent", "failed", "skipped"] as const
 export type PledgeReminderStatus = (typeof PLEDGE_REMINDER_STATUSES)[number]
 
@@ -58,6 +129,7 @@ export type PledgeReminderRecord = {
   message_body: string
   delivered_externally: boolean
   contact_notes: string | null
+  contact_method: PledgeContactMethod | null
   sent_at: string | null
   sent_by: string | null
   created_at: string

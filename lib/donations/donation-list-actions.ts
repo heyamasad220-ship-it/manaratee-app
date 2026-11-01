@@ -7,9 +7,11 @@ import { DONATIONS_PAGE_SIZE } from "@/lib/donations/donation-pagination"
 import { createServiceRoleClient } from "@/lib/supabase/service-role"
 import { formatFinancialActivityPaymentStatus } from "@/lib/donations/donation-status"
 import { formatPaymentSourceLabel } from "@/lib/donations/payment-source-channel"
+import { applyContactedReminder } from "@/lib/donations/pledge-reminder-types"
 import { countsTowardGivingTotals, paymentNetAmount } from "@/lib/donations/payment-net-amount"
 import { attachPaymentDonorDisplayNames } from "@/lib/donations/payment-donor-display"
 import { attachPaymentMethodDisplayLabels } from "@/lib/donations/payment-method-display"
+import { lookupDonorEmailPhone } from "@/lib/donations/pledge-donor-context"
 
 function escapeIlike(value: string) {
   return value.replace(/[%_\\,]/g, "\\$&")
@@ -681,7 +683,7 @@ export type PledgesPageInput = {
   status?: string
   campaignId?: string
   minAmountPledged?: number
-  sortBy?: "pledge_date" | "donor_name" | "balance_remaining"
+  sortBy?: "pledge_date" | "donor_name" | "balance_remaining" | "amount_pledged"
   sortAsc?: boolean
 }
 
@@ -743,6 +745,7 @@ export async function fetchPledgesPageAction(input: PledgesPageInput = {}) {
     )
     .eq("organization_id", access.orgId)
     .order(sortBy, { ascending: sortAsc })
+    .order("donor_name", { ascending: true })
 
   query = applyPledgeListFilters(query, input)
 
@@ -762,6 +765,8 @@ export async function fetchPledgesPageAction(input: PledgesPageInput = {}) {
 export type PledgeExportRow = {
   id: string
   donor_name: string | null
+  email: string | null
+  phone: string | null
   amount_pledged: number
   amount_paid: number
   balance_remaining: number
@@ -770,6 +775,9 @@ export type PledgeExportRow = {
   last_reminder_status: string | null
   last_reminder_at: string | null
   last_contacted_at: string | null
+  last_call_at: string | null
+  last_text_at: string | null
+  contact_notes: string | null
 }
 
 async function attachPledgeReminderExportSummaries(
@@ -784,7 +792,7 @@ async function attachPledgeReminderExportSummaries(
     const slice = pledgeIds.slice(index, index + chunkSize)
     const { data, error } = await supabase
       .from("pledge_reminders")
-      .select("pledge_id, status, reminder_type, sent_at, created_at")
+      .select("pledge_id, status, reminder_type, contact_method, sent_at, created_at, contact_notes")
       .eq("organization_id", orgId)
       .in("pledge_id", slice)
       .order("created_at", { ascending: false })
@@ -793,7 +801,15 @@ async function attachPledgeReminderExportSummaries(
 
     const summaryByPledge = new Map<
       string,
-      { last_reminder_status: string | null; last_reminder_at: string | null; last_contacted_at: string | null }
+      {
+        last_reminder_status: string | null
+        last_reminder_at: string | null
+        last_contacted_at: string | null
+        last_call_at: string | null
+        last_text_at: string | null
+        contact_notes: string | null
+        contactNotesAt: string | null
+      }
     >()
 
     for (const row of data || []) {
@@ -803,11 +819,25 @@ async function attachPledgeReminderExportSummaries(
         last_reminder_status: null,
         last_reminder_at: null,
         last_contacted_at: null,
+        last_call_at: null,
+        last_text_at: null,
+        contact_notes: null,
+        contactNotesAt: null,
       }
 
-      if (row.reminder_type === "contacted" && !existing.last_contacted_at) {
-        existing.last_contacted_at = (row.sent_at || row.created_at) as string
+      const contacted = {
+        lastCallAt: existing.last_call_at,
+        lastTextAt: existing.last_text_at,
+        lastContactedAt: existing.last_contacted_at,
+        contactNotes: existing.contact_notes,
+        contactNotesAt: existing.contactNotesAt,
       }
+      applyContactedReminder(contacted, row)
+      existing.last_call_at = contacted.lastCallAt
+      existing.last_text_at = contacted.lastTextAt
+      existing.last_contacted_at = contacted.lastContactedAt
+      existing.contact_notes = contacted.contactNotes
+      existing.contactNotesAt = contacted.contactNotesAt
 
       if (row.reminder_type !== "contacted" && !existing.last_reminder_at) {
         existing.last_reminder_at = (row.sent_at || row.created_at) as string
@@ -823,6 +853,9 @@ async function attachPledgeReminderExportSummaries(
       pledge.last_reminder_status = summary.last_reminder_status
       pledge.last_reminder_at = summary.last_reminder_at
       pledge.last_contacted_at = summary.last_contacted_at
+      pledge.last_call_at = summary.last_call_at
+      pledge.last_text_at = summary.last_text_at
+      pledge.contact_notes = summary.contact_notes
     }
   }
 }
@@ -834,6 +867,7 @@ export async function fetchPledgesExportAction(input: PledgeListFilters = {}) {
   try {
     const rows: Array<{
       id: string
+      donor_id: string | null
       donor_name: string | null
       campaign_name: string | null
       amount_pledged: number | string | null
@@ -848,11 +882,12 @@ export async function fetchPledgesExportAction(input: PledgeListFilters = {}) {
       let query = access.supabase
         .from("pledge_status_view")
         .select(
-          "id, donor_name, campaign_name, amount_pledged, amount_paid, balance_remaining, calculated_status"
+          "id, donor_id, donor_name, campaign_name, amount_pledged, amount_paid, balance_remaining, calculated_status"
         )
         .eq("organization_id", access.orgId)
         .neq("calculated_status", "cancelled")
-        .order("pledge_date", { ascending: false })
+        .order("amount_pledged", { ascending: false })
+        .order("donor_name", { ascending: true })
         .range(from, from + pageSize - 1)
 
       query = applyPledgeListFilters(query, input)
@@ -869,6 +904,8 @@ export async function fetchPledgesExportAction(input: PledgeListFilters = {}) {
     const pledges: PledgeExportRow[] = rows.map((row) => ({
       id: row.id,
       donor_name: row.donor_name,
+      email: null,
+      phone: null,
       amount_pledged: Number(row.amount_pledged || 0),
       amount_paid: Number(row.amount_paid || 0),
       balance_remaining: Number(row.balance_remaining || 0),
@@ -877,9 +914,24 @@ export async function fetchPledgesExportAction(input: PledgeListFilters = {}) {
       last_reminder_status: null,
       last_reminder_at: null,
       last_contacted_at: null,
+      last_call_at: null,
+      last_text_at: null,
+      contact_notes: null,
     }))
 
     await attachPledgeReminderExportSummaries(access.supabase, access.orgId, pledges)
+    const donorIdByPledge = new Map(rows.map((row) => [row.id, row.donor_id]))
+    const channels = await lookupDonorEmailPhone(
+      access.supabase,
+      access.orgId,
+      rows.map((row) => row.donor_id || "").filter(Boolean)
+    )
+    for (const pledge of pledges) {
+      const donorId = donorIdByPledge.get(pledge.id)
+      const channel = donorId ? channels.get(donorId) : undefined
+      pledge.email = channel?.email ?? null
+      pledge.phone = channel?.phone ?? null
+    }
 
     return { success: true as const, pledges }
   } catch (error) {

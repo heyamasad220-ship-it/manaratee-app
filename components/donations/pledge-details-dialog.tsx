@@ -11,7 +11,6 @@ import {
 import { CampaignGroupPicker } from "@/components/donations/campaign-group-picker"
 import { PaymentHistory } from "@/components/donations/payment-history"
 import { PledgeContactPicker } from "@/components/donations/pledge-contact-picker"
-import { PledgeReminderActions } from "@/components/donations/pledge-reminder-actions"
 import { WishlistItemPicker } from "@/components/donations/wishlist-item-picker"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -716,17 +715,6 @@ export function PledgeDetailsDialog({
                           Receive Payment
                         </Button>
                       )
-                    ) : null}
-
-                    {canCollect ? (
-                      <section className="space-y-3 rounded-lg border p-4">
-                        <h3 className="text-sm font-semibold">Remind / Contact</h3>
-                        <PledgeReminderActions
-                          pledgeId={activePledgeId!}
-                          donorName={loaded.donorName}
-                          onUpdated={() => void loadExisting(activePledgeId!)}
-                        />
-                      </section>
                     ) : null}
 
                     <PaymentHistory

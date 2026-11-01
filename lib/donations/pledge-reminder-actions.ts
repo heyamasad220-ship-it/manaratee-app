@@ -182,7 +182,12 @@ export async function sendPledgeReminderAction(
   }
 }
 
-export async function markPledgeContactedAction(pledgeId: string, contactNotes?: string) {
+export async function markPledgeContactedAction(
+  pledgeId: string,
+  contactNotes?: string,
+  contactedOn?: string,
+  contactMethod?: string
+) {
   const access = await requireDonationStaffAccess("manage")
   if (!access.ok) return { success: false as const, error: access.error }
   const { supabase, orgId, userId } = access
@@ -208,23 +213,87 @@ export async function markPledgeContactedAction(pledgeId: string, contactNotes?:
     contactId = donor?.contact_id ?? null
   }
 
-  const now = new Date().toISOString()
+  const contactedDate = (contactedOn || "").trim()
+  const parsedContactedOn = /^\d{4}-\d{2}-\d{2}$/.test(contactedDate)
+    ? new Date(`${contactedDate}T12:00:00`)
+    : null
+  if (!parsedContactedOn || Number.isNaN(parsedContactedOn.getTime())) {
+    return { success: false as const, error: "Choose the date this person was contacted." }
+  }
+  if (contactMethod !== "call" && contactMethod !== "text") {
+    return { success: false as const, error: "Choose call or text." }
+  }
+
+  const contact = {
+    organization_id: orgId,
+    pledge_id: pledgeId,
+    donor_id: pledge.donor_id ?? null,
+    contact_id: contactId,
+    reminder_type: "contacted" as const,
+    status: "sent" as const,
+    message_subject: "Manual contact logged",
+    message_body: `Staff marked ${pledge.donor_name || "donor"} as contacted.`,
+    contact_notes: contactNotes?.trim() || null,
+    contact_method: contactMethod,
+    delivered_externally: false,
+    sent_at: parsedContactedOn.toISOString(),
+    sent_by: userId,
+  }
+
+  const { data: sameDayRows, error: sameDayError } = await supabase
+    .from("pledge_reminders")
+    .select("id, sent_at, created_at")
+    .eq("organization_id", orgId)
+    .eq("pledge_id", pledgeId)
+    .eq("reminder_type", "contacted")
+    .order("created_at", { ascending: false })
+
+  if (sameDayError) return { success: false as const, error: sameDayError.message }
+
+  const matches = (sameDayRows || []).filter((row) => {
+    if (!row.sent_at) return false
+    const sent = new Date(row.sent_at)
+    const key = `${sent.getFullYear()}-${String(sent.getMonth() + 1).padStart(2, "0")}-${String(sent.getDate()).padStart(2, "0")}`
+    return key === contactedDate
+  })
+
+  if (matches.length > 0) {
+    const [keep, ...extras] = matches
+    const { data: updated, error: updateError } = await supabase
+      .from("pledge_reminders")
+      .update({
+        contact_notes: contact.contact_notes,
+        contact_method: contact.contact_method,
+        sent_at: contact.sent_at,
+        sent_by: contact.sent_by,
+        message_body: contact.message_body,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", keep.id)
+      .eq("organization_id", orgId)
+      .select("id, sent_at, contact_notes")
+      .single()
+
+    if (updateError) return { success: false as const, error: updateError.message }
+
+    if (extras.length > 0) {
+      const { error: deleteError } = await supabase
+        .from("pledge_reminders")
+        .delete()
+        .eq("organization_id", orgId)
+        .in(
+          "id",
+          extras.map((row) => row.id)
+        )
+      if (deleteError) return { success: false as const, error: deleteError.message }
+    }
+
+    return { success: true as const, contact: updated }
+  }
+
   const { data: inserted, error } = await supabase
     .from("pledge_reminders")
-    .insert({
-      organization_id: orgId,
-      pledge_id: pledgeId,
-      donor_id: pledge.donor_id ?? null,
-      contact_id: contactId,
-      reminder_type: "contacted",
-      status: "sent",
-      message_subject: "Manual contact logged",
-      message_body: `Staff marked ${pledge.donor_name || "donor"} as contacted.`,
-      contact_notes: contactNotes?.trim() || null,
-      delivered_externally: false,
-      sent_at: now,
-      sent_by: userId,
-    })
+    .insert(contact)
     .select("id, sent_at, contact_notes")
     .single()
 

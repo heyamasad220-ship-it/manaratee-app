@@ -4,6 +4,7 @@ import {
   Banknote,
   CreditCard,
   DollarSign,
+  FileDown,
   Gift,
   Heart,
   Landmark,
@@ -58,6 +59,9 @@ type CampaignOverviewMetricsTableProps = {
   canCustomize?: boolean
   onCustomizeClick?: () => void
   onMetricClick?: (key: string) => void
+  reportBusy?: boolean
+  onCampaignReport?: () => void
+  onCampaignReportExcel?: () => void
 }
 
 function MetricTableRowCell({
@@ -256,6 +260,9 @@ export function CampaignOverviewMetricsTable({
   canCustomize = false,
   onCustomizeClick,
   onMetricClick,
+  reportBusy = false,
+  onCampaignReport,
+  onCampaignReportExcel,
 }: CampaignOverviewMetricsTableProps) {
   const resolvedKeys = resolveCampaignOverviewMetricKeys({
     savedKeys: visibleMetricKeys ?? null,
@@ -278,16 +285,37 @@ export function CampaignOverviewMetricsTable({
 
   return (
     <Card className="h-full">
-      {canCustomize ? (
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 px-4 py-3">
-          <CardTitle className="text-base font-medium">Overview metrics</CardTitle>
-          <Button type="button" variant="outline" size="sm" onClick={onCustomizeClick}>
-            <Settings2 className="mr-2 h-4 w-4" />
-            Customize
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 px-4 py-3">
+        <CardTitle className="text-base font-medium">Overview metrics</CardTitle>
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={reportBusy || !onCampaignReport}
+            onClick={onCampaignReport}
+          >
+            <FileDown className="mr-2 h-4 w-4" />
+            {reportBusy ? "Preparing..." : "Campaign report"}
           </Button>
-        </CardHeader>
-      ) : null}
-      <CardContent className={cn("p-0", canCustomize && "border-t")}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={reportBusy || !onCampaignReportExcel}
+            onClick={onCampaignReportExcel}
+          >
+            {reportBusy ? "Preparing..." : "Excel"}
+          </Button>
+          {canCustomize ? (
+            <Button type="button" variant="outline" size="sm" onClick={onCustomizeClick}>
+              <Settings2 className="mr-2 h-4 w-4" />
+              Customize
+            </Button>
+          ) : null}
+        </div>
+      </CardHeader>
+      <CardContent className="border-t p-0">
         <Table>
           <TableBody>
             {rows.map((row) => (

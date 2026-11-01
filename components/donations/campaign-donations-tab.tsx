@@ -165,6 +165,8 @@ export function CampaignDonationsTab({
   const [bulkAmount, setBulkAmount] = useState("")
   const [bulkDate, setBulkDate] = useState(todayDateOnly())
   const [bulkMemo, setBulkMemo] = useState("")
+  const [bulkCampaignGroupId, setBulkCampaignGroupId] = useState<string | null>(null)
+  const [bulkCampaignGroupLabel, setBulkCampaignGroupLabel] = useState("")
   const [showPlanDialog, setShowPlanDialog] = useState(false)
   const [showQuickAddContact, setShowQuickAddContact] = useState(false)
   const [quickAddTarget, setQuickAddTarget] = useState<"donation" | "plan">("donation")
@@ -239,6 +241,8 @@ export function CampaignDonationsTab({
     setBulkAmount("")
     setBulkDate(todayDateOnly())
     setBulkMemo("")
+    setBulkCampaignGroupId(null)
+    setBulkCampaignGroupLabel("")
     setShowBulkDialog(true)
   }
 
@@ -253,7 +257,7 @@ export function CampaignDonationsTab({
       organization_id: organizationId,
       donor_id: null,
       contact_id: null,
-      campaign_group_id: null,
+      campaign_group_id: bulkCampaignGroupId,
       pledge_id: null,
       sender_name: anonymousBulkSenderName(bulkSource),
       amount: Number(bulkAmount),
@@ -928,8 +932,9 @@ export function CampaignDonationsTab({
           <DialogHeader>
             <DialogTitle>Bulk entry</DialogTitle>
             <DialogDescription>
-              One total for cash counted with no names, or Square taps with no customer. It stays in
-              collected and raised, and it is not a donor.
+              One total for cash counted with no names, or Square taps with no customer. Choose the
+              campaign group when that group turned the money in. It stays in collected and raised,
+              and it is not a donor.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-4 py-2">
@@ -971,6 +976,16 @@ export function CampaignDonationsTab({
                 />
               </div>
             </div>
+            <CampaignGroupPicker
+              campaignId={campaignId}
+              groupId={bulkCampaignGroupId}
+              groupLabel={bulkCampaignGroupLabel}
+              onChange={(groupId, label) => {
+                setBulkCampaignGroupId(groupId)
+                setBulkCampaignGroupLabel(label)
+              }}
+              disabled={saving}
+            />
             <div className="flex flex-col gap-2">
               <Label htmlFor="campaign-bulk-memo">Note</Label>
               <Textarea

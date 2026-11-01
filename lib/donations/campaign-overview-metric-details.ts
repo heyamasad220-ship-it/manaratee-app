@@ -26,6 +26,8 @@ export type CampaignOverviewMetricDetail = {
   title: string
   description: string
   lines: CampaignOverviewMetricDetailLine[]
+  /** Outstanding is already open pledges, so method and date are omitted. */
+  columns?: "name-amount" | "full"
 }
 
 const SOURCE_ROW_BUCKETS: Record<string, CampaignSourceBucket> = {
@@ -141,6 +143,7 @@ export function buildCampaignOverviewMetricDetail(input: {
       title: key === "pledges" ? "Pledges" : "Outstanding",
       description: `${formatDonationCurrency(metrics.outstanding)} still open`,
       lines: sortLines(outstanding.map(openPledgeLine)),
+      columns: "name-amount",
     }
   }
 

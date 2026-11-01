@@ -380,7 +380,7 @@ Import CSV flow writes directly to `payments` + `payment_import_batches` (no row
 * pledge_status_view (includes `campaign_phase_id` after migration `260`)
 * donation_settings (receipt + pledge reminder config per org — migrations `090`, `091`)
 * donation_receipts (payment receipts + annual statements — canonical payments only)
-* pledge_reminders (pledge collection reminder activity log — migration `091`)
+* pledge_reminders (pledge collection reminder activity log — migration `091`; `contact_method` call or text — migration `311`)
 * recurring_donation_plans (ongoing giving schedules — migration `092`; not pledges; `daily` frequency added in migration `155`; `total_payments` / `payments_made` added in migration `156`)
 * donation_checkout_sessions (in-flight Stripe Checkout — migration `093`; campaign group attribution — `264`; not a payment ledger)
 * payment_processor_events (Stripe webhook audit + idempotency — migration `093`)

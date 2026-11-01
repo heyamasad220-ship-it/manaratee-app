@@ -49,6 +49,8 @@ export function CampaignOverviewMetricDialog({
   onLineClick,
 }: CampaignOverviewMetricDialogProps) {
   const lines = detail?.lines ?? []
+  const nameAndAmountOnly = detail?.columns === "name-amount"
+  const columnCount = nameAndAmountOnly ? 2 : 4
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -63,15 +65,19 @@ export function CampaignOverviewMetricDialog({
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
-                <TableHead>Method</TableHead>
-                <TableHead>Date</TableHead>
+                {nameAndAmountOnly ? null : (
+                  <>
+                    <TableHead>Method</TableHead>
+                    <TableHead>Date</TableHead>
+                  </>
+                )}
                 <TableHead className="text-right">Amount</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {lines.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
+                  <TableCell colSpan={columnCount} className="py-8 text-center text-muted-foreground">
                     Nothing in this total yet
                   </TableCell>
                 </TableRow>
@@ -93,8 +99,12 @@ export function CampaignOverviewMetricDialog({
                           line.name
                         )}
                       </TableCell>
-                      <TableCell>{line.method}</TableCell>
-                      <TableCell>{formatShortDate(line.date)}</TableCell>
+                      {nameAndAmountOnly ? null : (
+                        <>
+                          <TableCell>{line.method}</TableCell>
+                          <TableCell>{formatShortDate(line.date)}</TableCell>
+                        </>
+                      )}
                       <TableCell className="text-right tabular-nums">
                         {formatDonationCurrency(line.amount)}
                       </TableCell>

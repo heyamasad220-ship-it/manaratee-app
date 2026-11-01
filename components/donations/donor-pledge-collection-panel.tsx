@@ -14,6 +14,7 @@ import {
 import { PledgeDetailsDialog } from "@/components/donations/pledge-details-dialog"
 import { getDonorPledgeCollectionSummaryAction } from "@/lib/donations/pledge-reminder-actions"
 import { formatPledgeStatusLabel } from "@/lib/donations/donation-status"
+import { pledgeContactMethodLabel } from "@/lib/donations/pledge-reminder-types"
 
 type DonorPledgeCollectionPanelProps = {
   donorId: string
@@ -118,7 +119,11 @@ export function DonorPledgeCollectionPanel({
               {data.reminderHistory.slice(0, 5).map((row) => (
                 <div key={row.id} className="rounded-md border p-3 text-sm">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-medium capitalize">{row.reminder_type}</span>
+                    <span className="font-medium capitalize">
+                      {row.reminder_type === "contacted"
+                        ? pledgeContactMethodLabel(row.contact_method) || "Contacted"
+                        : row.reminder_type}
+                    </span>
                     <span className="text-muted-foreground">{formatDate(row.sent_at || row.created_at)}</span>
                   </div>
                   {row.contact_notes && (

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -14,15 +14,22 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
+import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Mail, Phone, Eye } from "lucide-react"
 import {
   markPledgeContactedAction,
+  getPledgeReminderHistoryAction,
   previewPledgeReminderAction,
   sendPledgeReminderAction,
 } from "@/lib/donations/pledge-reminder-actions"
-import type { PledgeReminderMessage } from "@/lib/donations/pledge-reminder-types"
+import {
+  pledgeContactMethodLabel,
+  type PledgeContactMethod,
+  type PledgeReminderMessage,
+  type PledgeReminderRecord,
+} from "@/lib/donations/pledge-reminder-types"
 
 type PledgeReminderControls = {
   loading: boolean
@@ -33,6 +40,10 @@ type PledgeReminderControls = {
   preview: PledgeReminderMessage | null
   contactNotes: string
   setContactNotes: (value: string) => void
+  contactedOn: string
+  setContactedOn: (value: string) => void
+  contactMethod: PledgeContactMethod | ""
+  setContactMethod: (value: PledgeContactMethod | "") => void
   handlePreview: () => Promise<void>
   handleSend: () => Promise<void>
   handleMarkContacted: () => Promise<void>
@@ -82,6 +93,10 @@ export function PledgeReminderDialogs({
     preview,
     contactNotes,
     setContactNotes,
+    contactedOn,
+    setContactedOn,
+    contactMethod,
+    setContactMethod,
     handleSend,
     handleMarkContacted,
   } = controls
@@ -101,6 +116,10 @@ export function PledgeReminderDialogs({
         donorName={donorName}
         contactNotes={contactNotes}
         onContactNotesChange={setContactNotes}
+        contactedOn={contactedOn}
+        onContactedOnChange={setContactedOn}
+        contactMethod={contactMethod}
+        onContactMethodChange={setContactMethod}
         onSave={handleMarkContacted}
         loading={loading}
       />
@@ -108,9 +127,16 @@ export function PledgeReminderDialogs({
   )
 }
 
+function todayDateOnly() {
+  const now = new Date()
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
+  return local.toISOString().slice(0, 10)
+}
+
 export function usePledgeReminderControls(
   pledgeId: string,
-  onUpdated?: () => void
+  onUpdated?: () => void,
+  onContactLogged?: () => void
 ): PledgeReminderControls {
   const [loading, setLoading] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
@@ -118,6 +144,8 @@ export function usePledgeReminderControls(
   const [preview, setPreview] = useState<PledgeReminderMessage | null>(null)
   const [recipientEmail, setRecipientEmail] = useState<string | null>(null)
   const [contactNotes, setContactNotes] = useState("")
+  const [contactedOn, setContactedOn] = useState(todayDateOnly)
+  const [contactMethod, setContactMethod] = useState<PledgeContactMethod | "">("")
 
   async function loadPreview() {
     setLoading(true)
@@ -167,7 +195,12 @@ export function usePledgeReminderControls(
 
   async function handleMarkContacted() {
     setLoading(true)
-    const result = await markPledgeContactedAction(pledgeId, contactNotes)
+    const result = await markPledgeContactedAction(
+      pledgeId,
+      contactNotes,
+      contactedOn,
+      contactMethod
+    )
     setLoading(false)
 
     if (!result.success) {
@@ -177,8 +210,10 @@ export function usePledgeReminderControls(
 
     setContactOpen(false)
     setContactNotes("")
+    setContactedOn(todayDateOnly())
+    setContactMethod("")
     onUpdated?.()
-    alert("Contact logged for this pledge.")
+    onContactLogged?.()
   }
 
   return {
@@ -190,26 +225,97 @@ export function usePledgeReminderControls(
     preview,
     contactNotes,
     setContactNotes,
+    contactedOn,
+    setContactedOn,
+    contactMethod,
+    setContactMethod,
     handlePreview,
     handleSend,
     handleMarkContacted,
   }
 }
 
+export function PledgeOutreachDialog({
+  open,
+  onOpenChange,
+  pledgeId,
+  donorName,
+  onUpdated,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  pledgeId: string | null
+  donorName: string
+  onUpdated?: () => void
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Remind / Contact</DialogTitle>
+          <DialogDescription>
+            Email reminders and call or text logs save immediately for {donorName}. This does not
+            change the pledge.
+          </DialogDescription>
+        </DialogHeader>
+        {open && pledgeId ? (
+          <PledgeReminderActions
+            pledgeId={pledgeId}
+            donorName={donorName}
+            onUpdated={onUpdated}
+            onContactLogged={() => onOpenChange(false)}
+          />
+        ) : null}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 type PledgeReminderActionsProps = {
   pledgeId: string
   donorName: string
   onUpdated?: () => void
+  onContactLogged?: () => void
   compact?: boolean
+}
+
+function formatContactedDate(value: string | null) {
+  if (!value) return "—"
+  return new Date(value).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  })
 }
 
 export function PledgeReminderActions({
   pledgeId,
   donorName,
   onUpdated,
+  onContactLogged,
   compact = false,
 }: PledgeReminderActionsProps) {
-  const controls = usePledgeReminderControls(pledgeId, onUpdated)
+  const [contactLogs, setContactLogs] = useState<PledgeReminderRecord[]>([])
+
+  const loadContactLogs = useCallback(async () => {
+    const result = await getPledgeReminderHistoryAction({ pledgeId, limit: 20 })
+    if (!result.success) return
+    setContactLogs(result.history.filter((row) => row.reminder_type === "contacted"))
+  }, [pledgeId])
+
+  useEffect(() => {
+    if (compact) return
+    void loadContactLogs()
+  }, [compact, loadContactLogs])
+
+  const controls = usePledgeReminderControls(
+    pledgeId,
+    () => {
+      void loadContactLogs()
+      onUpdated?.()
+    },
+    onContactLogged
+  )
   const {
     loading,
     previewOpen,
@@ -219,6 +325,10 @@ export function PledgeReminderActions({
     preview,
     contactNotes,
     setContactNotes,
+    contactedOn,
+    setContactedOn,
+    contactMethod,
+    setContactMethod,
     handlePreview,
     handleSend,
     handleMarkContacted,
@@ -258,6 +368,21 @@ export function PledgeReminderActions({
           Mark Contacted
         </Button>
       </div>
+      {contactLogs.length > 0 ? (
+        <div className="space-y-2">
+          {contactLogs.map((row) => (
+            <div key={row.id} className="rounded-md border px-3 py-2 text-sm">
+              <p className="font-medium">
+                {pledgeContactMethodLabel(row.contact_method) || "Contacted"}{" "}
+                {formatContactedDate(row.sent_at || row.created_at)}
+              </p>
+              {row.contact_notes ? (
+                <p className="mt-1 text-muted-foreground">{row.contact_notes}</p>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       <ReminderPreviewDialog
         open={previewOpen}
@@ -273,6 +398,10 @@ export function PledgeReminderActions({
         donorName={donorName}
         contactNotes={contactNotes}
         onContactNotesChange={setContactNotes}
+        contactedOn={contactedOn}
+        onContactedOnChange={setContactedOn}
+        contactMethod={contactMethod}
+        onContactMethodChange={setContactMethod}
         onSave={handleMarkContacted}
         loading={loading}
       />
@@ -302,6 +431,10 @@ function MarkContactedDialog({
   donorName,
   contactNotes,
   onContactNotesChange,
+  contactedOn,
+  onContactedOnChange,
+  contactMethod,
+  onContactMethodChange,
   onSave,
   loading,
 }: {
@@ -310,9 +443,19 @@ function MarkContactedDialog({
   donorName: string
   contactNotes: string
   onContactNotesChange: (value: string) => void
+  contactedOn: string
+  onContactedOnChange: (value: string) => void
+  contactMethod: PledgeContactMethod | ""
+  onContactMethodChange: (value: PledgeContactMethod | "") => void
   onSave: () => Promise<void>
   loading: boolean
 }) {
+  useEffect(() => {
+    if (!open) return
+    onContactedOnChange(todayDateOnly())
+    onContactMethodChange("")
+  }, [open, onContactedOnChange, onContactMethodChange])
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -322,21 +465,51 @@ function MarkContactedDialog({
             Log manual outreach for {donorName}. This does not send email.
           </DialogDescription>
         </DialogHeader>
-        <div className="flex flex-col gap-2 py-2">
-          <Label htmlFor="contact-notes">Contact Notes (optional)</Label>
-          <Textarea
-            id="contact-notes"
-            rows={4}
-            value={contactNotes}
-            onChange={(e) => onContactNotesChange(e.target.value)}
-            placeholder="Called donor, left voicemail, etc."
-          />
+        <div className="flex flex-col gap-4 py-2">
+          <div className="flex flex-col gap-2">
+            <Label>How did you reach them?</Label>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant={contactMethod === "call" ? "default" : "outline"}
+                onClick={() => onContactMethodChange("call")}
+              >
+                Call
+              </Button>
+              <Button
+                type="button"
+                variant={contactMethod === "text" ? "default" : "outline"}
+                onClick={() => onContactMethodChange("text")}
+              >
+                Text
+              </Button>
+            </div>
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="contacted-on">Date contacted</Label>
+            <Input
+              id="contacted-on"
+              type="date"
+              value={contactedOn}
+              onChange={(e) => onContactedOnChange(e.target.value)}
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="contact-notes">Contact Notes (optional)</Label>
+            <Textarea
+              id="contact-notes"
+              rows={4}
+              value={contactNotes}
+              onChange={(e) => onContactNotesChange(e.target.value)}
+              placeholder="Left a voicemail, sent a text, etc."
+            />
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={() => void onSave()} disabled={loading}>
+          <Button onClick={() => void onSave()} disabled={loading || !contactMethod}>
             Save Contact Log
           </Button>
         </DialogFooter>

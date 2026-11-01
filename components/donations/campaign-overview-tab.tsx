@@ -20,6 +20,9 @@ import {
   type CampaignRow,
   type CampaignSourceBreakdown,
 } from "@/lib/donations/campaign-analytics"
+import { loadCampaignReportContactsAction } from "@/lib/donations/campaign-report-contacts"
+import { downloadCampaignReportExcel } from "@/lib/donations/campaign-report-excel"
+import { downloadCampaignReportPdf } from "@/lib/donations/campaign-report-pdf"
 import { buildCampaignOverviewMetricDetail } from "@/lib/donations/campaign-overview-metric-details"
 import type { CampaignOverviewMetricKey } from "@/lib/donations/campaign-overview-metrics"
 
@@ -69,6 +72,42 @@ export function CampaignOverviewTab({
   const raisedProgressPercent =
     goalAmount != null && goalAmount > 0 ? Math.min((totalRaised / goalAmount) * 100, 100) : null
   const [detailKey, setDetailKey] = useState<string | null>(null)
+  const [reportBusy, setReportBusy] = useState(false)
+
+  async function downloadReport(format: "pdf" | "excel") {
+    setReportBusy(true)
+    try {
+      const contactResult = await loadCampaignReportContactsAction(
+        pledges.map((pledge) => ({
+          id: pledge.id,
+          donorId: pledge.donorId,
+          contactId: pledge.contactId,
+        }))
+      )
+      if (!contactResult.success) {
+        alert(contactResult.error)
+        return
+      }
+      const reportPledges = pledges.map((pledge) => ({
+        ...pledge,
+        email: contactResult.contacts[pledge.id]?.email ?? null,
+        phone: contactResult.contacts[pledge.id]?.phone ?? null,
+      }))
+      const report = {
+        campaignName: campaign.name,
+        generatedAt: new Date(),
+        goalAmount,
+        metrics,
+        breakdown: sourceBreakdown,
+        visibleMetricKeys: overviewMetricKeys,
+        pledges: reportPledges,
+      }
+      if (format === "excel") await downloadCampaignReportExcel(report)
+      else await downloadCampaignReportPdf(report)
+    } finally {
+      setReportBusy(false)
+    }
+  }
   const detail = useMemo(
     () =>
       detailKey
@@ -92,6 +131,9 @@ export function CampaignOverviewTab({
             goalAmount={goalAmount}
             visibleMetricKeys={overviewMetricKeys}
             canCustomize={canManage}
+            reportBusy={reportBusy}
+            onCampaignReport={() => void downloadReport("pdf")}
+            onCampaignReportExcel={() => void downloadReport("excel")}
             onCustomizeClick={() => onShowMetricsEditorChange(true)}
             onMetricClick={(key) => {
               if (key === "donors") {
