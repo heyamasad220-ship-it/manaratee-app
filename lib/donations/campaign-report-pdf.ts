@@ -8,7 +8,7 @@ import {
 import { formatPhoneDisplayOrDash } from "@/lib/ui/format-phone"
 import {
   CAMPAIGN_OVERVIEW_METRIC_CATALOG,
-  resolveCampaignOverviewMetricKeys,
+  resolveAutoCampaignOverviewMetricKeys,
   type CampaignOverviewMetricKey,
 } from "@/lib/donations/campaign-overview-metrics"
 
@@ -23,7 +23,6 @@ export type CampaignReportPdfInput = {
   goalAmount: number | null
   metrics: CampaignMetrics
   breakdown: CampaignSourceBreakdown
-  visibleMetricKeys: CampaignOverviewMetricKey[] | null
   pledges: CampaignReportPledge[]
 }
 
@@ -86,10 +85,9 @@ export function campaignReportMetricLines(input: CampaignReportPdfInput): Metric
   const titles = new Map(
     CAMPAIGN_OVERVIEW_METRIC_CATALOG.map((metric) => [metric.key, metric.title])
   )
-  const visible = resolveCampaignOverviewMetricKeys({
-    savedKeys: input.visibleMetricKeys,
-    breakdown: input.breakdown,
-  }).filter((key) => key !== "donors" && key !== "largest-gift")
+  const visible = resolveAutoCampaignOverviewMetricKeys(input.breakdown).filter(
+    (key) => key !== "donors" && key !== "largest-gift"
+  )
 
   return [
     ...pinned,

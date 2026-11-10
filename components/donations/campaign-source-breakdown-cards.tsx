@@ -10,7 +10,6 @@ import {
   Landmark,
   RefreshCw,
   ScanLine,
-  Settings2,
   Target,
   Ticket,
   TrendingUp,
@@ -33,7 +32,7 @@ import {
   type CampaignSourceBreakdown,
 } from "@/lib/donations/campaign-analytics"
 import {
-  resolveCampaignOverviewMetricKeys,
+  resolveAutoCampaignOverviewMetricKeys,
   type CampaignOverviewMetricKey,
 } from "@/lib/donations/campaign-overview-metrics"
 import { cn } from "@/lib/utils"
@@ -55,9 +54,6 @@ type CampaignOverviewMetricsTableProps = {
   breakdown: CampaignSourceBreakdown
   metrics: CampaignMetrics
   goalAmount?: number | null
-  visibleMetricKeys?: CampaignOverviewMetricKey[] | null
-  canCustomize?: boolean
-  onCustomizeClick?: () => void
   onMetricClick?: (key: string) => void
   reportBusy?: boolean
   onCampaignReport?: () => void
@@ -256,18 +252,12 @@ export function CampaignOverviewMetricsTable({
   breakdown,
   metrics,
   goalAmount = null,
-  visibleMetricKeys,
-  canCustomize = false,
-  onCustomizeClick,
   onMetricClick,
   reportBusy = false,
   onCampaignReport,
   onCampaignReportExcel,
 }: CampaignOverviewMetricsTableProps) {
-  const resolvedKeys = resolveCampaignOverviewMetricKeys({
-    savedKeys: visibleMetricKeys ?? null,
-    breakdown,
-  })
+  const resolvedKeys = resolveAutoCampaignOverviewMetricKeys(breakdown)
   const rowByKey = new Map(
     buildCampaignOverviewMetricRows({
       breakdown,
@@ -307,12 +297,6 @@ export function CampaignOverviewMetricsTable({
           >
             {reportBusy ? "Preparing..." : "Excel"}
           </Button>
-          {canCustomize ? (
-            <Button type="button" variant="outline" size="sm" onClick={onCustomizeClick}>
-              <Settings2 className="mr-2 h-4 w-4" />
-              Customize
-            </Button>
-          ) : null}
         </div>
       </CardHeader>
       <CardContent className="border-t p-0">

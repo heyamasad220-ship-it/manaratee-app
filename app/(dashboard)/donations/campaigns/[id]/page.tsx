@@ -17,6 +17,7 @@ import {
 } from "@/components/donations/campaign-fundraising-plan-tab"
 import { CampaignDonationsKpis } from "@/components/donations/campaign-donations-kpis"
 import { CampaignDonationsTab } from "@/components/donations/campaign-donations-tab"
+import { DonationPaymentsPanel } from "@/components/donations/donation-payments-panel"
 import { CampaignEventKpis } from "@/components/donations/campaign-event-kpis"
 import { CampaignOverviewTab } from "@/components/donations/campaign-overview-tab"
 import { useCampaignBreadcrumb } from "@/components/donations/campaign-breadcrumb-context"
@@ -25,7 +26,6 @@ import { CampaignWishlistTab } from "@/components/donations/campaign-wishlist-ta
 import { PledgesLedger } from "@/app/(dashboard)/donations/campaigns/pledges/page"
 import {
   type CampaignAnalyticsEntry,
-  type CampaignDonorInsights,
   type CampaignOutstandingPledgeRow,
   type CampaignPaymentRow,
   type CampaignRecurringPlanRow,
@@ -34,7 +34,6 @@ import {
 } from "@/lib/donations/campaign-analytics"
 import { getCampaignDetailAction } from "@/lib/donations/donation-reports-actions"
 import type { CampaignEventStats } from "@/lib/events/campaign-event-actions"
-import type { CampaignOverviewMetricKey } from "@/lib/donations/campaign-overview-metrics"
 import type { CampaignFundraisingPlanKpis } from "@/lib/donations/campaign-prospect-types"
 import {
   canonicalizeCampaignWorkspaceHref,
@@ -84,7 +83,6 @@ export default function CampaignDetailPage() {
 
   const [campaign, setCampaign] = useState<CampaignRow | null>(null)
   const [entry, setEntry] = useState<CampaignAnalyticsEntry | null>(null)
-  const [insights, setInsights] = useState<CampaignDonorInsights | null>(null)
   const [sourceBreakdown, setSourceBreakdown] = useState<CampaignSourceBreakdown | null>(null)
   const [campaignPledges, setCampaignPledges] = useState<CampaignOutstandingPledgeRow[]>([])
   const [campaignPayments, setCampaignPayments] = useState<CampaignPaymentRow[]>([])
@@ -97,11 +95,6 @@ export default function CampaignDetailPage() {
   const [loading, setLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [showEditDialog, setShowEditDialog] = useState(false)
-  const [showMetricsEditor, setShowMetricsEditor] = useState(false)
-  const [overviewMetricKeys, setOverviewMetricKeys] = useState<CampaignOverviewMetricKey[] | null>(
-    null
-  )
-  const [showDonorsDialog, setShowDonorsDialog] = useState(false)
   const [contactProfileId, setContactProfileId] = useState<string | null>(null)
   const [showContactProfile, setShowContactProfile] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(false)
@@ -168,7 +161,6 @@ export default function CampaignDetailPage() {
       setErrorMessage(result.error)
       setCampaign(null)
       setEntry(null)
-      setInsights(null)
       setSourceBreakdown(null)
       setCampaignPledges([])
       setCampaignPayments([])
@@ -179,12 +171,10 @@ export default function CampaignDetailPage() {
 
     setCampaign(result.campaign)
     setEntry(result.entry)
-    setInsights(result.insights)
     setSourceBreakdown(result.sourceBreakdown)
     setCampaignPledges(result.campaignPledges)
     setCampaignPayments(result.campaignPayments)
     setCampaignRecurringPlans(result.campaignRecurringPlans)
-    setOverviewMetricKeys(result.overviewMetricKeys)
     setCanManage(result.canManage)
     setCanManageCampaigns(result.canManageCampaigns)
     setCanManageProspects(result.canManageProspects)
@@ -301,19 +291,10 @@ export default function CampaignDetailPage() {
             <CampaignOverviewTab
               campaign={campaign}
               entry={entry}
-              insights={insights}
               sourceBreakdown={sourceBreakdown}
               payments={campaignPayments}
               pledges={campaignPledges}
-              overviewMetricKeys={overviewMetricKeys}
-              canManage={canManageCampaigns}
-              showMetricsEditor={showMetricsEditor}
-              onShowMetricsEditorChange={setShowMetricsEditor}
-              showDonorsDialog={showDonorsDialog}
-              onShowDonorsDialogChange={setShowDonorsDialog}
-              onOverviewMetricKeysSaved={setOverviewMetricKeys}
               onOpenContactProfile={(target) => void openContactProfile(target)}
-              onReload={() => void loadCampaign()}
             />
             </div>
           ) : null}
@@ -345,32 +326,15 @@ export default function CampaignDetailPage() {
           ) : null}
 
           {activeTab === "donations" ? (
-            <CampaignDonationsTab
-              campaignId={campaign.id}
-              organizationId={campaign.organization_id}
-              payments={campaignPayments}
-              recurringPlans={campaignRecurringPlans}
-              openPledgeDonorIds={openPledgeDonorIds}
-              openPledgeContactIds={openPledgeContactIds}
-              canManage={canManage}
-              onDonorClick={(payment) =>
-                void openContactProfile({
-                  contactId: payment.contact_id,
-                  donorId: payment.donor_id,
-                })
-              }
-              onPledgeClick={(pledgeId) => {
-                setDetailsPledgeId(pledgeId)
-                setDetailsOpen(true)
-              }}
-              onRecurringDonorClick={(plan) =>
-                void openContactProfile({
-                  contactId: plan.contact_id,
-                  donorId: plan.donor_id,
-                })
-              }
-              onReload={() => void loadCampaign()}
-            />
+            <div className="h-full min-h-0 flex-1 overflow-y-auto">
+              <DonationPaymentsPanel
+                embedded
+                lockedCampaignId={campaign.id}
+                showCharts={false}
+                defaultRange="all"
+                readOnly={!canManage}
+              />
+            </div>
           ) : null}
 
           {activeTab === "transactions" ? (

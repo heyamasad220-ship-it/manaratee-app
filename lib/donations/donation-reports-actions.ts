@@ -17,11 +17,7 @@ import { sumActiveCampaignSponsorships } from "@/lib/donations/campaign-sponsors
 import { syncCampaignPhases } from "@/lib/donations/campaign-phase-actions"
 import { ensureCampaignDonationFund } from "@/lib/donations/ensure-campaign-donation-fund"
 import { createServiceRoleClient } from "@/lib/supabase/service-role"
-import {
-  normalizeCampaignOverviewMetricKeys,
-  parseCampaignOverviewMetricKeys,
-  type CampaignOverviewMetricKey,
-} from "@/lib/donations/campaign-overview-metrics"
+import { parseCampaignOverviewMetricKeys } from "@/lib/donations/campaign-overview-metrics"
 import {
   fetchDonorSummaryPageAction,
   fetchPaymentsPageAction,
@@ -509,48 +505,6 @@ export async function deleteCampaignAction(campaignId: string) {
 
     revalidateCampaignPaths(campaignId)
     return { success: true as const }
-  } catch (error) {
-    return { success: false as const, error: (error as Error).message }
-  }
-}
-
-export async function updateCampaignOverviewMetricsAction(
-  campaignId: string,
-  overviewMetricKeys: CampaignOverviewMetricKey[] | null
-) {
-  const access = await requireDonationStaffAccess("campaigns")
-  if (!access.ok) return { success: false as const, error: access.error }
-
-  const normalized =
-    overviewMetricKeys == null ? null : normalizeCampaignOverviewMetricKeys(overviewMetricKeys)
-
-  if (normalized != null && normalized.length === 0) {
-    return { success: false as const, error: "Select at least one metric or use automatic mode." }
-  }
-
-  try {
-    const writeClient = createServiceRoleClient()
-    const { data: campaign, error } = await writeClient
-      .from("campaigns")
-      .update({ overview_metric_keys: normalized })
-      .eq("organization_id", access.orgId)
-      .eq("id", campaignId)
-      .select(CAMPAIGN_SELECT)
-      .maybeSingle()
-
-    if (error || !campaign) {
-      return {
-        success: false as const,
-        error: formatCampaignWriteError(error, "Failed to update campaign overview metrics"),
-      }
-    }
-
-    revalidateCampaignPaths(campaignId)
-
-    return {
-      success: true as const,
-      overviewMetricKeys: parseCampaignOverviewMetricKeys(campaign.overview_metric_keys),
-    }
   } catch (error) {
     return { success: false as const, error: (error as Error).message }
   }

@@ -13,6 +13,7 @@ import {
   fetchPledgeReminderHistory,
 } from "@/lib/donations/pledge-reminder-data"
 import type { PledgeReminderType } from "@/lib/donations/pledge-reminder-types"
+import type { SupabaseClient } from "@supabase/supabase-js"
 import { isPledgeEligibleForReminder } from "@/lib/donations/pledge-reminder-types"
 
 export async function getOutstandingPledgesAction() {
@@ -179,6 +180,141 @@ export async function sendPledgeReminderAction(
     notice: delivery.configured
       ? "Pledge reminder email sent."
       : "Pledge reminder logged via console email provider (configure RESEND_API_KEY for live delivery).",
+  }
+}
+
+function pledgeContactLogName(subject: string | null | undefined) {
+  const name = subject?.trim()
+  if (!name || name === "Manual contact logged") return null
+  return name
+}
+
+async function loggedInStaffName(
+  supabase: SupabaseClient,
+  orgId: string,
+  userId: string,
+  email: string | null
+) {
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("full_name, first_name, last_name")
+    .eq("id", userId)
+    .maybeSingle()
+
+  const profileName =
+    (profile?.full_name as string | null)?.trim() ||
+    [profile?.first_name, profile?.last_name]
+      .map((part) => String(part || "").trim())
+      .filter(Boolean)
+      .join(" ")
+  if (profileName) return profileName
+
+  const { data: contact } = await supabase
+    .from("contacts")
+    .select("full_name")
+    .eq("organization_id", orgId)
+    .eq("auth_user_id", userId)
+    .maybeSingle()
+
+  return (contact?.full_name as string | null)?.trim() || email || "Staff"
+}
+
+export type PledgeContactLogEntry = {
+  id: string
+  at: string | null
+  name: string | null
+  notes: string | null
+}
+
+export async function listPledgeContactLogAction(pledgeId: string) {
+  const access = await requireDonationStaffAccess("view")
+  if (!access.ok) return { success: false as const, error: access.error }
+  if (!pledgeId.trim()) return { success: false as const, error: "Pledge is required" }
+
+  const { data, error } = await access.supabase
+    .from("pledge_reminders")
+    .select("id, sent_at, created_at, contact_notes, message_subject")
+    .eq("organization_id", access.orgId)
+    .eq("pledge_id", pledgeId)
+    .eq("reminder_type", "contacted")
+    .order("created_at", { ascending: false })
+
+  if (error) return { success: false as const, error: error.message }
+
+  const entries: PledgeContactLogEntry[] = (data || []).map((row) => ({
+    id: row.id as string,
+    at: (row.sent_at as string | null) || (row.created_at as string | null),
+    name: pledgeContactLogName(row.message_subject as string | null),
+    notes: (row.contact_notes as string | null) || null,
+  }))
+
+  return { success: true as const, entries }
+}
+
+export async function logPledgeContactNoteAction(pledgeId: string, notes: string) {
+  const access = await requireDonationStaffAccess("manage")
+  if (!access.ok) return { success: false as const, error: access.error }
+  const trimmed = notes.trim()
+  if (!pledgeId.trim()) return { success: false as const, error: "Pledge is required" }
+  if (!trimmed) return { success: false as const, error: "Add a note for this contact." }
+
+  const { data: pledge, error: pledgeError } = await access.supabase
+    .from("pledge_status_view")
+    .select("donor_id, donor_name")
+    .eq("organization_id", access.orgId)
+    .eq("id", pledgeId)
+    .maybeSingle()
+
+  if (pledgeError || !pledge) {
+    return { success: false as const, error: pledgeError?.message || "Pledge not found" }
+  }
+
+  let contactId: string | null = null
+  if (pledge.donor_id) {
+    const { data: donor } = await access.supabase
+      .from("donors")
+      .select("contact_id")
+      .eq("id", pledge.donor_id)
+      .maybeSingle()
+    contactId = (donor?.contact_id as string | null) ?? null
+  }
+
+  const name = await loggedInStaffName(
+    access.supabase,
+    access.orgId,
+    access.userId,
+    access.userEmail
+  )
+  const sentAt = new Date().toISOString()
+  const { data, error } = await access.supabase
+    .from("pledge_reminders")
+    .insert({
+      organization_id: access.orgId,
+      pledge_id: pledgeId,
+      donor_id: pledge.donor_id ?? null,
+      contact_id: contactId,
+      reminder_type: "contacted",
+      status: "sent",
+      message_subject: name,
+      message_body: trimmed,
+      contact_notes: trimmed,
+      delivered_externally: false,
+      sent_at: sentAt,
+      sent_by: access.userId,
+    })
+    .select("id, sent_at, contact_notes, message_subject")
+    .single()
+
+  if (error || !data) return { success: false as const, error: error?.message || "Could not log contact" }
+
+  return {
+    success: true as const,
+    entry: {
+      id: data.id as string,
+      at: (data.sent_at as string | null) || sentAt,
+      name: pledgeContactLogName(data.message_subject as string | null) || name,
+      notes: (data.contact_notes as string | null) || trimmed,
+    } satisfies PledgeContactLogEntry,
   }
 }
 

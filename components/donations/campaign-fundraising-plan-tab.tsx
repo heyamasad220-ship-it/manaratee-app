@@ -133,7 +133,6 @@ export function CampaignFundraisingPlanTab({
       suggested_ask_amount: input.suggested_ask_amount,
       assigned_to_contact_id: input.assigned_to_contact_id,
       assigned_to_name: input.assigned_to_name,
-      last_contacted_at: input.last_contacted_at,
       next_follow_up_at: input.next_follow_up_at,
       notes: input.notes,
       stage: "identified",
@@ -141,12 +140,12 @@ export function CampaignFundraisingPlanTab({
     setSaving(false)
     if (!result.success) {
       setErrorMessage(result.error)
-      return false
+      return null
     }
     setProspects((current) =>
       [...current, result.prospect].sort((a, b) => a.contactName.localeCompare(b.contactName))
     )
-    return true
+    return result.prospect
   }
 
   async function saveProspect(prospectId: string, input: FundraisingPlanSaveInput) {
@@ -157,19 +156,18 @@ export function CampaignFundraisingPlanTab({
       ask_level_id: null,
       assigned_to_contact_id: input.assigned_to_contact_id,
       assigned_to_name: input.assigned_to_name,
-      last_contacted_at: input.last_contacted_at,
       next_follow_up_at: input.next_follow_up_at,
       notes: input.notes,
     })
     setSaving(false)
     if (!result.success) {
       setErrorMessage(result.error)
-      return false
+      return null
     }
     setProspects((current) =>
       current.map((row) => (row.id === prospectId ? result.prospect : row))
     )
-    return true
+    return result.prospect
   }
 
   async function deleteProspect(prospectId: string) {
@@ -200,6 +198,13 @@ export function CampaignFundraisingPlanTab({
           errorMessage={errorMessage}
           onSaveProspect={saveProspect}
           onAddProspect={addProspect}
+          onContactLogged={(prospectId, lastContactedAt) => {
+            setProspects((current) =>
+              current.map((row) =>
+                row.id === prospectId ? { ...row, last_contacted_at: lastContactedAt } : row
+              )
+            )
+          }}
           onDeleteProspect={deleteProspect}
           onPledgeChanged={() => {
             void load(false)

@@ -46,6 +46,11 @@ import {
   updatePledgeAction,
 } from "@/lib/donations/pledge-admin-actions"
 import { suggestedPledgePaymentAmount } from "@/lib/donations/pledge-payment-plan"
+import {
+  listPledgeContactLogAction,
+  logPledgeContactNoteAction,
+  type PledgeContactLogEntry,
+} from "@/lib/donations/pledge-reminder-actions"
 import { unallocatePaymentFromPledgeAction } from "@/lib/donations/payment-admin-actions"
 import { createClient } from "@/lib/supabase/client"
 import { getSelectedOrganizationIdClient } from "@/lib/organizations/get-selected-organization-id-client"
@@ -82,6 +87,7 @@ export type PledgeDetailsDialogProps = {
   canManage?: boolean
   onSaved?: (pledgeId: string) => void
   onDeleted?: (pledgeId: string) => void
+  onContactLogged?: () => void
 }
 
 export function PledgeDetailsDialog({
@@ -96,6 +102,7 @@ export function PledgeDetailsDialog({
   canManage = true,
   onSaved,
   onDeleted,
+  onContactLogged,
 }: PledgeDetailsDialogProps) {
   const supabase = useMemo(() => createClient(), [])
   const [organizationId, setOrganizationId] = useState<string | null>(organizationIdProp)
@@ -134,6 +141,10 @@ export function PledgeDetailsDialog({
   const [paymentSource, setPaymentSource] = useState("check")
   const [paymentMemo, setPaymentMemo] = useState("")
   const [payments, setPayments] = useState<PaymentRow[]>([])
+  const [contactLog, setContactLog] = useState<PledgeContactLogEntry[]>([])
+  const [contactLogNote, setContactLogNote] = useState("")
+  const [contactLogError, setContactLogError] = useState<string | null>(null)
+  const [loggingContact, setLoggingContact] = useState(false)
 
   const isExisting = Boolean(activePledgeId)
   const balanceRemaining = loaded?.balanceRemaining ?? 0
@@ -163,6 +174,9 @@ export function PledgeDetailsDialog({
     setErrorMessage(null)
     setSuggestedPaymentAmount(0)
     setPayments([])
+    setContactLog([])
+    setContactLogNote("")
+    setContactLogError(null)
     setShowReceivePayment(false)
     setPaymentAmount("")
     setPaymentDate(getTodayPlainDate())
@@ -231,10 +245,42 @@ export function PledgeDetailsDialog({
       setOrganizationId(result.organizationId)
       applyLoadedPledge(result.pledge)
       await loadPayments(id, result.organizationId)
+      const logResult = await listPledgeContactLogAction(id)
+      setContactLog(logResult.success ? logResult.entries : [])
+      setContactLogNote("")
+      setContactLogError(logResult.success ? null : logResult.error)
       setLoading(false)
     },
     [applyLoadedPledge, loadPayments]
   )
+
+  function formatContactStamp(value: string | null) {
+    if (!value) return "—"
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return value
+    return date.toLocaleString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    })
+  }
+
+  async function handleLogContact() {
+    if (!activePledgeId || !contactLogNote.trim()) return
+    setLoggingContact(true)
+    const result = await logPledgeContactNoteAction(activePledgeId, contactLogNote.trim())
+    setLoggingContact(false)
+    if (!result.success) {
+      setContactLogError(result.error)
+      return
+    }
+    setContactLog((current) => [result.entry, ...current])
+    setContactLogNote("")
+    setContactLogError(null)
+    onContactLogged?.()
+  }
 
   async function handleUnallocatePayment(paymentId: string) {
     if (!activePledgeId) return
@@ -602,6 +648,55 @@ export function PledgeDetailsDialog({
                     onChange={(event) => setNotes(event.target.value)}
                   />
                 </div>
+
+                {isExisting ? (
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="pledge-contact-log">Contact log</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Your name and the time are added automatically. Write the notes for this contact.
+                    </p>
+                    {contactLog.length > 0 ? (
+                      <ul className="flex max-h-40 flex-col gap-3 overflow-y-auto rounded-md border p-3">
+                        {contactLog.map((entry) => (
+                          <li key={entry.id}>
+                            <p className="text-xs text-muted-foreground">
+                              {[entry.name, formatContactStamp(entry.at)].filter(Boolean).join(" · ")}
+                            </p>
+                            {entry.notes ? <p className="text-sm">{entry.notes}</p> : null}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No contacts logged yet.</p>
+                    )}
+                    {canManage ? (
+                      <>
+                        <Textarea
+                          id="pledge-contact-log"
+                          rows={3}
+                          value={contactLogNote}
+                          disabled={loggingContact}
+                          onChange={(event) => setContactLogNote(event.target.value)}
+                          placeholder="What happened on this contact"
+                        />
+                        {contactLogError ? (
+                          <p className="text-sm text-red-600">{contactLogError}</p>
+                        ) : null}
+                        <div className="flex justify-end">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={loggingContact || !contactLogNote.trim()}
+                            onClick={() => void handleLogContact()}
+                          >
+                            {loggingContact ? "Logging..." : "Log contact"}
+                          </Button>
+                        </div>
+                      </>
+                    ) : null}
+                  </div>
+                ) : null}
 
                 {isExisting && loaded ? (
                   <>

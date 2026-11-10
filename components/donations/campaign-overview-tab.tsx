@@ -1,11 +1,10 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
 
-import { CampaignDonorsDialog } from "@/components/donations/campaign-donors-dialog"
 import { CampaignOverviewInsightsPanel } from "@/components/donations/campaign-overview-insights"
 import { CampaignOverviewMetricDialog } from "@/components/donations/campaign-overview-metric-dialog"
-import { CampaignOverviewMetricsEditor } from "@/components/donations/campaign-overview-metrics-editor"
 import { CampaignProgressBar } from "@/components/donations/campaign-progress-bar"
 import { CampaignProgressGauge } from "@/components/donations/campaign-progress-gauge"
 import { CampaignOverviewMetricsTable } from "@/components/donations/campaign-source-breakdown-cards"
@@ -14,7 +13,6 @@ import {
   campaignCommitmentRaised,
   formatDonationCurrency,
   type CampaignAnalyticsEntry,
-  type CampaignDonorInsights,
   type CampaignOutstandingPledgeRow,
   type CampaignPaymentRow,
   type CampaignRow,
@@ -24,7 +22,7 @@ import { loadCampaignReportContactsAction } from "@/lib/donations/campaign-repor
 import { downloadCampaignReportExcel } from "@/lib/donations/campaign-report-excel"
 import { downloadCampaignReportPdf } from "@/lib/donations/campaign-report-pdf"
 import { buildCampaignOverviewMetricDetail } from "@/lib/donations/campaign-overview-metric-details"
-import type { CampaignOverviewMetricKey } from "@/lib/donations/campaign-overview-metrics"
+import { DONATION_REPORTS_DONORS_PATH } from "@/lib/donations/donation-payment-paths"
 
 type ContactProfileTarget = {
   contactId?: string | null
@@ -34,38 +32,21 @@ type ContactProfileTarget = {
 type CampaignOverviewTabProps = {
   campaign: CampaignRow
   entry: CampaignAnalyticsEntry
-  insights: CampaignDonorInsights | null
   sourceBreakdown: CampaignSourceBreakdown
   payments: CampaignPaymentRow[]
   pledges: CampaignOutstandingPledgeRow[]
-  overviewMetricKeys: CampaignOverviewMetricKey[] | null
-  canManage: boolean
-  showMetricsEditor: boolean
-  onShowMetricsEditorChange: (open: boolean) => void
-  showDonorsDialog: boolean
-  onShowDonorsDialogChange: (open: boolean) => void
-  onOverviewMetricKeysSaved: (keys: CampaignOverviewMetricKey[] | null) => void
   onOpenContactProfile: (target: ContactProfileTarget) => void
-  onReload: () => void
 }
 
 export function CampaignOverviewTab({
   campaign,
   entry,
-  insights,
   sourceBreakdown,
   payments,
   pledges,
-  overviewMetricKeys,
-  canManage,
-  showMetricsEditor,
-  onShowMetricsEditorChange,
-  showDonorsDialog,
-  onShowDonorsDialogChange,
-  onOverviewMetricKeysSaved,
   onOpenContactProfile,
-  onReload,
 }: CampaignOverviewTabProps) {
+  const router = useRouter()
   const { metrics } = entry
   const goalAmount = Number(campaign.goal_amount || 0) || null
   const totalRaised = campaignCommitmentRaised(metrics)
@@ -99,7 +80,6 @@ export function CampaignOverviewTab({
         goalAmount,
         metrics,
         breakdown: sourceBreakdown,
-        visibleMetricKeys: overviewMetricKeys,
         pledges: reportPledges,
       }
       if (format === "excel") await downloadCampaignReportExcel(report)
@@ -129,15 +109,12 @@ export function CampaignOverviewTab({
             breakdown={sourceBreakdown}
             metrics={metrics}
             goalAmount={goalAmount}
-            visibleMetricKeys={overviewMetricKeys}
-            canCustomize={canManage}
             reportBusy={reportBusy}
             onCampaignReport={() => void downloadReport("pdf")}
             onCampaignReportExcel={() => void downloadReport("excel")}
-            onCustomizeClick={() => onShowMetricsEditorChange(true)}
             onMetricClick={(key) => {
               if (key === "donors") {
-                onShowDonorsDialogChange(true)
+                router.push(`${DONATION_REPORTS_DONORS_PATH}?campaignId=${campaign.id}`)
                 return
               }
               setDetailKey(key)
@@ -171,31 +148,6 @@ export function CampaignOverviewTab({
         <CampaignOverviewInsightsPanel campaignId={campaign.id} />
       </div>
 
-      {canManage ? (
-        <CampaignOverviewMetricsEditor
-          campaignId={campaign.id}
-          savedKeys={overviewMetricKeys}
-          open={showMetricsEditor}
-          onOpenChange={onShowMetricsEditorChange}
-          onSaved={(keys) => {
-            onOverviewMetricKeysSaved(keys)
-            onReload()
-          }}
-        />
-      ) : null}
-
-      <CampaignDonorsDialog
-        campaignName={campaign.name}
-        donors={insights?.donors || []}
-        open={showDonorsDialog}
-        onOpenChange={onShowDonorsDialogChange}
-        onDonorClick={(donor) =>
-          onOpenContactProfile({
-            contactId: donor.contactId,
-            donorId: donor.donorId,
-          })
-        }
-      />
       <CampaignOverviewMetricDialog
         detail={detail}
         open={detailKey != null}

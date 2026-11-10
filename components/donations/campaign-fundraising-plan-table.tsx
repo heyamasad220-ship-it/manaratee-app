@@ -56,6 +56,7 @@ export function CampaignFundraisingPlanTable({
   errorMessage,
   onSaveProspect,
   onAddProspect,
+  onContactLogged,
   onDeleteProspect,
   onPledgeChanged,
 }: {
@@ -67,8 +68,12 @@ export function CampaignFundraisingPlanTable({
   assigneeFilter: string | null
   saving: boolean
   errorMessage: string | null
-  onSaveProspect: (prospectId: string, input: FundraisingPlanSaveInput) => Promise<boolean>
-  onAddProspect: (input: FundraisingPlanSaveInput) => Promise<boolean>
+  onSaveProspect: (
+    prospectId: string,
+    input: FundraisingPlanSaveInput
+  ) => Promise<CampaignProspectListItem | null>
+  onAddProspect: (input: FundraisingPlanSaveInput) => Promise<CampaignProspectListItem | null>
+  onContactLogged: (prospectId: string, lastContactedAt: string | null) => void
   onDeleteProspect: (prospectId: string) => Promise<boolean>
   onPledgeChanged: () => void
 }) {
@@ -220,6 +225,15 @@ export function CampaignFundraisingPlanTable({
           if (editing) return onSaveProspect(editing.id, input)
           return onAddProspect(input)
         }}
+        onContactLogged={(prospectId, lastContactedAt) => {
+          setEditing((current) =>
+            current && current.id === prospectId
+              ? { ...current, last_contacted_at: lastContactedAt }
+              : current
+          )
+          onContactLogged(prospectId, lastContactedAt)
+        }}
+        onAttached={setEditing}
         onDelete={async () => {
           if (!editing) return false
           return onDeleteProspect(editing.id)

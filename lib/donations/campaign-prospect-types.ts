@@ -39,6 +39,7 @@ export const CAMPAIGN_PROSPECT_CONTACT_ACTIVITY_TYPES: CampaignProspectActivityT
   "meeting",
   "text",
   "follow_up",
+  "note",
 ]
 
 export const CAMPAIGN_PROSPECT_STAGES = [

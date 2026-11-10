@@ -34,7 +34,6 @@ import { Plus, Columns3, Download } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { PledgeDonorSubline } from "@/components/donations/pledge-donor-subline";
 import { PledgeDetailsDialog } from "@/components/donations/pledge-details-dialog";
-import { PledgeOutreachDialog } from "@/components/donations/pledge-reminder-actions";
 import {
   PledgeSummaryMetricCards,
   type PledgeSummaryMetrics,
@@ -110,6 +109,7 @@ interface Pledge {
   lastCallAt: string | null;
   lastTextAt: string | null;
   contactNotes: string | null;
+  contactByName: string | null;
 }
 
 type CampaignOption = {
@@ -135,6 +135,23 @@ function formatDisplayDate(value: string | null | undefined) {
   });
 }
 
+function pledgeContactLogName(subject: string | null | undefined) {
+  const name = subject?.trim();
+  if (!name || name === "Manual contact logged") return null;
+  return name;
+}
+
+function formatPledgeLastContact(pledge: Pledge) {
+  if (!pledge.lastContactedAt && !pledge.contactNotes) return "—";
+  const when = pledge.lastContactedAt
+    ? new Date(pledge.lastContactedAt).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      })
+    : null;
+  return [pledge.contactByName, when, pledge.contactNotes].filter(Boolean).join(" · ");
+}
+
 async function attachReminderSummaries(
   supabase: ReturnType<typeof createClient>,
   orgId: string,
@@ -145,7 +162,9 @@ async function attachReminderSummaries(
 
   const { data } = await supabase
     .from("pledge_reminders")
-    .select("pledge_id, status, reminder_type, contact_method, sent_at, created_at, contact_notes")
+    .select(
+      "pledge_id, status, reminder_type, contact_method, sent_at, created_at, contact_notes, message_subject"
+    )
     .eq("organization_id", orgId)
     .in("pledge_id", pledgeIds)
     .order("created_at", { ascending: false });
@@ -160,6 +179,7 @@ async function attachReminderSummaries(
       lastTextAt: string | null;
       contactNotes: string | null;
       contactNotesAt: string | null;
+      contactByName: string | null;
     }
   >();
 
@@ -173,6 +193,7 @@ async function attachReminderSummaries(
       lastTextAt: null,
       contactNotes: null,
       contactNotesAt: null,
+      contactByName: null,
     };
 
     const contacted = {
@@ -188,6 +209,9 @@ async function attachReminderSummaries(
     existing.lastContactedAt = contacted.lastContactedAt;
     existing.contactNotes = contacted.contactNotes;
     existing.contactNotesAt = contacted.contactNotesAt;
+    if (contacted.contactNotesAt === (row.sent_at || row.created_at)) {
+      existing.contactByName = pledgeContactLogName(row.message_subject as string | null);
+    }
 
     if (row.reminder_type !== "contacted" && !existing.lastReminderAt) {
       existing.lastReminderAt = (row.sent_at || row.created_at) as string;
@@ -207,6 +231,7 @@ async function attachReminderSummaries(
       lastCallAt: summary?.lastCallAt ?? null,
       lastTextAt: summary?.lastTextAt ?? null,
       contactNotes: summary?.contactNotes ?? null,
+      contactByName: summary?.contactByName ?? null,
     };
   });
 }
@@ -245,6 +270,7 @@ function pledgeFromRow(row: any): Pledge {
     lastCallAt: null,
     lastTextAt: null,
     contactNotes: null,
+    contactByName: null,
   };
 }
 
@@ -292,9 +318,6 @@ export function PledgesLedger({
 
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [detailsPledgeId, setDetailsPledgeId] = useState<string | null>(null);
-  const [outreachPledge, setOutreachPledge] = useState<{ id: string; donorName: string } | null>(
-    null
-  );
   const [detailsProspectId, setDetailsProspectId] = useState<string | null>(null);
   const [detailsCampaignId, setDetailsCampaignId] = useState<string | null>(null);
   const [detailsContactId, setDetailsContactId] = useState<string | null>(null);
@@ -727,6 +750,7 @@ export function PledgesLedger({
                     <TableHead>Email reminder</TableHead>
                   ) : null}
                   {visibleColumnSet.has("callText") ? <TableHead>Call / text</TableHead> : null}
+                  {visibleColumnSet.has("lastContact") ? <TableHead>Last contact</TableHead> : null}
                   {visibleColumnSet.has("notes") ? <TableHead>Notes</TableHead> : null}
                 </TableRow>
               </TableHeader>
@@ -833,29 +857,17 @@ export function PledgesLedger({
                       <TableCell className="text-sm text-muted-foreground">
                         {(() => {
                           const lines = callTextReminderLines(pledge, formatDisplayDate);
-                          return (
-                            <div className="flex flex-col items-start gap-1">
-                              {lines.length === 0
-                                ? null
-                                : lines.map((line) => <div key={line}>{line}</div>)}
-                              <Button
-                                type="button"
-                                variant="link"
-                                size="sm"
-                                className="h-auto px-0"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  setOutreachPledge({
-                                    id: pledge.id,
-                                    donorName: pledge.donorName,
-                                  });
-                                }}
-                              >
-                                Log contact
-                              </Button>
-                            </div>
-                          );
+                          if (lines.length === 0) return "—";
+                          return lines.map((line) => <div key={line}>{line}</div>);
                         })()}
+                      </TableCell>
+                      ) : null}
+                      {visibleColumnSet.has("lastContact") ? (
+                      <TableCell
+                        className="max-w-xs truncate text-sm text-muted-foreground"
+                        title={formatPledgeLastContact(pledge)}
+                      >
+                        {formatPledgeLastContact(pledge)}
                       </TableCell>
                       ) : null}
                       {visibleColumnSet.has("notes") ? (
@@ -956,18 +968,6 @@ export function PledgesLedger({
         </DialogContent>
       </Dialog>
 
-      <PledgeOutreachDialog
-        open={outreachPledge != null}
-        onOpenChange={(open) => {
-          if (!open) setOutreachPledge(null);
-        }}
-        pledgeId={outreachPledge?.id ?? null}
-        donorName={outreachPledge?.donorName || "this donor"}
-        onUpdated={() => {
-          void fetchPledges();
-        }}
-      />
-
       <PledgeDetailsDialog
         open={detailsOpen}
         onOpenChange={closeDetails}
@@ -978,6 +978,9 @@ export function PledgesLedger({
         prospectId={detailsProspectId}
         onSaved={() => {
           setDetailsProspectId(null);
+          void fetchPledges();
+        }}
+        onContactLogged={() => {
           void fetchPledges();
         }}
         onDeleted={() => {

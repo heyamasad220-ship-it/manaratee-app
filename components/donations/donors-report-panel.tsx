@@ -7,8 +7,10 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation"
 import {
   fetchDonorGivingReportExportContextAction,
   fetchDonorSummaryExportAction,
+  fetchCampaignDonorGivingPageAction,
   fetchDonorSummaryPageAction,
   fetchDonorSummaryReportSummaryAction,
+  getDonationPaymentFilterOptionsAction,
   fetchGroupGivingReportPageAction,
   fetchHouseholdGivingReportPageAction,
   type DonorReportLastGiftFilter,
@@ -244,6 +246,30 @@ export function DonorsReportPanel() {
   const [addGroupName, setAddGroupName] = useState("")
   const [addGroupSaving, setAddGroupSaving] = useState(false)
   const [addGroupError, setAddGroupError] = useState("")
+  const [campaignId, setCampaignId] = useState(searchParams.get("campaignId") || "all")
+  const [campaignOptions, setCampaignOptions] = useState<Array<{ id: string; name: string }>>([])
+
+  useEffect(() => {
+    setCampaignId(searchParams.get("campaignId") || "all")
+  }, [searchParams])
+
+  useEffect(() => {
+    void getDonationPaymentFilterOptionsAction().then((result) => {
+      if (result.success) setCampaignOptions(result.options.campaigns)
+    })
+  }, [])
+
+  function setCampaignAndUrl(nextCampaignId: string) {
+    setCampaignId(nextCampaignId)
+    setPage(1)
+    setLoading(true)
+    const params = new URLSearchParams(searchParams.toString())
+    if (!nextCampaignId || nextCampaignId === "all") params.delete("campaignId")
+    else params.set("campaignId", nextCampaignId)
+    if (nextCampaignId !== "all") params.delete("view")
+    replaceQueryWithoutRefresh(pathname, params)
+    if (nextCampaignId !== "all") setReportView("individual")
+  }
 
   useEffect(() => {
     const view = searchParams.get("view")
@@ -270,6 +296,8 @@ export function DonorsReportPanel() {
       params.delete("view")
     } else {
       params.set("view", view)
+      params.delete("campaignId")
+      setCampaignId("all")
     }
     replaceQueryWithoutRefresh(pathname, params)
   }
@@ -397,6 +425,7 @@ export function DonorsReportPanel() {
     customDateFrom,
     customDateTo,
     reportView,
+    campaignId,
   ])
 
   const loadDonors = useCallback(async () => {
@@ -478,6 +507,30 @@ export function DonorsReportPanel() {
         return
       }
 
+      if (campaignId !== "all") {
+        const result = await fetchCampaignDonorGivingPageAction({
+          campaignId,
+          page,
+          pageSize,
+          search: filterInput.donorName || filterInput.search,
+          dateFrom: filterInput.dateFrom,
+          dateTo: filterInput.dateTo,
+        })
+        if (!result.success) {
+          setError(result.error)
+          setDonors([])
+          setTotal(0)
+          setSummary({ donorCount: 0, totalGiven: 0, giftCount: 0 })
+        } else {
+          setDonors(result.donors)
+          setHouseholds([])
+          setGroups([])
+          setTotal(result.total)
+          setSummary(result.summary)
+        }
+        return
+      }
+
       const result = await fetchDonorSummaryPageAction({
         page,
         pageSize,
@@ -508,10 +561,10 @@ export function DonorsReportPanel() {
       setSummaryLoading(false)
       setLoading(false)
     }
-  }, [page, pageSize, filterInput, sortBy, sortAsc, reportView])
+  }, [page, pageSize, filterInput, sortBy, sortAsc, reportView, campaignId])
 
   const loadSummary = useCallback(async () => {
-    if (reportView === "household" || reportView === "group") {
+    if (reportView === "household" || reportView === "group" || campaignId !== "all") {
       setSummaryLoading(false)
       return
     }
@@ -536,7 +589,7 @@ export function DonorsReportPanel() {
     } finally {
       setSummaryLoading(false)
     }
-  }, [filterInput, reportView])
+  }, [filterInput, reportView, campaignId])
 
   useEffect(() => {
     void loadDonors()
@@ -709,7 +762,24 @@ export function DonorsReportPanel() {
         )}
       >
         <div className="space-y-4">
-          <h2 className="text-xl font-semibold">Donor Giving</h2>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-xl font-semibold">Donor Giving</h2>
+            {reportView === "individual" ? (
+              <Select value={campaignId} onValueChange={setCampaignAndUrl}>
+                <SelectTrigger className="w-[240px]" aria-label="Campaign">
+                  <SelectValue placeholder="All campaigns" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All campaigns</SelectItem>
+                  {campaignOptions.map((campaign) => (
+                    <SelectItem key={campaign.id} value={campaign.id}>
+                      {campaign.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : null}
+          </div>
           <div className="flex flex-wrap gap-2">
             <Button
               variant={reportView === "individual" ? "default" : "outline"}

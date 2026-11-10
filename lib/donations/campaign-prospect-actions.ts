@@ -100,6 +100,20 @@ async function resolveStaffDisplayName(
   email: string | null
 ): Promise<string> {
   const writeClient = createServiceRoleClient()
+  const { data: profile } = await writeClient
+    .from("profiles")
+    .select("full_name, first_name, last_name")
+    .eq("id", userId)
+    .maybeSingle()
+
+  const profileName =
+    (profile?.full_name as string | null)?.trim() ||
+    [profile?.first_name, profile?.last_name]
+      .map((part) => String(part || "").trim())
+      .filter(Boolean)
+      .join(" ")
+  if (profileName) return profileName
+
   const { data } = await writeClient
     .from("contacts")
     .select("full_name")

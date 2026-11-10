@@ -1629,6 +1629,161 @@ export async function searchDonorsForPickerAction(search: string, limit = 50) {
   }
 }
 
+export async function fetchRecurringPlansListAction(campaignId?: string | null) {
+  const access = await requireDonationStaffAccess("view")
+  if (!access.ok) return { success: false as const, error: access.error }
+
+  let query = access.supabase
+    .from("recurring_donation_plans")
+    .select(
+      "id, amount, frequency, status, start_date, next_payment_date, payments_made, campaign_id, donors(full_name)"
+    )
+    .eq("organization_id", access.orgId)
+    .order("created_at", { ascending: false })
+    .limit(500)
+
+  if (campaignId) query = query.eq("campaign_id", campaignId)
+
+  const { data, error } = await query
+  if (error) return { success: false as const, error: error.message }
+
+  const plans = (data || []).map((row) => {
+    const donor = Array.isArray(row.donors) ? row.donors[0] : row.donors
+    return {
+      id: row.id as string,
+      amount: Number(row.amount || 0),
+      frequency: (row.frequency as string | null) || "monthly",
+      status: (row.status as string | null) || "active",
+      startDate: (row.start_date as string | null) || null,
+      nextPaymentDate: (row.next_payment_date as string | null) || null,
+      paymentsMade: Number(row.payments_made || 0),
+      donorName: (donor as { full_name?: string | null } | null)?.full_name || "Unknown donor",
+    }
+  })
+
+  return { success: true as const, plans }
+}
+
+export async function fetchCampaignDonorGivingPageAction(input: {
+  campaignId: string
+  page?: number
+  pageSize?: number
+  search?: string
+  dateFrom?: string
+  dateTo?: string
+}) {
+  const access = await requireDonationStaffAccess("view")
+  if (!access.ok) return { success: false as const, error: access.error }
+  if (!input.campaignId) return { success: false as const, error: "Campaign is required" }
+
+  const page = Math.max(1, input.page ?? 1)
+  const pageSize = Math.min(100, Math.max(1, input.pageSize ?? DONATIONS_PAGE_SIZE))
+  const payments: Array<{
+    donor_id: string | null
+    amount: number | null
+    refunded_amount: number | null
+    payment_date: string | null
+    status: string | null
+  }> = []
+
+  let from = 0
+  while (true) {
+    const { data, error } = await access.supabase
+      .from("payments")
+      .select("donor_id, amount, refunded_amount, payment_date, status")
+      .eq("organization_id", access.orgId)
+      .eq("campaign_id", input.campaignId)
+      .not("donor_id", "is", null)
+      .range(from, from + 999)
+
+    if (error) return { success: false as const, error: error.message }
+    const batch = data || []
+    payments.push(...batch)
+    if (batch.length < 1000) break
+    from += 1000
+  }
+
+  const byDonor = new Map<string, { total: number; count: number; last: string | null }>()
+  for (const row of payments) {
+    if (!row.donor_id) continue
+    if (String(row.status || "").toLowerCase() === "voided") continue
+    const paidOn = row.payment_date || ""
+    if (input.dateFrom && paidOn && paidOn < input.dateFrom) continue
+    if (input.dateTo && paidOn && paidOn > input.dateTo) continue
+    const net = Number(row.amount || 0) - Number(row.refunded_amount || 0)
+    if (net <= 0) continue
+    const current = byDonor.get(row.donor_id) || { total: 0, count: 0, last: null }
+    current.total += net
+    current.count += 1
+    if (row.payment_date && (!current.last || row.payment_date > current.last)) {
+      current.last = row.payment_date
+    }
+    byDonor.set(row.donor_id, current)
+  }
+
+  const donorIds = [...byDonor.keys()]
+  const donorRows: Array<{
+    id: string
+    full_name: string | null
+    email: string | null
+    phone: string | null
+    contact_id: string | null
+    donor_type: string | null
+  }> = []
+
+  for (let index = 0; index < donorIds.length; index += 200) {
+    const slice = donorIds.slice(index, index + 200)
+    const { data, error } = await access.supabase
+      .from("donors")
+      .select("id, full_name, email, phone, contact_id, donor_type")
+      .eq("organization_id", access.orgId)
+      .in("id", slice)
+    if (error) return { success: false as const, error: error.message }
+    donorRows.push(...((data || []) as typeof donorRows))
+  }
+
+  const search = input.search?.trim().toLowerCase()
+  let rows: DonorSummaryReportRow[] = donorRows.map((donor) => {
+    const giving = byDonor.get(donor.id)
+    return {
+      id: donor.id,
+      contact_id: donor.contact_id,
+      full_name: donor.full_name,
+      email: donor.email,
+      phone: donor.phone,
+      donor_type: donor.donor_type,
+      total_donations: giving?.total || 0,
+      donation_count: giving?.count || 0,
+      last_donation_date: giving?.last || null,
+      lifetime_last_donation_date: giving?.last || null,
+      pledge_status: null,
+      has_open_pledge: false,
+      outstanding_pledge_balance: 0,
+    }
+  })
+
+  if (search) {
+    rows = rows.filter((row) => (row.full_name || "").toLowerCase().includes(search))
+  }
+  rows.sort((left, right) => right.total_donations - left.total_donations)
+
+  const summary = {
+    donorCount: rows.length,
+    totalGiven: rows.reduce((sum, row) => sum + row.total_donations, 0),
+    giftCount: rows.reduce((sum, row) => sum + row.donation_count, 0),
+  }
+  const start = (page - 1) * pageSize
+
+  return {
+    success: true as const,
+    donors: rows.slice(start, start + pageSize),
+    total: rows.length,
+    page,
+    pageSize,
+    summary,
+  }
+}
+
 export async function fetchOpenPledgesForAllocationAction(donorId?: string | null) {
   const access = await requireDonationStaffAccess("view")
   if (!access.ok) return { success: false as const, error: access.error }
