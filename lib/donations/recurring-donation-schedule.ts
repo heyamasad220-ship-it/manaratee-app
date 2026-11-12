@@ -14,6 +14,20 @@ function formatDateOnly(date: Date): string {
   return `${y}-${m}-${d}`
 }
 
+export function roundRecurringMoney(value: number): number {
+  return Math.round(value * 100) / 100
+}
+
+/** Ongoing plans pass a null remaining balance and charge the full amount. */
+export function nextRecurringChargeAmount(planAmount: number, remaining: number | null): number {
+  const amount = roundRecurringMoney(planAmount)
+  if (!Number.isFinite(amount) || amount <= 0) return 0
+  if (remaining == null) return amount
+  const left = roundRecurringMoney(remaining)
+  if (left <= 0) return 0
+  return roundRecurringMoney(Math.min(amount, left))
+}
+
 export function calculateNextPaymentDate(
   fromDate: string | Date,
   frequency: RecurringFrequency

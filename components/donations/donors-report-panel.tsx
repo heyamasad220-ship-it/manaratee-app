@@ -2,21 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { useRouter, usePathname, useSearchParams } from "next/navigation"
+import { usePathname, useSearchParams } from "next/navigation"
 
 import {
   fetchDonorGivingReportExportContextAction,
   fetchDonorSummaryExportAction,
-  fetchCampaignDonorGivingPageAction,
   fetchDonorSummaryPageAction,
   fetchDonorSummaryReportSummaryAction,
-  getDonationPaymentFilterOptionsAction,
-  fetchGroupGivingReportPageAction,
-  fetchHouseholdGivingReportPageAction,
   type DonorReportLastGiftFilter,
   type DonorSummaryReportRow,
-  type GroupGivingReportRow,
-  type HouseholdGivingReportRow,
 } from "@/lib/donations/donation-list-actions"
 import { downloadDonorGivingReportCsv } from "@/lib/donations/donor-report-csv"
 import { downloadDonorGivingReportPdf } from "@/lib/donations/donor-report-pdf"
@@ -27,25 +21,13 @@ import {
   type DonorReportSortBy,
 } from "@/lib/donations/donor-giving-report"
 import { getDonorProfilePath } from "@/lib/donations/donor-profile-path"
-import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
-import { donationGroupHref } from "@/lib/donations/donation-group-path"
-import { createGivingGroupAction } from "@/lib/donations/giving-group-actions"
 import { formatDonationCurrency } from "@/lib/donations/campaign-analytics"
 import { DONATIONS_PAGE_SIZE } from "@/lib/donations/donation-pagination"
 import { ListPagination } from "@/components/ui/list-pagination"
 import { PhoneText } from "@/components/ui/phone-text"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import {
   Select,
   SelectContent,
@@ -66,19 +48,7 @@ import {
   DonationMetricCardGrid,
 } from "@/components/donations/donation-metric-card"
 import { TableColumnHeaderFilter } from "@/components/ui/table-column-header-filter"
-import {
-  ArrowDown,
-  ArrowUp,
-  ArrowUpDown,
-  Download,
-  DollarSign,
-  FileText,
-  Gift,
-  Home,
-  Plus,
-  Users,
-  UsersRound,
-} from "lucide-react"
+import { Download, DollarSign, FileText, Gift, Users } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { STAFF_MAIN_CONTENT_STICKY_TOP_CLASS } from "@/lib/layout/staff-dashboard-chrome"
 
@@ -98,44 +68,7 @@ function formatContactField(value: string | null | undefined) {
   return trimmed || "—"
 }
 
-const INDIVIDUAL_TABLE_COLSPAN = 6
-const HOUSEHOLD_TABLE_COLSPAN = 8
-const GROUP_TABLE_COLSPAN = 5
-
-type DonorsReportView = "individual" | "household" | "group"
-
-function tableColSpan(view: DonorsReportView) {
-  if (view === "household") return HOUSEHOLD_TABLE_COLSPAN
-  if (view === "group") return GROUP_TABLE_COLSPAN
-  return INDIVIDUAL_TABLE_COLSPAN
-}
-
-function SortableReportHeader({
-  label,
-  column,
-  sortBy,
-  sortAsc,
-  onToggle,
-}: {
-  label: string
-  column: DonorReportSortBy
-  sortBy: DonorReportSortBy
-  sortAsc: boolean
-  onToggle: (column: DonorReportSortBy) => void
-}) {
-  const active = sortBy === column
-  const Icon = !active ? ArrowUpDown : sortAsc ? ArrowUp : ArrowDown
-  return (
-    <button
-      type="button"
-      onClick={() => onToggle(column)}
-      className="inline-flex items-center gap-1 font-medium hover:text-foreground"
-    >
-      {label}
-      <Icon className="h-3.5 w-3.5 text-muted-foreground" />
-    </button>
-  )
-}
+const DONOR_TABLE_COLSPAN = 6
 
 const LAST_GIFT_FILTER_OPTIONS: { value: DonorReportLastGiftFilter; label: string }[] = [
   { value: "all", label: "All" },
@@ -198,29 +131,14 @@ function replaceQueryWithoutRefresh(pathname: string, params: URLSearchParams) {
 }
 
 export function DonorsReportPanel() {
-  const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const initialView = searchParams.get("view")
-  const [reportView, setReportView] = useState<DonorsReportView>(
-    initialView === "group" || initialView === "household" || initialView === "individual"
-      ? initialView
-      : "individual"
-  )
   const [donors, setDonors] = useState<DonorSummaryReportRow[]>([])
-  const [households, setHouseholds] = useState<HouseholdGivingReportRow[]>([])
-  const [groups, setGroups] = useState<GroupGivingReportRow[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DONATIONS_PAGE_SIZE)
-  const [rollupSearch, setRollupSearch] = useState("")
-  const [debouncedRollupSearch, setDebouncedRollupSearch] = useState("")
-  const [donorNameFilter, setDonorNameFilter] = useState("")
-  const [donorNameFilterInput, setDonorNameFilterInput] = useState("")
-  const [emailFilter, setEmailFilter] = useState("")
-  const [emailFilterInput, setEmailFilterInput] = useState("")
-  const [phoneFilter, setPhoneFilter] = useState("")
-  const [phoneFilterInput, setPhoneFilterInput] = useState("")
+  const [searchInput, setSearchInput] = useState("")
+  const [search, setSearch] = useState("")
   const [minTotalGivenFilterInput, setMinTotalGivenFilterInput] = useState("")
   const [debouncedMinTotalGiven, setDebouncedMinTotalGiven] = useState<number | undefined>(
     undefined
@@ -230,8 +148,8 @@ export function DonorsReportPanel() {
   const [taxYear, setTaxYear] = useState(String(new Date().getFullYear()))
   const [customDateFrom, setCustomDateFrom] = useState("")
   const [customDateTo, setCustomDateTo] = useState("")
-  const [sortBy, setSortBy] = useState<DonorReportSortBy>("total_donations")
-  const [sortAsc, setSortAsc] = useState(false)
+  const sortBy: DonorReportSortBy = "total_donations"
+  const sortAsc = false
   const [loading, setLoading] = useState(true)
   const [summaryLoading, setSummaryLoading] = useState(true)
   const [exportingCsv, setExportingCsv] = useState(false)
@@ -242,94 +160,16 @@ export function DonorsReportPanel() {
     totalGiven: 0,
     giftCount: 0,
   })
-  const [addGroupOpen, setAddGroupOpen] = useState(false)
-  const [addGroupName, setAddGroupName] = useState("")
-  const [addGroupSaving, setAddGroupSaving] = useState(false)
-  const [addGroupError, setAddGroupError] = useState("")
-  const [campaignId, setCampaignId] = useState(searchParams.get("campaignId") || "all")
-  const [campaignOptions, setCampaignOptions] = useState<Array<{ id: string; name: string }>>([])
-
   useEffect(() => {
-    setCampaignId(searchParams.get("campaignId") || "all")
-  }, [searchParams])
-
-  useEffect(() => {
-    void getDonationPaymentFilterOptionsAction().then((result) => {
-      if (result.success) setCampaignOptions(result.options.campaigns)
-    })
-  }, [])
-
-  function setCampaignAndUrl(nextCampaignId: string) {
-    setCampaignId(nextCampaignId)
-    setPage(1)
-    setLoading(true)
+    if (!searchParams.has("view") && searchParams.get("add") !== "1" && !searchParams.has("campaignId")) {
+      return
+    }
     const params = new URLSearchParams(searchParams.toString())
-    if (!nextCampaignId || nextCampaignId === "all") params.delete("campaignId")
-    else params.set("campaignId", nextCampaignId)
-    if (nextCampaignId !== "all") params.delete("view")
+    params.delete("view")
+    params.delete("add")
+    params.delete("campaignId")
     replaceQueryWithoutRefresh(pathname, params)
-    if (nextCampaignId !== "all") setReportView("individual")
-  }
-
-  useEffect(() => {
-    const view = searchParams.get("view")
-    if (view === "group" || view === "household" || view === "individual") {
-      setReportView(view)
-    }
-    if (view === "group" && searchParams.get("add") === "1") {
-      setAddGroupOpen(true)
-    }
-  }, [searchParams])
-
-  function setReportViewAndUrl(view: DonorsReportView) {
-    setReportView(view)
-    setPage(1)
-    setLoading(true)
-    setError("")
-    setDonors([])
-    setHouseholds([])
-    setGroups([])
-    setTotal(0)
-    setSummary({ donorCount: 0, totalGiven: 0, giftCount: 0 })
-    const params = new URLSearchParams(searchParams.toString())
-    if (view === "individual") {
-      params.delete("view")
-    } else {
-      params.set("view", view)
-      params.delete("campaignId")
-      setCampaignId("all")
-    }
-    replaceQueryWithoutRefresh(pathname, params)
-  }
-
-  function toggleReportSort(column: DonorReportSortBy) {
-    setPage(1)
-    if (sortBy === column) {
-      setSortAsc((current) => !current)
-      return
-    }
-    setSortBy(column)
-    setSortAsc(column === "full_name")
-  }
-
-  async function handleCreateGroup() {
-    const name = addGroupName.trim()
-    if (!name) {
-      setAddGroupError("Group name is required.")
-      return
-    }
-    setAddGroupSaving(true)
-    setAddGroupError("")
-    const result = await createGivingGroupAction({ fullName: name })
-    setAddGroupSaving(false)
-    if (!result.success) {
-      setAddGroupError(result.error)
-      return
-    }
-    setAddGroupOpen(false)
-    setAddGroupName("")
-    router.push(donationGroupHref(result.groupContactId))
-  }
+  }, [pathname, searchParams])
 
   const dateRange = useMemo(
     () =>
@@ -355,46 +195,19 @@ export function DonorsReportPanel() {
 
   const filterInput = useMemo(
     () => ({
-      search: reportView === "household" ? debouncedRollupSearch || undefined : undefined,
-      donorName: reportView === "individual" ? donorNameFilter || undefined : undefined,
-      email: reportView === "individual" ? emailFilter || undefined : undefined,
-      phone: reportView === "individual" ? phoneFilter || undefined : undefined,
+      search: search || undefined,
       lastGiftFilter: lastGiftFilter !== "all" ? lastGiftFilter : undefined,
       minTotalGiven: debouncedMinTotalGiven,
       dateFrom: dateRange.dateFrom,
       dateTo: dateRange.dateTo,
     }),
-    [
-      reportView,
-      debouncedRollupSearch,
-      donorNameFilter,
-      emailFilter,
-      phoneFilter,
-      lastGiftFilter,
-      debouncedMinTotalGiven,
-      dateRange,
-    ]
+    [search, lastGiftFilter, debouncedMinTotalGiven, dateRange]
   )
 
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedRollupSearch(rollupSearch), 300)
+    const timer = setTimeout(() => setSearch(searchInput.trim()), 300)
     return () => clearTimeout(timer)
-  }, [rollupSearch])
-
-  useEffect(() => {
-    const timer = setTimeout(() => setDonorNameFilter(donorNameFilterInput), 300)
-    return () => clearTimeout(timer)
-  }, [donorNameFilterInput])
-
-  useEffect(() => {
-    const timer = setTimeout(() => setEmailFilter(emailFilterInput), 300)
-    return () => clearTimeout(timer)
-  }, [emailFilterInput])
-
-  useEffect(() => {
-    const timer = setTimeout(() => setPhoneFilter(phoneFilterInput), 300)
-    return () => clearTimeout(timer)
-  }, [phoneFilterInput])
+  }, [searchInput])
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -414,18 +227,13 @@ export function DonorsReportPanel() {
   useEffect(() => {
     setPage(1)
   }, [
-    debouncedRollupSearch,
-    donorNameFilter,
-    emailFilter,
-    phoneFilter,
+    search,
     lastGiftFilter,
     debouncedMinTotalGiven,
     dateRangeMode,
     taxYear,
     customDateFrom,
     customDateTo,
-    reportView,
-    campaignId,
   ])
 
   const loadDonors = useCallback(async () => {
@@ -433,104 +241,6 @@ export function DonorsReportPanel() {
     setError("")
 
     try {
-      if (reportView === "household") {
-        const result = await fetchHouseholdGivingReportPageAction({
-          page,
-          pageSize,
-          search: filterInput.search,
-          dateFrom: filterInput.dateFrom,
-          dateTo: filterInput.dateTo,
-          sortBy,
-          sortAsc,
-        })
-
-        if (!result.success) {
-          setError(result.error)
-          setHouseholds([])
-          setGroups([])
-          setTotal(0)
-          setSummary({ donorCount: 0, totalGiven: 0, giftCount: 0 })
-        } else {
-          setHouseholds(result.households)
-          setGroups([])
-          setDonors([])
-          setTotal(result.total)
-          setSummary({
-            donorCount: result.total,
-            totalGiven: result.households.reduce(
-              (sum, row) => sum + Number(row.total_donations || 0),
-              0
-            ),
-            giftCount: result.households.reduce(
-              (sum, row) => sum + Number(row.donation_count || 0),
-              0
-            ),
-          })
-        }
-        return
-      }
-
-      if (reportView === "group") {
-        const result = await fetchGroupGivingReportPageAction({
-          page,
-          pageSize,
-          search: filterInput.search,
-          dateFrom: filterInput.dateFrom,
-          dateTo: filterInput.dateTo,
-          sortBy,
-          sortAsc,
-        })
-
-        if (!result.success) {
-          setError(result.error)
-          setGroups([])
-          setHouseholds([])
-          setTotal(0)
-          setSummary({ donorCount: 0, totalGiven: 0, giftCount: 0 })
-        } else {
-          setGroups(result.groups)
-          setHouseholds([])
-          setDonors([])
-          setTotal(result.total)
-          setSummary({
-            donorCount: result.total,
-            totalGiven: result.groups.reduce(
-              (sum, row) => sum + Number(row.total_donations || 0),
-              0
-            ),
-            giftCount: result.groups.reduce(
-              (sum, row) => sum + Number(row.donation_count || 0),
-              0
-            ),
-          })
-        }
-        return
-      }
-
-      if (campaignId !== "all") {
-        const result = await fetchCampaignDonorGivingPageAction({
-          campaignId,
-          page,
-          pageSize,
-          search: filterInput.donorName || filterInput.search,
-          dateFrom: filterInput.dateFrom,
-          dateTo: filterInput.dateTo,
-        })
-        if (!result.success) {
-          setError(result.error)
-          setDonors([])
-          setTotal(0)
-          setSummary({ donorCount: 0, totalGiven: 0, giftCount: 0 })
-        } else {
-          setDonors(result.donors)
-          setHouseholds([])
-          setGroups([])
-          setTotal(result.total)
-          setSummary(result.summary)
-        }
-        return
-      }
-
       const result = await fetchDonorSummaryPageAction({
         page,
         pageSize,
@@ -542,13 +252,9 @@ export function DonorsReportPanel() {
       if (!result.success) {
         setError(result.error)
         setDonors([])
-        setHouseholds([])
-        setGroups([])
         setTotal(0)
       } else {
         setDonors(result.donors)
-        setHouseholds([])
-        setGroups([])
         setTotal(result.total)
       }
     } catch (loadError) {
@@ -561,14 +267,9 @@ export function DonorsReportPanel() {
       setSummaryLoading(false)
       setLoading(false)
     }
-  }, [page, pageSize, filterInput, sortBy, sortAsc, reportView, campaignId])
+  }, [page, pageSize, filterInput, sortBy, sortAsc])
 
   const loadSummary = useCallback(async () => {
-    if (reportView === "household" || reportView === "group" || campaignId !== "all") {
-      setSummaryLoading(false)
-      return
-    }
-
     setSummaryLoading(true)
 
     try {
@@ -589,7 +290,7 @@ export function DonorsReportPanel() {
     } finally {
       setSummaryLoading(false)
     }
-  }, [filterInput, reportView, campaignId])
+  }, [filterInput])
 
   useEffect(() => {
     void loadDonors()
@@ -600,15 +301,6 @@ export function DonorsReportPanel() {
   }, [loadSummary, pathname])
 
   async function handleExportCsv() {
-    if (reportView === "household" || reportView === "group") {
-      alert(
-        reportView === "group"
-          ? "CSV export for group giving is not available yet."
-          : "CSV export for household giving is not available yet."
-      )
-      return
-    }
-
     setExportingCsv(true)
 
     const result = await fetchDonorSummaryExportAction({
@@ -633,15 +325,6 @@ export function DonorsReportPanel() {
   }
 
   async function handleExportPdf() {
-    if (reportView === "household" || reportView === "group") {
-      alert(
-        reportView === "group"
-          ? "PDF export for group giving is not available yet."
-          : "PDF export for household giving is not available yet."
-      )
-      return
-    }
-
     setExportingPdf(true)
 
     const [exportResult, contextResult] = await Promise.all([
@@ -678,9 +361,7 @@ export function DonorsReportPanel() {
       generatedAt: exportResult.generatedAt,
       filterSummary: buildFilterSummary({
         lastGiftFilter,
-        donorName: donorNameFilter,
-        email: emailFilter,
-        phone: phoneFilter,
+        search,
         minTotalGiven: debouncedMinTotalGiven,
       }),
       summary: exportResult.summary,
@@ -693,12 +374,6 @@ export function DonorsReportPanel() {
   const lastGiftHeader =
     dateRangeMode === "lifetime" ? "Last Gift" : "Last Gift (in period)"
   const exporting = exportingCsv || exportingPdf
-  const tableTitle =
-    reportView === "household"
-      ? "Household Giving"
-      : reportView === "group"
-        ? "Group Giving"
-        : "Individual Giving"
 
   const periodControls = (
     <div className="flex flex-wrap items-center gap-3">
@@ -754,62 +429,27 @@ export function DonorsReportPanel() {
   )
 
   return (
-    <div className="flex flex-col gap-6 p-6">
+    <div className="flex flex-col gap-3 p-6">
       <div
         className={cn(
-          "sticky z-30 -mx-6 space-y-4 border-b border-border bg-background px-6 pb-4 pt-6",
+          "sticky z-30 -mx-6 space-y-3 border-b border-border bg-background px-6 pb-3 pt-6",
           STAFF_MAIN_CONTENT_STICKY_TOP_CLASS
         )}
       >
-        <div className="space-y-4">
+        <div>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-xl font-semibold">Donor Giving</h2>
-            {reportView === "individual" ? (
-              <Select value={campaignId} onValueChange={setCampaignAndUrl}>
-                <SelectTrigger className="w-[240px]" aria-label="Campaign">
-                  <SelectValue placeholder="All campaigns" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All campaigns</SelectItem>
-                  {campaignOptions.map((campaign) => (
-                    <SelectItem key={campaign.id} value={campaign.id}>
-                      {campaign.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : null}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant={reportView === "individual" ? "default" : "outline"}
-              onClick={() => setReportViewAndUrl("individual")}
-            >
-              <Users className="mr-2 h-4 w-4" />
-              Individual Giving
-            </Button>
-            <Button
-              variant={reportView === "household" ? "default" : "outline"}
-              onClick={() => setReportViewAndUrl("household")}
-            >
-              <Home className="mr-2 h-4 w-4" />
-              Household Giving
-            </Button>
-            <Button
-              variant={reportView === "group" ? "default" : "outline"}
-              onClick={() => setReportViewAndUrl("group")}
-            >
-              <UsersRound className="mr-2 h-4 w-4" />
-              Group Giving
-            </Button>
-            <Button variant="outline" disabled={exporting || loading} onClick={handleExportCsv}>
-              <Download className="mr-2 h-4 w-4" />
-              {exportingCsv ? "Exporting..." : "Export CSV"}
-            </Button>
-            <Button variant="outline" disabled={exporting || loading} onClick={handleExportPdf}>
-              <FileText className="mr-2 h-4 w-4" />
-              {exportingPdf ? "Exporting..." : "Export PDF"}
-            </Button>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {periodControls}
+              <Button variant="outline" disabled={exporting || loading} onClick={handleExportCsv}>
+                <Download className="mr-2 h-4 w-4" />
+                {exportingCsv ? "Exporting..." : "Export CSV"}
+              </Button>
+              <Button variant="outline" disabled={exporting || loading} onClick={handleExportPdf}>
+                <FileText className="mr-2 h-4 w-4" />
+                {exportingPdf ? "Exporting..." : "Export PDF"}
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -818,17 +458,9 @@ export function DonorsReportPanel() {
       ) : (
         <DonationMetricCardGrid colorful columns={3}>
           <DonationMetricCard
-            title={
-              reportView === "household"
-                ? "Households"
-                : reportView === "group"
-                  ? "Groups"
-                  : "Donors"
-            }
+            title="Donors"
             value={summary.donorCount}
-            icon={
-              reportView === "household" ? Home : reportView === "group" ? UsersRound : Users
-            }
+            icon={Users}
             accent="blue"
           />
           <DonationMetricCard
@@ -847,157 +479,27 @@ export function DonorsReportPanel() {
       )}
       </div>
 
-      <Card>
-        <CardHeader className="space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-3">
-              <CardTitle>{tableTitle}</CardTitle>
-              {reportView === "group" ? (
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    setAddGroupError("")
-                    setAddGroupOpen(true)
-                  }}
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Group
-                </Button>
-              ) : null}
-            </div>
-            {periodControls}
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            {reportView === "household" ? (
-              <Input
-                placeholder="Search household or member name..."
-                value={rollupSearch}
-                onChange={(event) => setRollupSearch(event.target.value)}
-                className="max-w-sm"
-              />
-            ) : null}
-            <span className="text-sm text-muted-foreground">
-              {total > 0
-                ? `${rangeStart}–${rangeEnd} of ${total}`
-                : reportView === "household"
-                    ? "No households with two or more adult donors in this period"
-                  : reportView === "group"
-                    ? "No groups with gifts in this period"
-                    : "No donors"}
-            </span>
-          </div>
-        </CardHeader>
-
+      <Card className="gap-0 py-0">
+        <div className="flex flex-wrap items-center gap-3 px-4 py-2">
+          <Input
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.target.value)}
+            placeholder="Search name, email, or phone"
+            aria-label="Search donors"
+            className="h-9 max-w-sm"
+          />
+          <span className="text-sm text-muted-foreground">
+            {total > 0 ? `${rangeStart}–${rangeEnd} of ${total}` : "No donors"}
+          </span>
+        </div>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
               <TableRow>
-                {reportView === "household" ? (
                   <>
-                    <TableHead>Household</TableHead>
-                    <TableHead>Primary Contact</TableHead>
+                    <TableHead>Donor</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Phone</TableHead>
-                    <TableHead>Members</TableHead>
-                    <TableHead>Total Given</TableHead>
-                    <TableHead>Gifts</TableHead>
-                    <TableHead>
-                      <SortableReportHeader
-                        label={lastGiftHeader}
-                        column="last_donation_date"
-                        sortBy={sortBy}
-                        sortAsc={sortAsc}
-                        onToggle={toggleReportSort}
-                      />
-                    </TableHead>
-                  </>
-                ) : reportView === "group" ? (
-                  <>
-                    <TableHead>
-                      <SortableReportHeader
-                        label="Group"
-                        column="full_name"
-                        sortBy={sortBy}
-                        sortAsc={sortAsc}
-                        onToggle={toggleReportSort}
-                      />
-                    </TableHead>
-                    <TableHead>Primary Contact</TableHead>
-                    <TableHead>Combined Total</TableHead>
-                    <TableHead>Gifts</TableHead>
-                    <TableHead>
-                      <SortableReportHeader
-                        label={lastGiftHeader}
-                        column="last_donation_date"
-                        sortBy={sortBy}
-                        sortAsc={sortAsc}
-                        onToggle={toggleReportSort}
-                      />
-                    </TableHead>
-                  </>
-                ) : (
-                  <>
-                    <TableHead>
-                      <TableColumnHeaderFilter
-                        label="Donor"
-                        active={Boolean(donorNameFilter.trim())}
-                      >
-                        {({ close }) => (
-                          <Input
-                            placeholder="Search by name"
-                            value={donorNameFilterInput}
-                            onChange={(event) => setDonorNameFilterInput(event.target.value)}
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter") {
-                                setDonorNameFilter(donorNameFilterInput)
-                                close()
-                              }
-                            }}
-                          />
-                        )}
-                      </TableColumnHeaderFilter>
-                    </TableHead>
-                    <TableHead>
-                      <TableColumnHeaderFilter
-                        label="Email"
-                        active={Boolean(emailFilter.trim())}
-                      >
-                        {({ close }) => (
-                          <Input
-                            placeholder="Search by email"
-                            value={emailFilterInput}
-                            onChange={(event) => setEmailFilterInput(event.target.value)}
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter") {
-                                setEmailFilter(emailFilterInput)
-                                close()
-                              }
-                            }}
-                          />
-                        )}
-                      </TableColumnHeaderFilter>
-                    </TableHead>
-                    <TableHead>
-                      <TableColumnHeaderFilter
-                        label="Phone"
-                        active={Boolean(phoneFilter.trim())}
-                      >
-                        {({ close }) => (
-                          <Input
-                            placeholder="Search by phone"
-                            value={phoneFilterInput}
-                            onChange={(event) => setPhoneFilterInput(event.target.value)}
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter") {
-                                setPhoneFilter(phoneFilterInput)
-                                close()
-                              }
-                            }}
-                          />
-                        )}
-                      </TableColumnHeaderFilter>
-                    </TableHead>
                     <TableHead>
                       <TableColumnHeaderFilter
                         label="Total Given"
@@ -1060,14 +562,13 @@ export function DonorsReportPanel() {
                       </TableColumnHeaderFilter>
                     </TableHead>
                   </>
-                )}
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading && (
                 <TableRow>
                   <TableCell
-                    colSpan={tableColSpan(reportView)}
+                    colSpan={DONOR_TABLE_COLSPAN}
                     className="py-8 text-center text-muted-foreground"
                   >
                     Loading report...
@@ -1077,20 +578,17 @@ export function DonorsReportPanel() {
               {!loading && error && (
                 <TableRow>
                   <TableCell
-                    colSpan={tableColSpan(reportView)}
+                    colSpan={DONOR_TABLE_COLSPAN}
                     className="py-8 text-center text-destructive"
                   >
                     {error}
                   </TableCell>
                 </TableRow>
               )}
-              {!loading &&
-                !error &&
-                reportView === "individual" &&
-                donors.length === 0 && (
+              {!loading && !error && donors.length === 0 && (
                   <TableRow>
                     <TableCell
-                      colSpan={INDIVIDUAL_TABLE_COLSPAN}
+                      colSpan={DONOR_TABLE_COLSPAN}
                       className="py-8 text-center text-muted-foreground"
                     >
                       No donors match the current filters.
@@ -1099,33 +597,6 @@ export function DonorsReportPanel() {
                 )}
               {!loading &&
                 !error &&
-                reportView === "household" &&
-                households.length === 0 && (
-                  <TableRow>
-                    <TableCell
-                      colSpan={HOUSEHOLD_TABLE_COLSPAN}
-                      className="py-8 text-center text-muted-foreground"
-                    >
-                      No households with two or more adult donors in this period.
-                    </TableCell>
-                  </TableRow>
-                )}
-              {!loading &&
-                !error &&
-                reportView === "group" &&
-                groups.length === 0 && (
-                  <TableRow>
-                    <TableCell
-                      colSpan={GROUP_TABLE_COLSPAN}
-                      className="py-8 text-center text-muted-foreground"
-                    >
-                      No groups received gifts or attributions in this period.
-                    </TableCell>
-                  </TableRow>
-                )}
-              {!loading &&
-                !error &&
-                reportView === "individual" &&
                 donors.map((donor) => (
                   <TableRow key={donor.id}>
                     <TableCell className="font-medium">
@@ -1149,74 +620,6 @@ export function DonorsReportPanel() {
                     <TableCell>{formatDate(donor.last_donation_date)}</TableCell>
                   </TableRow>
                 ))}
-              {!loading &&
-                !error &&
-                reportView === "household" &&
-                households.map((household) => (
-                  <TableRow key={household.family_id}>
-                    <TableCell className="font-medium">
-                      {household.primary_contact_id ? (
-                        <Link
-                          href={contactProfileHref(household.primary_contact_id, {
-                            tab: "financial",
-                            list: "families",
-                          })}
-                          className="text-primary hover:underline"
-                        >
-                          {household.family_name}
-                        </Link>
-                      ) : (
-                        household.family_name
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {household.primary_contact_id ? (
-                        <Link
-                          href={contactProfileHref(household.primary_contact_id, {
-                            tab: "financial",
-                          })}
-                          className="text-primary hover:underline"
-                        >
-                          {household.primary_name}
-                        </Link>
-                      ) : (
-                        household.primary_name
-                      )}
-                    </TableCell>
-                    <TableCell>{formatContactField(household.primary_email)}</TableCell>
-                    <TableCell><PhoneText value={household.primary_phone} /></TableCell>
-                    <TableCell>{household.member_count}</TableCell>
-                    <TableCell>
-                      {formatDonationCurrency(Number(household.total_donations || 0))}
-                    </TableCell>
-                    <TableCell>{household.donation_count ?? 0}</TableCell>
-                    <TableCell>{formatDate(household.last_donation_date)}</TableCell>
-                  </TableRow>
-                ))}
-              {!loading &&
-                !error &&
-                reportView === "group" &&
-                groups.map((group) => (
-                  <TableRow key={group.group_contact_id}>
-                    <TableCell className="font-medium">
-                      <Link
-                        href={donationGroupHref(group.group_contact_id, {
-                          tab: "financial",
-                          returnTo: "/donations/reports/donors?view=group",
-                        })}
-                        className="text-primary hover:underline"
-                      >
-                        {group.group_name}
-                      </Link>
-                    </TableCell>
-                    <TableCell>{formatContactField(group.primary_contact_name)}</TableCell>
-                    <TableCell>
-                      {formatDonationCurrency(Number(group.total_donations || 0))}
-                    </TableCell>
-                    <TableCell>{group.donation_count ?? 0}</TableCell>
-                    <TableCell>{formatDate(group.last_donation_date)}</TableCell>
-                  </TableRow>
-                ))}
             </TableBody>
           </Table>
         </CardContent>
@@ -1227,71 +630,13 @@ export function DonorsReportPanel() {
         pageSize={pageSize}
         total={total}
         disabled={loading}
-        entryLabel={
-          reportView === "household"
-            ? "households"
-            : reportView === "group"
-              ? "groups"
-              : "donors"
-        }
+        entryLabel="donors"
         onPageChange={setPage}
         onPageSizeChange={(next) => {
           setPageSize(next)
           setPage(1)
         }}
       />
-
-      <Dialog
-        open={addGroupOpen}
-        onOpenChange={(open) => {
-          setAddGroupOpen(open)
-          if (!open) {
-            setAddGroupName("")
-            setAddGroupError("")
-          }
-        }}
-      >
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Add Group</DialogTitle>
-            <DialogDescription>
-              Create a giving group to track donations attributed to a department, committee, or
-              other collective. You can set status and category after it opens.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2">
-            <Label htmlFor="new-giving-group-name">Group name</Label>
-            <Input
-              id="new-giving-group-name"
-              value={addGroupName}
-              onChange={(event) => setAddGroupName(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault()
-                  void handleCreateGroup()
-                }
-              }}
-              placeholder="Qur'an Institute for Ladies"
-            />
-            {addGroupError ? (
-              <p className="text-sm text-red-600">{addGroupError}</p>
-            ) : null}
-          </div>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setAddGroupOpen(false)}
-              disabled={addGroupSaving}
-            >
-              Cancel
-            </Button>
-            <Button type="button" onClick={() => void handleCreateGroup()} disabled={addGroupSaving}>
-              {addGroupSaving ? "Creating..." : "Create group"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

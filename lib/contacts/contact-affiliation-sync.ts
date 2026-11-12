@@ -51,24 +51,17 @@ export async function computeDerivedAffiliations(
 
   const donorIds = (donorRows || []).map((row) => row.id as string)
 
-  const { count: paymentByContactCount } = await supabase
-    .from("payments")
-    .select("id", { count: "exact", head: true })
-    .eq("organization_id", organizationId)
-    .eq("contact_id", contactId)
-
-  if ((paymentByContactCount ?? 0) > 0) {
+  if (donorIds.length > 0) {
     derived.add("donor")
-  }
-
-  if (!derived.has("donor") && donorIds.length > 0) {
-    const { count: paymentByDonorCount } = await supabase
+  } else {
+    const { count: paymentByContactCount } = await supabase
       .from("payments")
       .select("id", { count: "exact", head: true })
       .eq("organization_id", organizationId)
-      .in("donor_id", donorIds)
+      .eq("contact_id", contactId)
+      .neq("status", "voided")
 
-    if ((paymentByDonorCount ?? 0) > 0) {
+    if ((paymentByContactCount ?? 0) > 0) {
       derived.add("donor")
     }
   }
@@ -345,7 +338,56 @@ export async function syncContactAffiliationsForStaff(staffId: string) {
   }
 }
 
-/** Refresh affiliations when opening a contact profile. */
+/**
+ * Profile open only ensures the Donor tag from the donor row or a non-voided payment.
+ * The full `sync_contact_affiliations` RPC stays on write paths. Running it on every
+ * profile open held a database connection until statement timeout and stalled the page.
+ */
 export async function refreshContactAffiliations(contactId: string) {
-  await syncContactAffiliations(contactId, undefined, undefined, false)
+  const supabase = await createClient()
+  const organizationId = await getSelectedOrganizationId()
+  if (!organizationId || !contactId) return
+
+  const autoSyncFlags = await loadAffiliationAutoSyncFlags(organizationId, supabase)
+  if (!autoSyncFlags.get("donor")) return
+
+  const { data: donor, error: donorError } = await supabase
+    .from("donors")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("contact_id", contactId)
+    .limit(1)
+    .maybeSingle()
+
+  if (donorError) {
+    throw new Error(donorError.message || "Could not check the donor record")
+  }
+
+  let qualifies = Boolean(donor?.id)
+  if (!qualifies) {
+    const { count, error: paymentError } = await supabase
+      .from("payments")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .eq("contact_id", contactId)
+      .neq("status", "voided")
+
+    if (paymentError) {
+      throw new Error(paymentError.message || "Could not check donation payments")
+    }
+    qualifies = (count ?? 0) > 0
+  }
+
+  if (!qualifies) return
+
+  const { error } = await supabase.from("contact_roles").insert({
+    organization_id: organizationId,
+    contact_id: contactId,
+    role: "donor",
+    is_manual: false,
+  })
+
+  if (error && error.code !== "23505") {
+    throw new Error(error.message || "Could not add the donor role")
+  }
 }

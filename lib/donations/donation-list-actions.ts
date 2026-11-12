@@ -48,7 +48,7 @@ function rankDonationPickerContacts(contacts: DonationPickerContact[], search: s
 
 export type PaymentStatusDisplayFilter =
   | "Succeeded"
-  | "Failed"
+  | "Needs review"
   | "Refunded"
   | "Partially Refunded"
 
@@ -126,7 +126,7 @@ function applyPaymentStatusDisplayFilter<
   },
 >(query: T, statusDisplay: PaymentStatusDisplayFilter): T {
   switch (statusDisplay) {
-    case "Failed":
+    case "Needs review":
       return query.in("status", ["voided", "pending_review", "unresolved"])
     case "Refunded":
       return query.eq("status", "refunded")
@@ -168,7 +168,7 @@ function applyPaymentAttributeFilters<
   if (input.transactionType === "pledge") {
     query = query.not("pledge_id", "is", null)
   } else if (input.transactionType === "recurring") {
-    query = query.not("recurring_donation_plan_id", "is", null)
+    query = query.is("pledge_id", null).not("recurring_donation_plan_id", "is", null)
   } else if (input.transactionType === "one_time") {
     query = query.is("pledge_id", null).is("recurring_donation_plan_id", null)
   }

@@ -17,21 +17,27 @@ import {
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { CampaignProgressBar } from "@/components/donations/campaign-progress-bar"
+import { DonationGivingCharts } from "@/components/donations/donation-giving-charts"
 import {
   DonationMetricCard,
   DonationMetricCardGrid,
 } from "@/components/donations/donation-metric-card"
 import { formatDonationCurrency } from "@/lib/donations/campaign-analytics"
 import {
+  getDonationGivingBreakdownAction,
+  type DonationGivingBreakdown,
+} from "@/lib/donations/donation-list-actions"
+import {
   getDonationOverviewDashboardAction,
   type DonationOverviewPayload,
 } from "@/lib/donations/donation-overview-actions"
 import { donationPledgesHref } from "@/lib/donations/donation-pledge-paths"
+import { donationRecordPaymentHref } from "@/lib/donations/donation-payment-paths"
 
 const QUICK_ACTIONS = [
   {
     label: "Receive Payment",
-    href: "/donations/payments/transactions",
+    href: donationRecordPaymentHref(),
     icon: DollarSign,
   },
   {
@@ -53,6 +59,7 @@ const QUICK_ACTIONS = [
 
 export function DonationsOverviewDashboard() {
   const [data, setData] = useState<DonationOverviewPayload | null>(null)
+  const [breakdown, setBreakdown] = useState<DonationGivingBreakdown | null>(null)
   const [loading, setLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
@@ -61,12 +68,17 @@ export function DonationsOverviewDashboard() {
       setLoading(true)
       setErrorMessage(null)
 
-      const result = await getDonationOverviewDashboardAction()
+      const [result, chartResult] = await Promise.all([
+        getDonationOverviewDashboardAction(),
+        getDonationGivingBreakdownAction(),
+      ])
       if (!result.success) {
         setErrorMessage(result.error)
         setData(null)
+        setBreakdown(null)
       } else {
         setData(result.data)
+        setBreakdown(chartResult.success ? chartResult.breakdown : null)
       }
 
       setLoading(false)
@@ -103,9 +115,16 @@ export function DonationsOverviewDashboard() {
         </p>
       </div>
 
-      <div className="grid items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_13.5rem]">
-        <div className="flex min-w-0 flex-col gap-4">
-          <DonationMetricCardGrid colorful compact className="lg:grid-cols-4">
+      {data.onlineGivingReady ? null : (
+        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+          Online card gifts are off until Stripe is connected.{" "}
+          <Link href="/donations/settings?tab=online-payments" className="font-medium underline">
+            Connect Stripe
+          </Link>
+        </p>
+      )}
+
+      <DonationMetricCardGrid colorful compact className="lg:grid-cols-4">
             <DonationMetricCard
               compact
               title="Active Campaigns"
@@ -147,39 +166,9 @@ export function DonationsOverviewDashboard() {
               accent="purple"
               description="Current calendar month"
             />
-          </DonationMetricCardGrid>
+      </DonationMetricCardGrid>
 
-          <div className="grid flex-1 gap-4 md:grid-cols-2">
-            <Card className="h-full">
-              <CardHeader className="p-4 pb-2">
-                <CardTitle className="text-sm">Action Required</CardTitle>
-                <CardDescription className="text-xs">
-                  Operational items that need staff attention
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-4 pt-2">
-                {actionItems.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    No donation actions need attention right now.
-                  </p>
-                ) : (
-                  <ul className="space-y-1.5">
-                    {actionItems.map((item) => (
-                      <li key={item.id}>
-                        <Link
-                          href={item.href}
-                          className="flex items-center justify-between gap-3 rounded-md border px-2.5 py-1.5 text-sm transition hover:bg-muted/50"
-                        >
-                          <span>{item.label}</span>
-                          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </CardContent>
-            </Card>
-
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1.35fr)_minmax(0,0.8fr)_12.5rem]">
             <Card className="h-full">
               <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 p-4 pb-2">
                 <div>
@@ -227,35 +216,64 @@ export function DonationsOverviewDashboard() {
                 )}
               </CardContent>
             </Card>
-          </div>
-        </div>
 
-        <Card className="h-full">
-          <CardHeader className="p-4 pb-2">
-            <CardTitle className="text-sm">Quick Actions</CardTitle>
-            <CardDescription className="text-xs">
-              Jump to common donation workflows
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-4 pt-2">
-            <ul className="space-y-2">
-              {QUICK_ACTIONS.map((action) => {
-                const Icon = action.icon
-                return (
-                  <li key={action.href}>
-                    <Link
-                      href={action.href}
-                      className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
-                    >
-                      <Icon className="h-4 w-4 shrink-0" />
-                      {action.label}
-                    </Link>
-                  </li>
-                )
-              })}
-            </ul>
-          </CardContent>
-        </Card>
+            <DonationGivingCharts
+              compact
+              loading={false}
+              breakdown={breakdown}
+              description="Net received payments"
+            />
+
+            <Card className="gap-2 py-4">
+              <CardHeader className="px-3 pb-1">
+                <CardTitle className="text-sm">Action Required</CardTitle>
+              </CardHeader>
+              <CardContent className="px-3 pt-1">
+                {actionItems.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No donation actions need attention right now.
+                  </p>
+                ) : (
+                  <ul className="space-y-1.5">
+                    {actionItems.map((item) => (
+                      <li key={item.id}>
+                        <Link
+                          href={item.href}
+                          className="flex items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-sm transition hover:bg-muted/50"
+                        >
+                          <span>{item.label}</span>
+                          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="gap-2 py-4">
+              <CardHeader className="px-3 pb-1">
+                <CardTitle className="text-sm">Quick Actions</CardTitle>
+              </CardHeader>
+              <CardContent className="px-3 pt-1">
+                <ul className="space-y-2">
+                  {QUICK_ACTIONS.map((action) => {
+                    const Icon = action.icon
+                    return (
+                      <li key={action.href}>
+                        <Link
+                          href={action.href}
+                          className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+                        >
+                          <Icon className="h-4 w-4 shrink-0" />
+                          {action.label}
+                        </Link>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </CardContent>
+            </Card>
       </div>
     </div>
   )

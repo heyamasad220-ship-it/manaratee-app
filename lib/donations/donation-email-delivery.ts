@@ -328,11 +328,13 @@ export async function sendPledgeReminderEmail(
     relatedEntityId: input.reminderId,
   })
 
+  const deliveredExternally = delivery.sent && delivery.configured && delivery.provider === "resend"
+
   await supabase
     .from("pledge_reminders")
     .update({
       status: delivery.sent ? "sent" : "failed",
-      delivered_externally: delivery.sent,
+      delivered_externally: deliveredExternally,
       sent_at: delivery.sent ? new Date().toISOString() : null,
     })
     .eq("id", input.reminderId)

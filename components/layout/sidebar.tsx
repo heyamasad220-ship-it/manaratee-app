@@ -31,11 +31,7 @@ import {
 import type { LucideIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { isContactsListSegment, type ContactsListSegment } from "@/lib/contacts/contact-module-label"
-import {
-  directoryRolePath,
-  populatedDirectoryRoles,
-  type DirectoryRoleCountMap,
-} from "@/lib/directory/directory-roles"
+import { type DirectoryRoleCountMap } from "@/lib/directory/directory-roles"
 import { DONATIONS_SIDEBAR_CHILDREN } from "@/lib/navigation/donations-sidebar-children"
 import {
   ADMINISTRATION_MODULE_LABEL,
@@ -459,66 +455,21 @@ function injectAdministrationNavItem(
   return result
 }
 
-function buildDirectoryChildren(
-  roleCounts: DirectoryRoleCountMap = {},
-  options: { facilitiesEnabled?: boolean } = {}
-): SubItem[] {
-  const core: SubItem[] = [
+function buildDirectoryChildren(): SubItem[] {
+  return [
     {
-      label: "Overview",
+      label: "All Contacts",
       href: "/directory",
       matchPrefix: "/directory",
-      exact: true,
+      alsoMatchPrefixes: ["/contacts/people", "/contacts/families", "/contacts/organizations"],
       permissionKey: "contacts.view",
     },
-    {
-      label: "People",
-      href: "/directory/people",
-      matchPrefix: "/directory/people",
-      alsoMatchPrefixes: ["/contacts/people"],
-      contactListSegment: "people",
-      permissionKey: "contacts.view",
-    },
-    {
-      label: "Families",
-      href: "/directory/families",
-      matchPrefix: "/directory/families",
-      alsoMatchPrefixes: ["/contacts/families"],
-      contactListSegment: "families",
-      permissionKey: "contacts.view",
-    },
-    {
-      label: "Organizations",
-      href: "/directory/organizations",
-      matchPrefix: "/directory/organizations",
-      alsoMatchPrefixes: ["/contacts/organizations"],
-      contactListSegment: "organizations",
-      permissionKey: "contacts.view",
-    },
-  ]
-
-  const roleItems: SubItem[] = []
-  for (const role of populatedDirectoryRoles(roleCounts, {
-    ...options,
-    directoryNav: true,
-  })) {
-    roleItems.push({
-      label: role.label,
-      href: directoryRolePath(role.key),
-      matchPrefix: directoryRolePath(role.key),
-      permissionKey: "contacts.view",
-      dividerBefore: roleItems.length === 0,
-    })
-  }
-
-  const footer: SubItem[] = [
     {
       label: "Reports",
       href: "/directory/reports",
       matchPrefix: "/directory/reports",
       alsoMatchPrefixes: ["/contacts/reports"],
       permissionKey: "contacts.view",
-      dividerBefore: true,
     },
     {
       label: "Settings",
@@ -528,8 +479,6 @@ function buildDirectoryChildren(
       permissionKey: "contacts.view",
     },
   ]
-
-  return [...core, ...roleItems, ...footer]
 }
 
 /** Shared Community Calendar — top-level when Vendor Hub and/or Event Management is enabled. */
@@ -747,7 +696,7 @@ function buildNavItems(
   rows: SidebarModuleRow[],
   permissionContext: UserPermissionContext,
   myDepartment?: { id: string; name: string } | null,
-  directoryRoleCounts: DirectoryRoleCountMap = {},
+  _directoryRoleCounts: DirectoryRoleCountMap = {},
   programKinds: OrganizationProgramKindsEntitlement = "both",
   myPrograms: Array<{ id: string; name: string }> = []
 ): NavItem[] {
@@ -769,9 +718,6 @@ function buildNavItems(
       const hasVenueRentals = rows.some(
         (candidate) => normalizeModuleSlug(candidate.slug) === "bookings"
       )
-      const facilitiesEnabled = rows.some(
-        (candidate) => normalizeModuleSlug(candidate.slug) === "spaces"
-      )
       const href =
         navSlug === "spaces" && !hasVenueRentals
           ? "/facilities/calendar"
@@ -784,7 +730,7 @@ function buildNavItems(
       const Icon = iconMap[iconName] || Boxes
       let rawChildren =
         navSlug === "contacts" || slug === "contacts"
-          ? buildDirectoryChildren(directoryRoleCounts, { facilitiesEnabled })
+          ? buildDirectoryChildren()
           : moduleChildren[navSlug] ||
             moduleChildren[slug] ||
             [

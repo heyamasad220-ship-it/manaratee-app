@@ -6,7 +6,6 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
   Calendar,
-  CreditCard,
   DollarSign,
   Info,
   Loader2,
@@ -30,13 +29,6 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import {
   Sheet,
   SheetContent,
@@ -73,6 +65,7 @@ import {
   FINANCIAL_BILLING_MODULE_LABELS,
   getEnabledFinancialBillingModules,
   getFinancialDetailTabs,
+  parseFinancialDetailTab,
   parseFinancialModuleSection,
   resolveFinancialModuleSection,
   shouldShowFinancialModuleNav,
@@ -145,6 +138,14 @@ function isRefundEvent(event: ContactFinancialTimelineEvent) {
   const status = (event.status || "").toLowerCase()
   const type = (event.eventType || "").toLowerCase()
   return status.includes("refund") || type.includes("refund")
+}
+
+function usefulTransactionDescription(description: string | null | undefined) {
+  const text = description?.trim()
+  if (!text) return null
+  if (text === "One-Time Donation" || text === "Recurring Donation") return null
+  if (/ Recurring Donation$/i.test(text)) return null
+  return text
 }
 
 function isPaidTransaction(event: ContactFinancialTimelineEvent) {
@@ -259,9 +260,16 @@ type ContactFinancialPanelProps = {
    * full: customer / legacy complete layout.
    */
   surface?: "full" | "staff-overview" | "staff-details"
+  /** Overview third column: lifetime giving, pledges, and other module totals. */
+  overviewSummary?: ReactNode
   /** URL `?module=` on the Financial tab (`fund-development`, `programs`, …). */
   initialModuleSection?: string | null
+  /** URL `?detail=` on the Financial tab (`transactions`, `recurring`, …). */
+  initialDetailTab?: string | null
   onModuleSectionChange?: (section: ContactFinancialModuleSection) => void
+  onDetailTabChange?: (tab: ContactFinancialDetailTab | null) => void
+  /** Overview “View all transactions” leaves the profile and opens Financial. */
+  onViewAllTransactions?: () => void
 }
 
 function ContactFinancialIdentity({
@@ -375,8 +383,8 @@ function ContactFinancialMetricsGrid({
       />
       <DonationMetricCard
         title="Last Payment"
-        value={formatDate(lastPaymentDate ?? metrics.lastActivityDate)}
-        description={lastPaymentLabel || "No payments yet"}
+        value={lastPaymentDate ? formatDate(lastPaymentDate) : "No payment"}
+        description={lastPaymentDate ? lastPaymentLabel || undefined : undefined}
         icon={Calendar}
         accent="purple"
         compact
@@ -388,9 +396,11 @@ function ContactFinancialMetricsGrid({
 function ModuleBreakdownChart({
   slices,
   totalPaid,
+  compact = false,
 }: {
   slices: Array<{ key: string; name: string; value: number; color: string }>
   totalPaid: number
+  compact?: boolean
 }) {
   const chartData = slices.map((slice) => ({
     ...slice,
@@ -398,14 +408,24 @@ function ModuleBreakdownChart({
   }))
   const hasValues = totalPaid > 0
 
+  const chartSize = compact ? "h-[112px] w-[112px]" : "h-[180px] w-[180px]"
+  const innerRadius = compact ? 34 : 52
+  const outerRadius = compact ? 50 : 78
+
   return (
-    <Card className="h-full">
-      <CardHeader className="pb-2">
+    <Card className={compact ? "h-full gap-3 py-3" : "h-full"}>
+      <CardHeader className={compact ? "px-4 pb-0" : "pb-2"}>
         <CardTitle className="text-base">Financial by Module</CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-center">
-          <div className="relative mx-auto h-[180px] w-[180px] shrink-0">
+      <CardContent className={compact ? "px-4" : undefined}>
+        <div
+          className={
+            compact
+              ? "flex flex-col items-center gap-3"
+              : "flex flex-col items-center gap-6 sm:flex-row sm:items-center"
+          }
+        >
+          <div className={cn("relative mx-auto shrink-0", chartSize)}>
             <ChartContainer
               config={Object.fromEntries(
                 slices.map((slice) => [slice.key, { label: slice.name, color: slice.color }])
@@ -421,8 +441,8 @@ function ModuleBreakdownChart({
                   }
                   cx="50%"
                   cy="50%"
-                  innerRadius={52}
-                  outerRadius={78}
+                  innerRadius={innerRadius}
+                  outerRadius={outerRadius}
                   paddingAngle={hasValues ? 2 : 0}
                   dataKey="value"
                   strokeWidth={0}
@@ -438,7 +458,9 @@ function ModuleBreakdownChart({
               </PieChart>
             </ChartContainer>
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-              <p className="text-lg font-semibold tabular-nums">{formatCurrency(totalPaid)}</p>
+              <p className={cn("font-semibold tabular-nums", compact ? "text-sm" : "text-lg")}>
+                {formatCurrency(totalPaid)}
+              </p>
               <p className="text-[11px] text-muted-foreground">Payments received</p>
             </div>
           </div>
@@ -486,11 +508,15 @@ export function ContactFinancialPanel({
   belowSticky,
   leadingContent,
   trailingContent,
+  overviewSummary,
   refreshToken = 0,
   stickyTopClass = "top-0",
   surface = "full",
   initialModuleSection = null,
+  initialDetailTab = null,
   onModuleSectionChange,
+  onDetailTabChange,
+  onViewAllTransactions,
 }: ContactFinancialPanelProps) {
   const isCustomer = variant === "customer"
   const [loading, setLoading] = useState(true)
@@ -583,6 +609,10 @@ export function ContactFinancialPanel({
     setRequestedModuleSection(parseFinancialModuleSection(initialModuleSection))
   }, [initialModuleSection])
 
+  useEffect(() => {
+    setUserDetailTab(parseFinancialDetailTab(initialDetailTab))
+  }, [initialDetailTab])
+
   const enabledBillingModules = getEnabledFinancialBillingModules(modules)
   const activity = data
     ? detectContactFinancialActivity(data)
@@ -623,11 +653,10 @@ export function ContactFinancialPanel({
       getFinancialDetailTabs({
         section: moduleSection,
         modules,
-        showPaymentMethods: showPaymentMethodsTab,
         isGroup,
         isCustomer,
       }),
-    [isCustomer, isGroup, moduleSection, modules, showPaymentMethodsTab]
+    [isCustomer, isGroup, moduleSection, modules]
   )
   const availableDetailTabs = detailTabSpecs.map((tab) => tab.id)
   const resolvedDetailTab =
@@ -641,14 +670,6 @@ export function ContactFinancialPanel({
     setRequestedModuleSection(parsed)
     setUserDetailTab(null)
     onModuleSectionChange?.(parsed)
-  }
-
-  function goToPaymentMethods() {
-    if (showModuleNav && moduleSection !== "all") {
-      setRequestedModuleSection("all")
-      onModuleSectionChange?.("all")
-    }
-    setUserDetailTab("payment-methods")
   }
 
   const contactIdentity = hideIdentity ? null : (
@@ -783,26 +804,15 @@ export function ContactFinancialPanel({
 
   const metricsBlock =
     showHomepage && !isGroup ? (
-      <div className="space-y-3">
-        <div className="flex justify-end">
-          <Select value="all-time" disabled>
-            <SelectTrigger className="h-8 w-[140px] text-xs">
-              <Calendar className="mr-1.5 h-3.5 w-3.5" />
-              <SelectValue placeholder="All Time" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all-time">All Time</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        {metricsGrid}
-      </div>
+      metricsGrid
     ) : showHomepage && contactIdentity ? (
       contactIdentity
     ) : null
 
+  const overviewRow = Boolean(overviewSummary) && surface === "staff-overview"
+
   return (
-    <div className="space-y-6">
+    <div className={overviewRow ? "space-y-3" : "space-y-6"}>
       {showHomepage && hideIdentity && stickyHeader
         ? renderCombinedSticky(metricsGrid)
         : showHomepage
@@ -840,7 +850,7 @@ export function ContactFinancialPanel({
         </Sheet>
       ) : null}
 
-      {showHomepage ? (
+      {showHomepage && !onViewAllTransactions ? (
         <Sheet open={allTransactionsOpen} onOpenChange={setAllTransactionsOpen}>
           <SheetContent className="flex w-full flex-col sm:max-w-3xl">
             <SheetHeader>
@@ -878,16 +888,24 @@ export function ContactFinancialPanel({
       >
         <div className="space-y-6">
           {showHomepage && !isGroup ? (
-            <div className="grid gap-6 lg:grid-cols-2">
+            <div
+              className={cn(
+                "grid items-start gap-3",
+                overviewRow
+                  ? "lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.55fr)_minmax(12.5rem,0.8fr)]"
+                  : "lg:grid-cols-2 lg:gap-6"
+              )}
+            >
               <ModuleBreakdownChart
                 slices={moduleBreakdown.slices}
                 totalPaid={moduleBreakdown.totalPaid}
+                compact={overviewRow}
               />
-              <Card className="h-full">
-                <CardHeader className="pb-2">
+              <Card className={overviewRow ? "h-full gap-3 py-3" : "h-full"}>
+                <CardHeader className={overviewRow ? "px-4 pb-0" : "pb-2"}>
                   <CardTitle className="text-base">Recent Transactions</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-3">
+                <CardContent className={overviewRow ? "space-y-2 px-4" : "space-y-3"}>
                   <FinancialTransactionsTable
                     rows={recentTransactions}
                     emptyMessage={
@@ -907,13 +925,17 @@ export function ContactFinancialPanel({
                     <Button
                       variant="ghost"
                       className="h-8 w-full text-sm"
-                      onClick={() => setAllTransactionsOpen(true)}
+                      onClick={() => {
+                        if (onViewAllTransactions) onViewAllTransactions()
+                        else setAllTransactionsOpen(true)
+                      }}
                     >
                       View all transactions
                     </Button>
                   ) : null}
                 </CardContent>
               </Card>
+              {overviewRow ? overviewSummary : null}
             </div>
           ) : null}
 
@@ -970,9 +992,11 @@ export function ContactFinancialPanel({
               ) : (
                 <Tabs
                   value={resolvedDetailTab}
-                  onValueChange={(value) =>
-                    setUserDetailTab(value as ContactFinancialDetailTab)
-                  }
+                  onValueChange={(value) => {
+                    const next = value as ContactFinancialDetailTab
+                    setUserDetailTab(next)
+                    onDetailTabChange?.(next)
+                  }}
                 >
                   <CardHeader className={cn("pb-2", showModuleNav ? "pt-3" : "pt-4")}>
                     <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
@@ -1050,7 +1074,9 @@ export function ContactFinancialPanel({
                                 ? "No venue rental payments recorded for this contact."
                                 : moduleSection === "vendorHub"
                                   ? "No vendor payments recorded for this contact."
-                                  : "No payments recorded for this contact yet."
+                                  : moduleSection === "donations" || moduleSection === "all"
+                                    ? "No transactions recorded for this contact yet."
+                                    : "No payments recorded for this contact yet."
                           }
                           contactId={contactId}
                           contactName={contactName}
@@ -1075,22 +1101,6 @@ export function ContactFinancialPanel({
                       </TabsContent>
                     ) : null}
 
-                    {availableDetailTabs.includes("payment-methods") ? (
-                      <TabsContent value="payment-methods" className="mt-0">
-                        {paymentMethodsLoading ? (
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            Loading payment methods...
-                          </div>
-                        ) : (
-                          <ContactPaymentMethodsPanel
-                            contactId={contactId}
-                            paymentMethods={paymentMethods}
-                            embedded
-                          />
-                        )}
-                      </TabsContent>
-                    ) : null}
                   </CardContent>
                 </Tabs>
               )}
@@ -1160,46 +1170,26 @@ export function ContactFinancialPanel({
             ) : null}
 
             {showPaymentMethodsTab ? (
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-base">Payment Methods</CardTitle>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 px-2 text-xs"
-                    onClick={goToPaymentMethods}
-                  >
-                    + Add
-                  </Button>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {paymentMethodsLoading ? (
+              paymentMethodsLoading ? (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Payment Methods</CardTitle>
+                  </CardHeader>
+                  <CardContent>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Loading…
                     </div>
-                  ) : paymentMethods.length === 0 ? (
-                    <div className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <CreditCard className="mt-0.5 h-4 w-4 shrink-0" />
-                      No payment methods on file.
-                    </div>
-                  ) : (
-                    <ContactPaymentMethodsPanel
-                      contactId={contactId}
-                      paymentMethods={paymentMethods.slice(0, 2)}
-                      compact
-                      embedded
-                    />
-                  )}
-                  <Button
-                    variant="ghost"
-                    className="h-8 w-full justify-start px-0 text-sm text-primary"
-                    onClick={goToPaymentMethods}
-                  >
-                    Manage payment methods
-                  </Button>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              ) : (
+                <ContactPaymentMethodsPanel
+                  key={paymentMethods.map((method) => method.id).join(",")}
+                  contactId={contactId}
+                  paymentMethods={paymentMethods}
+                  compact
+                />
+              )
             ) : null}
 
             {showStatementsCard && donorId ? (
@@ -1351,6 +1341,8 @@ function FinancialTransactionsTable({
   }
 
   const showActions = !compact && !readOnly
+  const showDescription =
+    !compact && rows.some((event) => usefulTransactionDescription(event.description))
 
   return (
     <>
@@ -1360,7 +1352,7 @@ function FinancialTransactionsTable({
             <TableRow>
               <TableHead>Date</TableHead>
               <TableHead>Type</TableHead>
-              <TableHead>Description</TableHead>
+              {showDescription ? <TableHead>Description</TableHead> : null}
               <TableHead className="text-right">Amount</TableHead>
               <TableHead>Status</TableHead>
               {showActions ? (
@@ -1395,9 +1387,11 @@ function FinancialTransactionsTable({
                     )}
                   </TableCell>
                   <TableCell className="whitespace-nowrap">{event.eventType}</TableCell>
-                  <TableCell className="max-w-[200px] truncate font-medium">
-                    {event.description}
-                  </TableCell>
+                  {showDescription ? (
+                    <TableCell className="max-w-[200px] truncate font-medium">
+                      {usefulTransactionDescription(event.description) ?? "—"}
+                    </TableCell>
+                  ) : null}
                   <TableCell className="text-right">
                     {event.amount != null ? formatCurrency(event.amount) : "—"}
                   </TableCell>

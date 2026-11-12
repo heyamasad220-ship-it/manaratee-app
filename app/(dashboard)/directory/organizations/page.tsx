@@ -1,20 +1,22 @@
-import { Header } from "@/components/layout/header"
-import { ContactsCrmList } from "@/components/contacts/contacts-crm-list"
-import { isDirectoryFacilitiesEnabled } from "@/lib/directory/directory-nav-summary"
+import { redirect } from "next/navigation"
 
-export default async function DirectoryOrganizationsPage() {
-  const facilitiesEnabled = await isDirectoryFacilitiesEnabled()
+import { directoryContactsTabPath } from "@/lib/directory/directory-paths"
 
-  return (
-    <>
-      <Header title="Organizations" />
-      <ContactsCrmList
-        lockedRecordType="organization"
-        showStats={false}
-        facilitiesEnabled={facilitiesEnabled}
-        emptyTitle="No organizations yet"
-        emptyDescription="Add businesses, partners, sponsors, vendors, and other organizations to your directory."
-      />
-    </>
+export default async function DirectoryOrganizationsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}) {
+  const params = await searchParams
+  const query = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) {
+    if (key === "tab" || typeof value !== "string") continue
+    query.set(key, value)
+  }
+  const extra = query.toString()
+  redirect(
+    extra
+      ? `${directoryContactsTabPath("organizations")}&${extra}`
+      : directoryContactsTabPath("organizations")
   )
 }

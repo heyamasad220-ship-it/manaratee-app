@@ -1,6 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import type { SupabaseClient } from "@supabase/supabase-js"
 
 import { requireDonationStaffAccess } from "@/lib/donations/donation-action-auth"
 import {
@@ -10,9 +11,13 @@ import {
   fetchRecurringPlans,
 } from "@/lib/donations/recurring-donation-data"
 import {
-  calculateNextPaymentDate,
+  applyRecurringPlanAfterSuccessfulCharge,
+  recurringPlanAmountStillOwed,
+} from "@/lib/donations/recurring-plan-progress"
+import {
   initialNextPaymentDate,
-  buildRecurringPlanSchedule,
+  nextRecurringChargeAmount,
+  roundRecurringMoney,
 } from "@/lib/donations/recurring-donation-schedule"
 import type {
   RecurringFrequency,
@@ -47,10 +52,12 @@ export async function createRecurringDonationPlanAction(input: {
   amount: number
   frequency: RecurringFrequency
   startDate: string
-  numberOfPayments?: number | null
-  endDate?: string | null
+  goalAmount?: number | null
+  pledgeId?: string | null
   notes?: string | null
   campaignGroupId?: string | null
+  contactPaymentMethodId?: string | null
+  nextPaymentDate?: string | null
 }) {
   const access = await requireDonationStaffAccess("manage")
   if (!access.ok) return { success: false as const, error: access.error }
@@ -59,27 +66,25 @@ export async function createRecurringDonationPlanAction(input: {
     return { success: false as const, error: "Amount must be greater than zero" }
   }
 
-  const schedule = buildRecurringPlanSchedule({
-    frequency: input.frequency,
-    startDate: input.startDate,
-    numberOfPayments: input.numberOfPayments,
-    endDate: input.endDate,
+  const cap = await resolveRecurringPlanCap(supabase, orgId, input.donorId, {
+    goalAmount: input.goalAmount,
+    pledgeId: input.pledgeId,
   })
-  if (!schedule.ok) {
-    return { success: false as const, error: schedule.error }
-  }
+  if (!cap.ok) return { success: false as const, error: cap.error }
 
-  const nextPaymentDate = initialNextPaymentDate(input.startDate, input.frequency)
+  const nextPaymentDate =
+    input.nextPaymentDate?.trim() || initialNextPaymentDate(input.startDate, input.frequency)
 
   const fundCheck = await validateOpenDonationFund(supabase, orgId, input.subcategoryId)
   if (!fundCheck.ok) {
     return { success: false as const, error: fundCheck.error }
   }
 
+  const campaignId = input.campaignId ?? cap.campaignId
   const group = await campaignGroupIdForCampaign(
     supabase,
     orgId,
-    input.campaignId,
+    campaignId,
     input.campaignGroupId
   )
   if (!group.ok) return { success: false as const, error: group.error }
@@ -95,24 +100,35 @@ export async function createRecurringDonationPlanAction(input: {
     contactId = (donor?.contact_id as string | null) ?? null
   }
 
+  const card = await resolveContactPaymentMethodId(
+    supabase,
+    orgId,
+    contactId,
+    input.contactPaymentMethodId
+  )
+  if (!card.ok) return { success: false as const, error: card.error }
+
   const { data, error } = await supabase
     .from("recurring_donation_plans")
     .insert({
       organization_id: orgId,
       donor_id: input.donorId,
       contact_id: contactId,
-      campaign_id: input.campaignId ?? null,
+      campaign_id: campaignId,
       campaign_group_id: group.campaignGroupId,
       category_id: input.categoryId ?? null,
       subcategory_id: input.subcategoryId ?? null,
       payment_method_id: input.paymentMethodId ?? null,
+      contact_payment_method_id: card.id,
       amount: input.amount,
       frequency: input.frequency,
       status: "active",
       start_date: input.startDate,
       next_payment_date: nextPaymentDate,
-      end_date: schedule.endDate,
-      total_payments: schedule.totalPayments,
+      end_date: null,
+      goal_amount: cap.goalAmount,
+      pledge_id: cap.pledgeId,
+      total_payments: null,
       payments_made: 0,
       notes: input.notes ?? null,
     })
@@ -123,8 +139,8 @@ export async function createRecurringDonationPlanAction(input: {
 
   revalidatePath("/donations/payments/recurring")
   revalidatePath("/donations/campaigns")
-  if (input.campaignId) {
-    revalidatePath(`/donations/campaigns/${input.campaignId}`)
+  if (campaignId) {
+    revalidatePath(`/donations/campaigns/${campaignId}`)
   }
 
   return { success: true as const, planId: data.id }
@@ -202,7 +218,39 @@ export async function recordRecurringDonationPaymentAction(input: {
     return { success: false as const, error: "Only active, paused, or past-due plans can receive payments" }
   }
 
-  const amount = input.amount ?? Number(plan.amount)
+  const goalAmount = plan.goal_amount == null ? null : Number(plan.goal_amount)
+  const pledgeId = (plan.pledge_id as string | null) ?? null
+  let remaining: number | null
+  try {
+    remaining = await recurringPlanAmountStillOwed(supabase, {
+      organizationId: orgId,
+      planId: plan.id,
+      goalAmount,
+      pledgeId,
+    })
+  } catch (error) {
+    return { success: false as const, error: (error as Error).message }
+  }
+
+  const requested = input.amount ?? Number(plan.amount)
+  const amount = nextRecurringChargeAmount(requested, remaining)
+  if (amount <= 0) {
+    try {
+      await applyRecurringPlanAfterSuccessfulCharge(supabase, {
+        organizationId: orgId,
+        planId: plan.id,
+        frequency: plan.frequency as RecurringFrequency,
+        currentNextDate: plan.next_payment_date,
+        currentStatus: String(plan.status),
+        goalAmount,
+        pledgeId,
+      })
+    } catch (error) {
+      return { success: false as const, error: (error as Error).message }
+    }
+    return { success: false as const, error: "This plan is already paid in full." }
+  }
+
   const paymentDate = input.paymentDate
     ? `${input.paymentDate}T12:00:00`
     : new Date().toISOString()
@@ -234,7 +282,7 @@ export async function recordRecurringDonationPaymentAction(input: {
       campaign_id: plan.campaign_id,
       category_id: plan.category_id,
       subcategory_id: plan.subcategory_id,
-      pledge_id: null,
+      pledge_id: pledgeId,
       recurring_donation_plan_id: plan.id,
       sender_name: donor?.full_name || donor?.email || null,
       amount,
@@ -250,26 +298,27 @@ export async function recordRecurringDonationPaymentAction(input: {
 
   if (paymentError) return { success: false as const, error: paymentError.message }
 
-  const nextPaymentDate = calculateNextPaymentDate(
-    plan.next_payment_date,
-    plan.frequency as RecurringFrequency
-  )
-
-  const { error: updateError } = await supabase
-    .from("recurring_donation_plans")
-    .update({
-      next_payment_date: nextPaymentDate,
-      status: plan.status === "paused" ? "paused" : "active",
+  let progress: { completed: boolean; nextPaymentDate: string | null }
+  try {
+    progress = await applyRecurringPlanAfterSuccessfulCharge(supabase, {
+      organizationId: orgId,
+      planId: plan.id,
+      frequency: plan.frequency as RecurringFrequency,
+      currentNextDate: plan.next_payment_date,
+      currentStatus: String(plan.status),
+      goalAmount,
+      pledgeId,
     })
-    .eq("id", plan.id)
-    .eq("organization_id", orgId)
-
-  if (updateError) return { success: false as const, error: updateError.message }
+  } catch (error) {
+    return { success: false as const, error: (error as Error).message }
+  }
 
   return {
     success: true as const,
     payment,
-    nextPaymentDate,
+    amount,
+    completed: progress.completed,
+    nextPaymentDate: progress.nextPaymentDate,
   }
 }
 
@@ -293,12 +342,6 @@ export async function getRecurringReportingSummaryAction() {
   } catch (error) {
     return { success: false as const, error: (error as Error).message }
   }
-}
-
-function parseOptionalCount(value: number | null | undefined) {
-  if (value == null) return null
-  if (!Number.isFinite(value) || value < 0) return null
-  return Math.trunc(value)
 }
 
 export async function getRecurringPlanContactPaymentMethodsAction(planId: string) {
@@ -360,20 +403,87 @@ export async function getRecurringPlanContactPaymentMethodsAction(planId: string
   }
 }
 
+export async function listDonorContactPaymentMethodsAction(donorId: string) {
+  const access = await requireDonationStaffAccess("view")
+  if (!access.ok) return { success: false as const, error: access.error }
+
+  const { data: donor, error: donorError } = await access.supabase
+    .from("donors")
+    .select("contact_id")
+    .eq("id", donorId)
+    .eq("organization_id", access.orgId)
+    .maybeSingle()
+
+  if (donorError || !donor) {
+    return { success: false as const, error: donorError?.message || "Donor not found" }
+  }
+
+  const contactId = (donor.contact_id as string | null) ?? null
+  if (!contactId) {
+    return { success: true as const, contactId: null, paymentMethods: [] as ContactCardRow[] }
+  }
+
+  const cards = await loadContactCards(access.supabase, access.orgId, contactId)
+  if (!cards.ok) return { success: false as const, error: cards.error }
+
+  return { success: true as const, contactId, paymentMethods: cards.paymentMethods }
+}
+
+type ContactCardRow = {
+  id: string
+  cardBrand: string | null
+  last4: string
+  expMonth: number | null
+  expYear: number | null
+  cardholderName: string | null
+  isDefault: boolean
+  createdAt: string
+}
+
+async function loadContactCards(
+  supabase: SupabaseClient,
+  orgId: string,
+  contactId: string
+): Promise<{ ok: true; paymentMethods: ContactCardRow[] } | { ok: false; error: string }> {
+  const { data, error } = await supabase
+    .from("contact_payment_methods")
+    .select("id, card_brand, last4, exp_month, exp_year, cardholder_name, is_default, created_at")
+    .eq("organization_id", orgId)
+    .eq("contact_id", contactId)
+    .order("is_default", { ascending: false })
+    .order("created_at", { ascending: false })
+
+  if (error) return { ok: false, error: error.message }
+
+  return {
+    ok: true,
+    paymentMethods: (data || []).map((row) => ({
+      id: row.id as string,
+      cardBrand: (row.card_brand as string | null) ?? null,
+      last4: row.last4 as string,
+      expMonth: row.exp_month == null ? null : Number(row.exp_month),
+      expYear: row.exp_year == null ? null : Number(row.exp_year),
+      cardholderName: (row.cardholder_name as string | null) ?? null,
+      isDefault: Boolean(row.is_default),
+      createdAt: row.created_at as string,
+    })),
+  }
+}
+
 export async function updateRecurringDonationPlanAction(input: {
   planId: string
   amount?: number
   frequency?: RecurringFrequency
   startDate?: string | null
-  endDate?: string | null
-  totalPayments?: number | null
-  paymentsMade?: number | null
+  goalAmount?: number | null
+  pledgeId?: string | null
   nextPaymentDate?: string | null
   campaignId?: string | null
   campaignGroupId?: string | null
   categoryId?: string | null
   subcategoryId?: string | null
   notes?: string | null
+  contactPaymentMethodId?: string | null
 }) {
   const access = await requireDonationStaffAccess("manage")
   if (!access.ok) return { success: false as const, error: access.error }
@@ -381,7 +491,7 @@ export async function updateRecurringDonationPlanAction(input: {
 
   const { data: existing, error: existingError } = await supabase
     .from("recurring_donation_plans")
-    .select("id, status, subcategory_id, campaign_id")
+    .select("id, status, subcategory_id, campaign_id, donor_id, contact_id")
     .eq("id", input.planId)
     .eq("organization_id", orgId)
     .maybeSingle()
@@ -407,10 +517,21 @@ export async function updateRecurringDonationPlanAction(input: {
   }
   if (input.frequency) patch.frequency = input.frequency
   if (input.startDate !== undefined) patch.start_date = input.startDate
-  if (input.endDate !== undefined) patch.end_date = input.endDate
-  if (input.totalPayments !== undefined) patch.total_payments = parseOptionalCount(input.totalPayments)
-  if (input.paymentsMade !== undefined) patch.payments_made = parseOptionalCount(input.paymentsMade)
   if (input.nextPaymentDate !== undefined) patch.next_payment_date = input.nextPaymentDate
+  if (input.goalAmount !== undefined || input.pledgeId !== undefined) {
+    const cap = await resolveRecurringPlanCap(
+      supabase,
+      orgId,
+      existing.donor_id as string,
+      {
+        goalAmount: input.goalAmount,
+        pledgeId: input.pledgeId,
+      }
+    )
+    if (!cap.ok) return { success: false as const, error: cap.error }
+    patch.goal_amount = cap.goalAmount
+    patch.pledge_id = cap.pledgeId
+  }
   if (input.campaignId !== undefined) patch.campaign_id = input.campaignId
   if (input.campaignGroupId !== undefined) {
     const campaignId =
@@ -429,6 +550,26 @@ export async function updateRecurringDonationPlanAction(input: {
   if (input.categoryId !== undefined) patch.category_id = input.categoryId
   if (input.subcategoryId !== undefined) patch.subcategory_id = input.subcategoryId
   if (input.notes !== undefined) patch.notes = input.notes
+  if (input.contactPaymentMethodId !== undefined) {
+    let contactId = (existing.contact_id as string | null) ?? null
+    if (!contactId && existing.donor_id) {
+      const { data: donor } = await supabase
+        .from("donors")
+        .select("contact_id")
+        .eq("id", existing.donor_id)
+        .eq("organization_id", orgId)
+        .maybeSingle()
+      contactId = (donor?.contact_id as string | null) ?? null
+    }
+    const card = await resolveContactPaymentMethodId(
+      supabase,
+      orgId,
+      contactId,
+      input.contactPaymentMethodId
+    )
+    if (!card.ok) return { success: false as const, error: card.error }
+    patch.contact_payment_method_id = card.id
+  }
 
   if (Object.keys(patch).length === 0) {
     return { success: false as const, error: "No changes to save" }
@@ -518,4 +659,141 @@ export async function updateRecurringPlanPaymentMethodAction(input: {
 
   if (error) return { success: false as const, error: error.message }
   return { success: true as const }
+}
+
+export async function listOpenPledgesForRecurringPlanAction(donorId: string) {
+  const access = await requireDonationStaffAccess("view")
+  if (!access.ok) return { success: false as const, error: access.error }
+
+  const { data, error } = await access.supabase
+    .from("pledge_status_view")
+    .select("id, campaign_name, amount_pledged, balance_remaining")
+    .eq("organization_id", access.orgId)
+    .eq("donor_id", donorId)
+    .gt("balance_remaining", 0)
+    .order("pledge_date", { ascending: false })
+
+  if (error) return { success: false as const, error: error.message }
+
+  return {
+    success: true as const,
+    pledges: (data || []).map((row) => ({
+      id: row.id as string,
+      campaignName: (row.campaign_name as string | null) ?? null,
+      amountPledged: Number(row.amount_pledged || 0),
+      balanceRemaining: Number(row.balance_remaining || 0),
+    })),
+  }
+}
+
+export async function markRecurringChargeFailedAction(planId: string) {
+  const access = await requireDonationStaffAccess("manage")
+  if (!access.ok) return { success: false as const, error: access.error }
+
+  const { data: plan, error: planError } = await access.supabase
+    .from("recurring_donation_plans")
+    .select("id, status")
+    .eq("id", planId)
+    .eq("organization_id", access.orgId)
+    .maybeSingle()
+
+  if (planError || !plan) {
+    return { success: false as const, error: planError?.message || "Plan not found" }
+  }
+
+  if (plan.status !== "active" && plan.status !== "paused" && plan.status !== "past_due") {
+    return { success: false as const, error: "Only an open plan can record a failed charge" }
+  }
+
+  const { error } = await access.supabase
+    .from("recurring_donation_plans")
+    .update({ status: "past_due" })
+    .eq("id", planId)
+    .eq("organization_id", access.orgId)
+
+  if (error) return { success: false as const, error: error.message }
+  return { success: true as const }
+}
+
+async function resolveContactPaymentMethodId(
+  supabase: SupabaseClient,
+  orgId: string,
+  contactId: string | null,
+  paymentMethodId: string | null | undefined
+): Promise<{ ok: true; id: string | null } | { ok: false; error: string }> {
+  const id = paymentMethodId?.trim() || null
+  if (!id || id === "none") return { ok: true, id: null }
+  if (!contactId) {
+    return {
+      ok: false,
+      error: "Link this donor to a contact before assigning a card on file.",
+    }
+  }
+
+  const { data, error } = await supabase
+    .from("contact_payment_methods")
+    .select("id")
+    .eq("id", id)
+    .eq("organization_id", orgId)
+    .eq("contact_id", contactId)
+    .maybeSingle()
+
+  if (error || !data) {
+    return { ok: false, error: error?.message || "Selected card was not found for this donor." }
+  }
+  return { ok: true, id }
+}
+
+async function resolveRecurringPlanCap(
+  supabase: SupabaseClient,
+  orgId: string,
+  donorId: string,
+  input: { goalAmount?: number | null; pledgeId?: string | null }
+): Promise<
+  | {
+      ok: true
+      goalAmount: number | null
+      pledgeId: string | null
+      campaignId: string | null
+    }
+  | { ok: false; error: string }
+> {
+  const pledgeId = input.pledgeId?.trim() || null
+  if (pledgeId) {
+    const { data, error } = await supabase
+      .from("pledge_status_view")
+      .select("id, donor_id, balance_remaining, campaign_id")
+      .eq("organization_id", orgId)
+      .eq("id", pledgeId)
+      .maybeSingle()
+    if (error || !data) {
+      return { ok: false, error: error?.message || "Pledge not found" }
+    }
+    if (data.donor_id !== donorId) {
+      return { ok: false, error: "Choose an open pledge for this donor." }
+    }
+    if (Number(data.balance_remaining) <= 0) {
+      return { ok: false, error: "That pledge is already paid." }
+    }
+    return {
+      ok: true,
+      goalAmount: null,
+      pledgeId,
+      campaignId: (data.campaign_id as string | null) ?? null,
+    }
+  }
+
+  const raw = input.goalAmount
+  if (raw == null || raw === 0) {
+    return { ok: true, goalAmount: null, pledgeId: null, campaignId: null }
+  }
+  if (!Number.isFinite(raw) || raw <= 0) {
+    return { ok: false, error: "Total amount must be greater than zero." }
+  }
+  return {
+    ok: true,
+    goalAmount: roundRecurringMoney(raw),
+    pledgeId: null,
+    campaignId: null,
+  }
 }

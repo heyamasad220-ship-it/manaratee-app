@@ -19,6 +19,9 @@ import type {
   RecurringSubscriptionLinkResult,
 } from "@/lib/donations/stripe/types"
 import { markCheckoutSessionStatus } from "@/lib/donations/stripe/checkout-session-utils"
+import { applyRecurringPlanAfterSuccessfulCharge } from "@/lib/donations/recurring-plan-progress"
+import { recordChargeFailureFromInvoice } from "@/lib/donations/stripe/record-charge-failure"
+import type { RecurringFrequency } from "@/lib/donations/recurring-donation-types"
 
 type RecurringPlanRow = {
   id: string
@@ -35,12 +38,14 @@ type RecurringPlanRow = {
   frequency: string
   status: string
   next_payment_date: string
+  goal_amount: number | null
+  pledge_id: string | null
   external_processor: string | null
   external_processor_id: string | null
 }
 
 const RECURRING_PLAN_SELECT =
-  "id, organization_id, donor_id, contact_id, campaign_id, campaign_group_id, attributed_group_contact_id, wishlist_item_id, category_id, subcategory_id, amount, frequency, status, next_payment_date, external_processor, external_processor_id"
+  "id, organization_id, donor_id, contact_id, campaign_id, campaign_group_id, attributed_group_contact_id, wishlist_item_id, category_id, subcategory_id, amount, frequency, status, next_payment_date, goal_amount, pledge_id, external_processor, external_processor_id"
 
 async function loadRecurringPlan(
   supabase: SupabaseClient,
@@ -84,6 +89,8 @@ function normalizeRecurringPlanRow(data: Record<string, unknown>): RecurringPlan
     frequency: data.frequency as string,
     status: data.status as string,
     next_payment_date: data.next_payment_date as string,
+    goal_amount: data.goal_amount == null ? null : Number(data.goal_amount),
+    pledge_id: (data.pledge_id as string | null) ?? null,
     external_processor: (data.external_processor as string | null) ?? null,
     external_processor_id: (data.external_processor_id as string | null) ?? null,
   }
@@ -320,7 +327,7 @@ export async function insertProcessorPaymentFromInvoice(
       organization_id: plan.organization_id,
       donor_id: plan.donor_id,
       contact_id: plan.contact_id,
-      pledge_id: null,
+      pledge_id: plan.pledge_id,
       recurring_donation_plan_id: plan.id,
       sender_name: null,
       amount: amountPaid / 100,
@@ -356,14 +363,16 @@ export async function insertProcessorPaymentFromInvoice(
     nextPaymentDate = stripePeriodEndToDateOnly(periodEnd) ?? plan.next_payment_date
   }
 
-  await supabase
-    .from("recurring_donation_plans")
-    .update({
-      status: "active",
-      next_payment_date: nextPaymentDate,
-    })
-    .eq("id", plan.id)
-    .eq("organization_id", plan.organization_id)
+  await applyRecurringPlanAfterSuccessfulCharge(supabase, {
+    organizationId: plan.organization_id,
+    planId: plan.id,
+    frequency: plan.frequency as RecurringFrequency,
+    currentNextDate: plan.next_payment_date,
+    currentStatus: plan.status,
+    goalAmount: plan.goal_amount,
+    pledgeId: plan.pledge_id,
+    explicitNextDate: nextPaymentDate,
+  })
 
   await maybeAutoGenerateAndEmailPaymentReceipt(
     supabase,
@@ -419,7 +428,9 @@ export async function handleInvoicePaymentFailed(
     .eq("id", plan.id)
     .eq("organization_id", plan.organization_id)
 
-  return { handled: true as const, planId: plan.id, status: "past_due" as const }
+  const failure = await recordChargeFailureFromInvoice(supabase, invoice, plan)
+
+  return { handled: true as const, planId: plan.id, status: "past_due" as const, failure }
 }
 
 export async function handleSubscriptionUpdated(

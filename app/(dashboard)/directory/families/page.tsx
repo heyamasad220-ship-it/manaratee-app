@@ -1,17 +1,20 @@
-import { Suspense } from "react"
+import { redirect } from "next/navigation"
 
-import { Header } from "@/components/layout/header"
-import { DirectoryFamiliesClient } from "@/components/directory/directory-families-client"
+import { directoryContactsTabPath } from "@/lib/directory/directory-paths"
 
-export default function DirectoryFamiliesPage() {
-  return (
-    <>
-      <Header title="Families" />
-      <Suspense
-        fallback={<div className="p-6 text-sm text-muted-foreground">Loading families...</div>}
-      >
-        <DirectoryFamiliesClient />
-      </Suspense>
-    </>
+export default async function DirectoryFamiliesPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}) {
+  const params = await searchParams
+  const query = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) {
+    if (key === "tab" || typeof value !== "string") continue
+    query.set(key, value)
+  }
+  const extra = query.toString()
+  redirect(
+    extra ? `${directoryContactsTabPath("families")}&${extra}` : directoryContactsTabPath("families")
   )
 }

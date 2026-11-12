@@ -28,6 +28,8 @@ export type RecurringDonationPlan = {
   start_date: string
   next_payment_date: string
   end_date: string | null
+  goal_amount: number | null
+  pledge_id: string | null
   total_payments: number | null
   payments_made: number | null
   notes: string | null
@@ -52,12 +54,32 @@ export type RecurringPlanWithDonor = RecurringDonationPlan & {
 export type RecurringDashboardMetrics = {
   activeDonorCount: number
   activePlanCount: number
+  onSchedulePlanCount: number
+  pastDuePlanCount: number
+  pastDueMonthlyAmount: number
   pausedPlanCount: number
   cancelledPlanCount: number
   monthlyRecurringRevenue: number
   annualRecurringRevenue: number
   actualRecurringRevenue: number
   upcomingThisMonth: number
+}
+
+export function recurringTodayDateOnly(now = new Date()): string {
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, "0")
+  const day = String(now.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
+
+/** Active plans whose next charge date is today or later. Past dates are not expected income. */
+export function isOnScheduleRecurringPlan(
+  plan: { status?: string | null; next_payment_date?: string | null },
+  today = recurringTodayDateOnly()
+): boolean {
+  if (String(plan.status || "").toLowerCase() !== "active") return false
+  const next = String(plan.next_payment_date || "").slice(0, 10)
+  return /^\d{4}-\d{2}-\d{2}$/.test(next) && next >= today
 }
 
 export type RecurringDonorSummary = {

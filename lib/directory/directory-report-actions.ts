@@ -1,137 +1,88 @@
 "use server"
 
-import { fetchDirectoryNavSummary } from "@/lib/directory/directory-nav-summary"
-import { DIRECTORY_DYNAMIC_ROLE_DEFS } from "@/lib/directory/directory-roles"
 import type {
-  DirectoryCompletenessStats,
   DirectoryDuplicateRow,
-  DirectoryGrowthPoint,
-  DirectoryRoleDistributionRow,
+  DirectoryNewContactPeriod,
+  DirectoryNewContactRow,
+  DirectoryNewContactsPage,
 } from "@/lib/directory/directory-report-types"
 import { getSelectedOrganizationId } from "@/lib/organizations/get-selected-organization-id"
 import { PERMISSIONS } from "@/lib/permissions/permission-keys"
 import { hasPermission } from "@/lib/permissions/permissions"
 import { createClient } from "@/lib/supabase/server"
 
-function startOfMonthUtc(date: Date) {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1))
+const NEW_CONTACT_PAGE_SIZE = 25
+const DUPLICATE_SCAN_PAGE = 1000
+const DUPLICATE_SCAN_LIMIT = 20000
+
+function directoryNewContactPeriodStart(
+  period: DirectoryNewContactPeriod,
+  now = new Date()
+) {
+  if (period === "month") {
+    return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString()
+  }
+  if (period === "30d") {
+    return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString()
+  }
+  return new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000).toISOString()
 }
 
-function monthKey(value: string) {
-  return value.slice(0, 7)
-}
-
-export async function fetchDirectoryReportStatsAction(): Promise<
-  | {
-      success: true
-      roleDistribution: DirectoryRoleDistributionRow[]
-      completeness: DirectoryCompletenessStats
-      growth: DirectoryGrowthPoint[]
-      duplicates: DirectoryDuplicateRow[]
-      uniquePeople: number
-    }
-  | { success: false; error: string }
-> {
+async function requireDirectoryReports() {
   const allowed = await hasPermission(PERMISSIONS.CONTACTS_VIEW)
-  if (!allowed) {
-    return { success: false, error: "Not authorized to view Directory reports." }
-  }
-
+  if (!allowed) return { ok: false as const, error: "Not authorized to view Directory reports." }
   const organizationId = await getSelectedOrganizationId()
-  if (!organizationId) {
-    return { success: false, error: "No organization selected." }
-  }
-
+  if (!organizationId) return { ok: false as const, error: "No organization selected." }
   const supabase = await createClient()
-  const summary = await fetchDirectoryNavSummary(organizationId)
+  return { ok: true as const, organizationId, supabase }
+}
 
-  const roleDistribution = DIRECTORY_DYNAMIC_ROLE_DEFS.filter(
-    (def) => def.key !== "service-providers" || summary.facilitiesEnabled
-  ).map((def) => ({
-    key: def.key,
-    label: def.label,
-    count: summary.roles[def.key] ?? 0,
-  }))
+async function loadDuplicatePeople(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  organizationId: string
+) {
+  const rows: Array<{
+    id: string
+    full_name: string | null
+    email: string | null
+    phone: string | null
+  }> = []
+  let from = 0
 
-  const [
-    peopleRes,
-    missingEmailRes,
-    missingPhoneRes,
-    missingAddressRes,
-    roleRowsRes,
-    growthRowsRes,
-    duplicateSourceRes,
-  ] = await Promise.all([
-    supabase
-      .from("contacts")
-      .select("id", { count: "exact", head: true })
-      .eq("organization_id", organizationId)
-      .eq("contact_type", "individual"),
-    supabase
-      .from("contacts")
-      .select("id", { count: "exact", head: true })
-      .eq("organization_id", organizationId)
-      .eq("contact_type", "individual")
-      .or("email.is.null,email.eq."),
-    supabase
-      .from("contacts")
-      .select("id", { count: "exact", head: true })
-      .eq("organization_id", organizationId)
-      .eq("contact_type", "individual")
-      .or("phone.is.null,phone.eq."),
-    supabase
-      .from("contacts")
-      .select("id", { count: "exact", head: true })
-      .eq("organization_id", organizationId)
-      .eq("contact_type", "individual")
-      .or("address.is.null,address.eq."),
-    supabase
-      .from("contact_roles")
-      .select("contact_id")
-      .eq("organization_id", organizationId),
-    supabase
-      .from("contacts")
-      .select("created_at, contact_type")
-      .eq("organization_id", organizationId)
-      .gte("created_at", startOfMonthUtc(new Date(Date.now() - 1000 * 60 * 60 * 24 * 365)).toISOString())
-      .in("contact_type", ["individual", "organization"]),
-    supabase
+  while (from < DUPLICATE_SCAN_LIMIT) {
+    const { data, error } = await supabase
       .from("contacts")
       .select("id, full_name, email, phone")
       .eq("organization_id", organizationId)
       .eq("contact_type", "individual")
-      .limit(5000),
-  ])
+      .range(from, from + DUPLICATE_SCAN_PAGE - 1)
 
-  const people = peopleRes.count ?? 0
-  const contactIdsWithRoles = new Set(
-    (roleRowsRes.data || []).map((row) => row.contact_id as string)
-  )
-
-  const growthMap = new Map<string, DirectoryGrowthPoint>()
-  for (let i = 11; i >= 0; i--) {
-    const date = new Date()
-    date.setUTCDate(1)
-    date.setUTCMonth(date.getUTCMonth() - i)
-    const key = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`
-    growthMap.set(key, { month: key, people: 0, organizations: 0 })
+    if (error) return { ok: false as const, error: error.message }
+    const batch = data || []
+    rows.push(...batch)
+    if (batch.length < DUPLICATE_SCAN_PAGE) break
+    from += DUPLICATE_SCAN_PAGE
   }
 
-  for (const row of growthRowsRes.data || []) {
-    const key = monthKey(String(row.created_at || ""))
-    const point = growthMap.get(key)
-    if (!point) continue
-    if (row.contact_type === "organization") point.organizations += 1
-    else point.people += 1
-  }
+  return { ok: true as const, rows }
+}
 
+function buildDuplicateRows(
+  rows: Array<{
+    id: string
+    full_name: string | null
+    email: string | null
+    phone: string | null
+  }>
+) {
   const emailMap = new Map<string, { ids: string[]; names: string[] }>()
   const phoneMap = new Map<string, { ids: string[]; names: string[] }>()
-  for (const row of duplicateSourceRes.data || []) {
+
+  for (const row of rows) {
     const email = String(row.email || "").trim().toLowerCase()
     const phone = String(row.phone || "").replace(/\D/g, "")
-    const name = (row.full_name as string) || "Unnamed"
-    const id = row.id as string
+    const name = row.full_name || "Unnamed"
+    const id = row.id
     if (email) {
       const current = emailMap.get(email) || { ids: [], names: [] }
       current.ids.push(id)
@@ -167,21 +118,84 @@ export async function fetchDirectoryReportStatsAction(): Promise<
       names: match.names,
     })
   }
+  return duplicates.slice(0, 100)
+}
 
-  const noRole = Math.max(0, people - contactIdsWithRoles.size)
+export async function fetchDirectoryNewContactsAction(
+  period: DirectoryNewContactPeriod = "month",
+  page = 1
+): Promise<{ success: true; result: DirectoryNewContactsPage } | { success: false; error: string }> {
+  const access = await requireDirectoryReports()
+  if (!access.ok) return { success: false, error: access.error }
+
+  const since = directoryNewContactPeriodStart(period)
+  const safePage = Math.max(1, page)
+  const from = (safePage - 1) * NEW_CONTACT_PAGE_SIZE
+  const to = from + NEW_CONTACT_PAGE_SIZE - 1
+
+  const [peopleRes, organizationsRes, listRes] = await Promise.all([
+    access.supabase
+      .from("contacts")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", access.organizationId)
+      .eq("contact_type", "individual")
+      .gte("created_at", since),
+    access.supabase
+      .from("contacts")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", access.organizationId)
+      .eq("contact_type", "organization")
+      .gte("created_at", since),
+    access.supabase
+      .from("contacts")
+      .select("id, full_name, contact_type, created_at", { count: "exact" })
+      .eq("organization_id", access.organizationId)
+      .in("contact_type", ["individual", "organization"])
+      .gte("created_at", since)
+      .order("created_at", { ascending: false })
+      .range(from, to),
+  ])
+
+  if (peopleRes.error) return { success: false, error: peopleRes.error.message }
+  if (organizationsRes.error) return { success: false, error: organizationsRes.error.message }
+  if (listRes.error) return { success: false, error: listRes.error.message }
+
+  const contacts: DirectoryNewContactRow[] = (listRes.data || []).map((row) => ({
+    id: row.id as string,
+    name: (row.full_name as string) || "Unnamed",
+    kind: row.contact_type === "organization" ? "organization" : "person",
+    createdAt: String(row.created_at || ""),
+  }))
 
   return {
     success: true,
-    uniquePeople: people,
-    roleDistribution,
-    completeness: {
-      people,
-      missingEmail: missingEmailRes.count ?? 0,
-      missingPhone: missingPhoneRes.count ?? 0,
-      missingAddress: missingAddressRes.count ?? 0,
-      noRole,
+    result: {
+      period,
+      peopleCount: peopleRes.count ?? 0,
+      organizationCount: organizationsRes.count ?? 0,
+      total: listRes.count ?? contacts.length,
+      page: safePage,
+      pageSize: NEW_CONTACT_PAGE_SIZE,
+      contacts,
     },
-    growth: Array.from(growthMap.values()),
-    duplicates: duplicates.slice(0, 100),
+  }
+}
+
+export async function fetchDirectoryReportPageAction() {
+  const access = await requireDirectoryReports()
+  if (!access.ok) return { success: false as const, error: access.error }
+
+  const [duplicatesResult, newContacts] = await Promise.all([
+    loadDuplicatePeople(access.supabase, access.organizationId),
+    fetchDirectoryNewContactsAction("month", 1),
+  ])
+
+  if (!duplicatesResult.ok) return { success: false as const, error: duplicatesResult.error }
+  if (!newContacts.success) return { success: false as const, error: newContacts.error }
+
+  return {
+    success: true as const,
+    duplicates: buildDuplicateRows(duplicatesResult.rows),
+    newContacts: newContacts.result,
   }
 }

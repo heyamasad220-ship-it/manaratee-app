@@ -55,10 +55,10 @@ type ContactPaymentMethodsPanelProps = {
 const CARD_BRANDS = ["Visa", "Mastercard", "American Express", "Discover", "Other"]
 
 export const CONTACT_PAYMENT_METHODS_ADMIN_HELP =
-  "You can add cards here as staff (Financial → Payment Methods). The contact can also add cards from their profile page. Both paths save to the same list on this contact."
+  "Add a card on this contact’s Financial page. The contact can also add cards from their own profile. Both paths save to the same list."
 
 export const CONTACT_PAYMENT_METHODS_CUSTOMER_HELP =
-  "Add cards here for faster checkout. Staff can also add a card for you from your contact profile under Financial → Payment Methods."
+  "Add cards here for faster checkout. Staff can also add a card on your contact Financial page."
 
 export function ContactPaymentMethodsPanel({
   contactId,
@@ -394,7 +394,7 @@ export function ContactPaymentMethodsPanel({
               }
             >
               <CreditCard className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} />
-              Payment methods
+              Payment Methods
             </CardTitle>
             {!compact ? (
               <CardDescription>

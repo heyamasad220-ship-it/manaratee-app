@@ -16,6 +16,7 @@ import {
   handleSubscriptionDeleted,
   handleSubscriptionUpdated,
 } from "@/lib/donations/stripe/processor-subscription"
+import { recordChargeFailureFromPaymentIntent } from "@/lib/donations/stripe/record-charge-failure"
 import type { CreateOneTimeDonationCheckoutInput } from "@/lib/donations/stripe/types"
 import { validateCustomerDonationAttribution } from "@/lib/donations/donation-fund-status"
 import {
@@ -238,10 +239,11 @@ export async function processStripeDonationWebhookEvent(
           manarateeCheckoutId,
           status: "failed",
         })
+        const failure = await recordChargeFailureFromPaymentIntent(supabase, paymentIntent)
         return {
           ok: true as const,
           duplicate: false as const,
-          result: { handled: true, checkoutSessionId, status: "failed" },
+          result: { handled: true, checkoutSessionId, status: "failed", failure },
         }
       }
       case "checkout.session.expired": {

@@ -162,11 +162,11 @@ discount_tags.organization_id → organizations.id
 
 **Group membership (migration `135_contact_group_members.sql`):** `contact_group_members` links individuals to group contacts (`group_contact_id`, `member_contact_id`, `status`). Group gifts on group Financial tab; member gifts attributed via `payments.attributed_group_contact_id` (migration **`136_payment_attributed_group.sql`**) roll up for group competition. Staff gift and pledge forms write `campaign_group_id` instead and do not auto-add membership. Public campaign-group checkout can still set `attributed_group_contact_id` when the campaign group links an org group. UI: group **Group Members** on the contact summary. Person profiles do not show group badges or assign-to-group actions (July 2026). Contact profile summary combines financial KPIs + activity; personal info is under actions **View Details**. Server: `lib/contacts/group-members-load-action.ts`, `lib/contacts/group-membership-data.ts`, `lib/contacts/group-member-actions.ts`, `lib/contacts/group-giving-actions.ts`.
 
-**Group giving report (migration `166_group_giving_report.sql`):** RPC `donation_group_giving_report` powers **Fund Development → Donors → Group Giving**. Returns only groups with at least one non-voided gift in the date range (direct gift on the group contact or attributed member gift). Columns include group/member gift split, combined total, gift count, last gift, and group-contact pledge status.
+**Group giving report (migration `166_group_giving_report.sql`):** RPC `donation_group_giving_report` remains in the database. Fund Development → Donors no longer shows Group Giving (November 2026). Returns only groups with at least one non-voided gift in the date range (direct gift on the group contact or attributed member gift). Columns include group/member gift split, combined total, gift count, last gift, and group-contact pledge status.
 
 **Family households (migration `148_families_and_family_members.sql` + `196_family_members_person.sql`):** `families` + `family_members` are household containers — **not** a separate contact type or parallel profile. The **contact** is canonical (phone/email/address, donations, rentals, events). Family is an extension managed on the contact Family card (name, head, members). Members are adults (**contacts**) and minors (**people** only, no CRM profile). `family_members.contact_id` is optional; `person_id` identifies minors. One active household per person; first adult is head/primary (changeable). **UI:** `/directory/families` household directory; `/directory/families/[id]` household detail; legacy `/contacts/families` redirects there. Auto-sync when kids are added under a parent Contact (`syncHouseholdFromParentContact`). Backfill camp parents: `node scripts/sync-summer-camp-households.mjs --execute` after **196**. `person_relationships` remains the Contact profile Family panel source. **Household Giving (`295`):** `donation_household_giving_report` returns only families with two or more adult Directory contacts who each donated in the selected period.
 
-**Contact payment methods (migration `138_contact_payment_methods.sql`):** `contact_payment_methods` stores cards on file for a contact (brand, last4, expiry, cardholder, default flag). **Staff** add cards from contact profile **Financial → Payment Methods**; **contacts** add cards from the customer portal **Profile → Payment Methods**. Both paths use the same `contact_payment_methods` rows (full PAN and CVV collected at save only; only last 4 + MM/YYYY expiration persist). Server: `lib/contacts/contact-payment-method-actions.ts`, `lib/contacts/contact-payment-method-validation.ts`, `components/contacts/contact-payment-methods-panel.tsx`. Run after `137_customer_role_merge.sql`.
+**Contact payment methods (migration `138_contact_payment_methods.sql`):** `contact_payment_methods` stores cards on file for a contact (brand, last4, expiry, cardholder, default flag). **Staff** add cards from the Payment Methods card on the contact **Financial** page; **contacts** add cards from the customer portal **Profile → Payment Methods**. Both paths use the same `contact_payment_methods` rows (full PAN and CVV collected at save only; only last 4 + MM/YYYY expiration persist). Server: `lib/contacts/contact-payment-method-actions.ts`, `lib/contacts/contact-payment-method-validation.ts`, `components/contacts/contact-payment-methods-panel.tsx`. Run after `137_customer_role_merge.sql`.
 
 **Phase 1 identity linkage (June 2026):**
 
@@ -178,10 +178,10 @@ discount_tags.organization_id → organizations.id
 | `program_enrollments.payer_contact_id` | Payer (preserved separately from participant) |
 | `ticket_orders.contact_id` | Ticketing purchaser identity + **Customer** derivation |
 | `venue_rentals.billing_contact_id` | Venue rental billing contact + **Customer** derivation |
-| `donors.contact_id` | Donor extension (pledges/payments FK); `donor` affiliation requires a payment |
+| `donors.contact_id` | Donor extension (pledges/payments FK); `donor` affiliation and Directory → Donors come from this row or a non-voided payment (`scripts/315_donor_role_from_donor_record.sql`, `scripts/316_donor_directory_includes_donor_records.sql`) |
 | `volunteers.contact_id` | Volunteer roster + `volunteer` derivation |
 
-Affiliation writes use `sync_contact_affiliations` RPC via `syncContactAffiliations` / `handleDonationAffiliationSync` — not manual `contact_roles` inserts on activity write paths. Profile open may call `refreshContactAffiliations` for reconciliation only; Phase 1 modules do not depend on it. **Sponsor** is a manual `contact_roles` value (not derived); run `scripts/269_directory_sponsor_role.sql` to extend the role CHECK.
+Affiliation writes use `sync_contact_affiliations` RPC via `syncContactAffiliations` / `handleDonationAffiliationSync` — not manual `contact_roles` inserts on activity write paths. Profile open calls `refreshContactAffiliations` only to ensure the Donor tag. It does not run the full RPC. **Sponsor** is a manual `contact_roles` value (not derived); run `scripts/269_directory_sponsor_role.sql` to extend the role CHECK.
 
 **RLS hardening (migrations `102`–`111`, June 2026):**
 
@@ -378,12 +378,13 @@ Import CSV flow writes directly to `payments` + `payment_import_batches` (no row
 * payment_methods
 * donor_summary_view
 * pledge_status_view (includes `campaign_phase_id` after migration `260`)
-* donation_settings (receipt + pledge reminder config per org — migrations `090`, `091`)
+* donation_settings (receipt + pledge reminder config per org — migrations `090`, `091`; `enable_giving_groups` default false — migration `313`)
 * donation_receipts (payment receipts + annual statements — canonical payments only)
 * pledge_reminders (pledge collection reminder activity log — migration `091`; `contact_method` call or text — migration `311`). Pledge Details **Contact log** reuses this table: a note with no `contact_method` stores the staff name in `message_subject` and the note in `contact_notes`. No new migration.
 * recurring_donation_plans (ongoing giving schedules — migration `092`; not pledges; `daily` frequency added in migration `155`; `total_payments` / `payments_made` added in migration `156`)
 * donation_checkout_sessions (in-flight Stripe Checkout — migration `093`; campaign group attribution — `264`; not a payment ledger)
 * payment_processor_events (Stripe webhook audit + idempotency — migration `093`)
+* donation_charge_failures (declined card charges, not collected payments — script `314`)
 * transactional_email_log (operational donation email audit — migration `094`)
 
 **Stripe processor columns on `payments` (migration `093`):** `stripe_checkout_session_id`, `stripe_payment_intent_id`, `stripe_charge_id`, `refunded_amount`. Unique partial index on `stripe_payment_intent_id`. Online card donations are inserted only via webhook (`source_type = processor`, `source = stripe`).
@@ -391,6 +392,8 @@ Import CSV flow writes directly to `payments` + `payment_import_batches` (no row
 **Stripe recurring billing (migration `100_stripe_recurring_donations.sql`):** `payments.stripe_invoice_id` (unique partial index). `recurring_donation_plans.stripe_customer_id`. Plan statuses include `pending_setup` and `past_due`. Recurring charges insert `payments` via `invoice.paid` webhook with `recurring_donation_plan_id` set; `pledge_id` remains null.
 
 **Square plan metadata (migration `156_recurring_plan_payment_counts.sql`):** `recurring_donation_plans.total_payments` (expected count from processor export) and `payments_made` (completed count). Populated by `scripts/import-madina-recurring-plans.mjs` from Square recurring plans CSV. **`157_recurring_plan_contact_payment_method.sql`** adds `contact_payment_method_id` (FK to `contact_payment_methods`) for on-file cards on recurring plans.
+
+**Recurring total or pledge (migration `312_recurring_plan_goal_and_pledge.sql`):** `recurring_donation_plans.goal_amount` is an optional collected-dollar cap. `pledge_id` points at an existing pledge and that pledge's remaining balance is the finish line. A linked plan does not also store the pledge total. Successful charges write `payments.pledge_id`. Run `scripts/312_recurring_plan_goal_and_pledge.sql`. Applied on the hosted project November 2026.
 
 **Transactional email (migration `094`):** `transactional_email_log` tracks receipt, year-end statement, and pledge reminder sends. Extended in **`266`** with `group_pledge_confirmation` and `prospect_follow_up_reminder`. `donation_receipts.status` includes `failed`. `donation_settings.year_end_statement_email_template` for statement email body.
 
@@ -585,6 +588,14 @@ donation_checkout_sessions.payment_id → payments.id
 payment_processor_events.organization_id → organizations.id
 payment_processor_events.payment_id → payments.id
 payment_processor_events.checkout_session_id → donation_checkout_sessions.id
+
+donation_charge_failures.organization_id → organizations.id
+donation_charge_failures.donor_id → donors.id
+donation_charge_failures.contact_id → contacts.id
+donation_charge_failures.campaign_id → campaigns.id
+donation_charge_failures.pledge_id → pledges.id
+donation_charge_failures.recurring_donation_plan_id → recurring_donation_plans.id
+donation_charge_failures.checkout_session_id → donation_checkout_sessions.id
 
 transactional_email_log.organization_id → organizations.id
 ```

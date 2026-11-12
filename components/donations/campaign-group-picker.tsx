@@ -15,6 +15,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { listCampaignGroupOptionsAction } from "@/lib/donations/campaign-group-actions"
+import { getGivingGroupsEnabledAction } from "@/lib/donations/giving-groups-settings-actions"
 import { cn } from "@/lib/utils"
 
 type CampaignGroupPickerProps = {
@@ -35,10 +36,21 @@ export function CampaignGroupPicker({
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState("")
   const [loading, setLoading] = useState(false)
+  const [groupsEnabled, setGroupsEnabled] = useState(false)
   const [groups, setGroups] = useState<Array<{ id: string; name: string }>>([])
 
   useEffect(() => {
-    if (!campaignId) {
+    let cancelled = false
+    void getGivingGroupsEnabledAction().then((enabled) => {
+      if (!cancelled) setGroupsEnabled(enabled)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!groupsEnabled || !campaignId) {
       setGroups([])
       return
     }
@@ -54,13 +66,15 @@ export function CampaignGroupPicker({
     return () => {
       cancelled = true
     }
-  }, [campaignId])
+  }, [campaignId, groupsEnabled])
 
   const visibleGroups = useMemo(() => {
     const term = search.trim().toLowerCase()
     if (!term) return groups
     return groups.filter((group) => group.name.toLowerCase().includes(term))
   }, [groups, search])
+
+  if (!groupsEnabled) return null
 
   const selectedLabel = groupId
     ? groupLabel || groups.find((group) => group.id === groupId)?.name || "Selected group"

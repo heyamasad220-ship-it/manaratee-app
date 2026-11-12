@@ -146,7 +146,7 @@ export function DepartmentGroupWorkspaceClient({
         )
       : safeReturnTo || WORKFORCE_DEPARTMENTS_PATH
 
-  const backLabel = entryPoint === "donations" ? "Group Giving" : "Departments"
+  const backLabel = entryPoint === "donations" ? "Donors" : "Departments"
 
   const bumpFinanceKpis = useCallback(() => {
     setFinanceKpiTick((tick) => tick + 1)

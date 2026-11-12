@@ -105,8 +105,8 @@ export const AFFILIATION_RULE_DEFINITIONS: AffiliationRuleDefinition[] = [
   {
     role: "donor",
     label: "Donor",
-    trigger: "Any linked donation payment (pledge alone does not qualify)",
-    autoAdd: "Yes — on first payment",
+    trigger: "A linked donor record (a pledge or a gift) or any non-voided donation payment",
+    autoAdd: "Yes — when the person is saved as a donor, pledges, or gives",
     autoRemove: "Never — once a donor, always a donor",
     moduleList: "Donations → Donors",
     moduleSlugs: AFFILIATION_ROLE_MODULE_SLUGS.donor,

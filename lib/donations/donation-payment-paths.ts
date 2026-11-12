@@ -1,4 +1,5 @@
 export const DONATION_TRANSACTIONS_PATH = "/donations/payments/transactions"
+export const DONATION_FAILED_CHARGES_PATH = "/donations/payments/failed"
 export const DONATION_RECURRING_OPS_PATH = "/donations/payments/recurring"
 export const DONATION_IMPORT_MATCH_PATH = "/donations/payments/import-match"
 export const DONATION_RECEIPTS_OPS_PATH = "/donations/payments/receipts"

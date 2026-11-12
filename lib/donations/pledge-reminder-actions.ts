@@ -13,8 +13,15 @@ import {
   fetchPledgeReminderHistory,
 } from "@/lib/donations/pledge-reminder-data"
 import type { PledgeReminderType } from "@/lib/donations/pledge-reminder-types"
+import { isTransactionalEmailConfigured } from "@/lib/email/get-email-provider"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { isPledgeEligibleForReminder } from "@/lib/donations/pledge-reminder-types"
+
+export async function getPledgeReminderEmailStatusAction() {
+  const access = await requireDonationStaffAccess("view")
+  if (!access.ok) return { success: false as const, error: access.error }
+  return { success: true as const, configured: isTransactionalEmailConfigured() }
+}
 
 export async function getOutstandingPledgesAction() {
   const access = await requireDonationStaffAccess("view")

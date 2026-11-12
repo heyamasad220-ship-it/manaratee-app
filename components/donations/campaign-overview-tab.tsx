@@ -22,7 +22,7 @@ import { loadCampaignReportContactsAction } from "@/lib/donations/campaign-repor
 import { downloadCampaignReportExcel } from "@/lib/donations/campaign-report-excel"
 import { downloadCampaignReportPdf } from "@/lib/donations/campaign-report-pdf"
 import { buildCampaignOverviewMetricDetail } from "@/lib/donations/campaign-overview-metric-details"
-import { DONATION_REPORTS_DONORS_PATH } from "@/lib/donations/donation-payment-paths"
+import { donationCampaignWorkspaceHref } from "@/lib/donations/campaign-workspace-paths"
 
 type ContactProfileTarget = {
   contactId?: string | null
@@ -114,7 +114,7 @@ export function CampaignOverviewTab({
             onCampaignReportExcel={() => void downloadReport("excel")}
             onMetricClick={(key) => {
               if (key === "donors") {
-                router.push(`${DONATION_REPORTS_DONORS_PATH}?campaignId=${campaign.id}`)
+                router.push(donationCampaignWorkspaceHref(campaign.id, { tab: "donations" }))
                 return
               }
               setDetailKey(key)

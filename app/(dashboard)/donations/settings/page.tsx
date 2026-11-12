@@ -36,11 +36,12 @@ import {
 import { Plus, Pencil, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { DonationReceiptSettingsForm } from "@/components/donations/donation-receipt-settings-form"
+import { GivingGroupsSettingsForm } from "@/components/donations/giving-groups-settings-form"
 import { PledgeReminderSettingsForm } from "@/components/donations/pledge-reminder-settings-form"
 import { DonationStripeConnectPanel } from "@/components/donations/donation-stripe-connect-panel"
 import { getCurrentOrganizationId } from "@/lib/current-organization"
 
-const settingsTabs = ["Categories", "Online Payments", "Receipts", "Pledge Reminders", "Notifications"] as const
+const settingsTabs = ["Categories", "Online Payments", "Receipts", "Pledge Reminders", "Groups", "Notifications"] as const
 type SettingsTab = (typeof settingsTabs)[number]
 
 function DonationSettingsTabSync({
@@ -590,6 +591,8 @@ async function handleSaveCategory() {
         {activeTab === "Receipts" && <DonationReceiptSettingsForm mode="receipts" />}
 
         {activeTab === "Pledge Reminders" && <PledgeReminderSettingsForm />}
+
+        {activeTab === "Groups" && <GivingGroupsSettingsForm />}
 
         {activeTab === "Notifications" && (
           <div className="flex flex-col gap-6">

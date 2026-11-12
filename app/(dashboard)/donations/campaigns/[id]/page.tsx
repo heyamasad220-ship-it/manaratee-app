@@ -330,7 +330,6 @@ export default function CampaignDetailPage() {
               <DonationPaymentsPanel
                 embedded
                 lockedCampaignId={campaign.id}
-                showCharts={false}
                 defaultRange="all"
                 readOnly={!canManage}
               />

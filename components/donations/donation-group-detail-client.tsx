@@ -212,7 +212,7 @@ export function DonationGroupDetailClient({ groupId }: DonationGroupDetailClient
               <Button variant="outline" className="mt-4" asChild>
                 <Link href={backHref}>
                   <ArrowLeft className="mr-2 h-4 w-4" />
-                  Back to Group Giving
+                  Back to Donors
                 </Link>
               </Button>
             </CardContent>
@@ -239,7 +239,7 @@ export function DonationGroupDetailClient({ groupId }: DonationGroupDetailClient
           <div className="min-w-0 space-y-2">
             <PageBreadcrumbs
               items={[
-                { label: "Group Giving", href: backHref },
+                { label: "Donors", href: backHref },
                 { label: displayName },
               ]}
             />

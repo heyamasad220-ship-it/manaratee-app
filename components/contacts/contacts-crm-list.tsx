@@ -32,8 +32,6 @@ import {
   type ContactRoleValue,
   getContactRecordTypeLabel,
   getRoleFilterOptionsForRecordType,
-  ROLE_COLORS,
-  STATUS_COLORS,
   usesPrimaryContactField,
 } from "@/lib/contacts/contact-constants"
 import { fetchContactDirectoryExportAction } from "@/lib/contacts/contact-report-actions"
@@ -132,6 +130,8 @@ export type ContactsCrmListProps = {
   emptyDescription?: string
   /** When false, Service Provider is omitted from Directory role assignment. */
   facilitiesEnabled?: boolean
+  /** Drop the page padding and Add button when the list sits under All Contacts. */
+  embedded?: boolean
 }
 
 function getInitials(name: string) {
@@ -177,6 +177,7 @@ function ContactsCrmListInner({
   emptyTitle,
   emptyDescription,
   facilitiesEnabled = false,
+  embedded = false,
 }: ContactsCrmListProps = {}) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -373,6 +374,13 @@ function ContactsCrmListInner({
   const listTitle = entityLabel
   const rangeStart = total === 0 ? 0 : (page - 1) * pageSize + 1
   const rangeEnd = Math.min(page * pageSize, total)
+  const countSummary = loading
+    ? `Loading ${entityLabel.toLowerCase()}...`
+    : total === 0
+      ? `No ${entityLabel.toLowerCase()} yet`
+      : isRecentView
+        ? `Showing ${rangeEnd.toLocaleString()} of ${total.toLocaleString()} ${entityLabel.toLowerCase()}`
+        : `Showing ${rangeStart.toLocaleString()}–${rangeEnd.toLocaleString()} of ${total.toLocaleString()} ${entityLabel.toLowerCase()}`
 
   function clearFilters() {
     setSearchQuery("")
@@ -545,13 +553,13 @@ function ContactsCrmListInner({
 
   const tableColumnCount =
     (!lockedRecordType
-      ? 7
+      ? 5
       : lockedRecordType === "organization" || lockedRecordType === "group"
-        ? 7
-        : 6) + extraColumns.length
+        ? 5
+        : 4) + extraColumns.length
 
   return (
-    <div className="flex flex-col gap-6 p-6">
+    <div className={embedded ? "flex flex-col gap-2" : "flex flex-col gap-6 p-6"}>
       {intro}
       {showStats && statCards.length > 0 && (
         <StatCardsRow>
@@ -567,69 +575,96 @@ function ContactsCrmListInner({
         </StatCardsRow>
       )}
 
+      {embedded ? (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm text-muted-foreground">{countSummary}</p>
+          <div className="flex shrink-0 items-center gap-2">
+            {hasActiveFilters ? (
+              <Button type="button" variant="ghost" size="sm" onClick={clearFilters}>
+                Clear filters
+              </Button>
+            ) : null}
+            {canExportCsv ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={exportingCsv || loading || total === 0}
+                onClick={() => void handleExportCsv()}
+              >
+                <Download className="mr-1.5 h-4 w-4" />
+                {exportingCsv ? "Exporting..." : "Export CSV"}
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
       {!usesEntityColumnControls ? (
         <div className="relative">
-          <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+          <Search
+            className={
+              embedded
+                ? "absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                : "absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground"
+            }
+          />
           <Input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={searchPlaceholder}
-            className="h-12 pl-12 text-base"
+            className={embedded ? "h-10 pl-9" : "h-12 pl-12 text-base"}
           />
         </div>
       ) : null}
 
-      <div className="flex flex-wrap items-center gap-3">
-        {hasActiveFilters && (
-          <Button type="button" variant="ghost" size="sm" onClick={clearFilters}>
-            Clear filters
-          </Button>
-        )}
+      {embedded ? null : (
+        <>
+          <div className="flex flex-wrap items-center gap-3">
+            {hasActiveFilters && (
+              <Button type="button" variant="ghost" size="sm" onClick={clearFilters}>
+                Clear filters
+              </Button>
+            )}
 
-        <div className="ml-auto flex shrink-0 items-center gap-2">
-          {canExportCsv ? (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={exportingCsv || loading || total === 0}
-              onClick={() => void handleExportCsv()}
-            >
-              <Download className="mr-1.5 h-4 w-4" />
-              {exportingCsv ? "Exporting..." : "Export CSV"}
-            </Button>
-          ) : null}
-          {showUniversalAdd ? (
-            <DirectoryAddMenu />
-          ) : (
-            <Button
-              size="sm"
-              onClick={() => {
-                resetAddForm()
-                setShowAddDialog(true)
-              }}
-            >
-              <Plus className="mr-1.5 h-4 w-4" />
-              {addButtonLabel}
-            </Button>
-          )}
-        </div>
-      </div>
+            <div className="ml-auto flex shrink-0 items-center gap-2">
+              {canExportCsv ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={exportingCsv || loading || total === 0}
+                  onClick={() => void handleExportCsv()}
+                >
+                  <Download className="mr-1.5 h-4 w-4" />
+                  {exportingCsv ? "Exporting..." : "Export CSV"}
+                </Button>
+              ) : null}
+              {showUniversalAdd ? (
+                <DirectoryAddMenu />
+              ) : (
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    resetAddForm()
+                    setShowAddDialog(true)
+                  }}
+                >
+                  <Plus className="mr-1.5 h-4 w-4" />
+                  {addButtonLabel}
+                </Button>
+              )}
+            </div>
+          </div>
 
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-lg font-semibold">{listTitle}</h2>
-          <p className="text-sm text-muted-foreground">
-            {loading
-              ? `Loading ${entityLabel.toLowerCase()}...`
-              : total === 0
-                ? `No ${entityLabel.toLowerCase()} yet`
-                : isRecentView
-                  ? `Showing ${rangeEnd.toLocaleString()} of ${total.toLocaleString()} ${entityLabel.toLowerCase()}`
-                  : `Showing ${rangeStart.toLocaleString()}–${rangeEnd.toLocaleString()} of ${total.toLocaleString()} ${entityLabel.toLowerCase()}`}
-          </p>
-        </div>
-      </div>
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">{listTitle}</h2>
+              <p className="text-sm text-muted-foreground">{countSummary}</p>
+            </div>
+          </div>
+        </>
+      )}
 
       {errorMessage && (
         <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -637,7 +672,7 @@ function ContactsCrmListInner({
         </div>
       )}
 
-      <Card>
+      <Card className={embedded ? "gap-0 py-0" : undefined}>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
@@ -680,35 +715,6 @@ function ContactsCrmListInner({
                 ) : null}
                 <TableHead className="hidden md:table-cell">Email</TableHead>
                 <TableHead className="hidden md:table-cell">Phone</TableHead>
-                <TableHead className="hidden lg:table-cell">
-                  {lockedRoleKey ? (
-                    "Roles"
-                  ) : (
-                    <TableColumnHeaderFilter label="Roles" active={roleFilter !== "all"}>
-                      {({ close }) => (
-                        <Select
-                          value={roleFilter}
-                          onValueChange={(value) => {
-                            setRoleFilter(value as ContactRoleValue | "all")
-                            close()
-                          }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="All roles" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All roles</SelectItem>
-                            {roleOptions.map((option) => (
-                              <SelectItem key={option.value} value={option.value}>
-                                {option.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      )}
-                    </TableColumnHeaderFilter>
-                  )}
-                </TableHead>
                 {extraColumns.map((column) => (
                   <TableHead key={column.key} className="hidden lg:table-cell">
                     {column.label}
@@ -718,7 +724,6 @@ function ContactsCrmListInner({
                 {!lockedRecordType && (
                   <TableHead className="hidden xl:table-cell">Type</TableHead>
                 )}
-                <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -790,24 +795,6 @@ function ContactsCrmListInner({
                       <PhoneText value={contact.phone} />
                     </TableCell>
 
-                    <TableCell className="hidden lg:table-cell">
-                      {contact.roles.length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
-                          {contact.roles.map((role) => (
-                            <Badge
-                              key={role}
-                              variant="secondary"
-                              className={ROLE_COLORS[role]}
-                            >
-                              {role}
-                            </Badge>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
-
                     {extraColumns.map((column) => (
                       <TableCell
                         key={column.key}
@@ -828,12 +815,6 @@ function ContactsCrmListInner({
                         </Badge>
                       </TableCell>
                     )}
-
-                    <TableCell>
-                      <Badge variant="secondary" className={STATUS_COLORS[contact.status]}>
-                        {contact.status}
-                      </Badge>
-                    </TableCell>
                   </TableRow>
                 ))
               )}

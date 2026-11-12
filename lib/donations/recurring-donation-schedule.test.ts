@@ -4,6 +4,7 @@ import { describe, it } from "node:test"
 import {
   buildRecurringPlanSchedule,
   lastRecurringDateFromCount,
+  nextRecurringChargeAmount,
   paymentCountFromLastRecurringDate,
 } from "./recurring-donation-schedule"
 
@@ -25,6 +26,16 @@ describe("recurring plan schedule", () => {
     if (!result.ok) {
       assert.match(result.error, /installments or an end date/i)
     }
+  })
+
+  it("charges the full amount when the plan has no total", () => {
+    assert.equal(nextRecurringChargeAmount(25, null), 25)
+  })
+
+  it("charges only the remainder so the plan does not pass the total", () => {
+    assert.equal(nextRecurringChargeAmount(25, 300), 25)
+    assert.equal(nextRecurringChargeAmount(25, 10), 10)
+    assert.equal(nextRecurringChargeAmount(25, 0), 0)
   })
 
   it("writes schedule fields from installment count", () => {

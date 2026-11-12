@@ -20,7 +20,6 @@ export type ContactFinancialDetailTab =
   | "pledges"
   | "charges"
   | "refunds"
-  | "payment-methods"
 
 export type ContactFinancialActivityFlags = Record<ContactFinancialBillingModule, boolean>
 
@@ -117,6 +116,22 @@ export function parseFinancialModuleSection(
   return SECTION_QUERY_ALIASES[value.trim().toLowerCase()] ?? null
 }
 
+const FINANCIAL_DETAIL_TABS: ContactFinancialDetailTab[] = [
+  "transactions",
+  "recurring",
+  "pledges",
+  "charges",
+  "refunds",
+]
+
+export function parseFinancialDetailTab(
+  value: string | null | undefined
+): ContactFinancialDetailTab | null {
+  if (!value) return null
+  const normalized = value.trim().toLowerCase()
+  return FINANCIAL_DETAIL_TABS.find((tab) => tab === normalized) ?? null
+}
+
 export function financialModuleSectionQueryValue(
   section: ContactFinancialModuleSection
 ): string {
@@ -185,27 +200,23 @@ export function filterFinancialRowsBySection<
 export function getFinancialDetailTabs(input: {
   section: ContactFinancialModuleSection
   modules: ContactProfileModuleFlags
-  showPaymentMethods: boolean
   isGroup?: boolean
   isCustomer?: boolean
 }): ContactFinancialDetailTabSpec[] {
   if (input.isGroup || input.isCustomer) return []
-
-  const flattened = !shouldShowFinancialModuleNav(input.modules)
-  const includePaymentMethods =
-    input.showPaymentMethods && (flattened || input.section === "all")
 
   const tabs: ContactFinancialDetailTabSpec[] = []
 
   switch (input.section) {
     case "all":
       tabs.push(
-        { id: "transactions", label: "Payments" },
+        { id: "transactions", label: "All transactions" },
         { id: "refunds", label: "Refunds" }
       )
       break
     case "donations":
       tabs.push(
+        { id: "transactions", label: "All transactions" },
         { id: "recurring", label: "Recurring" },
         { id: "pledges", label: "Pledges" },
         { id: "refunds", label: "Refunds" }
@@ -222,10 +233,6 @@ export function getFinancialDetailTabs(input: {
       break
     case "membership":
       return []
-  }
-
-  if (includePaymentMethods) {
-    tabs.push({ id: "payment-methods", label: "Payment Methods" })
   }
 
   return tabs

@@ -51,18 +51,17 @@ import {
   Pause,
   MoreHorizontal,
   TrendingUp,
-  Pencil,
-  CreditCard,
   Eye,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import {
   createRecurringDonationPlanAction,
   getRecurringDashboardAction,
-  getRecurringPlanContactPaymentMethodsAction,
+  listDonorContactPaymentMethodsAction,
+  listOpenPledgesForRecurringPlanAction,
+  markRecurringChargeFailedAction,
   recordRecurringDonationPaymentAction,
   updateRecurringDonationPlanAction,
-  updateRecurringPlanPaymentMethodAction,
   updateRecurringPlanStatusAction,
 } from "@/lib/donations/recurring-donation-actions"
 import {
@@ -77,12 +76,9 @@ import type { ContactPaymentMethodRow } from "@/lib/contacts/contact-payment-met
 import {
   formatRecurringFrequencyLabel,
   formatRecurringStatusLabel,
+  isOnScheduleRecurringPlan,
   type RecurringFrequency,
 } from "@/lib/donations/recurring-donation-types"
-import {
-  lastRecurringDateFromCount,
-  paymentCountFromLastRecurringDate,
-} from "@/lib/donations/recurring-donation-schedule"
 import { receivePaymentActionLabel } from "@/lib/donations/payment-admin-copy"
 import { getDonorProfilePath } from "@/lib/donations/donor-profile-path"
 import { TableColumnHeaderFilter, TableColumnHeaderSort } from "@/components/ui/table-column-header-filter"
@@ -150,6 +146,21 @@ function formatCount(value: number | null) {
   return value == null ? "—" : String(value)
 }
 
+function formatPlanTotal(plan: RecurringPlanWithDonor) {
+  if (plan.pledge_id) return "Pledge"
+  if (plan.goal_amount != null && plan.goal_amount > 0) return formatCurrency(plan.goal_amount)
+  if (plan.total_payments != null) return formatCount(plan.total_payments)
+  return "Ongoing"
+}
+
+function parseGoalInput(value: string): { ok: true; amount: number | null } | { ok: false } {
+  const trimmed = value.trim()
+  if (!trimmed) return { ok: true, amount: null }
+  const amount = Number(trimmed)
+  if (!Number.isFinite(amount) || amount <= 0) return { ok: false }
+  return { ok: true, amount }
+}
+
 function isImportedRecurringPlan(plan: RecurringPlanWithDonor) {
   if (plan.external_processor === "square") return true
   const notes = String(plan.notes || "")
@@ -163,6 +174,11 @@ function isImportedRecurringPlan(plan: RecurringPlanWithDonor) {
 function formatNextPaymentDate(plan: RecurringPlanWithDonor) {
   if (isImportedRecurringPlan(plan)) return "—"
   return formatDate(plan.next_payment_date)
+}
+
+function recurringDisplayStatus(plan: RecurringPlanWithDonor) {
+  if (plan.status === "active" && !isOnScheduleRecurringPlan(plan)) return "past_due"
+  return plan.status
 }
 
 function getRecurringStatusBadgeClass(status: string) {
@@ -229,11 +245,46 @@ function formatPaymentMethodOption(method: ContactPaymentMethodRow) {
   return `${brand} •••• ${method.last4}${expiry}${method.isDefault ? " — Default" : ""}`
 }
 
-function parseOptionalCountInput(value: string) {
-  const trimmed = value.trim()
-  if (!trimmed) return null
-  const parsed = Number.parseInt(trimmed, 10)
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null
+function OpenPledgeField({
+  id,
+  value,
+  pledges,
+  onChange,
+}: {
+  id: string
+  value: string
+  pledges: Array<{
+    id: string
+    campaignName: string | null
+    balanceRemaining: number
+  }>
+  onChange: (pledgeId: string) => void
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <Label htmlFor={id}>Pay toward a pledge</Label>
+      <Select value={value || "none"} onValueChange={(next) => onChange(next === "none" ? "" : next)}>
+        <SelectTrigger id={id}>
+          <SelectValue placeholder="Ongoing, or choose a pledge" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="none">No pledge</SelectItem>
+          {pledges.map((pledge) => (
+            <SelectItem key={pledge.id} value={pledge.id}>
+              {(pledge.campaignName || "Pledge") + " — " + formatCurrency(pledge.balanceRemaining) + " left"}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <p className="text-xs text-muted-foreground">
+        {value
+          ? "The pledge balance is the finish line. A check or another payment on that pledge lowers the next charge."
+          : pledges.length
+            ? "Leave this blank to use the optional total, or to keep the plan going until it is cancelled."
+            : "This donor has no open pledge. Leave the total blank to continue until the plan is cancelled."}
+      </p>
+    </div>
+  )
 }
 
 export function DonationRecurringPanel({
@@ -259,6 +310,9 @@ export function DonationRecurringPanel({
   const [metrics, setMetrics] = useState({
     activeDonorCount: 0,
     activePlanCount: 0,
+    onSchedulePlanCount: 0,
+    pastDuePlanCount: 0,
+    pastDueMonthlyAmount: 0,
     pausedPlanCount: 0,
     cancelledPlanCount: 0,
     monthlyRecurringRevenue: 0,
@@ -274,9 +328,8 @@ export function DonationRecurringPanel({
   const [donorNameFilter, setDonorNameFilter] = useState("")
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showPaymentDialog, setShowPaymentDialog] = useState(false)
-  const [showEditDialog, setShowEditDialog] = useState(false)
   const [showViewDialog, setShowViewDialog] = useState(false)
-  const [showCardDialog, setShowCardDialog] = useState(false)
+  const [editingPlan, setEditingPlan] = useState<RecurringPlanWithDonor | null>(null)
   const [selectedPlan, setSelectedPlan] = useState<RecurringPlanWithDonor | null>(null)
   const [saving, setSaving] = useState(false)
   const [cardMethodsLoading, setCardMethodsLoading] = useState(false)
@@ -284,22 +337,6 @@ export function DonationRecurringPanel({
   const [selectedContactPaymentMethodId, setSelectedContactPaymentMethodId] = useState("none")
   const [cardDialogError, setCardDialogError] = useState<string | null>(null)
   const [cardContactId, setCardContactId] = useState<string | null>(null)
-
-  const [editAmount, setEditAmount] = useState("")
-  const [editFrequency, setEditFrequency] = useState<
-    "daily" | "weekly" | "monthly" | "quarterly" | "annually"
-  >("monthly")
-  const [editStartDate, setEditStartDate] = useState("")
-  const [editEndDate, setEditEndDate] = useState("")
-  const [editNextPaymentDate, setEditNextPaymentDate] = useState("")
-  const [editTotalPayments, setEditTotalPayments] = useState("")
-  const [editPaymentsMade, setEditPaymentsMade] = useState("")
-  const [editAttribution, setEditAttribution] = useState<DonationAttributionValue>(
-    EMPTY_DONATION_ATTRIBUTION_VALUE
-  )
-  const [editNotes, setEditNotes] = useState("")
-  const [editCampaignGroupId, setEditCampaignGroupId] = useState<string | null>(null)
-  const [editCampaignGroupLabel, setEditCampaignGroupLabel] = useState("")
 
   const [donors, setDonors] = useState<Array<{ id: string; full_name: string | null; email: string | null }>>([])
   const [organizationId, setOrganizationId] = useState<string | null>(null)
@@ -310,8 +347,17 @@ export function DonationRecurringPanel({
   const [amount, setAmount] = useState("")
   const [frequency, setFrequency] = useState<RecurringFrequency>("monthly")
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10))
-  const [planPayments, setPlanPayments] = useState("")
-  const [planEndDate, setPlanEndDate] = useState("")
+  const [nextPaymentDate, setNextPaymentDate] = useState(new Date().toISOString().slice(0, 10))
+  const [goalAmount, setGoalAmount] = useState("")
+  const [pledgeId, setPledgeId] = useState("")
+  const [openPledges, setOpenPledges] = useState<
+    Array<{
+      id: string
+      campaignName: string | null
+      amountPledged: number
+      balanceRemaining: number
+    }>
+  >([])
   const [notes, setNotes] = useState("")
   const [planCampaignGroupId, setPlanCampaignGroupId] = useState<string | null>(null)
   const [planCampaignGroupLabel, setPlanCampaignGroupLabel] = useState("")
@@ -381,6 +427,32 @@ export function DonationRecurringPanel({
     loadFormOptions()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scopedDonorId])
+
+  useEffect(() => {
+    const id = showCreateDialog ? donorId : ""
+    if (!id) return
+    let cancelled = false
+    void listOpenPledgesForRecurringPlanAction(id).then((result) => {
+      if (cancelled || !result.success) return
+      setOpenPledges(result.pledges)
+    })
+    setCardMethodsLoading(true)
+    void listDonorContactPaymentMethodsAction(id).then((result) => {
+      if (cancelled) return
+      setCardMethodsLoading(false)
+      if (!result.success) {
+        setCardDialogError(result.error || "Could not load payment methods")
+        setContactPaymentMethods([])
+        return
+      }
+      setCardDialogError(null)
+      setCardContactId(result.contactId)
+      setContactPaymentMethods(result.paymentMethods)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [showCreateDialog, donorId])
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDonorNameFilter(donorNameFilterInput.trim()), 300)
@@ -461,48 +533,33 @@ export function DonationRecurringPanel({
     return sorted
   }, [plans, statusFilter, categoryFundFilter, frequencyFilter, donorNameFilter, sortKey])
 
-  function applyCreateInstallmentCount(value: string) {
-    setPlanPayments(value)
-    const count = Number(value)
-    if (startDate && Number.isInteger(count) && count >= 2) {
-      const last = lastRecurringDateFromCount(startDate, frequency, count)
-      if (last) setPlanEndDate(last)
-    }
+  function todayDate() {
+    return new Date().toISOString().slice(0, 10)
   }
 
-  function applyCreateEndDate(value: string) {
-    setPlanEndDate(value)
-    if (startDate && value) {
-      const count = paymentCountFromLastRecurringDate(startDate, frequency, value)
-      setPlanPayments(count >= 2 ? String(count) : "")
-    }
+  function resetPlanForm() {
+    setEditingPlan(null)
+    setDonorId(scopedDonorId || "")
+    setAttribution(EMPTY_DONATION_ATTRIBUTION_VALUE)
+    setAmount("")
+    setFrequency("monthly")
+    setStartDate(todayDate())
+    setNextPaymentDate(todayDate())
+    setGoalAmount("")
+    setPledgeId("")
+    setNotes("")
+    setPlanCampaignGroupId(null)
+    setPlanCampaignGroupLabel("")
+    setSelectedContactPaymentMethodId("none")
+    setCardDialogError(null)
   }
 
-  function applyCreateStartDate(value: string) {
-    setStartDate(value)
-    const count = Number(planPayments)
-    if (value && Number.isInteger(count) && count >= 2) {
-      const last = lastRecurringDateFromCount(value, frequency, count)
-      if (last) setPlanEndDate(last)
-    } else if (value && planEndDate) {
-      const nextCount = paymentCountFromLastRecurringDate(value, frequency, planEndDate)
-      setPlanPayments(nextCount >= 2 ? String(nextCount) : "")
-    }
+  function openCreatePlan() {
+    resetPlanForm()
+    setShowCreateDialog(true)
   }
 
-  function applyCreateFrequency(value: RecurringFrequency) {
-    setFrequency(value)
-    const count = Number(planPayments)
-    if (startDate && Number.isInteger(count) && count >= 2) {
-      const last = lastRecurringDateFromCount(startDate, value, count)
-      if (last) setPlanEndDate(last)
-    } else if (startDate && planEndDate) {
-      const nextCount = paymentCountFromLastRecurringDate(startDate, value, planEndDate)
-      setPlanPayments(nextCount >= 2 ? String(nextCount) : "")
-    }
-  }
-
-  async function handleCreatePlan() {
+  async function handleSavePlan() {
     if (!donorId) {
       alert("Select a donor")
       return
@@ -511,38 +568,56 @@ export function DonationRecurringPanel({
       alert("Enter a valid amount")
       return
     }
+    const goal = pledgeId ? { ok: true as const, amount: null } : parseGoalInput(goalAmount)
+    if (!goal.ok) {
+      alert("Enter a total greater than zero, or leave it blank.")
+      return
+    }
 
     setSaving(true)
     const attributionIds = toAttributionIds(attribution)
-    const result = await createRecurringDonationPlanAction({
-      donorId,
-      campaignId: attributionIds.campaign_id,
-      categoryId: attributionIds.category_id,
-      subcategoryId: attributionIds.subcategory_id,
-      amount: Number(amount),
-      frequency,
-      startDate,
-      numberOfPayments: planPayments ? Number(planPayments) : null,
-      endDate: planEndDate || null,
-      notes: notes || null,
-      campaignGroupId: planCampaignGroupId,
-    })
+    const cardId =
+      selectedContactPaymentMethodId === "none" ? null : selectedContactPaymentMethodId
+    const result = editingPlan
+      ? await updateRecurringDonationPlanAction({
+          planId: editingPlan.id,
+          amount: Number(amount),
+          frequency,
+          startDate: startDate || null,
+          nextPaymentDate: nextPaymentDate.trim() ? nextPaymentDate : null,
+          goalAmount: goal.amount,
+          pledgeId: pledgeId || null,
+          campaignId: attributionIds.campaign_id,
+          categoryId: attributionIds.category_id,
+          subcategoryId: attributionIds.subcategory_id,
+          campaignGroupId: planCampaignGroupId,
+          notes: notes.trim() ? notes.trim() : null,
+          contactPaymentMethodId: cardId,
+        })
+      : await createRecurringDonationPlanAction({
+          donorId,
+          campaignId: attributionIds.campaign_id,
+          categoryId: attributionIds.category_id,
+          subcategoryId: attributionIds.subcategory_id,
+          amount: Number(amount),
+          frequency,
+          startDate,
+          nextPaymentDate: nextPaymentDate.trim() ? nextPaymentDate : null,
+          goalAmount: goal.amount,
+          pledgeId: pledgeId || null,
+          notes: notes || null,
+          campaignGroupId: planCampaignGroupId,
+          contactPaymentMethodId: cardId,
+        })
     setSaving(false)
 
     if (!result.success) {
-      alert(result.error || "Could not create plan")
+      alert(result.error || (editingPlan ? "Could not update plan" : "Could not create plan"))
       return
     }
 
     setShowCreateDialog(false)
-    setDonorId(scopedDonorId || "")
-    setAttribution(EMPTY_DONATION_ATTRIBUTION_VALUE)
-    setAmount("")
-    setPlanPayments("")
-    setPlanEndDate("")
-    setNotes("")
-    setPlanCampaignGroupId(null)
-    setPlanCampaignGroupLabel("")
+    resetPlanForm()
     await refreshAfterChange()
   }
 
@@ -563,7 +638,20 @@ export function DonationRecurringPanel({
 
     setShowPaymentDialog(false)
     setSelectedPlan(null)
-    alert(`Payment recorded. Next payment: ${result.nextPaymentDate}`)
+    alert(
+      result.completed
+        ? `Recorded ${formatCurrency(result.amount)}. This plan is paid in full.`
+        : `Recorded ${formatCurrency(result.amount)}. Next payment: ${result.nextPaymentDate}`
+    )
+    await refreshAfterChange()
+  }
+
+  async function handleMarkChargeFailed(planId: string) {
+    const result = await markRecurringChargeFailedAction(planId)
+    if (!result.success) {
+      alert(result.error || "Could not mark the charge failed")
+      return
+    }
     await refreshAfterChange()
   }
 
@@ -586,111 +674,21 @@ export function DonationRecurringPanel({
       openViewPlan(plan)
       return
     }
-    setSelectedPlan(plan)
-    setEditAmount(String(plan.amount))
-    setEditFrequency(plan.frequency)
-    setEditStartDate(plan.start_date || "")
-    setEditEndDate(plan.end_date || "")
-    setEditNextPaymentDate(plan.next_payment_date || "")
-    setEditTotalPayments(plan.total_payments == null ? "" : String(plan.total_payments))
-    setEditPaymentsMade(plan.payments_made == null ? "" : String(plan.payments_made))
-    setEditAttribution(attributionFromPlan(plan))
-    setEditCampaignGroupId(plan.campaign_group_id)
-    setEditCampaignGroupLabel("")
-    setEditNotes(plan.notes || "")
-    setShowEditDialog(true)
-  }
-
-  async function handleSaveEditPlan() {
-    if (!selectedPlan) return
-    if (!editAmount || Number(editAmount) <= 0) {
-      alert("Enter a valid amount")
-      return
-    }
-
-    setSaving(true)
-    const attributionIds = toAttributionIds(editAttribution)
-    const result = await updateRecurringDonationPlanAction({
-      planId: selectedPlan.id,
-      amount: Number(editAmount),
-      frequency: editFrequency,
-      startDate: editStartDate || null,
-      endDate: editEndDate.trim() ? editEndDate : null,
-      nextPaymentDate: editNextPaymentDate.trim() ? editNextPaymentDate : null,
-      totalPayments: parseOptionalCountInput(editTotalPayments),
-      paymentsMade: parseOptionalCountInput(editPaymentsMade),
-      campaignId: attributionIds.campaign_id,
-      categoryId: attributionIds.category_id,
-      subcategoryId: attributionIds.subcategory_id,
-      campaignGroupId: editCampaignGroupId,
-      notes: editNotes.trim() ? editNotes.trim() : null,
-    })
-    setSaving(false)
-
-    if (!result.success) {
-      alert(result.error || "Could not update plan")
-      return
-    }
-
-    setShowEditDialog(false)
-    setSelectedPlan(null)
-    await refreshAfterChange()
-  }
-
-  async function openChangeCard(plan: RecurringPlanWithDonor) {
-    if (isCompletedRecurringPlan(plan)) {
-      alert("Completed plans cannot be updated. Create a new plan instead.")
-      return
-    }
-    setSelectedPlan(plan)
-    setCardDialogError(null)
-    setContactPaymentMethods([])
-    setCardContactId(plan.contact_id)
+    setEditingPlan(plan)
+    setDonorId(plan.donor_id)
+    setAmount(String(plan.amount))
+    setFrequency(plan.frequency)
+    setStartDate(plan.start_date || "")
+    setNextPaymentDate(plan.next_payment_date || "")
+    setGoalAmount(plan.goal_amount == null ? "" : String(plan.goal_amount))
+    setPledgeId(plan.pledge_id || "")
+    setAttribution(attributionFromPlan(plan))
+    setPlanCampaignGroupId(plan.campaign_group_id)
+    setPlanCampaignGroupLabel("")
+    setNotes(plan.notes || "")
     setSelectedContactPaymentMethodId(plan.contact_payment_method_id || "none")
-    setShowCardDialog(true)
-
-    setCardMethodsLoading(true)
-    const result = await getRecurringPlanContactPaymentMethodsAction(plan.id)
-    setCardMethodsLoading(false)
-
-    if (!result.success) {
-      setCardDialogError(result.error || "Could not load payment methods")
-      return
-    }
-
-    setCardContactId(result.contactId)
-    setContactPaymentMethods(result.paymentMethods)
-    if (
-      result.currentPaymentMethodId &&
-      result.paymentMethods.some((method) => method.id === result.currentPaymentMethodId)
-    ) {
-      setSelectedContactPaymentMethodId(result.currentPaymentMethodId)
-    } else if (result.paymentMethods.length === 1) {
-      setSelectedContactPaymentMethodId(result.paymentMethods[0].id)
-    } else {
-      setSelectedContactPaymentMethodId("none")
-    }
-  }
-
-  async function handleSaveCard() {
-    if (!selectedPlan) return
-
-    setSaving(true)
-    const result = await updateRecurringPlanPaymentMethodAction({
-      planId: selectedPlan.id,
-      contactPaymentMethodId:
-        selectedContactPaymentMethodId === "none" ? null : selectedContactPaymentMethodId,
-    })
-    setSaving(false)
-
-    if (!result.success) {
-      alert(result.error || "Could not update card")
-      return
-    }
-
-    setShowCardDialog(false)
-    setSelectedPlan(null)
-    await refreshAfterChange()
+    setCardDialogError(null)
+    setShowCreateDialog(true)
   }
 
   return (
@@ -701,10 +699,7 @@ export function DonationRecurringPanel({
           <div className="flex justify-start">
             <Button
               size="sm"
-              onClick={() => {
-                if (scopedDonorId) setDonorId(scopedDonorId)
-                setShowCreateDialog(true)
-              }}
+              onClick={openCreatePlan}
             >
               <Plus className="mr-2 h-4 w-4" />
               New Plan
@@ -728,12 +723,7 @@ export function DonationRecurringPanel({
                 Refresh
               </Button>
               {readOnly ? null : (
-              <Button
-                onClick={() => {
-                  if (scopedDonorId) setDonorId(scopedDonorId)
-                  setShowCreateDialog(true)
-                }}
-              >
+              <Button onClick={openCreatePlan}>
                 <Plus className="mr-2 h-4 w-4" />
                 New Plan
               </Button>
@@ -749,14 +739,18 @@ export function DonationRecurringPanel({
               value={metrics.activeDonorCount}
               icon={Users}
               accent="emerald"
-              description={`${metrics.activePlanCount} active plans`}
+              description={`${metrics.onSchedulePlanCount} on schedule · ${metrics.pastDuePlanCount} past due`}
             />
             <DonationMetricCard
               title="Monthly Recurring Revenue"
               value={formatCurrency(metrics.monthlyRecurringRevenue)}
               icon={DollarSign}
               accent="blue"
-              description="Projected from active plans"
+              description={
+                metrics.pastDuePlanCount > 0
+                  ? `${formatCurrency(metrics.pastDueMonthlyAmount)} past due is not included`
+                  : "Plans due today or later"
+              }
             />
             <DonationMetricCard
               title="Annual Recurring Revenue"
@@ -912,7 +906,7 @@ export function DonationRecurringPanel({
                   <TableHead
                     className={contactScopedColumns ? "w-[110px] text-right" : "text-right"}
                   >
-                    Total Payments
+                    Total
                   </TableHead>
                   <TableHead
                     className={contactScopedColumns ? "w-[110px] text-right" : "text-right"}
@@ -1004,16 +998,14 @@ export function DonationRecurringPanel({
                       {!contactScopedColumns ? (
                         <TableCell>{formatDate(plan.end_date)}</TableCell>
                       ) : null}
-                      <TableCell className="text-right">
-                        {formatCount(plan.total_payments)}
-                      </TableCell>
+                      <TableCell className="text-right">{formatPlanTotal(plan)}</TableCell>
                       <TableCell className="text-right">{formatPaymentsMade(plan)}</TableCell>
                       <TableCell>
                         <Badge
                           variant="outline"
-                          className={getRecurringStatusBadgeClass(plan.status)}
+                          className={getRecurringStatusBadgeClass(recurringDisplayStatus(plan))}
                         >
-                          {formatRecurringStatusLabel(plan.status)}
+                          {formatRecurringStatusLabel(recurringDisplayStatus(plan))}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -1036,11 +1028,9 @@ export function DonationRecurringPanel({
                             ) : (
                               <>
                                 <DropdownMenuItem onClick={() => openEditPlan(plan)}>
-                                  <Pencil className="mr-2 h-4 w-4" />
                                   Edit Plan
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => void openChangeCard(plan)}>
-                                  <CreditCard className="mr-2 h-4 w-4" />
+                                <DropdownMenuItem onClick={() => openEditPlan(plan)}>
                                   Change Credit Card
                                 </DropdownMenuItem>
                                 {(plan.status === "active" ||
@@ -1055,6 +1045,13 @@ export function DonationRecurringPanel({
                                     }}
                                   >
                                     Receive Payment
+                                  </DropdownMenuItem>
+                                )}
+                                {(plan.status === "active" || plan.status === "paused") && (
+                                  <DropdownMenuItem
+                                    onClick={() => void handleMarkChargeFailed(plan.id)}
+                                  >
+                                    Mark charge failed
                                   </DropdownMenuItem>
                                 )}
                                 {plan.status === "active" && (
@@ -1094,20 +1091,37 @@ export function DonationRecurringPanel({
         </Card>
       </div>
 
-      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent>
+      <Dialog
+        open={showCreateDialog}
+        onOpenChange={(open) => {
+          setShowCreateDialog(open)
+          if (!open) setEditingPlan(null)
+        }}
+      >
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>New Recurring Donation Plan</DialogTitle>
+            <DialogTitle>
+              {editingPlan ? "Edit Recurring Plan" : "New Recurring Donation Plan"}
+            </DialogTitle>
             <DialogDescription>
-              Create a schedule record. Enter the number of installments or an end date. Payments
-              are recorded manually until processor billing is added.
+              Charge this amount on the schedule until the donor cancels. Add a total to stop when
+              that amount is collected, or choose an open pledge and stop when the pledge is paid.
+              Choose a card on file for the plan. A failed charge does not count, and the last
+              charge is only what is still owed.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-4 py-2">
             {!isDonorScoped ? (
               <div className="flex flex-col gap-2">
                 <Label>Donor</Label>
-                <Select value={donorId} onValueChange={setDonorId}>
+                <Select
+                  value={donorId}
+                  onValueChange={(value) => {
+                    setDonorId(value)
+                    setSelectedContactPaymentMethodId("none")
+                  }}
+                  disabled={Boolean(editingPlan)}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select donor" />
                   </SelectTrigger>
@@ -1133,7 +1147,7 @@ export function DonationRecurringPanel({
               </div>
               <div className="flex flex-col gap-2">
                 <Label>Frequency</Label>
-                <Select value={frequency} onValueChange={(v) => applyCreateFrequency(v as RecurringFrequency)}>
+                <Select value={frequency} onValueChange={(value) => setFrequency(value as RecurringFrequency)}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -1149,30 +1163,75 @@ export function DonationRecurringPanel({
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-2">
-                <Label>Start Date</Label>
-                <Input type="date" value={startDate} onChange={(e) => applyCreateStartDate(e.target.value)} />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="recurring-create-installments">Number of installments</Label>
+                <Label htmlFor="recurring-create-start">Start Date</Label>
                 <Input
-                  id="recurring-create-installments"
-                  type="number"
-                  min={2}
-                  placeholder="e.g. 12"
-                  value={planPayments}
-                  onChange={(e) => applyCreateInstallmentCount(e.target.value)}
+                  id="recurring-create-start"
+                  type="date"
+                  value={startDate}
+                  onChange={(event) => setStartDate(event.target.value)}
                 />
               </div>
-              <div className="flex flex-col gap-2 sm:col-span-2">
-                <Label htmlFor="recurring-create-end">End date</Label>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="recurring-plan-next">Next Payment</Label>
                 <Input
-                  id="recurring-create-end"
+                  id="recurring-plan-next"
                   type="date"
-                  value={planEndDate}
-                  onChange={(e) => applyCreateEndDate(e.target.value)}
+                  value={nextPaymentDate}
+                  onChange={(event) => setNextPaymentDate(event.target.value)}
                 />
               </div>
             </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="recurring-create-total">Total amount</Label>
+              <Input
+                id="recurring-create-total"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="Optional"
+                value={pledgeId ? "" : goalAmount}
+                disabled={Boolean(pledgeId)}
+                onChange={(event) => setGoalAmount(event.target.value)}
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="recurring-plan-card">Payment method</Label>
+              <Select
+                value={selectedContactPaymentMethodId}
+                onValueChange={setSelectedContactPaymentMethodId}
+                disabled={!donorId || cardMethodsLoading}
+              >
+                <SelectTrigger id="recurring-plan-card">
+                  <SelectValue placeholder={cardMethodsLoading ? "Loading cards..." : "Select a card"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No card assigned</SelectItem>
+                  {contactPaymentMethods.map((method) => (
+                    <SelectItem key={method.id} value={method.id}>
+                      {formatPaymentMethodOption(method)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {cardDialogError ? (
+                <p className="text-xs text-destructive">{cardDialogError}</p>
+              ) : contactPaymentMethods.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  {donorId
+                    ? "No cards on file. Add one from Payment Methods on this contact."
+                    : "Select a donor to choose a card."}
+                </p>
+              ) : null}
+            </div>
+            <OpenPledgeField
+              id="recurring-create-pledge"
+              value={pledgeId}
+              pledges={openPledges}
+              onChange={(next) => {
+                setPledgeId(next)
+                if (next) setGoalAmount("")
+              }}
+            />
             <DonationAttributionFields
               organizationId={organizationId}
               value={attribution}
@@ -1200,11 +1259,17 @@ export function DonationRecurringPanel({
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowCreateDialog(false)
+                setEditingPlan(null)
+              }}
+            >
               Cancel
             </Button>
-            <Button onClick={handleCreatePlan} disabled={saving}>
-              {saving ? "Creating..." : "Create Plan"}
+            <Button onClick={() => void handleSavePlan()} disabled={saving}>
+              {saving ? "Saving..." : editingPlan ? "Save Changes" : "Create Plan"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1215,7 +1280,8 @@ export function DonationRecurringPanel({
           <DialogHeader>
             <DialogTitle>Receive Payment</DialogTitle>
             <DialogDescription>
-              Creates a canonical payment linked to this plan and advances the next payment date.
+              Records the next successful charge. If a total or a pledge is set, the charge stops
+              at what is still owed. A failed charge stays unpaid until you record it here.
             </DialogDescription>
           </DialogHeader>
           {selectedPlan && (
@@ -1265,145 +1331,6 @@ export function DonationRecurringPanel({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Edit Recurring Plan</DialogTitle>
-            <DialogDescription>
-              Update plan amounts, schedule, and attribution for {selectedPlan?.donor_name || "this donor"}.
-            </DialogDescription>
-          </DialogHeader>
-          {selectedPlan ? (
-            <div className="flex flex-col gap-4 py-2">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="edit-plan-amount">Amount</Label>
-                  <Input
-                    id="edit-plan-amount"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={editAmount}
-                    onChange={(event) => setEditAmount(event.target.value)}
-                  />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Label>Frequency</Label>
-                  <Select
-                    value={editFrequency}
-                    onValueChange={(value) =>
-                      setEditFrequency(value as typeof editFrequency)
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="daily">Daily</SelectItem>
-                      <SelectItem value="weekly">Weekly</SelectItem>
-                      <SelectItem value="monthly">Monthly</SelectItem>
-                      <SelectItem value="quarterly">Quarterly</SelectItem>
-                      <SelectItem value="annually">Annually</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="edit-plan-start">Plan Start</Label>
-                  <Input
-                    id="edit-plan-start"
-                    type="date"
-                    value={editStartDate}
-                    onChange={(event) => setEditStartDate(event.target.value)}
-                  />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="edit-plan-end">Plan End</Label>
-                  <Input
-                    id="edit-plan-end"
-                    type="date"
-                    value={editEndDate}
-                    onChange={(event) => setEditEndDate(event.target.value)}
-                  />
-                </div>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-3">
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="edit-plan-next">Next Payment</Label>
-                  <Input
-                    id="edit-plan-next"
-                    type="date"
-                    value={editNextPaymentDate}
-                    onChange={(event) => setEditNextPaymentDate(event.target.value)}
-                  />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="edit-plan-total">Total Payments</Label>
-                  <Input
-                    id="edit-plan-total"
-                    type="number"
-                    min="0"
-                    value={editTotalPayments}
-                    onChange={(event) => setEditTotalPayments(event.target.value)}
-                    placeholder="Optional"
-                  />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="edit-plan-made">Payments Made</Label>
-                  <Input
-                    id="edit-plan-made"
-                    type="number"
-                    min="0"
-                    value={editPaymentsMade}
-                    onChange={(event) => setEditPaymentsMade(event.target.value)}
-                    placeholder="Optional"
-                  />
-                </div>
-              </div>
-              <DonationAttributionFields
-                organizationId={organizationId}
-                value={editAttribution}
-                onChange={(value) => {
-                  setEditAttribution(value)
-                  if (value.campaignId !== editAttribution.campaignId) {
-                    setEditCampaignGroupId(null)
-                    setEditCampaignGroupLabel("")
-                  }
-                }}
-              />
-              <CampaignGroupPicker
-                campaignId={editAttribution.campaignId || null}
-                groupId={editCampaignGroupId}
-                groupLabel={editCampaignGroupLabel}
-                onChange={(nextGroupId, label) => {
-                  setEditCampaignGroupId(nextGroupId)
-                  setEditCampaignGroupLabel(label)
-                }}
-                disabled={saving}
-              />
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="edit-plan-notes">Notes</Label>
-                <Textarea
-                  id="edit-plan-notes"
-                  value={editNotes}
-                  onChange={(event) => setEditNotes(event.target.value)}
-                  rows={2}
-                />
-              </div>
-            </div>
-          ) : null}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowEditDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSaveEditPlan} disabled={saving}>
-              {saving ? "Saving..." : "Save Changes"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       <Dialog
         open={showViewDialog}
         onOpenChange={(open) => {
@@ -1432,7 +1359,7 @@ export function DonationRecurringPanel({
                     variant="outline"
                     className={getRecurringStatusBadgeClass(selectedPlan.status)}
                   >
-                    {formatRecurringStatusLabel(selectedPlan.status)}
+                    {formatRecurringStatusLabel(recurringDisplayStatus(selectedPlan))}
                   </Badge>
                 </div>
                 <div>
@@ -1460,8 +1387,8 @@ export function DonationRecurringPanel({
                   <p>{formatDate(selectedPlan.end_date)}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground">Total Payments</p>
-                  <p>{formatCount(selectedPlan.total_payments)}</p>
+                  <p className="text-xs font-medium text-muted-foreground">Total</p>
+                  <p>{formatPlanTotal(selectedPlan)}</p>
                 </div>
                 <div>
                   <p className="text-xs font-medium text-muted-foreground">Payments Made</p>
@@ -1481,101 +1408,13 @@ export function DonationRecurringPanel({
               variant="outline"
               onClick={() => {
                 setShowViewDialog(false)
-                if (scopedDonorId) setDonorId(scopedDonorId)
-                setShowCreateDialog(true)
+                openCreatePlan()
               }}
             >
               <Plus className="mr-2 h-4 w-4" />
               New Plan
             </Button>
             <Button onClick={() => setShowViewDialog(false)}>Close</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showCardDialog} onOpenChange={setShowCardDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Change Credit Card</DialogTitle>
-            <DialogDescription>
-              Choose an on-file card for {selectedPlan?.donor_name || "this donor"}&apos;s recurring plan.
-            </DialogDescription>
-          </DialogHeader>
-          {selectedPlan ? (
-            <div className="space-y-4 text-sm">
-              {selectedPlan.payment_method_label ? (
-                <p>
-                  <span className="text-muted-foreground">Current card:</span>{" "}
-                  {selectedPlan.payment_method_label}
-                </p>
-              ) : (
-                <p className="text-muted-foreground">No card is assigned to this plan yet.</p>
-              )}
-              {cardDialogError ? (
-                <p className="text-destructive">{cardDialogError}</p>
-              ) : cardMethodsLoading ? (
-                <p className="text-muted-foreground">Loading saved cards...</p>
-              ) : contactPaymentMethods.length === 0 ? (
-                <div className="space-y-2">
-                  <p className="text-muted-foreground">
-                    No cards on file for this contact. Add one on the donor contact profile under{" "}
-                    <span className="font-medium">Financial → Payment Methods</span>.
-                  </p>
-                  <div className="flex flex-col gap-2">
-                    <Label>Card on file</Label>
-                    <Select value="none" onValueChange={setSelectedContactPaymentMethodId}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">No card assigned</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  <Label>Card on file</Label>
-                  <Select
-                    value={selectedContactPaymentMethodId}
-                    onValueChange={setSelectedContactPaymentMethodId}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a card" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">No card assigned</SelectItem>
-                      {contactPaymentMethods.map((method) => (
-                        <SelectItem key={method.id} value={method.id}>
-                          {formatPaymentMethodOption(method)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-              {cardContactId ? (
-                <p>
-                  <Link
-                    href={`/contacts/${cardContactId}?tab=financial`}
-                    className="text-primary hover:underline"
-                  >
-                    Manage cards on contact profile
-                  </Link>
-                </p>
-              ) : null}
-            </div>
-          ) : null}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCardDialog(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSaveCard}
-              disabled={saving || cardMethodsLoading || Boolean(cardDialogError)}
-            >
-              {saving ? "Saving..." : "Save Card"}
-            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

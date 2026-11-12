@@ -2,7 +2,7 @@
 
 
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 import { useParams, useRouter, useSearchParams } from "next/navigation"
 
@@ -213,6 +213,7 @@ export default function ContactDetailPage() {
   const [enabledModuleSlugs, setEnabledModuleSlugs] = useState<string[]>([])
 
   const [loading, setLoading] = useState(true)
+  const loadedContactIdRef = useRef<string | null>(null)
 
   const [profileLoading, setProfileLoading] = useState(true)
 
@@ -292,7 +293,9 @@ export default function ContactDetailPage() {
 
   const loadContact = useCallback(async () => {
 
-    setLoading(true)
+    if (loadedContactIdRef.current !== contactId) {
+      setLoading(true)
+    }
 
     setErrorMessage("")
 
@@ -406,6 +409,7 @@ export default function ContactDetailPage() {
     }
 
     setContact(data)
+    loadedContactIdRef.current = contactId
     setOrganizationId(orgId)
 
     try {
@@ -485,7 +489,7 @@ export default function ContactDetailPage() {
 
     setLoading(false)
 
-  }, [contactId, loadExtendedData, loadProfileData, router, searchParams, supabase])
+  }, [contactId, loadExtendedData, loadProfileData, router, supabase])
 
 
 

@@ -1,157 +1,162 @@
 "use client"
 
+import { useState } from "react"
 import Link from "next/link"
-import { AlertTriangle, BarChart3, PieChart, UserX } from "lucide-react"
+import { AlertTriangle, UserPlus } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { StatCard, StatCardsRow } from "@/components/ui/stat-card"
+import { ListPagination } from "@/components/ui/list-pagination"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { contactProfileHref } from "@/lib/contacts/contact-profile-path"
+import { fetchDirectoryNewContactsAction } from "@/lib/directory/directory-report-actions"
 import type {
-  DirectoryCompletenessStats,
   DirectoryDuplicateRow,
-  DirectoryGrowthPoint,
-  DirectoryRoleDistributionRow,
+  DirectoryNewContactPeriod,
+  DirectoryNewContactsPage,
 } from "@/lib/directory/directory-report-types"
+import { formatPhoneDisplay } from "@/lib/ui/format-phone"
 
-function formatMonth(value: string) {
-  const [year, month] = value.split("-")
-  const date = new Date(Number(year), Number(month) - 1, 1)
-  return date.toLocaleDateString("en-US", { month: "short", year: "numeric" })
+const PERIODS: Array<{ id: DirectoryNewContactPeriod; label: string }> = [
+  { id: "month", label: "This month" },
+  { id: "30d", label: "Last 30 days" },
+  { id: "12m", label: "Last 12 months" },
+]
+
+function formatAddedOn(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return "—"
+  return date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  })
+}
+
+function duplicateValue(row: DirectoryDuplicateRow) {
+  if (row.matchType === "phone") return formatPhoneDisplay(row.value) || row.value
+  return row.value
 }
 
 export function DirectoryReportsClient({
-  uniquePeople,
-  roleDistribution,
-  completeness,
-  growth,
   duplicates,
+  initialNewContacts,
 }: {
-  uniquePeople: number
-  roleDistribution: DirectoryRoleDistributionRow[]
-  completeness: DirectoryCompletenessStats
-  growth: DirectoryGrowthPoint[]
   duplicates: DirectoryDuplicateRow[]
+  initialNewContacts: DirectoryNewContactsPage
 }) {
-  const populatedRoles = roleDistribution.filter((row) => row.count > 0)
-  const maxGrowth = Math.max(
-    1,
-    ...growth.map((point) => point.people + point.organizations)
-  )
+  const [period, setPeriod] = useState<DirectoryNewContactPeriod>(initialNewContacts.period)
+  const [newContacts, setNewContacts] = useState(initialNewContacts)
+  const [loadingContacts, setLoadingContacts] = useState(false)
+  const [contactsError, setContactsError] = useState("")
+
+  async function loadNewContacts(nextPeriod: DirectoryNewContactPeriod, page: number) {
+    setLoadingContacts(true)
+    setContactsError("")
+    const result = await fetchDirectoryNewContactsAction(nextPeriod, page)
+    setLoadingContacts(false)
+    if (!result.success) {
+      setContactsError(result.error)
+      return
+    }
+    setPeriod(nextPeriod)
+    setNewContacts(result.result)
+  }
 
   return (
     <div className="flex flex-col gap-6 p-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Directory Reports</h1>
         <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-          Analytics for identity data. Role counts overlap — a person can be a donor and a
-          volunteer, so totals are not unique people.
+          See who was added recently, and review people who share an email or phone.
         </p>
       </div>
 
-      <StatCardsRow equal columns={4}>
-        <StatCard label="People" value={uniquePeople.toLocaleString()} layout="header" fill />
-        <StatCard
-          label="Missing email"
-          value={completeness.missingEmail.toLocaleString()}
-          layout="header"
-          fill
-        />
-        <StatCard
-          label="Missing phone"
-          value={completeness.missingPhone.toLocaleString()}
-          layout="header"
-          fill
-        />
-        <StatCard
-          label="Possible duplicates"
-          value={duplicates.length.toLocaleString()}
-          layout="header"
-          fill
-        />
-      </StatCardsRow>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
+      <Card>
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
             <CardTitle className="flex items-center gap-2 text-base">
-              <PieChart className="h-4 w-4 text-muted-foreground" />
-              Role distribution
+              <UserPlus className="h-4 w-4 text-muted-foreground" />
+              New contacts
             </CardTitle>
             <CardDescription>
-              Counts can overlap. {uniquePeople.toLocaleString()} unique people in Directory.
+              {loadingContacts
+                ? "Loading..."
+                : `${newContacts.peopleCount.toLocaleString()} ${newContacts.peopleCount === 1 ? "person" : "people"} and ${newContacts.organizationCount.toLocaleString()} ${newContacts.organizationCount === 1 ? "organization" : "organizations"} added.`}
             </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {populatedRoles.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No role records yet.</p>
-            ) : (
-              populatedRoles.map((row) => (
-                <div key={row.key} className="flex items-center justify-between gap-3 text-sm">
-                  <span>{row.label}</span>
-                  <span className="tabular-nums font-medium">{row.count.toLocaleString()}</span>
-                </div>
-              ))
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <UserX className="h-4 w-4 text-muted-foreground" />
-              Data completeness
-            </CardTitle>
-            <CardDescription>People records missing common identity fields.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm">
-            <div className="flex justify-between">
-              <span>Missing email</span>
-              <span className="tabular-nums">{completeness.missingEmail.toLocaleString()}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Missing phone</span>
-              <span className="tabular-nums">{completeness.missingPhone.toLocaleString()}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Missing address</span>
-              <span className="tabular-nums">{completeness.missingAddress.toLocaleString()}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>No stored role</span>
-              <span className="tabular-nums">{completeness.noRole.toLocaleString()}</span>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <BarChart3 className="h-4 w-4 text-muted-foreground" />
-            Contact growth
-          </CardTitle>
-          <CardDescription>People vs organizations added in the last 12 months.</CardDescription>
+          </div>
+          <Select
+            value={period}
+            onValueChange={(value) => void loadNewContacts(value as DirectoryNewContactPeriod, 1)}
+          >
+            <SelectTrigger className="w-[180px]" aria-label="Time period">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PERIODS.map((item) => (
+                <SelectItem key={item.id} value={item.id}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </CardHeader>
-        <CardContent className="space-y-2">
-          {growth.map((point) => {
-            const total = point.people + point.organizations
-            const peopleWidth = `${Math.round((point.people / maxGrowth) * 100)}%`
-            const orgWidth = `${Math.round((point.organizations / maxGrowth) * 100)}%`
-            return (
-              <div key={point.month} className="grid grid-cols-[7rem_1fr_auto] items-center gap-3">
-                <span className="text-xs text-muted-foreground">{formatMonth(point.month)}</span>
-                <div className="flex h-3 overflow-hidden rounded bg-muted">
-                  <div className="bg-sky-500" style={{ width: peopleWidth }} />
-                  <div className="bg-amber-500" style={{ width: orgWidth }} />
-                </div>
-                <span className="text-xs tabular-nums text-muted-foreground">
-                  {total.toLocaleString()}
-                </span>
-              </div>
-            )
-          })}
-          <p className="pt-1 text-xs text-muted-foreground">Blue = people · Amber = organizations</p>
+        <CardContent className="space-y-3">
+          {contactsError ? <p className="text-sm text-red-700">{contactsError}</p> : null}
+          {newContacts.contacts.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No people or organizations were added in this period.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left text-muted-foreground">
+                    <th className="py-2 pr-3 font-medium">Name</th>
+                    <th className="py-2 pr-3 font-medium">Type</th>
+                    <th className="py-2 font-medium">Added</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {newContacts.contacts.map((contact) => (
+                    <tr key={contact.id} className="border-b last:border-0">
+                      <td className="py-2 pr-3">
+                        <Link
+                          href={contactProfileHref(contact.id, {
+                            list: contact.kind === "organization" ? "organizations" : "people",
+                          })}
+                          className="font-medium text-primary hover:underline"
+                        >
+                          {contact.name}
+                        </Link>
+                      </td>
+                      <td className="py-2 pr-3 text-muted-foreground">
+                        {contact.kind === "organization" ? "Organization" : "Person"}
+                      </td>
+                      <td className="py-2 text-muted-foreground">{formatAddedOn(contact.createdAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {newContacts.total > newContacts.pageSize ? (
+            <ListPagination
+              page={newContacts.page}
+              pageSize={newContacts.pageSize}
+              total={newContacts.total}
+              disabled={loadingContacts}
+              hidePageSize
+              entryLabel="contacts"
+              onPageChange={(page) => void loadNewContacts(period, page)}
+            />
+          ) : null}
         </CardContent>
       </Card>
 
@@ -159,22 +164,22 @@ export function DirectoryReportsClient({
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-            Possible duplicate people
+            Possible duplicates
           </CardTitle>
           <CardDescription>
-            Matching email or phone within this organization. Review and merge from the contact
-            profile — records are never merged automatically.
+            People with the same email or phone. Open a profile to review them. Records are not
+            merged from this page.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           {duplicates.length === 0 ? (
             <p className="text-sm text-muted-foreground">No email or phone duplicates found.</p>
           ) : (
-            duplicates.slice(0, 25).map((row) => (
+            duplicates.map((row) => (
               <div key={row.key} className="rounded-md border p-3">
                 <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <Badge variant="outline">{row.matchType}</Badge>
-                  <span className="text-sm font-medium">{row.value}</span>
+                  <Badge variant="outline">{row.matchType === "phone" ? "Phone" : "Email"}</Badge>
+                  <span className="text-sm font-medium">{duplicateValue(row)}</span>
                 </div>
                 <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm">
                   {row.contactIds.map((id, index) => (

@@ -1,6 +1,6 @@
+import { redirect } from "next/navigation"
 import { Header } from "@/components/layout/header"
 import { ContactsSettingsClient } from "@/components/contacts/contacts-settings-client"
-import { getOrganizationAffiliationSettings } from "@/lib/contacts/contact-affiliation-settings"
 import { getDiscountTags } from "@/lib/discount-tags/discount-tag-queries"
 
 export default async function DirectorySettingsPage({
@@ -9,19 +9,16 @@ export default async function DirectorySettingsPage({
   searchParams: Promise<{ tab?: string }>
 }) {
   const { tab } = await searchParams
-  const [tags, affiliationSettings] = await Promise.all([
-    getDiscountTags(),
-    getOrganizationAffiliationSettings(),
-  ])
+  if (tab) {
+    redirect("/directory/settings")
+  }
+
+  const tags = await getDiscountTags()
 
   return (
     <>
       <Header title="Directory Settings" />
-      <ContactsSettingsClient
-        tags={tags}
-        affiliationSettings={affiliationSettings}
-        initialTab={tab}
-      />
+      <ContactsSettingsClient tags={tags} />
     </>
   )
 }

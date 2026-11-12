@@ -65,10 +65,6 @@ import { DONATIONS_PAGE_SIZE } from "@/lib/donations/donation-pagination"
 import { DONATION_RECURRING_OPS_PATH } from "@/lib/donations/donation-payment-paths"
 import { formatPaymentAllocationStatus } from "@/lib/donations/donation-status"
 import {
-  lastRecurringDateFromCount,
-  paymentCountFromLastRecurringDate,
-} from "@/lib/donations/recurring-donation-schedule"
-import {
   formatRecurringFrequencyLabel,
   formatRecurringStatusLabel,
   type RecurringFrequency,
@@ -189,8 +185,7 @@ export function CampaignDonationsTab({
   const [planAmount, setPlanAmount] = useState("")
   const [planFrequency, setPlanFrequency] = useState<RecurringFrequency>("monthly")
   const [planStartDate, setPlanStartDate] = useState(todayDateOnly())
-  const [planPayments, setPlanPayments] = useState("")
-  const [planEndDate, setPlanEndDate] = useState("")
+  const [planGoalAmount, setPlanGoalAmount] = useState("")
   const [planNotes, setPlanNotes] = useState("")
   const [planCampaignGroupId, setPlanCampaignGroupId] = useState<string | null>(null)
   const [planCampaignGroupLabel, setPlanCampaignGroupLabel] = useState("")
@@ -223,8 +218,7 @@ export function CampaignDonationsTab({
     setPlanAmount("")
     setPlanFrequency("monthly")
     setPlanStartDate(todayDateOnly())
-    setPlanPayments("")
-    setPlanEndDate("")
+    setPlanGoalAmount("")
     setPlanNotes("")
     setPlanCampaignGroupId(null)
     setPlanCampaignGroupLabel("")
@@ -284,47 +278,6 @@ export function CampaignDonationsTab({
   function openPlanDialog() {
     resetPlanForm()
     setShowPlanDialog(true)
-  }
-
-  function applyPlanInstallmentCount(value: string) {
-    setPlanPayments(value)
-    const count = Number(value)
-    if (planStartDate && Number.isInteger(count) && count >= 2) {
-      const last = lastRecurringDateFromCount(planStartDate, planFrequency, count)
-      if (last) setPlanEndDate(last)
-    }
-  }
-
-  function applyPlanEndDate(value: string) {
-    setPlanEndDate(value)
-    if (planStartDate && value) {
-      const count = paymentCountFromLastRecurringDate(planStartDate, planFrequency, value)
-      setPlanPayments(count >= 2 ? String(count) : "")
-    }
-  }
-
-  function applyPlanStartDate(value: string) {
-    setPlanStartDate(value)
-    const count = Number(planPayments)
-    if (value && Number.isInteger(count) && count >= 2) {
-      const last = lastRecurringDateFromCount(value, planFrequency, count)
-      if (last) setPlanEndDate(last)
-    } else if (value && planEndDate) {
-      const nextCount = paymentCountFromLastRecurringDate(value, planFrequency, planEndDate)
-      setPlanPayments(nextCount >= 2 ? String(nextCount) : "")
-    }
-  }
-
-  function applyPlanFrequency(value: RecurringFrequency) {
-    setPlanFrequency(value)
-    const count = Number(planPayments)
-    if (planStartDate && Number.isInteger(count) && count >= 2) {
-      const last = lastRecurringDateFromCount(planStartDate, value, count)
-      if (last) setPlanEndDate(last)
-    } else if (planStartDate && planEndDate) {
-      const nextCount = paymentCountFromLastRecurringDate(planStartDate, value, planEndDate)
-      setPlanPayments(nextCount >= 2 ? String(nextCount) : "")
-    }
   }
 
   function handleQuickAddCreated(contact: QuickAddContactResult) {
@@ -414,6 +367,12 @@ export function CampaignDonationsTab({
       alert("Enter a valid amount.")
       return
     }
+    const trimmedGoal = planGoalAmount.trim()
+    const goalAmount = trimmedGoal ? Number(trimmedGoal) : null
+    if (trimmedGoal && (!Number.isFinite(goalAmount) || (goalAmount ?? 0) <= 0)) {
+      alert("Enter a total greater than zero, or leave it blank.")
+      return
+    }
 
     setSaving(true)
     const resolvedDonorId = await ensureDonorExtensionForContact(organizationId, planContactId)
@@ -436,8 +395,7 @@ export function CampaignDonationsTab({
       amount: Number(planAmount),
       frequency: planFrequency,
       startDate: planStartDate,
-      numberOfPayments: planPayments ? Number(planPayments) : null,
-      endDate: planEndDate || null,
+      goalAmount,
       notes: planNotes || null,
       campaignGroupId: planCampaignGroupId,
     })
@@ -1166,7 +1124,7 @@ export function CampaignDonationsTab({
           <DialogHeader>
             <DialogTitle>New Recurring Donation Plan</DialogTitle>
             <DialogDescription>
-              Create a schedule on this campaign. Enter the number of installments or an end date.
+              Charge this amount until the donor cancels. Add a total to stop when that amount is collected. To pay down an existing pledge, create the plan from the contact Financial page.
               Payments are recorded manually until processor billing is added.
             </DialogDescription>
           </DialogHeader>
@@ -1216,7 +1174,7 @@ export function CampaignDonationsTab({
                 <Label>Frequency</Label>
                 <Select
                   value={planFrequency}
-                  onValueChange={(value) => applyPlanFrequency(value as RecurringFrequency)}
+                  onValueChange={(value) => setPlanFrequency(value as RecurringFrequency)}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -1238,27 +1196,19 @@ export function CampaignDonationsTab({
                   id="campaign-plan-start"
                   type="date"
                   value={planStartDate}
-                  onChange={(event) => applyPlanStartDate(event.target.value)}
+                  onChange={(event) => setPlanStartDate(event.target.value)}
                 />
               </div>
               <div className="flex flex-col gap-2">
-                <Label htmlFor="campaign-plan-installments">Number of installments</Label>
+                <Label htmlFor="campaign-plan-total">Total amount</Label>
                 <Input
-                  id="campaign-plan-installments"
+                  id="campaign-plan-total"
                   type="number"
-                  min={2}
-                  placeholder="e.g. 12"
-                  value={planPayments}
-                  onChange={(event) => applyPlanInstallmentCount(event.target.value)}
-                />
-              </div>
-              <div className="flex flex-col gap-2 sm:col-span-2">
-                <Label htmlFor="campaign-plan-end">End date</Label>
-                <Input
-                  id="campaign-plan-end"
-                  type="date"
-                  value={planEndDate}
-                  onChange={(event) => applyPlanEndDate(event.target.value)}
+                  min="0"
+                  step="0.01"
+                  placeholder="Optional"
+                  value={planGoalAmount}
+                  onChange={(event) => setPlanGoalAmount(event.target.value)}
                 />
               </div>
             </div>

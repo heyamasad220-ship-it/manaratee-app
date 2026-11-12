@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -59,6 +59,10 @@ import {
   isContactsListSegment,
   type ContactsListSegment,
 } from "@/lib/contacts/contact-module-label"
+import {
+  shouldShowFinancialModuleNav,
+  type ContactFinancialDetailTab,
+} from "@/lib/contacts/contact-financial-nav"
 import {
   contactProfileHref,
   normalizeContactProfileTab,
@@ -126,6 +130,16 @@ function formatCurrencyCompact(amount: number) {
   }).format(amount)
 }
 
+function replaceSameProfile(
+  router: { replace: (href: string, options?: { scroll?: boolean }) => void },
+  pathname: string,
+  nextHref: string
+) {
+  const current = `${pathname}${window.location.search}`
+  if (current === nextHref) return
+  router.replace(nextHref, { scroll: false })
+}
+
 export function ContactProfileClient({
   contact,
   profileData,
@@ -147,11 +161,13 @@ export function ContactProfileClient({
   onClose,
 }: ContactProfileClientProps) {
   const router = useRouter()
+  const pathname = usePathname()
   const searchParams = useSearchParams()
   const supabase = useMemo(() => createClient(), [])
   const tabParam = searchParams.get("tab")
   const sectionParam = searchParams.get("section")
   const financialModuleParam = searchParams.get("module")
+  const financialDetailParam = searchParams.get("detail")
   const isDialog = variant === "dialog"
   const [dialogEditMode, setDialogEditMode] = useState(defaultEdit)
   const isEditMode = isDialog ? dialogEditMode : searchParams.get("edit") === "1"
@@ -198,8 +214,11 @@ export function ContactProfileClient({
       ...(tabParam === "financial" && financialModuleParam
         ? { financialModule: financialModuleParam }
         : {}),
+      ...(tabParam === "financial" && financialDetailParam
+        ? { financialDetail: financialDetailParam }
+        : {}),
     }),
-    [financialModuleParam, profileListSegment, resolvedReturnTo, tabParam]
+    [financialDetailParam, financialModuleParam, profileListSegment, resolvedReturnTo, tabParam]
   )
 
   const roles = useMemo(() => {
@@ -291,12 +310,13 @@ export function ContactProfileClient({
     if (sectionParam === "activity" && (!tabParam || tabParam === "home" || tabParam === "overview")) {
       setActiveTab("activity")
       if (!isDialog) {
-        router.replace(
+        replaceSameProfile(
+          router,
+          pathname,
           contactProfileHref(contact.id, {
             ...profileHrefOptions,
             tab: "activity",
-          }),
-          { scroll: false }
+          })
         )
       }
       return
@@ -317,6 +337,7 @@ export function ContactProfileClient({
     contact.id,
     isDialog,
     isEditMode,
+    pathname,
     profileHrefOptions,
     router,
     sectionParam,
@@ -338,12 +359,13 @@ export function ContactProfileClient({
     if (fromQuery === expectedList) return
 
     const tab = resolveAvailableTab(tabParam)
-    router.replace(
+    replaceSameProfile(
+      router,
+      pathname,
       contactProfileHref(contact.id, {
         ...profileHrefOptions,
         tab: tab === "overview" ? undefined : tab,
-      }),
-      { scroll: false }
+      })
     )
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -351,6 +373,7 @@ export function ContactProfileClient({
     isDialog,
     profileHrefOptions,
     recordType,
+    pathname,
     router,
     searchParams,
     tabParam,
@@ -403,6 +426,7 @@ export function ContactProfileClient({
         ...profileHrefOptions,
         tab: tab === "overview" ? undefined : tab,
         financialModule: tab === "financial" ? financialModuleParam : undefined,
+        financialDetail: tab === "financial" ? financialDetailParam : undefined,
         edit: false,
       }),
       { scroll: false }
@@ -710,21 +734,45 @@ export function ContactProfileClient({
               hideIdentity
               surface="staff-overview"
               stickyTopClass={stickyTopClass}
-            />
-          ) : null}
-
-          {showFinancialTab && !isGroup ? (
-            <ContactProfileFinancialSummaryCard
-              profileLoading={profileLoading}
-              donorStats={profileData?.donorStats ?? null}
-              rentalStats={profileData?.rentalStats ?? null}
-              vendorStats={profileData?.vendorStats ?? null}
-              showDonationsSummary={showDonationsSummary}
-              showBookingsSummary={showBookingsSummary}
-              showVendorSummary={showVendorSummary}
-              showProgramsHint={showProgramsHint}
-              showMembershipHint={showMembershipHint}
-              onOpenFinancial={() => handleTabChange("financial")}
+              onViewAllTransactions={
+                isDialog
+                  ? undefined
+                  : () => {
+                      router.replace(
+                        contactProfileHref(contact.id, {
+                          ...profileHrefOptions,
+                          tab: "financial",
+                          financialModule: shouldShowFinancialModuleNav(modules)
+                            ? "all"
+                            : undefined,
+                          financialDetail: "transactions",
+                          edit: false,
+                        }),
+                        { scroll: false }
+                      )
+                    }
+              }
+              overviewSummary={
+                showDonationsSummary ||
+                showBookingsSummary ||
+                showVendorSummary ||
+                showProgramsHint ||
+                showMembershipHint ? (
+                  <ContactProfileFinancialSummaryCard
+                    profileLoading={profileLoading}
+                    donorStats={profileData?.donorStats ?? null}
+                    rentalStats={profileData?.rentalStats ?? null}
+                    vendorStats={profileData?.vendorStats ?? null}
+                    showDonationsSummary={showDonationsSummary}
+                    showBookingsSummary={showBookingsSummary}
+                    showVendorSummary={showVendorSummary}
+                    showProgramsHint={showProgramsHint}
+                    showMembershipHint={showMembershipHint}
+                    compact
+                    onOpenFinancial={() => handleTabChange("financial")}
+                  />
+                ) : null
+              }
             />
           ) : null}
         </div>
@@ -748,6 +796,24 @@ export function ContactProfileClient({
           refreshToken={0}
           surface={isGroup ? "full" : "staff-details"}
           initialModuleSection={financialModuleParam}
+          initialDetailTab={financialDetailParam}
+          onDetailTabChange={
+            isDialog
+              ? undefined
+              : (detail: ContactFinancialDetailTab | null) => {
+                  router.replace(
+                    contactProfileHref(contact.id, {
+                      list: profileListSegment,
+                      ...(resolvedReturnTo ? { returnTo: resolvedReturnTo } : {}),
+                      tab: "financial",
+                      financialModule: financialModuleParam,
+                      financialDetail: detail,
+                      edit: false,
+                    }),
+                    { scroll: false }
+                  )
+                }
+          }
           onModuleSectionChange={
             isDialog
               ? undefined

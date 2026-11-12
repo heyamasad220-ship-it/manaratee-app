@@ -12,7 +12,21 @@ export const DIRECTORY_BASE_PATH = "/directory"
 export const DIRECTORY_PEOPLE_PATH = "/directory/people"
 export const DIRECTORY_FAMILIES_PATH = "/directory/families"
 export const DIRECTORY_ORGANIZATIONS_PATH = "/directory/organizations"
-/** Legacy Directory Groups URL — redirects to Fund Development Group Giving. */
+
+export type DirectoryContactsTab = "people" | "families" | "organizations"
+
+export function parseDirectoryContactsTab(
+  value: string | null | undefined
+): DirectoryContactsTab {
+  if (value === "families" || value === "organizations") return value
+  return "people"
+}
+
+/** People, families, and organizations share the All Contacts page. */
+export function directoryContactsTabPath(tab: DirectoryContactsTab = "people") {
+  return `${DIRECTORY_BASE_PATH}?tab=${tab}`
+}
+/** Legacy Directory Groups URL — opens Fund Development Donors. */
 export const DIRECTORY_GROUPS_PATH = "/directory/groups"
 export const DIRECTORY_REPORTS_PATH = "/directory/reports"
 export const DIRECTORY_SETTINGS_PATH = "/directory/settings"
@@ -38,10 +52,10 @@ export function directoryGroupPath(groupContactId: string) {
 }
 
 export function directoryListPathForSegment(segment: ContactsListSegment): string {
-  if (segment === "organizations") return DIRECTORY_ORGANIZATIONS_PATH
+  if (segment === "organizations") return directoryContactsTabPath("organizations")
   if (segment === "groups") return DONATIONS_GROUP_GIVING_REPORT_PATH
-  if (segment === "families") return DIRECTORY_FAMILIES_PATH
-  return DIRECTORY_PEOPLE_PATH
+  if (segment === "families") return directoryContactsTabPath("families")
+  return directoryContactsTabPath("people")
 }
 
 export function parseDirectoryRoleKey(

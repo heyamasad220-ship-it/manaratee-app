@@ -1,20 +1,18 @@
-import { Header } from "@/components/layout/header"
-import { ContactsCrmList } from "@/components/contacts/contacts-crm-list"
-import { isDirectoryFacilitiesEnabled } from "@/lib/directory/directory-nav-summary"
+import { redirect } from "next/navigation"
 
-export default async function DirectoryPeoplePage() {
-  const facilitiesEnabled = await isDirectoryFacilitiesEnabled()
+import { directoryContactsTabPath } from "@/lib/directory/directory-paths"
 
-  return (
-    <>
-      <Header title="People" />
-      <ContactsCrmList
-        lockedRecordType="individual"
-        showStats={false}
-        facilitiesEnabled={facilitiesEnabled}
-        emptyTitle="No people yet"
-        emptyDescription="Add people to your directory. One person can have many roles without creating duplicate records."
-      />
-    </>
-  )
+export default async function DirectoryPeoplePage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}) {
+  const params = await searchParams
+  const query = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) {
+    if (key === "tab" || typeof value !== "string") continue
+    query.set(key, value)
+  }
+  const extra = query.toString()
+  redirect(extra ? `${directoryContactsTabPath("people")}&${extra}` : directoryContactsTabPath("people"))
 }

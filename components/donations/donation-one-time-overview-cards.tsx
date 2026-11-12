@@ -12,9 +12,13 @@ import { formatDonationCurrency } from "@/lib/donations/campaign-analytics"
 export function DonationOneTimeOverviewCards({
   loading,
   summary,
+  needsReviewActive = false,
+  onNeedsReviewClick,
 }: {
   loading: boolean
   summary: DonationTransactionsSummary | null
+  needsReviewActive?: boolean
+  onNeedsReviewClick?: () => void
 }) {
   if (loading && !summary) {
     return <p className="text-sm text-muted-foreground">Loading overview...</p>
@@ -51,10 +55,13 @@ export function DonationOneTimeOverviewCards({
         accent="emerald"
       />
       <DonationMetricCard
-        title="Failed / Needs Attention"
+        title="Needs review"
         value={metrics.needsAttentionCount}
         icon={AlertCircle}
         accent="amber"
+        description="Unmatched imports and voided gifts"
+        onClick={onNeedsReviewClick}
+        className={needsReviewActive ? "ring-2 ring-amber-400" : undefined}
       />
     </DonationMetricCardGrid>
   )

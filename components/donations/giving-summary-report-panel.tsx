@@ -8,7 +8,6 @@ export function GivingSummaryReportPanel() {
       <DonationPaymentsPanel
         embedded
         readOnly
-        showCharts
         defaultRange="30d"
         defaultStatusDisplay="Succeeded"
       />

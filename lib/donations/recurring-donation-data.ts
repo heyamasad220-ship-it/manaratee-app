@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import {
+  isOnScheduleRecurringPlan,
   monthlyEquivalentAmount,
+  recurringTodayDateOnly,
   type RecurringDashboardMetrics,
   type RecurringDonationPlan,
   type RecurringDonorSummary,
@@ -73,6 +75,8 @@ export async function fetchRecurringPlans(
     start_date: row.start_date,
     next_payment_date: row.next_payment_date,
     end_date: row.end_date,
+    goal_amount: row.goal_amount == null ? null : Number(row.goal_amount),
+    pledge_id: (row.pledge_id as string | null) ?? null,
     total_payments: row.total_payments == null ? null : Number(row.total_payments),
     payments_made: row.payments_made == null ? null : Number(row.payments_made),
     notes: row.notes,
@@ -118,21 +122,28 @@ export async function buildRecurringDashboardMetrics(
   const activePlans = plans.filter((p) => p.status === "active")
   const pausedPlans = plans.filter((p) => p.status === "paused")
   const cancelledPlans = plans.filter((p) => p.status === "cancelled")
+  const today = recurringTodayDateOnly()
+  const onSchedulePlans = activePlans.filter((plan) => isOnScheduleRecurringPlan(plan, today))
+  const pastDuePlans = activePlans.filter((plan) => !isOnScheduleRecurringPlan(plan, today))
 
   const activeDonorIds = new Set(activePlans.map((p) => p.donor_id))
 
   let monthlyRecurringRevenue = 0
-  for (const plan of activePlans) {
+  for (const plan of onSchedulePlans) {
     monthlyRecurringRevenue += monthlyEquivalentAmount(plan.amount, plan.frequency)
   }
 
-  const now = new Date()
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+  let pastDueMonthlyAmount = 0
+  for (const plan of pastDuePlans) {
+    pastDueMonthlyAmount += monthlyEquivalentAmount(plan.amount, plan.frequency)
+  }
 
-  const upcomingThisMonth = activePlans.filter((plan) => {
-    const next = new Date(plan.next_payment_date + "T00:00:00")
-    return next >= monthStart && next <= monthEnd
+  const now = new Date()
+  const monthEnd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()).padStart(2, "0")}`
+
+  const upcomingThisMonth = onSchedulePlans.filter((plan) => {
+    const next = String(plan.next_payment_date || "").slice(0, 10)
+    return next >= today && next <= monthEnd
   }).length
 
   const { data: recurringPayments } = await supabase
@@ -148,6 +159,9 @@ export async function buildRecurringDashboardMetrics(
   return {
     activeDonorCount: activeDonorIds.size,
     activePlanCount: activePlans.length,
+    onSchedulePlanCount: onSchedulePlans.length,
+    pastDuePlanCount: pastDuePlans.length,
+    pastDueMonthlyAmount,
     pausedPlanCount: pausedPlans.length,
     cancelledPlanCount: cancelledPlans.length,
     monthlyRecurringRevenue,

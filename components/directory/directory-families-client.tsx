@@ -18,9 +18,9 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { createDirectoryFamilyAction } from "@/lib/contacts/family-management-actions"
-import { DIRECTORY_FAMILIES_PATH } from "@/lib/directory/directory-paths"
+import { directoryContactsTabPath } from "@/lib/directory/directory-paths"
 
-export function DirectoryFamiliesClient() {
+export function DirectoryFamiliesClient({ embedded = false }: { embedded?: boolean } = {}) {
   const searchParams = useSearchParams()
   const [open, setOpen] = useState(false)
   const [name, setName] = useState("")
@@ -52,19 +52,21 @@ export function DirectoryFamiliesClient() {
   }
 
   return (
-    <div className="flex flex-col gap-6 p-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Families</h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Households are relationships between people. Each member stays a single person record.
-          </p>
+    <div className={embedded ? "flex flex-col gap-6" : "flex flex-col gap-6 p-6"}>
+      {embedded ? null : (
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Families</h1>
+            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+              Households are relationships between people. Each member stays a single person record.
+            </p>
+          </div>
+          <DirectoryAddMenu />
         </div>
-        <DirectoryAddMenu />
-      </div>
+      )}
       <ContactsFamiliesDirectoryPanel
         key={refreshKey}
-        returnTo={DIRECTORY_FAMILIES_PATH}
+        returnTo={directoryContactsTabPath("families")}
       />
 
       <Dialog open={open} onOpenChange={setOpen}>

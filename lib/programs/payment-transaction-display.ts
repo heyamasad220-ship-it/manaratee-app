@@ -26,6 +26,7 @@ export function formatPaymentTransactionStatus(
     raw === "failed" ||
     raw === "declined" ||
     raw === "unresolved" ||
+    raw === "needs review" ||
     raw.includes("declin")
   ) {
     return "Failed"

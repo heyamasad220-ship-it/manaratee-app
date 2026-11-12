@@ -20,6 +20,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { getPledgeReminderEmailStatusAction } from "@/lib/donations/pledge-reminder-actions"
 import {
   getDonationReceiptSettingsAction,
   saveDonationReceiptSettingsAction,
@@ -34,14 +35,19 @@ import {
 
 export function PledgeReminderSettingsForm() {
   const [settings, setSettings] = useState<DonationReceiptSettings | null>(null)
+  const [emailConfigured, setEmailConfigured] = useState(false)
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function load() {
       setLoading(true)
-      const result = await getDonationReceiptSettingsAction()
+      const [result, emailStatus] = await Promise.all([
+        getDonationReceiptSettingsAction(),
+        getPledgeReminderEmailStatusAction(),
+      ])
       if (result.success) setSettings(result.settings)
+      if (emailStatus.success) setEmailConfigured(emailStatus.configured)
       setLoading(false)
     }
     load()
@@ -179,9 +185,16 @@ export function PledgeReminderSettingsForm() {
             />
           </div>
 
-          <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-            Outbound email is not connected yet. Sending a reminder records the message in
-            Manaratee and labels it as recorded — not externally delivered.
+          <p
+            className={
+              emailConfigured
+                ? "rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-950"
+                : "rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"
+            }
+          >
+            {emailConfigured
+              ? "Pledge reminders send by email and are saved on the pledge."
+              : "Live email is not configured. Set RESEND_API_KEY and TRANSACTIONAL_EMAIL_FROM. Until then, sending a reminder saves it on the pledge and does not deliver it to the donor."}
           </p>
         </CardContent>
       </Card>

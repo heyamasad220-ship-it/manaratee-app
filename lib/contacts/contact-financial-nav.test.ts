@@ -14,6 +14,7 @@ import {
   filterFinancialRowsBySection,
   getEnabledFinancialBillingModules,
   getFinancialDetailTabs,
+  parseFinancialDetailTab,
   parseFinancialModuleSection,
   resolveFinancialModuleSection,
   shouldShowFinancialModuleNav,
@@ -94,26 +95,36 @@ describe("contact financial nav", () => {
       getFinancialDetailTabs({
         section: "programs",
         modules: modules({ programs: true }),
-        showPaymentMethods: true,
       }).map((tab) => tab.id),
-      ["charges", "transactions", "refunds", "payment-methods"]
+      ["charges", "transactions", "refunds"]
     )
     assert.ok(
       !getFinancialDetailTabs({
         section: "programs",
         modules: modules({ programs: true }),
-        showPaymentMethods: true,
       }).some((tab) => tab.id === "recurring" || tab.id === "pledges")
     )
   })
 
-  it("flattens a donations-only tenant onto recurring and pledges", () => {
+  it("puts all transactions first for a donations-only tenant", () => {
     const tabs = getFinancialDetailTabs({
       section: "donations",
       modules: modules({ donations: true }),
-      showPaymentMethods: true,
-    }).map((tab) => tab.id)
-    assert.deepEqual(tabs, ["recurring", "pledges", "refunds", "payment-methods"])
+    })
+    assert.deepEqual(
+      tabs.map((tab) => tab.id),
+      ["transactions", "recurring", "pledges", "refunds"]
+    )
+    assert.equal(tabs[0]?.label, "All transactions")
+  })
+
+  it("names the shared ledger All transactions", () => {
+    const tabs = getFinancialDetailTabs({
+      section: "all",
+      modules: modules({ donations: true, programs: true }),
+    })
+    assert.equal(tabs[0]?.id, "transactions")
+    assert.equal(tabs[0]?.label, "All transactions")
   })
 
   it("shows All plus per-module nav when more than one billing module is on", () => {
@@ -180,6 +191,12 @@ describe("contact financial nav", () => {
       }),
       "programs"
     )
+  })
+
+  it("parses the financial detail query", () => {
+    assert.equal(parseFinancialDetailTab("transactions"), "transactions")
+    assert.equal(parseFinancialDetailTab("Recurring"), "recurring")
+    assert.equal(parseFinancialDetailTab("nope"), null)
   })
 
   it("parses friendly module query values", () => {

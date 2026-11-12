@@ -43,20 +43,17 @@ import { Badge } from "@/components/ui/badge";
 import { TableColumnHeaderFilter } from "@/components/ui/table-column-header-filter";
 import { DonationPaymentRowActions } from "@/components/donations/donation-payment-row-actions";
 import { DonationOneTimeOverviewCards } from "@/components/donations/donation-one-time-overview-cards";
-import { DonationGivingCharts } from "@/components/donations/donation-giving-charts";
 import {
   fetchOpenPledgesForAllocationAction,
   fetchPaymentsExportAction,
   fetchPaymentsPageAction,
-  fetchRecurringPlansListAction,
-  getDonationGivingBreakdownAction,
   getDonationPaymentFilterOptionsAction,
   getDonationTransactionsSummaryAction,
   searchContactsForDonationPickerAction,
-  type DonationGivingBreakdown,
   type DonationPaymentFilterOptions,
   type DonationTransactionsSummary,
   type PaymentStatusDisplayFilter,
+  type PaymentTransactionTypeFilter,
   type PaymentsPageInput,
 } from "@/lib/donations/donation-list-actions";
 import { DONATION_PLEDGES_PATH } from "@/lib/donations/donation-pledge-paths";
@@ -206,14 +203,12 @@ function toPaymentHistoryRow(payment: Payment) {
 export function DonationPaymentsPanel({
   embedded = false,
   readOnly = false,
-  showCharts = false,
   defaultRange = "all",
   defaultStatusDisplay = "all",
   lockedCampaignId,
 }: {
   embedded?: boolean
   readOnly?: boolean
-  showCharts?: boolean
   defaultRange?: DonationRangePreset
   defaultStatusDisplay?: PaymentStatusDisplayFilter | "all"
   lockedCampaignId?: string
@@ -236,21 +231,9 @@ export function DonationPaymentsPanel({
   const [statusFilter, setStatusFilter] = useState<PaymentStatusDisplayFilter | "all">(
     defaultStatusDisplay
   );
+  const [typeFilter, setTypeFilter] = useState<PaymentTransactionTypeFilter>("all");
   const [sourceFilter, setSourceFilter] = useState("all");
   const [campaignFilter, setCampaignFilter] = useState(lockedCampaignId || "all");
-  const [giftView, setGiftView] = useState<"one_time" | "recurring">("one_time");
-  const [recurringPlans, setRecurringPlans] = useState<
-    Array<{
-      id: string
-      amount: number
-      frequency: string
-      status: string
-      startDate: string | null
-      nextPaymentDate: string | null
-      paymentsMade: number
-      donorName: string
-    }>
-  >([]);
   const fundFilter = "all";
   const [filterOptions, setFilterOptions] = useState<DonationPaymentFilterOptions>({
     sources: [],
@@ -259,7 +242,6 @@ export function DonationPaymentsPanel({
     campaignGroups: [],
   });
   const [summary, setSummary] = useState<DonationTransactionsSummary | null>(null);
-  const [breakdown, setBreakdown] = useState<DonationGivingBreakdown | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -311,23 +293,23 @@ export function DonationPaymentsPanel({
     () => ({
       donorName: donorNameFilter || undefined,
       statusDisplay: statusFilter === "all" ? undefined : statusFilter,
+      transactionType: typeFilter === "all" ? undefined : typeFilter,
       dateFrom: dateFrom || undefined,
       dateTo: dateTo || undefined,
       source: sourceFilter === "all" ? undefined : sourceFilter,
       campaignId: lockedCampaignId || (campaignFilter === "all" ? undefined : campaignFilter),
-      transactionType: giftView === "one_time" ? "one_time" : undefined,
       fundId: fundFilter === "all" ? undefined : fundFilter,
     }),
     [
       donorNameFilter,
       statusFilter,
+      typeFilter,
       dateFrom,
       dateTo,
       sourceFilter,
       campaignFilter,
       fundFilter,
       lockedCampaignId,
-      giftView,
     ]
   );
 
@@ -408,7 +390,7 @@ export function DonationPaymentsPanel({
 
   useEffect(() => {
     setPage(1);
-  }, [donorNameFilter, statusFilter, range, sourceFilter, campaignFilter, fundFilter]);
+  }, [donorNameFilter, statusFilter, typeFilter, range, sourceFilter, campaignFilter, fundFilter]);
 
   useEffect(() => {
     void (async () => {
@@ -478,22 +460,6 @@ export function DonationPaymentsPanel({
 
     void (async () => {
       setLoading(true);
-      if (giftView === "recurring") {
-        const result = await fetchRecurringPlansListAction(
-          lockedCampaignId || (campaignFilter !== "all" ? campaignFilter : null)
-        );
-        if (cancelled) return;
-        if (!result.success) {
-          setRecurringPlans([]);
-          setLoadError(result.error);
-        } else {
-          setRecurringPlans(result.plans);
-          setLoadError("");
-        }
-        setLoading(false);
-        setSummaryLoading(false);
-        return;
-      }
       setLoadError(null);
 
       try {
@@ -517,15 +483,9 @@ export function DonationPaymentsPanel({
         setPage(result.page);
 
         setSummaryLoading(true);
-        const [summaryResult, breakdownResult] = await Promise.all([
-          getDonationTransactionsSummaryAction(listFilters),
-          showCharts
-            ? getDonationGivingBreakdownAction(listFilters)
-            : Promise.resolve({ success: false as const, error: "" }),
-        ]);
+        const summaryResult = await getDonationTransactionsSummaryAction(listFilters);
         if (cancelled) return;
         if (summaryResult.success) setSummary(summaryResult.summary);
-        if (breakdownResult.success) setBreakdown(breakdownResult.breakdown);
         setSummaryLoading(false);
 
         const effectiveOrgId = organizationId || (await getOrgIdForCurrentUser());
@@ -763,43 +723,20 @@ export function DonationPaymentsPanel({
           </div>
         </div>
 
-        {giftView === "one_time" ? (
-          <DonationOneTimeOverviewCards loading={summaryLoading} summary={summary} />
-        ) : null}
-
-        {showCharts && giftView === "one_time" ? (
-          <DonationGivingCharts loading={summaryLoading} breakdown={breakdown} />
-        ) : null}
-
-        <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            variant={giftView === "one_time" ? "default" : "outline"}
-            onClick={() => {
-              setGiftView("one_time")
-              setPage(1)
-            }}
-          >
-            One-Time
-          </Button>
-          <Button
-            type="button"
-            variant={giftView === "recurring" ? "default" : "outline"}
-            onClick={() => setGiftView("recurring")}
-          >
-            Recurring
-          </Button>
-        </div>
+        <DonationOneTimeOverviewCards
+          loading={summaryLoading}
+          summary={summary}
+          needsReviewActive={statusFilter === "Needs review"}
+          onNeedsReviewClick={() =>
+            setStatusFilter((current) => (current === "Needs review" ? "all" : "Needs review"))
+          }
+        />
 
         <div className="flex flex-wrap items-center gap-3">
           <span className="text-sm text-muted-foreground">
-            {giftView === "recurring"
-              ? recurringPlans.length > 0
-                ? `${recurringPlans.length} recurring plan${recurringPlans.length === 1 ? "" : "s"}`
-                : "No recurring plans"
-              : totalPayments > 0
-                ? `${(page - 1) * DONATIONS_PAGE_SIZE + 1}–${Math.min(page * DONATIONS_PAGE_SIZE, totalPayments)} of ${totalPayments}`
-                : "No payments"}
+            {totalPayments > 0
+              ? `${(page - 1) * DONATIONS_PAGE_SIZE + 1}–${Math.min(page * DONATIONS_PAGE_SIZE, totalPayments)} of ${totalPayments}`
+              : "No payments"}
           </span>
         </div>
 
@@ -810,42 +747,7 @@ export function DonationPaymentsPanel({
         ) : null}
 
         <div className="rounded-lg border bg-white overflow-hidden">
-          {giftView === "recurring" ? (
-            loading ? (
-              <div className="p-6 text-sm text-muted-foreground">Loading recurring plans...</div>
-            ) : recurringPlans.length === 0 ? (
-              <div className="p-6 text-sm text-muted-foreground">No recurring plans found.</div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/50">
-                    <tr className="border-b">
-                      <th className="p-3 text-left">Donor</th>
-                      <th className="p-3 text-left">Amount</th>
-                      <th className="p-3 text-left">Frequency</th>
-                      <th className="p-3 text-left">Status</th>
-                      <th className="p-3 text-left">Start</th>
-                      <th className="p-3 text-left">Next payment</th>
-                      <th className="p-3 text-left">Payments</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {recurringPlans.map((plan) => (
-                      <tr key={plan.id} className="border-b">
-                        <td className="p-3">{plan.donorName}</td>
-                        <td className="p-3 font-medium">{formatCurrency(plan.amount)}</td>
-                        <td className="p-3 capitalize">{plan.frequency.replaceAll("_", " ")}</td>
-                        <td className="p-3 capitalize">{plan.status.replaceAll("_", " ")}</td>
-                        <td className="p-3">{formatDate(plan.startDate)}</td>
-                        <td className="p-3">{formatDate(plan.nextPaymentDate)}</td>
-                        <td className="p-3">{plan.paymentsMade}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )
-          ) : loading ? (
+          {loading ? (
             <div className="p-6 text-sm text-muted-foreground">Loading payments...</div>
           ) : payments.length === 0 ? (
             <div className="p-6 text-sm text-muted-foreground">No payments found.</div>
@@ -876,7 +778,32 @@ export function DonationPaymentsPanel({
                       </TableColumnHeaderFilter>
                     </th>
                     <th className="text-left p-3">Amount</th>
-                    <th className="text-left p-3">Type</th>
+                    <th className="text-left p-3">
+                      <TableColumnHeaderFilter
+                        label="Type"
+                        active={typeFilter !== "all"}
+                      >
+                        {({ close }) => (
+                          <Select
+                            value={typeFilter}
+                            onValueChange={(value) => {
+                              setTypeFilter(value as PaymentTransactionTypeFilter);
+                              close();
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All types</SelectItem>
+                              <SelectItem value="one_time">One-time donation</SelectItem>
+                              <SelectItem value="pledge">Pledge</SelectItem>
+                              <SelectItem value="recurring">Recurring donation</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </TableColumnHeaderFilter>
+                    </th>
                     <th className="text-left p-3">
                       <TableColumnHeaderFilter
                         label="Method"
@@ -955,7 +882,7 @@ export function DonationPaymentsPanel({
                             <SelectContent>
                               <SelectItem value="all">All Status</SelectItem>
                               <SelectItem value="Succeeded">Succeeded</SelectItem>
-                              <SelectItem value="Failed">Failed</SelectItem>
+                              <SelectItem value="Needs review">Needs review</SelectItem>
                               <SelectItem value="Refunded">Refunded</SelectItem>
                               <SelectItem value="Partially Refunded">Partially Refunded</SelectItem>
                             </SelectContent>
@@ -1058,7 +985,7 @@ export function DonationPaymentsPanel({
           )}
         </div>
 
-        {giftView === "one_time" && Math.ceil(totalPayments / DONATIONS_PAGE_SIZE) > 1 ? (
+        {Math.ceil(totalPayments / DONATIONS_PAGE_SIZE) > 1 ? (
           <Pagination>
             <PaginationContent>
               <PaginationItem>

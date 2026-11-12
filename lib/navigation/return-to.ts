@@ -47,7 +47,8 @@ export function getReturnToLabel(path: string): string {
     return "Directory Settings"
   }
   if (pathname.startsWith("/directory/role/")) return "Directory"
-  if (pathname === "/directory" || pathname.startsWith("/directory/")) return "Directory"
+  if (pathname === "/directory") return "All Contacts"
+  if (pathname.startsWith("/directory/")) return "Directory"
   if (pathname.startsWith("/bookings")) return "Bookings"
   if (pathname === "/programs") return "Overview"
   if (pathname === "/programs/list") return "All programs"

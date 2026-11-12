@@ -54,6 +54,7 @@ export function ContactProfileFinancialSummaryCard({
   showVendorSummary = false,
   showProgramsHint = false,
   showMembershipHint = false,
+  compact = false,
   onOpenFinancial,
 }: {
   profileLoading: boolean
@@ -65,6 +66,7 @@ export function ContactProfileFinancialSummaryCard({
   showVendorSummary?: boolean
   showProgramsHint?: boolean
   showMembershipHint?: boolean
+  compact?: boolean
   onOpenFinancial: () => void
 }) {
   const lastGift = formatShortDate(donorStats?.lastDonationDate)
@@ -79,11 +81,11 @@ export function ContactProfileFinancialSummaryCard({
   if (!hasAnySummaryRows) return null
 
   return (
-    <Card>
-      <CardHeader className="pb-2">
+    <Card className={compact ? "h-full gap-3 py-3" : undefined}>
+      <CardHeader className={compact ? "px-4 pb-0" : "pb-2"}>
         <CardTitle className="text-base">Financial Summary</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className={compact ? "space-y-2 px-4" : "space-y-3"}>
         {profileLoading ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
         ) : (
@@ -130,7 +132,11 @@ export function ContactProfileFinancialSummaryCard({
             ) : null}
           </>
         )}
-        <Button variant="secondary" className="w-full" onClick={onOpenFinancial}>
+        <Button
+          variant="secondary"
+          className={compact ? "h-8 w-full" : "w-full"}
+          onClick={onOpenFinancial}
+        >
           View financial details
         </Button>
       </CardContent>

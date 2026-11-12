@@ -11,6 +11,7 @@ import { askLevelTargetValue } from "@/lib/donations/campaign-ask-level-types"
 import { countsTowardGivingTotals, paymentNetAmount } from "@/lib/donations/payment-net-amount"
 import { normalizePaymentSourceChannel } from "@/lib/donations/payment-source-channel"
 import {
+  isOnScheduleRecurringPlan,
   monthlyEquivalentAmount,
   RECURRING_FREQUENCIES,
   type RecurringFrequency,
@@ -198,11 +199,10 @@ export function computeCampaignDonationKpis(
     ),
     oneTimeCount: oneTimePayments.length,
     recurringCount: livePlans.length,
-    monthlyRecurringAmount: livePlans.reduce(
-      (sum, plan) =>
-        sum + monthlyEquivalentAmount(plan.amount, asRecurringFrequency(plan.frequency)),
-      0
-    ),
+    monthlyRecurringAmount: livePlans.reduce((sum, plan) => {
+      if (!isOnScheduleRecurringPlan(plan)) return sum
+      return sum + monthlyEquivalentAmount(plan.amount, asRecurringFrequency(plan.frequency))
+    }, 0),
     donorCount: donorKeys.size,
   }
 }

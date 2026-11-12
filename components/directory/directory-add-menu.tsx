@@ -10,16 +10,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import {
-  DIRECTORY_FAMILIES_PATH,
-  DIRECTORY_ORGANIZATIONS_PATH,
-  DIRECTORY_PEOPLE_PATH,
-} from "@/lib/directory/directory-paths"
+import { directoryContactsTabPath } from "@/lib/directory/directory-paths"
 
 const ADD_ITEMS = [
-  { label: "Person", href: `${DIRECTORY_PEOPLE_PATH}?add=1` },
-  { label: "Organization", href: `${DIRECTORY_ORGANIZATIONS_PATH}?add=1` },
-  { label: "Family", href: `${DIRECTORY_FAMILIES_PATH}?add=1` },
+  { label: "Person", href: `${directoryContactsTabPath("people")}&add=1` },
+  { label: "Organization", href: `${directoryContactsTabPath("organizations")}&add=1` },
+  { label: "Family", href: `${directoryContactsTabPath("families")}&add=1` },
 ] as const
 
 export function DirectoryAddMenu({

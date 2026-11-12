@@ -53,7 +53,7 @@ export function ContactGroupsField({
           <Link
             href={donationGroupHref(group.id, {
               tab: "financial",
-              returnTo: "/donations/reports/donors?view=group",
+              returnTo: "/donations/reports/donors",
             })}
             className="text-foreground hover:underline"
           >

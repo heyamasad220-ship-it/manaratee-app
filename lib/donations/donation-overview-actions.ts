@@ -16,6 +16,8 @@ import { buildPledgeCollectionReport } from "@/lib/donations/pledge-reminder-dat
 import { paymentNetAmount } from "@/lib/donations/payment-net-amount"
 import { donationPaymentDetailHref, donationReceiptsHref } from "@/lib/donations/donation-payment-paths"
 import { donationPledgesHref } from "@/lib/donations/donation-pledge-paths"
+import { loadOrganizationStripeConnect } from "@/lib/stripe/stripe-connect-queries"
+import { isOrganizationStripeConnectReady } from "@/lib/stripe/stripe-connect-types"
 
 const CAMPAIGNS_ENDING_SOON_DAYS = 14
 const RECENT_ACTIVITY_LIMIT = 10
@@ -47,6 +49,7 @@ export type DonationOverviewPayload = {
   actionItems: DonationOverviewActionItem[]
   activeCampaigns: DonationOverviewActiveCampaign[]
   recentActivity: DonationOverviewActivityItem[]
+  onlineGivingReady: boolean
 }
 
 function plural(count: number, singular: string, pluralLabel = `${singular}s`) {
@@ -419,6 +422,14 @@ export async function getDonationOverviewDashboardAction(): Promise<
     campaignsEndingSoon,
   })
 
+  let onlineGivingReady = false
+  try {
+    const stripeStatus = await loadOrganizationStripeConnect(access.supabase, access.orgId)
+    onlineGivingReady = isOrganizationStripeConnectReady(stripeStatus)
+  } catch (error) {
+    console.warn("Could not load Stripe Connect status:", error)
+  }
+
   const activeCampaigns = campaignEntries
     .filter(({ campaign }) => campaign.status?.toLowerCase() === "active")
     .map(mapActiveCampaign)
@@ -431,6 +442,7 @@ export async function getDonationOverviewDashboardAction(): Promise<
       actionItems,
       activeCampaigns,
       recentActivity: [],
+      onlineGivingReady,
     },
   }
 }

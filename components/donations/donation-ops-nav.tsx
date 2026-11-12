@@ -4,6 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import {
+  DONATION_FAILED_CHARGES_PATH,
   DONATION_IMPORT_MATCH_PATH,
   DONATION_RECEIPTS_OPS_PATH,
   DONATION_RECURRING_OPS_PATH,
@@ -24,6 +25,11 @@ export const DONATION_OPS_TABS: DonationOpsTab[] = [
     href: DONATION_TRANSACTIONS_PATH,
     matchPrefix: DONATION_TRANSACTIONS_PATH,
     extraMatchPrefixes: ["/donations/payments/one-time", "/donations/reports/one-time"],
+  },
+  {
+    label: "Failed",
+    href: DONATION_FAILED_CHARGES_PATH,
+    matchPrefix: DONATION_FAILED_CHARGES_PATH,
   },
   {
     label: "Recurring",

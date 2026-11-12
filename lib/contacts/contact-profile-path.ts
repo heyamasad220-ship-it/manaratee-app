@@ -1,7 +1,9 @@
 import type { ContactsListSegment } from "@/lib/contacts/contact-module-label"
 import {
   financialModuleSectionQueryValue,
+  parseFinancialDetailTab,
   parseFinancialModuleSection,
+  type ContactFinancialDetailTab,
   type ContactFinancialModuleSection,
 } from "@/lib/contacts/contact-financial-nav"
 import { isSafeReturnToPath, RETURN_TO_QUERY_PARAM } from "@/lib/navigation/return-to"
@@ -28,6 +30,8 @@ type ContactProfileHrefOptions = {
   section?: ContactProfileOverviewSection
   /** Inner Financial module section (`?module=programs`). */
   financialModule?: ContactFinancialModuleSection | string | null
+  /** Inner Financial list (`?detail=transactions`). */
+  financialDetail?: ContactFinancialDetailTab | string | null
   edit?: boolean
   list?: ContactsListSegment
   returnTo?: string
@@ -55,6 +59,7 @@ export function contactProfileHref(
   let tab: ContactProfileTab | undefined
   let section: ContactProfileOverviewSection | undefined
   let financialModule: ContactFinancialModuleSection | string | null | undefined
+  let financialDetail: ContactFinancialDetailTab | string | null | undefined
   let edit = false
   let list: ContactsListSegment | undefined
   let returnTo: string | undefined
@@ -65,6 +70,7 @@ export function contactProfileHref(
     tab = tabOrOptions.tab
     section = tabOrOptions.section
     financialModule = tabOrOptions.financialModule
+    financialDetail = tabOrOptions.financialDetail
     edit = tabOrOptions.edit ?? false
     list = tabOrOptions.list
     returnTo = tabOrOptions.returnTo
@@ -90,6 +96,12 @@ export function contactProfileHref(
     )
     if (parsedModule) {
       params.set("module", financialModuleSectionQueryValue(parsedModule))
+    }
+    const parsedDetail = parseFinancialDetailTab(
+      typeof financialDetail === "string" ? financialDetail : financialDetail ?? null
+    )
+    if (parsedDetail) {
+      params.set("detail", parsedDetail)
     }
   }
 

@@ -30,7 +30,7 @@ export function getContactsListPathForRecordType(
 
 export function getContactsListLabelForSegment(segment: ContactsListSegment): string {
   if (segment === "organizations") return "Organizations"
-  if (segment === "groups") return "Group Giving"
+  if (segment === "groups") return "Donors"
   if (segment === "families") return "Families"
   return "People"
 }
@@ -45,11 +45,7 @@ export function isContactsListSegment(value: string | null | undefined): value i
   return value === "people" || value === "organizations" || value === "groups" || value === "families"
 }
 
-export function contactsSettingsTabPath(tab: string) {
-  return `${CONTACTS_SETTINGS_PATH}?tab=${tab}`
-}
-
-export const CONTACTS_DISCOUNT_TAGS_PATH = contactsSettingsTabPath("discount-tags")
+export const CONTACTS_DISCOUNT_TAGS_PATH = CONTACTS_SETTINGS_PATH
 
 /** @deprecated Use CONTACTS_DISCOUNT_TAGS_PATH */
 export const CONTACTS_BENEFITS_PATH = CONTACTS_DISCOUNT_TAGS_PATH

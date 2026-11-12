@@ -119,13 +119,13 @@ export function formatFinancialActivityPaymentStatus(input: {
   status?: string | null
   amount?: number | null
   refunded_amount?: number | null
-}): "Succeeded" | "Failed" | "Refunded" | "Partially Refunded" {
+}): "Succeeded" | "Needs review" | "Refunded" | "Partially Refunded" {
   const normalized = normalizePaymentStatus(input.status)
   const amount = Number(input.amount || 0)
   const refundedAmount = Number(input.refunded_amount || 0)
 
   if (normalized === "voided" || normalized === "pending_review" || normalized === "unresolved") {
-    return "Failed"
+    return "Needs review"
   }
 
   if (normalized === "refunded" || (amount > 0 && refundedAmount >= amount)) {
@@ -143,8 +143,9 @@ export function financialActivityStatusBadgeClass(status: string) {
   switch (status) {
     case "Succeeded":
       return "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-50"
+    case "Needs review":
     case "Failed":
-      return "border-red-200 bg-red-50 text-red-700 hover:bg-red-50"
+      return "border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-50"
     case "Voided":
       return "border-zinc-200 bg-zinc-100 text-zinc-700 hover:bg-zinc-100"
     case "Refunded":

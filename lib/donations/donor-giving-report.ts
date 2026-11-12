@@ -1,7 +1,8 @@
 export type DonorDateRangeMode = "lifetime" | "year" | "custom"
 
 export const DONATIONS_DONORS_REPORT_PATH = "/donations/reports/donors"
-export const DONATIONS_GROUP_GIVING_REPORT_PATH = `${DONATIONS_DONORS_REPORT_PATH}?view=group`
+/** Legacy group-list links open the Donors giving list. Household and group views are no longer on this page. */
+export const DONATIONS_GROUP_GIVING_REPORT_PATH = DONATIONS_DONORS_REPORT_PATH
 
 export type DonorReportSortBy =
   | "full_name"
